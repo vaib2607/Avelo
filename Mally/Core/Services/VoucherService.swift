@@ -152,6 +152,11 @@ public final class VoucherService: Sendable {
         )
         let reversalId = UUID()
         let now = Date()
+        // The reversal must fall inside the original voucher's financial year
+        // (enforced by trg_mally_voucher_date_in_fy). Use "now" when it lands in
+        // the period; otherwise clamp to the FY's last day so reversals of
+        // earlier (still-open) years remain postable.
+        let reversalDate: Date = originalFY.contains(date: now) ? now : originalFY.endDate
         let flippedLines: [LedgerLine] = originalLines.enumerated().map { (idx, line) in
             LedgerLine(
                 id: UUID(),
@@ -171,7 +176,7 @@ public final class VoucherService: Sendable {
             financialYearId: originalFY.id,
             voucherTypeCode: original.voucherTypeCode,
             number: number,
-            date: now,
+            date: reversalDate,
             partyAccountId: original.partyAccountId,
             narration: "Reversal of \(original.number)" + (reason.map { ": \($0)" } ?? ""),
             isReversal: true,
