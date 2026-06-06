@@ -25,25 +25,8 @@ public struct DashboardView: View {
 
     @ViewBuilder
     private var accountTreeStrip: some View {
-        if let tree = env.accountTree {
-            HStack(spacing: 16) {
-                Label {
-                    Text("Account tree: \(tree.tree == nil ? "stale" : "ready")")
-                } icon: {
-                    Image(systemName: tree.tree == nil ? "exclamationmark.triangle" : "checkmark.seal")
-                        .foregroundStyle(tree.tree == nil ? .orange : .green)
-                }
-                if let t = tree.tree {
-                    Text("\(t.roots.count) root groups · \(t.allLedgers.count) ledgers")
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("Rebuild") { env.accountTree?.reload() }
-                    .controlSize(.small)
-            }
-            .font(.caption)
-            .padding(8)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        if let cache = env.accountTree {
+            AccountTreeStrip(cache: cache)
         }
     }
 
@@ -181,5 +164,30 @@ private struct LabeledMoney: View {
                 .font(bold ? .title3.bold() : .body)
                 .monospacedDigit()
         }
+    }
+}
+
+private struct AccountTreeStrip: View {
+    @ObservedObject var cache: AccountTreeCache
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Label {
+                Text("Account tree: \(cache.tree == nil ? "stale" : "ready")")
+            } icon: {
+                Image(systemName: cache.tree == nil ? "exclamationmark.triangle" : "checkmark.seal")
+                    .foregroundStyle(cache.tree == nil ? .orange : .green)
+            }
+            if let t = cache.tree {
+                Text("\(t.roots.count) root groups · \(t.allLedgers.count) ledgers")
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Rebuild") { cache.reload() }
+                .controlSize(.small)
+        }
+        .font(.caption)
+        .padding(8)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
     }
 }

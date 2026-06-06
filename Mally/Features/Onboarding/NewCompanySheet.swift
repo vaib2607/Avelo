@@ -118,7 +118,7 @@ public struct NewCompanySheet: View {
                 )
                 if vm.enableInventory {
                     if let id = try? env.registry.firstId(named: vm.companyName) {
-                        let ctx = try await env.manager.openHandle(id: id)
+                        let ctx = await env.manager.openHandle(id: id)
                         if let ctx = ctx {
                             let svc = CompanyService(db: ctx.db, companyId: id, manager: env.manager)
                             try svc.setInventoryMode(enabled: true, linkMode: vm.inventoryMode)

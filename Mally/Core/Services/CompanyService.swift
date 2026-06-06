@@ -83,7 +83,7 @@ public final class CompanyService: Sendable {
 
         let companyRepo = CompanyRepository(db: db)
         let fyRepo = FinancialYearRepository(db: db)
-        try companyRepo.insert(company)
+        _ = try companyRepo.insert(company)
         try fyRepo.insert(fy)
         try SeedLoader().loadDefaults(into: db,
                                        companyId: company.id,

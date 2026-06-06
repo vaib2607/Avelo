@@ -43,9 +43,11 @@ public struct RootView: View {
         }
         .sheet(item: env.presentedSheetBinding) { sheet in
             sheetView(for: sheet)
+                .capturesGlobalKeyboard()
         }
         .sheet(isPresented: $keyboardBridge.shortcutHelpActive) {
             ShortcutHelpSheet()
+                .capturesGlobalKeyboard()
         }
     }
 

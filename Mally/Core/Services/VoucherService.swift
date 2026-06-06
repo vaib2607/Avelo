@@ -82,9 +82,7 @@ public final class VoucherService: Sendable {
                 snapshotAfter: voucher
             )
             for line in lines {
-                if let accId = try? line.accountId.uuidString {
-                    try? AccountRepository(db: tx).markUsed(UUID(uuidString: accId) ?? UUID())
-                }
+                try? AccountRepository(db: tx).markUsed(line.accountId)
             }
         }
 
@@ -100,7 +98,6 @@ public final class VoucherService: Sendable {
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
         }
-        let existingLines = try linesRepository.findForVoucher(voucherId)
         var updated = existing
         updated.date = newDraft.date
         updated.partyAccountId = newDraft.partyAccountId

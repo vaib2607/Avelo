@@ -76,7 +76,7 @@ public final class AccountTreeCache: ObservableObject {
         """
         let binds: [SQLValue] = ledgers.map { .text($0.id.uuidString) }
         var out: [Account.ID: LedgerBalance] = [:]
-        try database.query(sql, bind: binds) { row in
+        _ = try database.query(sql, bind: binds) { row in
             if let idStr = row.optionalText("account_id"), let id = UUID(uuidString: idStr) {
                 out[id] = LedgerBalance(
                     debitPaise: row.int("dr"),

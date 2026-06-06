@@ -22,7 +22,7 @@ public struct KeyboardShortcutMap {
 }
 
 public enum KeyboardShortcuts {
-    public static let map: [KeyboardShortcutID: KeyboardShortcutMap] = [
+    public nonisolated(unsafe) static let map: [KeyboardShortcutID: KeyboardShortcutMap] = [
         .kNew:              KeyboardShortcutMap(id: .kNew,              key: "n", modifiers: .command,                  label: "New"),
         .kSave:             KeyboardShortcutMap(id: .kSave,             key: "s", modifiers: .command,                  label: "Save"),
         .kCancel:           KeyboardShortcutMap(id: .kCancel,           key: ".", modifiers: .command,                  label: "Cancel"),

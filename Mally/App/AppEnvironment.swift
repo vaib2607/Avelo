@@ -27,7 +27,7 @@ public final class AppEnvironment: ObservableObject {
         )
         let mallyDir = appSupport.appendingPathComponent("Mally", isDirectory: true)
         let registryPath = mallyDir.appendingPathComponent("mally_registry.sqlite").path
-        let backupDir = mallyDir.appendingPathComponent("Backups", isDirectory: true)
+        _ = mallyDir.appendingPathComponent("Backups", isDirectory: true)
 
         self.manager = try! DatabaseManager(appSupportDirectory: mallyDir)
         self.router = AppRouter()

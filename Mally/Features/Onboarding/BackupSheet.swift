@@ -46,7 +46,7 @@ public struct BackupSheet: View {
                 panel.canCreateDirectories = true
                 let result = await NSPanelBridge.runSave(panel)
                 if result == .OK, let url = panel.url {
-                    try await env.backupService.export(companyId: ctx.companyId, companyName: ctx.companyName, to: url)
+                    _ = try await env.backupService.export(companyId: ctx.companyId, companyName: ctx.companyName, to: url)
                     status = "Backup saved to \(url.lastPathComponent)."
                     env.showSuccess(status)
                 }
