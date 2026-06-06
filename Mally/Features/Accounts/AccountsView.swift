@@ -52,6 +52,7 @@ private struct AccountsContent: View {
 
 @MainActor
 private struct AccountsBody: View {
+    @EnvironmentObject private var env: AppEnvironment
     @ObservedObject var vm: AccountsViewModel
 
     var body: some View {
@@ -111,7 +112,15 @@ private struct AccountsBody: View {
                     }
                     Spacer()
                     Text(Currency.formatPaise(account.openingBalancePaise)).monospacedDigit()
+                    Button {
+                        env.router.openLedger(account.id)
+                    } label: {
+                        Label("Ledger", systemImage: "list.bullet.rectangle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Open this account's ledger")
                 }
+                .contentShape(Rectangle())
             }
         }
     }

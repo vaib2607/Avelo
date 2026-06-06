@@ -10,8 +10,9 @@ public struct ReportsView: View {
     public var body: some View {
         ReportsContent(holder: holder)
             .navigationTitle("Reports")
-            .onAppear { setup() }
+            .onAppear { setup(); consumePendingLedger() }
             .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .onChange(of: env.router.pendingLedgerAccountId) { _, _ in consumePendingLedger() }
     }
 
     private func setup() {
@@ -24,6 +25,16 @@ public struct ReportsView: View {
             model.reload()
             holder.vm = model
         }
+    }
+
+    /// Applies a deep-link request from elsewhere (e.g. AccountsView) to show a
+    /// specific account's ledger, then clears the request.
+    private func consumePendingLedger() {
+        guard let accountId = env.router.pendingLedgerAccountId, let vm = holder.vm else { return }
+        vm.selection = .ledger
+        vm.ledgerAccountId = accountId
+        vm.reload()
+        env.router.pendingLedgerAccountId = nil
     }
 }
 
@@ -119,26 +130,45 @@ private struct ReportsBody: View {
         .padding(12)
     }
 
-    @ViewBuilder
     private var trialBalanceSection: some View {
         let rows = vm.trialBalance
-        if rows.isEmpty {
-            Text("No data.").foregroundStyle(.secondary)
-        } else {
-            Table(rows) {
-                TableColumn("Account", value: \.accountName)
-                TableColumn("Group", value: \.groupPath)
-                TableColumn("Debit (₹)") { r in
-                    Text(Currency.formatPaise(r.debitPaise)).monospacedDigit()
+        let debitTotal = rows.reduce(Int64(0)) { $0 + $1.debitPaise }
+        let creditTotal = rows.reduce(Int64(0)) { $0 + $1.creditPaise }
+        let difference = debitTotal - creditTotal
+        return Group {
+            if rows.isEmpty {
+                Text("No data.").foregroundStyle(.secondary)
+            } else {
+                if difference != 0 {
+                    Label(
+                        "Trial balance does not tie out. Difference: \(Currency.formatPaise(abs(difference))) on the \(difference > 0 ? "debit" : "credit") side.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Label("Books are balanced.", systemImage: "checkmark.seal.fill")
+                        .font(.callout)
+                        .foregroundStyle(.green)
                 }
-                TableColumn("Credit (₹)") { r in
-                    Text(Currency.formatPaise(r.creditPaise)).monospacedDigit()
+                Table(rows) {
+                    TableColumn("Account", value: \.accountName)
+                    TableColumn("Group", value: \.groupPath)
+                    TableColumn("Debit (₹)") { r in
+                        Text(Currency.formatPaise(r.debitPaise)).monospacedDigit()
+                    }
+                    TableColumn("Credit (₹)") { r in
+                        Text(Currency.formatPaise(r.creditPaise)).monospacedDigit()
+                    }
                 }
-            }
-            HStack {
-                Spacer()
-                Text("Debit total: \(Currency.formatPaise(rows.reduce(0) { $0 + $1.debitPaise }))").monospacedDigit().bold()
-                Text("Credit total: \(Currency.formatPaise(rows.reduce(0) { $0 + $1.creditPaise }))").monospacedDigit().bold()
+                HStack {
+                    Spacer()
+                    Text("Debit total: \(Currency.formatPaise(debitTotal))").monospacedDigit().bold()
+                    Text("Credit total: \(Currency.formatPaise(creditTotal))").monospacedDigit().bold()
+                }
             }
         }
     }

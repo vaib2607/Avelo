@@ -11,6 +11,7 @@ public struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                voucherQuickActions
                 accountTreeStrip
                 kpiGrid
                 cashPosition
@@ -21,6 +22,41 @@ public struct DashboardView: View {
         }
         .navigationTitle("Dashboard")
         .task(id: env.companyContext?.companyId) { reload() }
+    }
+
+    @ViewBuilder
+    private var voucherQuickActions: some View {
+        GroupBox("Quick Entry") {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    quickButton("Contra", "F4", .newContra, "arrow.left.arrow.right")
+                    quickButton("Payment", "F5", .newPayment, "arrow.up.circle")
+                    quickButton("Receipt", "F6", .newReceipt, "arrow.down.circle")
+                    quickButton("Journal", "F7", .newJournal, "book.closed")
+                    quickButton("Sales", "F8", .newSales, "cart")
+                    quickButton("Purchase", "F9", .newPurchase, "bag")
+                    quickButton("Credit Note", "F10", .newCreditNote, "doc.badge.plus")
+                    quickButton("Debit Note", "F11", .newDebitNote, "doc.badge.minus")
+                }
+                .padding(6)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func quickButton(_ title: String, _ key: String, _ sheet: RouterSheet, _ symbol: String) -> some View {
+        Button {
+            env.router.present(sheet)
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: symbol).font(.title3)
+                Text(title).font(.caption)
+                Text(key).font(.caption2.monospaced()).foregroundStyle(.secondary)
+            }
+            .frame(width: 84, height: 64)
+        }
+        .buttonStyle(.bordered)
+        .help("\(title) (\(key))")
     }
 
     @ViewBuilder
