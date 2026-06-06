@@ -88,30 +88,32 @@ public final class InventoryService: Sendable {
                                ratePaise: Int64,
                                voucherId: Voucher.ID? = nil,
                                notes: String? = nil) throws {
+        let totalValuePaise = Int64((quantity * Double(ratePaise)).rounded())
+        let onHand = (try? repository.runningBalance(itemId: itemId, asOf: date))?.onHandQty ?? 0
+        let v = StockMovementValidator().validate(StockMovementValidator.Input(
+            itemId: itemId,
+            date: date,
+            movementType: type,
+            quantity: quantity,
+            unitCostPaise: ratePaise,
+            totalValuePaise: totalValuePaise,
+            currentOnHandQty: onHand
+        ))
+        if case .invalid(let errs) = v {
+            throw AppError.validation(errs[0])
+        }
         let movement = StockMovement(
             id: UUID(),
             companyId: companyId,
             itemId: itemId,
             date: date,
             movementType: type,
-            quantity: Int64(quantity),
+            quantity: quantity,
             unitCostPaise: ratePaise,
-            totalValuePaise: Int64(quantity) * ratePaise,
+            totalValuePaise: totalValuePaise,
             voucherId: voucherId,
             reason: notes
         )
-        let v = StockMovementValidator().validate(StockMovementValidator.Input(
-            itemId: itemId,
-            date: date,
-            movementType: type,
-            quantity: Int64(quantity),
-            unitCostPaise: ratePaise,
-            totalValuePaise: Int64(quantity) * ratePaise,
-            currentOnHandQty: 0
-        ))
-        if case .invalid(let errs) = v {
-            throw AppError.validation(errs[0])
-        }
         try db.write { tx in
             let repo = InventoryRepository(db: tx)
             try repo.insertMovement(movement)

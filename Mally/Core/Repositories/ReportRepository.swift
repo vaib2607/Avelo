@@ -495,22 +495,22 @@ public struct ReportRepository: Sendable {
         var rows: [ReportResult.StockValuationRow] = []
         for item in items {
             let bal = try repo.runningBalance(itemId: item.id, asOf: asOfDate)
-            let avg = bal.onHandQty > 0 ? bal.onHandValuePaise / bal.onHandQty : 0
+            let avg = bal.onHandQty > 0 ? Int64((Double(bal.onHandValuePaise) / bal.onHandQty).rounded()) : 0
             rows.append(ReportResult.StockValuationRow(
                 id: item.id,
                 itemCode: item.code,
                 itemName: item.name,
                 unit: item.unit,
-                quantity: Double(bal.onHandQty),
+                quantity: bal.onHandQty,
                 ratePaise: avg,
                 valuePaise: bal.onHandValuePaise,
                 openingQty: 0,
                 openingValuePaise: 0,
-                inQty: bal.inQty,
+                inQty: Int64(bal.inQty.rounded()),
                 inValuePaise: bal.inValuePaise,
-                outQty: bal.outQty,
+                outQty: Int64(bal.outQty.rounded()),
                 outValuePaise: bal.outValuePaise,
-                closingQty: bal.onHandQty,
+                closingQty: Int64(bal.onHandQty.rounded()),
                 closingValuePaise: bal.onHandValuePaise,
                 averageCostPaise: avg
             ))
