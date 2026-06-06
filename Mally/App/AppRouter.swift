@@ -1,0 +1,105 @@
+import Foundation
+import Combine
+
+@MainActor
+public final class AppRouter: ObservableObject {
+
+    @Published public var selection: SidebarDestination = .dashboard
+    @Published public var presentedSheet: RouterSheet?
+    @Published public var presentedAlert: RouterAlert?
+
+    public init() {}
+
+    public func reset() {
+        selection = .dashboard
+        presentedSheet = nil
+        presentedAlert = nil
+    }
+
+    public func go(_ destination: SidebarDestination) {
+        selection = destination
+    }
+
+    public func present(_ sheet: RouterSheet) {
+        presentedSheet = sheet
+    }
+
+    public func alert(_ alert: RouterAlert) {
+        presentedAlert = alert
+    }
+}
+
+public enum RouterSheet: Identifiable, Sendable {
+    case newCompany
+    case openCompany
+    case backup
+    case restore
+    case about
+    case preferences
+    case newVoucher
+    case newJournal
+    case newPayment
+    case newReceipt
+    case newContra
+    case newPurchase
+    case newSales
+    case newCreditNote
+    case newDebitNote
+    case editVoucher(Voucher.ID)
+    case reverseVoucher(Voucher.ID)
+    case newAccount
+    case newFinancialYear
+    case newEmployee
+    case newItem
+    case lockFinancialYear(FinancialYear.ID)
+    case closeFinancialYear(FinancialYear.ID)
+    case manageInventory
+    case managePayroll
+
+    public var id: String {
+        switch self {
+        case .newCompany: return "newCompany"
+        case .openCompany: return "openCompany"
+        case .backup: return "backup"
+        case .restore: return "restore"
+        case .about: return "about"
+        case .preferences: return "preferences"
+        case .newVoucher: return "newVoucher"
+        case .newJournal: return "newJournal"
+        case .newPayment: return "newPayment"
+        case .newReceipt: return "newReceipt"
+        case .newContra: return "newContra"
+        case .newPurchase: return "newPurchase"
+        case .newSales: return "newSales"
+        case .newCreditNote: return "newCreditNote"
+        case .newDebitNote: return "newDebitNote"
+        case .editVoucher(let id): return "editVoucher-\(id.uuidString)"
+        case .reverseVoucher(let id): return "reverseVoucher-\(id.uuidString)"
+        case .newAccount: return "newAccount"
+        case .newFinancialYear: return "newFinancialYear"
+        case .newEmployee: return "newEmployee"
+        case .newItem: return "newItem"
+        case .lockFinancialYear(let id): return "lockFy-\(id.uuidString)"
+        case .closeFinancialYear(let id): return "closeFy-\(id.uuidString)"
+        case .manageInventory: return "manageInventory"
+        case .managePayroll: return "managePayroll"
+        }
+    }
+}
+
+public struct RouterAlert: Identifiable, Sendable {
+    public let id = UUID()
+    public let title: String
+    public let message: String
+    public let confirmLabel: String
+    public let cancelLabel: String
+    public let destructive: Bool
+
+    public init(title: String, message: String, confirmLabel: String = "OK", cancelLabel: String = "Cancel", destructive: Bool = false) {
+        self.title = title
+        self.message = message
+        self.confirmLabel = confirmLabel
+        self.cancelLabel = cancelLabel
+        self.destructive = destructive
+    }
+}
