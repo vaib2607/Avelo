@@ -14,19 +14,7 @@ public final class BankReconciliationService: Sendable {
         self.companyId = companyId
     }
 
-    public struct StatementEntry: Sendable, Codable, Identifiable {
-        public let id: UUID
-        public let date: Date
-        public let amountPaise: Int64
-        public let narration: String
-
-        public init(id: UUID = UUID(), date: Date, amountPaise: Int64, narration: String) {
-            self.id = id
-            self.date = date
-            self.amountPaise = amountPaise
-            self.narration = narration
-        }
-    }
+    public typealias StatementEntry = BankReconciliationRepository.StatementLine
 
     public struct Match: Sendable, Codable, Identifiable {
         public let id: UUID
@@ -82,13 +70,18 @@ public final class BankReconciliationService: Sendable {
     public func reconcile(accountId: Account.ID,
                           asOf: Date,
                           tolerancePaise: Int64 = 0) throws -> ReconciliationResult {
-        try db.write { tx in
-            let repo = BankReconciliationRepository(db: tx)
-            let bookBalance = try repo.bookBalance(accountId: accountId, asOf: asOf)
-            let statement = try repo.statementLines(accountId: accountId, asOf: asOf)
-            let vouchers = try repo.candidateVouchers(accountId: accountId, asOf: asOf)
+        let bookBalance: Int64
+        let statement: [StatementEntry]
+        let vouchers: [BankReconciliationRepository.VoucherCandidate]
+        let matched: [Match]
+        let unmatched: [StatementEntry]
+        let bankBalance: Int64
+        do {
+            bookBalance = try repository.bookBalance(accountId: accountId, asOf: asOf)
+            statement = try repository.statementLines(accountId: accountId, asOf: asOf)
+            vouchers = try repository.candidateVouchers(accountId: accountId, asOf: asOf)
 
-            var matched: [Match] = []
+            var m: [Match] = []
             var matchedStatementIds: Set<UUID> = []
             var matchedVoucherIds: Set<Voucher.ID> = []
 
@@ -98,7 +91,7 @@ public final class BankReconciliationService: Sendable {
                         && v.date == s.date
                         && abs(v.amountPaise - abs(s.amountPaise)) <= tolerancePaise
                 }) {
-                    matched.append(Match(
+                    m.append(Match(
                         statementEntry: s,
                         voucherId: v.id,
                         voucherNumber: v.number,
@@ -109,17 +102,17 @@ public final class BankReconciliationService: Sendable {
                     matchedVoucherIds.insert(v.id)
                 }
             }
-            let unmatched = statement.filter { !matchedStatementIds.contains($0.id) }
-            let bankBalance = statement.reduce(Int64(0)) { $0 + $1.amountPaise }
-
-            return ReconciliationResult(
-                asOf: asOf,
-                matched: matched,
-                unmatchedStatement: unmatched,
-                bookBalancePaise: bookBalance,
-                bankBalancePaise: bankBalance
-            )
+            matched = m
+            unmatched = statement.filter { !matchedStatementIds.contains($0.id) }
+            bankBalance = statement.reduce(Int64(0)) { $0 + $1.amountPaise }
         }
+        return ReconciliationResult(
+            asOf: asOf,
+            matched: matched,
+            unmatchedStatement: unmatched,
+            bookBalancePaise: bookBalance,
+            bankBalancePaise: bankBalance
+        )
     }
 
     public func clearStatementLine(id: UUID) throws {

@@ -26,7 +26,7 @@ public struct FiscalLockChecker: Sendable {
 
     public func financialYear(containing date: Date,
                               companyId: Company.ID) throws -> FinancialYear.ID? {
-        let dateStr = DateFormatters.isoDate(date)
+        let dateStr = DateFormatters.formatIsoDate(date)
         let id: String? = try db.queryOne(
             "SELECT id FROM mally_financial_years WHERE company_id = ? AND ? BETWEEN start_date AND end_date LIMIT 1",
             bind: [.text(companyId.uuidString), .text(dateStr)]

@@ -36,6 +36,7 @@ public struct AuditRepository: Sendable {
         public var action: AuditAction?
         public var entityType: String?
         public var entityId: String?
+        public var searchText: String?
         public var fromDate: Date?
         public var toDate: Date?
         public var limit: Int
@@ -45,6 +46,7 @@ public struct AuditRepository: Sendable {
                     action: AuditAction? = nil,
                     entityType: String? = nil,
                     entityId: String? = nil,
+                    searchText: String? = nil,
                     fromDate: Date? = nil,
                     toDate: Date? = nil,
                     limit: Int = 200,
@@ -53,6 +55,7 @@ public struct AuditRepository: Sendable {
             self.action = action
             self.entityType = entityType
             self.entityId = entityId
+            self.searchText = searchText
             self.fromDate = fromDate
             self.toDate = toDate
             self.limit = limit

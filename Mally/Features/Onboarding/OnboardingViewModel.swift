@@ -24,7 +24,7 @@ public final class OnboardingViewModel: ObservableObject {
     }
 
     public func refreshValidity() {
-        let company = CompanyInputValidator.Input(name: companyName, pan: pan, gstin: gstin)
+        let company = CompanyInputValidator.Input(name: companyName, gstin: gstin, pan: pan)
         let fy = FinancialYearInputValidator.Input(
             label: fyLabel, startDate: fyStart, endDate: fyEnd, booksBeginDate: booksBegin
         )

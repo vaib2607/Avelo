@@ -109,7 +109,7 @@ public struct NewCompanySheet: View {
             defer { env.isBusy = false }
             do {
                 _ = try await CompanyService.create(
-                    companyInput: CompanyInputValidator.Input(name: vm.companyName, pan: vm.pan, gstin: vm.gstin),
+                    companyInput: CompanyInputValidator.Input(name: vm.companyName, gstin: vm.gstin, pan: vm.pan),
                     fyInput: FinancialYearInputValidator.Input(
                         label: vm.fyLabel, startDate: vm.fyStart, endDate: vm.fyEnd, booksBeginDate: vm.booksBegin
                     ),
@@ -119,9 +119,10 @@ public struct NewCompanySheet: View {
                 if vm.enableInventory {
                     if let id = try? env.registry.firstId(named: vm.companyName) {
                         let ctx = try await env.manager.openHandle(id: id)
-                        let db = ctx.database
-                        let svc = CompanyService(db: db, companyId: id, manager: env.manager)
-                        try svc.setInventoryMode(enabled: true, linkMode: vm.inventoryMode)
+                        if let ctx = ctx {
+                            let svc = CompanyService(db: ctx.db, companyId: id, manager: env.manager)
+                            try svc.setInventoryMode(enabled: true, linkMode: vm.inventoryMode)
+                        }
                     }
                 }
                 env.showSuccess("Company created.")

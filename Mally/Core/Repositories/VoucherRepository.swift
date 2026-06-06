@@ -22,6 +22,7 @@ public struct VoucherRepository: Sendable {
         public var partyAccountId: Account.ID?
         public var voucherTypeCodes: Set<VoucherType.Code>
         public var narrationContains: String?
+        public var searchText: String?
         public var onlyReversed: Bool
         public var onlyUnreversed: Bool
         public var limit: Int
@@ -34,6 +35,7 @@ public struct VoucherRepository: Sendable {
                     partyAccountId: Account.ID? = nil,
                     voucherTypeCodes: Set<VoucherType.Code> = [],
                     narrationContains: String? = nil,
+                    searchText: String? = nil,
                     onlyReversed: Bool = false,
                     onlyUnreversed: Bool = false,
                     limit: Int = 200,
@@ -45,6 +47,7 @@ public struct VoucherRepository: Sendable {
             self.partyAccountId = partyAccountId
             self.voucherTypeCodes = voucherTypeCodes
             self.narrationContains = narrationContains
+            self.searchText = searchText
             self.onlyReversed = onlyReversed
             self.onlyUnreversed = onlyUnreversed
             self.limit = limit
@@ -99,8 +102,8 @@ public struct VoucherRepository: Sendable {
             """
             INSERT INTO mally_vouchers
             (id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
-             narration, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             narration, reference, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(voucher.id.uuidString),
@@ -111,6 +114,7 @@ public struct VoucherRepository: Sendable {
                 .date(voucher.date),
                 .optionalText(voucher.partyAccountId?.uuidString),
                 .text(voucher.narration),
+                .text(voucher.reference),
                 .bool(voucher.isReversal),
                 .optionalText(voucher.reversalOfId?.uuidString),
                 .bool(voucher.isPosted),
@@ -148,7 +152,7 @@ public struct VoucherRepository: Sendable {
 
     static let selectAllSQL: String = """
         SELECT id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
-               narration, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at
+               narration, reference, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at
         FROM mally_vouchers
     """
 
@@ -173,6 +177,7 @@ public struct VoucherRepository: Sendable {
             reversalOfId: reversalOf,
             isPosted: r.bool("is_posted"),
             totalPaise: r.int("total_paise"),
+            reference: r.optionalText("reference") ?? "",
             createdAt: r.timestamp("created_at"),
             updatedAt: r.timestamp("updated_at")
         )

@@ -19,7 +19,7 @@ public final class PayrollService: Sendable {
     }
 
     public func findEmployee(_ id: PayrollEmployee.ID) throws -> PayrollEmployee? {
-        try repository.findEmployee(id)
+        try repository.findEmployee(id: id)
     }
 
     public func createEmployee(name: String,
@@ -89,7 +89,15 @@ public final class PayrollService: Sendable {
 
     public func listEntries(employeeId: PayrollEmployee.ID? = nil,
                             monthYear: Int? = nil) throws -> [PayrollEntry] {
-        try repository.listEntries(companyId: companyId, employeeId: employeeId, monthYear: monthYear)
+        let my: (year: Int, month: Int)? = monthYear.map { my in
+            (year: my / 100, month: my % 100)
+        }
+        let filter = PayrollRepository.EntryFilter(
+            companyId: companyId,
+            employeeId: employeeId,
+            monthYear: my
+        )
+        return try repository.listEntries(filter: filter)
     }
 
     public func postEntry(employeeId: PayrollEmployee.ID,
@@ -99,37 +107,42 @@ public final class PayrollService: Sendable {
                           overtimePaise: Int64,
                           deductionsPaise: Int64,
                           financialYearId: FinancialYear.ID) throws -> PayrollEntry {
-        let employee = try repository.findEmployee(employeeId)
+        let employee = try repository.findEmployee(id: employeeId)
         guard let employee = employee else { throw AppError.notFound("Employee") }
 
         let gross = employee.basicPaise + employee.hraPaise + employee.otherAllowancesPaise + overtimePaise
         let net = gross - deductionsPaise
+        let year = monthYear / 100
+        let month = monthYear % 100
         let entry = PayrollEntry(
             id: UUID(),
             companyId: companyId,
-            financialYearId: financialYearId,
             employeeId: employeeId,
-            monthYear: monthYear,
-            workingDays: workingDays,
-            paidDays: paidDays,
+            financialYearId: financialYearId,
+            month: month,
+            year: year,
+            grossPaise: gross,
+            deductionsPaise: deductionsPaise,
+            netPaise: net,
+            workingDays: Double(workingDays),
+            paidDays: Double(paidDays),
             basicPaise: employee.basicPaise,
             hraPaise: employee.hraPaise,
             otherAllowancesPaise: employee.otherAllowancesPaise,
             overtimePaise: overtimePaise,
-            grossPaise: gross,
-            deductionsPaise: deductionsPaise,
-            netPaise: net,
             pfApplicable: employee.pfApplicable,
             esiApplicable: employee.esiApplicable,
             postedAt: Date()
         )
         let result = PayrollDraftValidator().validate(PayrollDraftValidator.Input(
             employeeId: employeeId,
-            monthYear: monthYear,
-            workingDays: workingDays,
-            paidDays: paidDays,
-            overtimePaise: overtimePaise,
-            deductionsPaise: deductionsPaise
+            month: month,
+            year: year,
+            grossPaise: gross,
+            deductionsPaise: deductionsPaise,
+            netPaise: net,
+            employeeActive: employee.isActive,
+            employeeHasEndDate: employee.endDate != nil
         ))
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])

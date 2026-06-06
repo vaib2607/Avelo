@@ -44,9 +44,9 @@ public struct BackupSheet: View {
                 let panel = NSSavePanel()
                 panel.nameFieldStringValue = "MallyBackup-\(ctx.companyId.uuidString.prefix(8)).zip"
                 panel.canCreateDirectories = true
-                let result = await panel.beginAsync()
+                let result = await NSPanelBridge.runSave(panel)
                 if result == .OK, let url = panel.url {
-                    try await env.backupService.export(companyId: ctx.companyId, to: url)
+                    try await env.backupService.export(companyId: ctx.companyId, companyName: ctx.companyName, to: url)
                     status = "Backup saved to \(url.lastPathComponent)."
                     env.showSuccess(status)
                 }
@@ -57,11 +57,11 @@ public struct BackupSheet: View {
     }
 }
 
-extension NSSavePanel {
+extension NSPanelBridge {
     @MainActor
-    func beginAsync() async -> NSApplication.ModalResponse {
+    static func runSave(_ panel: NSSavePanel) async -> NSApplication.ModalResponse {
         await withCheckedContinuation { (cont: CheckedContinuation<NSApplication.ModalResponse, Never>) in
-            self.begin { resp in cont.resume(returning: resp) }
+            panel.begin { resp in cont.resume(returning: resp) }
         }
     }
 }

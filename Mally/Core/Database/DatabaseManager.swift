@@ -2,10 +2,12 @@ import Foundation
 
 public final class CompanyHandle: @unchecked Sendable {
     public let companyId: Company.ID
+    public let companyName: String
     public let db: SQLiteDatabase
 
-    public init(companyId: Company.ID, db: SQLiteDatabase) {
+    public init(companyId: Company.ID, companyName: String, db: SQLiteDatabase) {
         self.companyId = companyId
+        self.companyName = companyName
         self.db = db
     }
 }
@@ -115,7 +117,13 @@ public final actor DatabaseManager {
         if current < SchemaVersion.current.rawValue {
             try MigrationRunner().runMigrations(on: db)
         }
-        let handle = CompanyHandle(companyId: id, db: db)
+        let companyName: String
+        if let reg = registryDb, let entry = try? RegistryRepository(db: reg).findById(id) {
+            companyName = entry.name
+        } else {
+            companyName = ""
+        }
+        let handle = CompanyHandle(companyId: id, companyName: companyName, db: db)
         openHandles[id] = handle
         try touchLastOpened(id: id)
         return handle

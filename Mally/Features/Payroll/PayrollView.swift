@@ -3,33 +3,61 @@ import SwiftUI
 public struct PayrollView: View {
 
     @EnvironmentObject private var env: AppEnvironment
-    @State private var vm: PayrollViewModel?
+    @State private var holder = PayrollViewModelHolder()
     @State private var postFor: PayrollEmployee.ID?
 
     public init() {}
 
     public var body: some View {
-        Group {
-            if let vm = vm {
-                content(vm: vm)
-            } else {
-                ProgressView()
-            }
-        }
-        .navigationTitle("Payroll")
-        .toolbar {
-            ToolbarItem {
-                Button { env.router.present(.newEmployee) } label: {
-                    Label("New Employee", systemImage: "plus")
+        PayrollContent(holder: holder, postFor: $postFor)
+            .navigationTitle("Payroll")
+            .toolbar {
+                ToolbarItem {
+                    Button { env.router.present(.newEmployee) } label: {
+                        Label("New Employee", systemImage: "plus")
+                    }
                 }
             }
-        }
-        .onAppear { setup() }
-        .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .onAppear { setup() }
+            .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
     }
 
-    @ViewBuilder
-    private func content(vm: PayrollViewModel) -> some View {
+    private func setup() {
+        guard let ctx = env.companyContext else { return }
+        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
+            holder.vm = PayrollViewModel(companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id)
+            holder.vm?.reload()
+        }
+    }
+}
+
+@MainActor
+final class PayrollViewModelHolder: ObservableObject {
+    @Published var vm: PayrollViewModel?
+}
+
+private struct IdWrap: Identifiable { let id: PayrollEmployee.ID }
+
+@MainActor
+private struct PayrollContent: View {
+    @ObservedObject var holder: PayrollViewModelHolder
+    @Binding var postFor: PayrollEmployee.ID?
+
+    var body: some View {
+        if let vm = holder.vm {
+            PayrollBody(vm: vm, postFor: $postFor)
+        } else {
+            ProgressView()
+        }
+    }
+}
+
+@MainActor
+private struct PayrollBody: View {
+    @ObservedObject var vm: PayrollViewModel
+    @Binding var postFor: PayrollEmployee.ID?
+
+    var body: some View {
         VSplitView {
             VStack(spacing: 0) {
                 HStack {
@@ -40,7 +68,9 @@ public struct PayrollView: View {
                 Table(vm.filtered) {
                     TableColumn("Code", value: \.employeeCode)
                     TableColumn("Name", value: \.name)
-                    TableColumn("Designation", value: \.designation ?? "—")
+                    TableColumn("Designation") { e in
+                        Text(e.designation ?? "—")
+                    }
                     TableColumn("Basic (₹)") { e in
                         Text(Currency.formatPaise(e.basicPaise)).monospacedDigit()
                     }
@@ -87,16 +117,6 @@ public struct PayrollView: View {
             set: { postFor = $0?.id }
         )) { wrap in
             PostSalarySheet(employeeId: wrap.id)
-        }
-    }
-
-    private struct IdWrap: Identifiable { let id: PayrollEmployee.ID }
-
-    private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if vm == nil || vm?.companyId != ctx.companyId {
-            vm = PayrollViewModel(companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id)
-            vm?.reload()
         }
     }
 }

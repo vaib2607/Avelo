@@ -69,4 +69,9 @@ public enum Currency {
         guard let decimal = Decimal(string: normalized) else { return nil }
         return rupeesToPaise(decimal)
     }
+
+    public static func formatAmountInput(paise: Int64) -> String {
+        if paise == 0 { return "0.00" }
+        return formatPaise(paise, style: .plain)
+    }
 }

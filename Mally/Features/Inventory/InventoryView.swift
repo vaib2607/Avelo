@@ -3,33 +3,61 @@ import SwiftUI
 public struct InventoryView: View {
 
     @EnvironmentObject private var env: AppEnvironment
-    @State private var vm: InventoryViewModel?
+    @State private var holder = InventoryViewModelHolder()
     @State private var showMovement: InventoryItem.ID?
 
     public init() {}
 
     public var body: some View {
-        Group {
-            if let vm = vm {
-                content(vm: vm)
-            } else {
-                ProgressView()
+        InventoryContent(holder: holder, showMovement: $showMovement)
+            .navigationTitle("Inventory")
+            .toolbar {
+                ToolbarItem {
+                    Button {
+                        env.router.present(.newItem)
+                    } label: { Label("New Item", systemImage: "plus") }
+                }
             }
-        }
-        .navigationTitle("Inventory")
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    env.router.present(.newItem)
-                } label: { Label("New Item", systemImage: "plus") }
-            }
-        }
-        .onAppear { setup() }
-        .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .onAppear { setup() }
+            .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
     }
 
-    @ViewBuilder
-    private func content(vm: InventoryViewModel) -> some View {
+    private func setup() {
+        guard let ctx = env.companyContext else { return }
+        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
+            holder.vm = InventoryViewModel(companyId: ctx.companyId, db: ctx.database)
+            holder.vm?.reload()
+        }
+    }
+}
+
+@MainActor
+final class InventoryViewModelHolder: ObservableObject {
+    @Published var vm: InventoryViewModel?
+}
+
+private struct IdWrap: Identifiable { let id: InventoryItem.ID }
+
+@MainActor
+private struct InventoryContent: View {
+    @ObservedObject var holder: InventoryViewModelHolder
+    @Binding var showMovement: InventoryItem.ID?
+
+    var body: some View {
+        if let vm = holder.vm {
+            InventoryBody(vm: vm, showMovement: $showMovement)
+        } else {
+            ProgressView()
+        }
+    }
+}
+
+@MainActor
+private struct InventoryBody: View {
+    @ObservedObject var vm: InventoryViewModel
+    @Binding var showMovement: InventoryItem.ID?
+
+    var body: some View {
         VStack(spacing: 0) {
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search items…")
@@ -67,16 +95,6 @@ public struct InventoryView: View {
             set: { showMovement = $0?.id }
         )) { wrap in
             StockMovementSheet(itemId: wrap.id)
-        }
-    }
-
-    private struct IdWrap: Identifiable { let id: InventoryItem.ID }
-
-    private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if vm == nil || vm?.companyId != ctx.companyId {
-            vm = InventoryViewModel(companyId: ctx.companyId, db: ctx.database)
-            vm?.reload()
         }
     }
 }

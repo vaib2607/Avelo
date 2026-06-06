@@ -40,6 +40,11 @@ public struct StatusBadge: View {
         self.style = style
     }
 
+    public init(kind: StatusBadgeStyle, text: String) {
+        self.text = text
+        self.style = kind
+    }
+
     public var body: some View {
         Text(text)
             .font(AppTypography.smallFont)

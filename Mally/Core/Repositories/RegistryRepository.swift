@@ -23,6 +23,20 @@ public struct RegistryRepository: Sendable {
         }
     }
 
+    public func listAll() throws -> [CompanyRegistryEntry] { try listCompanies() }
+
+    public func firstId(named name: String) throws -> Company.ID? {
+        try listCompanies().first(where: { $0.name == name })?.id
+    }
+
+    public func findName(id: Company.ID) throws -> String? {
+        try listCompanies().first(where: { $0.id == id })?.name
+    }
+
+    public func findById(_ id: Company.ID) throws -> CompanyRegistryEntry? {
+        try listCompanies().first(where: { $0.id == id })
+    }
+
     public func register(_ entry: CompanyRegistryEntry) throws {
         try db.execute(
             """

@@ -38,19 +38,19 @@ public struct RestoreSheet: View {
     private func run() {
         isWorking = true
         status = ""
-        Task {
+        Task<Void, Never> {
             defer { isWorking = false }
             do {
                 let panel = NSOpenPanel()
                 panel.canChooseFiles = true
                 panel.canChooseDirectories = false
                 panel.allowsMultipleSelection = false
-                let result = await panel.beginAsync()
+                let result = await NSPanelBridge.runOpen(panel)
                 if result == .OK, let url = panel.url {
                     let restore = RestoreService(manager: env.manager)
                     let newId = try await restore.restore(from: url)
                     env.showSuccess("Restored as new company.")
-                    status = "New company id: \(newId.uuidString.prefix(8))"
+                    status = "New company id: \(newId.id.uuidString.prefix(8))"
                 }
             } catch {
                 env.showError(AppError.wrap(error))
@@ -59,11 +59,11 @@ public struct RestoreSheet: View {
     }
 }
 
-extension NSOpenPanel {
+enum NSPanelBridge {
     @MainActor
-    func beginAsync() async -> NSApplication.ModalResponse {
+    static func runOpen(_ panel: NSOpenPanel) async -> NSApplication.ModalResponse {
         await withCheckedContinuation { (cont: CheckedContinuation<NSApplication.ModalResponse, Never>) in
-            self.begin { resp in cont.resume(returning: resp) }
+            panel.begin { resp in cont.resume(returning: resp) }
         }
     }
 }
