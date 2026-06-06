@@ -311,3 +311,79 @@ Restore never overwrites an existing company. The user is asked to pick a target
 6. Banking, reconciliation, backup/restore, audit log viewer.
 7. Payroll: employees, salary voucher, monthly posting.
 8. Hardening: voucher templates, last-used account sort, multi-line paste, dark mode polish, keyboard shortcut help, full app icon set.
+
+## Appendix A. In-memory AccountTree cache
+
+### A.1 Motivation
+A Tally-style UI needs instant drill-down from the Groups list into a Group → its ledgers → a single ledger's running balance. The naïve path (one SQL query per group, one per ledger, one per balance range) is too slow on cold start and on every drill. We solve this by building a single in-memory composite tree per open company and keeping it fresh.
+
+### A.2 Composite structure
+`Mally/Core/Cache/AccountTree.swift` defines:
+
+- `AccountTree` — the root; owns `roots: [GroupNode]`, plus `ledgersById` and `groupsById` lookup tables.
+- `GroupNode` — a group; owns `childGroups: [GroupNode]`, `childLedgers: [LedgerNode]`, and a precomputed `balancePaise` = sum of children (recursively).
+- `LedgerNode` — a single ledger; owns its `openingBalancePaise`, `movementDebitPaise`, `movementCreditPaise`, and a derived `balancePaise` = opening + debit − credit.
+- `LedgerBalance` — small struct used during tree construction to feed in aggregated line sums.
+
+The tree is built bottom-up: leaf ledger nodes compute their balance from `opening_balance_paise` (signed by `OpeningBalanceSide`) and a single SQL aggregation of `mally_ledger_lines` for that account. Group nodes sum their children. This means the construction cost is O(groups + ledgers) plus one SQL query that aggregates all ledger balances in a single `GROUP BY account_id` scan.
+
+### A.3 Cache lifecycle
+`Mally/Core/Cache/AccountTreeCache.swift` is a `@MainActor` `ObservableObject` owned by `AppEnvironment`. Lifecycle:
+
+1. **Created** in `AppEnvironment.openCompany(_:)` right after `CompanyContext` is set, with the per-company `SQLiteDatabase`.
+2. **Loaded** on first access (`ensureLoaded()`); the first call to `findLedger`, `findGroup`, or `breadcrumb` triggers a rebuild if the tree is dirty.
+3. **Invalidated** (`invalidate()`) by any write path: `env.markAccountTreeDirty()` is called from `NewVoucherSheet.post`, `EditVoucherSheet.save`, `NewAccountSheet.save`, and `PostSalarySheet.save`.
+4. **Disposed** implicitly when `closeCompany()` is called and `accountTree` is set to `nil`.
+
+`@Published tree` and `@Published isDirty` make the cache observable; the Dashboard can show "Tree rebuilt" or "Tree stale" if we want a debug overlay.
+
+### A.4 Accessors
+- `findLedger(_: Account.ID) -> LedgerNode?` — O(1) lookup.
+- `findGroup(_: AccountGroup.ID) -> GroupNode?` — O(1).
+- `groupPath(of: AccountGroup.ID)` / `groupPath(ofLedger:)` — walks up via `parentId`, returns the breadcrumb path.
+- `breadcrumb(of: Account.ID)` — renders `"Assets › Bank › HDFC Current"` for status bar / drill UI.
+- `allLedgers` — flat list for picker UIs.
+
+### A.5 Append-only ledger interaction
+The tree is *derived* from the database. Vouchers are append-only (the `mally_vouchers.reversal_of_id` column stores a pointer to the reversed voucher; the original is never deleted). The tree reads `SUM(...) FROM mally_ledger_lines` which naturally includes both originals and their reversals — netting to zero. The cache does not need to track "what changed"; it just rebuilds on invalidate and reads the current full state.
+
+## Appendix B. Global keyboard state machine
+
+### B.1 Motivation
+A Tally-style accountant works at the keyboard. We want a global state machine that intercepts function keys and a few chords to open the right sheet or navigate, without binding the same key to conflicting actions in nested views.
+
+### B.2 Components
+- `Mally/Core/Keyboard/KeyboardCommand.swift` — exhaustive enum of every global command (navigation, voucher creation, drill/back, reload, command palette).
+- `Mally/Core/Keyboard/KeyboardContext.swift` (in the same file) — the current state (`.idle`, `.voucherEdit`, `.accountDrill(Account.ID)`, `.search`).
+- `Mally/Core/Keyboard/KeyboardRouter.swift` — `@MainActor` `ObservableObject` that holds `context`, `pendingBuffer` (for the future "type-ahead account code" feature), and `lastCommand`. Views subscribe to it.
+- `Mally/Core/Keyboard/KeyboardMonitor.swift` — installs an `NSEvent.addLocalMonitorForEvents` callback, maps NSEvent key codes to `KeyboardCommand`s, dispatches to the active router.
+- `Mally/Core/Keyboard/KeyboardBridge.swift` — view-side bridge that translates `KeyboardCommand`s into `AppRouter` actions (`router.go(.accounts)`, `router.present(.newPayment)`, etc.) and toggles overlay flags for command palette / quick search / shortcut help.
+
+### B.3 Key bindings
+| Combo            | Command                          |
+|------------------|----------------------------------|
+| Esc              | `goBack`                         |
+| Return / numpad Enter | `drillDown`                 |
+| R                | `reload`                         |
+| F4               | `newVoucher(.contra)`            |
+| F5               | `newVoucher(.payment)`           |
+| F6               | `newVoucher(.receipt)`           |
+| F7               | `newVoucher(.journal)`           |
+| F8               | `newVoucher(.sales)`             |
+| F9               | `newVoucher(.purchase)`          |
+| F10              | `newVoucher(.creditNote)`        |
+| F11              | `newVoucher(.debitNote)`         |
+| Cmd+1..9         | Sidebar navigation               |
+| Cmd+K            | `commandPalette`                 |
+| Cmd+/            | `quickSearch`                    |
+| Cmd+,            | `showShortcutHelp`               |
+
+These bindings are also surfaced in the macOS menu bar via `CommandMenu("Go")` and `CommandMenu("Voucher")` in `MallyApp.commands`. The function keys *only* show in the menu as text labels (e.g. "Contra (F4)"); the SwiftUI menu has no first-class F-key `KeyEquivalent` constant for the function-key row, so the actual F-key interception is done by `KeyboardMonitor`.
+
+### B.4 Sheet capture
+When a sheet/editor is open and the user is typing in a `TextField`, the global monitor would otherwise hijack F5 ("Payment") while the user is typing an amount. The `KeyboardMonitor.setSheetCapture(_:)` flag, exposed via `KeyboardRouter`, suppresses global handling while a sheet is presented. Voucher editor sheets should set this to `true` on appear and `false` on disappear (future work; current implementation provides the flag and the suppression logic).
+
+### B.5 State transitions
+`KeyboardRouter.enter(_:)` lets a view push a new context (e.g. `accountDrill(accountId)`) when a user navigates into a ledger. `reset()` is called when the company is closed. The monitor does not care about the context; it just dispatches commands. The bridge decides what to do based on the current `router.presentedSheet` and the command.
+
+This split keeps the monitor stateless, the router a thin observable, and the bridge the one place that knows the SwiftUI navigation graph.

@@ -90,6 +90,7 @@ public struct PostSalarySheet: View {
                 deductionsPaise: Currency.parseRupeeInput(deductions) ?? 0,
                 financialYearId: ctx.financialYear.id
             )
+            env.markAccountTreeDirty()
             env.showSuccess("Salary posted.")
             router.presentedSheet = nil
         } catch {

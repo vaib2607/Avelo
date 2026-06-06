@@ -33,6 +33,7 @@ public struct NewVoucherSheet: View {
         do {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
             _ = try svc.post(draft: vm.buildDraft(), in: ctx.financialYear)
+            env.markAccountTreeDirty()
             env.showSuccess("Voucher posted.")
             router.presentedSheet = nil
         } catch {

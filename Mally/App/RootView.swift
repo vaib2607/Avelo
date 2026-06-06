@@ -3,6 +3,7 @@ import SwiftUI
 public struct RootView: View {
 
     @EnvironmentObject private var env: AppEnvironment
+    @EnvironmentObject private var keyboardBridge: KeyboardBridge
     @StateObject private var windowState = WindowState()
 
     public init() {}
@@ -25,7 +26,10 @@ public struct RootView: View {
         .overlay(alignment: .top) {
             ErrorBannerHost()
         }
-        .task { await env.bootstrap() }
+        .task {
+            await env.bootstrap()
+            keyboardBridge.attach(router: env.router)
+        }
         .alert(item: $env.globalError) { err in
             Alert(title: Text("Error"),
                   message: Text(err.localizedMessage),
@@ -39,6 +43,9 @@ public struct RootView: View {
         }
         .sheet(item: env.presentedSheetBinding) { sheet in
             sheetView(for: sheet)
+        }
+        .sheet(isPresented: $keyboardBridge.shortcutHelpActive) {
+            ShortcutHelpSheet()
         }
     }
 
