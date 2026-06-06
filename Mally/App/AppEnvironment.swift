@@ -11,6 +11,10 @@ public final class AppEnvironment: ObservableObject {
     @Published public var isBusy: Bool = false
     @Published public var accountTree: AccountTreeCache?
 
+    /// Non-nil when the app could not open its normal data location and had to
+    /// degrade (e.g. to a temporary directory). Surfaced to the user on launch.
+    @Published public var startupError: AppError?
+
     public let manager: DatabaseManager
     public let router: AppRouter
     public let keyboard: KeyboardRouter
@@ -18,29 +22,62 @@ public final class AppEnvironment: ObservableObject {
     public let backupService: BackupService
 
     public init() {
-        let fileManager = FileManager.default
-        let appSupport = try! fileManager.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let mallyDir = appSupport.appendingPathComponent("Mally", isDirectory: true)
-        let registryPath = mallyDir.appendingPathComponent("mally_registry.sqlite").path
-        _ = mallyDir.appendingPathComponent("Backups", isDirectory: true)
-
-        self.manager = try! DatabaseManager(appSupportDirectory: mallyDir)
         self.router = AppRouter()
         self.keyboard = KeyboardRouter()
 
-        let registryDb = try! SQLiteDatabase(path: registryPath)
-        self.registry = RegistryRepository(db: registryDb)
-        self.backupService = BackupService(manager: manager)
+        let bootstrap = AppEnvironment.makeStores()
+        self.manager = bootstrap.stores.manager
+        self.registry = RegistryRepository(db: bootstrap.stores.registryDb)
+        self.backupService = BackupService(manager: bootstrap.stores.manager)
+        self.startupError = bootstrap.error
+    }
+
+    private struct Stores {
+        let manager: DatabaseManager
+        let registryDb: SQLiteDatabase
+    }
+
+    /// Builds the database stores, tolerating failures of the normal
+    /// Application Support location by degrading to a temporary directory.
+    /// Returns any degradation as an `AppError` instead of crashing.
+    private static func makeStores() -> (stores: Stores, error: AppError?) {
+        // Tier 1: the normal Application Support location.
+        if let appSupport = try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: true
+        ) {
+            let dir = appSupport.appendingPathComponent("Mally", isDirectory: true)
+            if let stores = try? buildStores(in: dir) {
+                return (stores, nil)
+            }
+        }
+
+        // Tier 2: a unique temporary directory. Data will not persist across
+        // launches, but the app stays usable and the user is told why.
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("Mally-\(UUID().uuidString)", isDirectory: true)
+        if let stores = try? buildStores(in: tempDir) {
+            let msg = "Couldn't open Mally's data folder, so a temporary location is being used. Any changes will NOT be saved when you quit. Check disk permissions and restart."
+            return (stores, AppError.database(.openFailed(msg)))
+        }
+
+        // Tier 3: truly unrecoverable I/O environment. A clear, intentional
+        // failure beats an opaque force-unwrap crash.
+        preconditionFailure("Mally could not create a database in either Application Support or a temporary directory. The filesystem is not writable.")
+    }
+
+    private static func buildStores(in mallyDir: URL) throws -> Stores {
+        let manager = try DatabaseManager(appSupportDirectory: mallyDir)
+        let registryDb = try SQLiteDatabase(path: manager.registryPath)
+        return Stores(manager: manager, registryDb: registryDb)
     }
 
     public func bootstrap() async {
         // Directory creation + registry schema run inside DatabaseManager.init.
-        // Nothing to do here; kept as a hook for future one-time setup.
+        // Surface any startup degradation now that the UI is live.
+        if let startupError, globalError == nil {
+            globalError = startupError
+        }
     }
 
     public func openCompany(_ id: Company.ID) async {
