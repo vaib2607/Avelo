@@ -20,6 +20,11 @@ let package = Package(
             resources: [
                 .process("Resources/Seed")
             ]
+        ),
+        .testTarget(
+            name: "MallyTests",
+            dependencies: ["Mally"],
+            path: "Tests/MallyTests"
         )
     ]
 )
