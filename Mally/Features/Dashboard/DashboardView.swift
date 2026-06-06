@@ -11,6 +11,7 @@ public struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                accountTreeStrip
                 kpiGrid
                 cashPosition
                 monthlyPLSection
@@ -20,6 +21,30 @@ public struct DashboardView: View {
         }
         .navigationTitle("Dashboard")
         .task(id: env.companyContext?.companyId) { reload() }
+    }
+
+    @ViewBuilder
+    private var accountTreeStrip: some View {
+        if let tree = env.accountTree {
+            HStack(spacing: 16) {
+                Label {
+                    Text("Account tree: \(tree.tree == nil ? "stale" : "ready")")
+                } icon: {
+                    Image(systemName: tree.tree == nil ? "exclamationmark.triangle" : "checkmark.seal")
+                        .foregroundStyle(tree.tree == nil ? .orange : .green)
+                }
+                if let t = tree.tree {
+                    Text("\(t.roots.count) root groups · \(t.allLedgers.count) ledgers")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Rebuild") { env.accountTree?.reload() }
+                    .controlSize(.small)
+            }
+            .font(.caption)
+            .padding(8)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        }
     }
 
     @ViewBuilder

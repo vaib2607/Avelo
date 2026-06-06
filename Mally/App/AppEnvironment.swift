@@ -9,9 +9,11 @@ public final class AppEnvironment: ObservableObject {
     @Published public var globalError: AppError?
     @Published public var banner: BannerPayload?
     @Published public var isBusy: Bool = false
+    @Published public var accountTree: AccountTreeCache?
 
     public let manager: DatabaseManager
     public let router: AppRouter
+    public let keyboard: KeyboardRouter
     public let registry: RegistryRepository
     public let backupService: BackupService
 
@@ -29,6 +31,7 @@ public final class AppEnvironment: ObservableObject {
 
         self.manager = try! DatabaseManager(appSupportDirectory: mallyDir)
         self.router = AppRouter()
+        self.keyboard = KeyboardRouter()
 
         let registryDb = try! SQLiteDatabase(path: registryPath)
         self.registry = RegistryRepository(db: registryDb)
@@ -55,6 +58,8 @@ public final class AppEnvironment: ObservableObject {
                 financialYear: fy,
                 database: handle.db
             )
+            self.accountTree = AccountTreeCache(companyId: handle.companyId, database: handle.db)
+            self.accountTree?.reload()
             router.reset()
             banner = BannerPayload(kind: .success("Company opened."), message: "Company opened.")
         } catch {
@@ -67,7 +72,12 @@ public final class AppEnvironment: ObservableObject {
             Task { await manager.closeCompany(id: ctx.companyId) }
         }
         companyContext = nil
+        accountTree = nil
         router.reset()
+    }
+
+    public func markAccountTreeDirty() {
+        accountTree?.invalidate()
     }
 
     public func showError(_ error: AppError) {

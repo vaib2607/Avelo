@@ -52,6 +52,7 @@ private struct EditVoucherEditor: View {
         do {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
             _ = try svc.edit(voucher.id, with: vm.buildDraft(), in: ctx.financialYear)
+            env.markAccountTreeDirty()
             env.showSuccess("Voucher updated.")
             router.presentedSheet = nil
         } catch {

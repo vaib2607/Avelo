@@ -97,6 +97,7 @@ public struct NewAccountSheet: View {
         )
         do {
             _ = try AccountService(db: ctx.database, companyId: ctx.companyId).createAccount(input)
+            env.markAccountTreeDirty()
             env.showSuccess("Account created.")
             router.presentedSheet = nil
         } catch {
