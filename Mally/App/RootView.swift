@@ -49,6 +49,14 @@ public struct RootView: View {
             ShortcutHelpSheet()
                 .capturesGlobalKeyboard()
         }
+        .sheet(isPresented: $keyboardBridge.commandPaletteActive) {
+            CommandPaletteSheet()
+                .capturesGlobalKeyboard()
+        }
+        .sheet(isPresented: $keyboardBridge.quickSearchActive) {
+            QuickSearchSheet()
+                .capturesGlobalKeyboard()
+        }
     }
 
     @ViewBuilder
