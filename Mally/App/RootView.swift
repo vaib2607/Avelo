@@ -26,6 +26,19 @@ public struct RootView: View {
         .overlay(alignment: .top) {
             ErrorBannerHost()
         }
+        .overlay(alignment: .bottom) {
+            if let flash = keyboardBridge.suppressedKeyFlash {
+                Label(flash, systemImage: "keyboard.badge.ellipsis")
+                    .font(.callout)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.thinMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(.quaternary))
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: keyboardBridge.suppressedKeyFlash)
         .task {
             await env.bootstrap()
             keyboardBridge.attach(router: env.router)

@@ -18,6 +18,9 @@ struct MallyApp: App {
                     environment.keyboard.onCommand = { [weak keyboardBridge] cmd in
                         keyboardBridge?.dispatch(cmd)
                     }
+                    KeyboardMonitor.shared.onSuppressedKey = { [weak keyboardBridge] in
+                        keyboardBridge?.flashSuppressed()
+                    }
                     KeyboardMonitor.shared.install(router: environment.keyboard)
                 }
                 .onDisappear {

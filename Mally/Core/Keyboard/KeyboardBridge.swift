@@ -12,9 +12,27 @@ public final class KeyboardBridge: ObservableObject {
     @Published public var commandPaletteActive: Bool = false
     @Published public var shortcutHelpActive: Bool = false
 
+    /// Transient hint shown when a voucher function key is pressed while a
+    /// sheet is open. Auto-clears shortly after being set.
+    @Published public var suppressedKeyFlash: String?
+
     private weak var router: AppRouter?
+    private var flashGeneration: Int = 0
 
     public init() {}
+
+    /// Shows a brief hint that voucher shortcuts are unavailable while a sheet
+    /// is open, then clears it (unless superseded by a newer flash).
+    public func flashSuppressed() {
+        flashGeneration &+= 1
+        let generation = flashGeneration
+        suppressedKeyFlash = "Close this window to switch voucher types."
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            guard let self, self.flashGeneration == generation else { return }
+            self.suppressedKeyFlash = nil
+        }
+    }
 
     public func attach(router: AppRouter) {
         self.router = router

@@ -22,6 +22,11 @@ public final class KeyboardMonitor {
     private weak var router: KeyboardRouter?
     private var inSheetCapture: Bool = false
 
+    /// Invoked when a voucher function key (F4–F11) is pressed while a sheet is
+    /// open and global shortcuts are suppressed, so the UI can show a hint
+    /// instead of silently swallowing the key.
+    public var onSuppressedKey: (() -> Void)?
+
     public init() {}
 
     public func install(router: KeyboardRouter) {
@@ -30,11 +35,24 @@ public final class KeyboardMonitor {
 
         self.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self else { return event }
-            if self.inSheetCapture { return event }
+            if self.inSheetCapture {
+                if self.isVoucherFunctionKey(event) { self.onSuppressedKey?() }
+                return event
+            }
             if self.handle(event) {
                 return nil
             }
             return event
+        }
+    }
+
+    private func isVoucherFunctionKey(_ event: NSEvent) -> Bool {
+        let mods = event.modifierFlags
+        guard !mods.contains(.command), !mods.contains(.shift),
+              !mods.contains(.option), !mods.contains(.control) else { return false }
+        switch event.keyCode {
+        case 118, 96, 97, 98, 100, 101, 109, 103: return true // F4–F11
+        default: return false
         }
     }
 
