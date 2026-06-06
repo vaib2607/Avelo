@@ -120,14 +120,14 @@ public struct VoucherDraftValidator: Sendable {
                 errors.append(ValidationError(
                     code: .voucherDateOutsideFY,
                     field: "date",
-                    message: "Date \(DateFormatters.displayDate(draft.date)) is outside the active financial year."
+                    message: "Date \(DateFormatters.formatDisplayDate(draft.date)) is outside the active financial year."
                 ))
             }
         } else {
             errors.append(ValidationError(
                 code: .voucherDateOutsideFY,
                 field: "date",
-                message: "Date \(DateFormatters.displayDate(draft.date)) is not within any open financial year."
+                message: "Date \(DateFormatters.formatDisplayDate(draft.date)) is not within any open financial year."
             ))
         }
 

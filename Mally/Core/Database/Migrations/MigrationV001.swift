@@ -140,10 +140,11 @@ public struct MigrationV001: Migration {
         date TEXT NOT NULL,
         party_account_id TEXT REFERENCES mally_accounts(id),
         narration TEXT NOT NULL DEFAULT '',
+        reference TEXT NOT NULL DEFAULT '',
         is_reversal INTEGER NOT NULL DEFAULT 0 CHECK(is_reversal IN (0,1)),
         reversal_of_id TEXT REFERENCES mally_vouchers(id),
         is_posted INTEGER NOT NULL DEFAULT 1 CHECK(is_posted IN (0,1)),
-        total_paise INTEGER NOT NULL CHECK(total_paise > 0),
+        total_paise INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         CHECK(length(trim(number)) > 0),
@@ -242,6 +243,13 @@ public struct MigrationV001: Migration {
         unit TEXT NOT NULL,
         valuation_method TEXT NOT NULL DEFAULT 'fifo' CHECK(valuation_method IN ('fifo','weightedAverage')),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+        opening_quantity REAL NOT NULL DEFAULT 0,
+        opening_rate_paise INTEGER NOT NULL DEFAULT 0,
+        gst_rate REAL NOT NULL DEFAULT 0,
+        barcode TEXT,
+        hsn_sac TEXT,
+        is_archived INTEGER NOT NULL DEFAULT 0 CHECK(is_archived IN (0,1)),
+        linked_account_id TEXT REFERENCES mally_accounts(id),
         created_at TEXT NOT NULL,
         CHECK(length(trim(code)) > 0),
         CHECK(length(trim(name)) > 0),
@@ -254,10 +262,10 @@ public struct MigrationV001: Migration {
         item_id TEXT NOT NULL REFERENCES mally_inventory_items(id),
         voucher_id TEXT REFERENCES mally_vouchers(id),
         date TEXT NOT NULL,
-        movement_type TEXT NOT NULL CHECK(movement_type IN ('in','out','adjustment')),
-        quantity INTEGER NOT NULL CHECK(quantity > 0),
-        unit_cost_paise INTEGER NOT NULL CHECK(unit_cost_paise >= 0),
-        total_value_paise INTEGER NOT NULL CHECK(total_value_paise >= 0),
+        movement_type TEXT NOT NULL CHECK(movement_type IN ('in','out','adjustment','opening','purchase','purchaseReturn','sale','saleReturn','adjustmentIn','adjustmentOut')),
+        quantity REAL NOT NULL DEFAULT 0,
+        unit_cost_paise INTEGER NOT NULL DEFAULT 0,
+        total_value_paise INTEGER NOT NULL DEFAULT 0,
         reference_voucher_number TEXT,
         reason TEXT,
         created_at TEXT NOT NULL
@@ -274,7 +282,14 @@ public struct MigrationV001: Migration {
         designation TEXT,
         pan TEXT,
         bank_account_id TEXT REFERENCES mally_accounts(id),
-        base_salary_paise INTEGER NOT NULL CHECK(base_salary_paise >= 0),
+        base_salary_paise INTEGER NOT NULL DEFAULT 0,
+        basic_paise INTEGER NOT NULL DEFAULT 0,
+        hra_paise INTEGER NOT NULL DEFAULT 0,
+        other_allowances_paise INTEGER NOT NULL DEFAULT 0,
+        bank_account TEXT,
+        ifsc TEXT,
+        pf_applicable INTEGER NOT NULL DEFAULT 0 CHECK(pf_applicable IN (0,1)),
+        esi_applicable INTEGER NOT NULL DEFAULT 0 CHECK(esi_applicable IN (0,1)),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
         joined_on TEXT NOT NULL,
         end_date TEXT,
@@ -292,9 +307,17 @@ public struct MigrationV001: Migration {
         voucher_id TEXT REFERENCES mally_vouchers(id),
         month INTEGER NOT NULL CHECK(month BETWEEN 1 AND 12),
         year INTEGER NOT NULL CHECK(year BETWEEN 2000 AND 9999),
-        gross_paise INTEGER NOT NULL CHECK(gross_paise > 0),
-        deductions_paise INTEGER NOT NULL DEFAULT 0 CHECK(deductions_paise >= 0),
-        net_paise INTEGER NOT NULL CHECK(net_paise = gross_paise - deductions_paise),
+        working_days INTEGER NOT NULL DEFAULT 0,
+        paid_days INTEGER NOT NULL DEFAULT 0,
+        basic_paise INTEGER NOT NULL DEFAULT 0,
+        hra_paise INTEGER NOT NULL DEFAULT 0,
+        other_allowances_paise INTEGER NOT NULL DEFAULT 0,
+        overtime_paise INTEGER NOT NULL DEFAULT 0,
+        gross_paise INTEGER NOT NULL DEFAULT 0,
+        deductions_paise INTEGER NOT NULL DEFAULT 0,
+        net_paise INTEGER NOT NULL DEFAULT 0,
+        pf_applicable INTEGER NOT NULL DEFAULT 0,
+        esi_applicable INTEGER NOT NULL DEFAULT 0,
         posted_at TEXT NOT NULL
     );
     CREATE INDEX idx_mally_payroll_emp_period ON mally_payroll_entries(employee_id, year, month);
@@ -364,6 +387,17 @@ public struct MigrationV001: Migration {
         UNIQUE(voucher_id)
     );
     CREATE INDEX idx_mally_br_account_cleared ON mally_bank_reconciliations(bank_account_id, is_cleared);
+
+    CREATE TABLE mally_bank_statement_lines (
+        id TEXT NOT NULL PRIMARY KEY,
+        account_id TEXT NOT NULL REFERENCES mally_accounts(id),
+        date TEXT NOT NULL,
+        amount_paise INTEGER NOT NULL,
+        narration TEXT NOT NULL DEFAULT '',
+        is_cleared INTEGER NOT NULL DEFAULT 0 CHECK(is_cleared IN (0,1)),
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX idx_mally_bsl_account_date ON mally_bank_statement_lines(account_id, date);
 
     CREATE TABLE mally_migrations (
         version INTEGER NOT NULL PRIMARY KEY,

@@ -43,7 +43,7 @@ public final class VoucherEditViewModel: ObservableObject {
         }
     }
 
-    public struct LineRow: Identifiable {
+    public struct LineRow: Identifiable, Equatable {
         public let id = UUID()
         public var accountId: Account.ID?
         public var amount: String = "0.00"
@@ -52,6 +52,18 @@ public final class VoucherEditViewModel: ObservableObject {
         public var costCenter: String?
 
         public init() {}
+
+        public init(accountId: Account.ID?,
+                    amount: String,
+                    side: LedgerSide,
+                    taxCode: String? = nil,
+                    costCenter: String? = nil) {
+            self.accountId = accountId
+            self.amount = amount
+            self.side = side
+            self.taxCode = taxCode
+            self.costCenter = costCenter
+        }
     }
 
     public func load(accounts: [Account], initialDate: Date) {

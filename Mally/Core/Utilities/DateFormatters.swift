@@ -37,29 +37,48 @@ public enum DateFormatters {
         return df
     }()
 
-    public static func isoDate(_ date: Date) -> String {
-        isoDateFormatter.string(from: date)
-    }
+    public static let gstReturnFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.calendar = Calendar(identifier: .gregorian)
+        df.locale = Locale(identifier: "en_IN")
+        df.timeZone = TimeZone.current
+        df.dateFormat = "MMM yyyy"
+        return df
+    }()
 
-    public static func isoTimestamp(_ date: Date) -> String {
-        isoTimestampFormatter.string(from: date)
-    }
+    public static let gstPeriodFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.calendar = Calendar(identifier: .gregorian)
+        df.locale = Locale(identifier: "en_IN")
+        df.timeZone = TimeZone.current
+        df.dateFormat = "MM/yyyy"
+        return df
+    }()
 
-    public static func parseDate(_ s: String) -> Date? {
-        if s.isEmpty { return nil }
-        return isoDateFormatter.date(from: s)
-    }
+    public static let userDate: DateFormatter = displayDateFormatter
+    public static let isoTimestamp: DateFormatter = isoTimestampFormatter
+    public static let isoDate: DateFormatter = isoDateFormatter
+    public static let gstReturn: DateFormatter = gstReturnFormatter
+    public static let gstPeriod: DateFormatter = gstPeriodFormatter
 
+    public static func stringFromIsoDate(_ s: String) -> String { s }
     public static func parseTimestamp(_ s: String) -> Date? {
         if s.isEmpty { return nil }
         return isoTimestampFormatter.date(from: s)
     }
 
-    public static func displayDate(_ date: Date) -> String {
-        displayDateFormatter.string(from: date)
+    public static func parseDate(_ s: String) -> Date? {
+        if s.isEmpty { return nil }
+        if let d = isoDateFormatter.date(from: s) { return d }
+        return displayDateFormatter.date(from: s)
     }
 
-    public static func displayDateTime(_ date: Date) -> String {
-        displayDateTimeFormatter.string(from: date)
-    }
+    public static func formatIsoDate(_ date: Date) -> String { isoDateFormatter.string(from: date) }
+    public static func formatDisplayDate(_ date: Date) -> String { displayDateFormatter.string(from: date) }
+    public static func formatDisplayDateTime(_ date: Date) -> String { displayDateTimeFormatter.string(from: date) }
+    public static func formatIsoTimestamp(_ date: Date) -> String { isoTimestampFormatter.string(from: date) }
+    public static func formatGstReturn(_ date: Date) -> String { gstReturnFormatter.string(from: date) }
+    public static func formatGstPeriod(_ date: Date) -> String { gstPeriodFormatter.string(from: date) }
+
+    public static func displayDate(_ date: Date) -> String { displayDateFormatter.string(from: date) }
 }

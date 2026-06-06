@@ -26,6 +26,7 @@ public enum ValidationErrorCode: String, CaseIterable, Sendable, Codable, Identi
     case stockMovementQuantityZero
     case stockMovementCostMismatch
     case quantityExceedsStock
+    case `internal`
 
     public var id: String { rawValue }
 
@@ -56,6 +57,7 @@ public enum ValidationErrorCode: String, CaseIterable, Sendable, Codable, Identi
         case .stockMovementQuantityZero:   return "Stock movement qty zero"
         case .stockMovementCostMismatch:   return "Stock movement cost mismatch"
         case .quantityExceedsStock:        return "Quantity exceeds stock"
+        case .`internal`:                  return "Internal error"
         }
     }
 }

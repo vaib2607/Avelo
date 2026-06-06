@@ -3,22 +3,16 @@ import SwiftUI
 public struct AccountsView: View {
 
     @EnvironmentObject private var env: AppEnvironment
-    @State private var vm: AccountsViewModel?
+    @State private var holder = AccountsViewModelHolder()
 
     public init() {}
 
     public var body: some View {
-        Group {
-            if let vm = vm {
-                content(vm: vm)
-            } else {
-                ProgressView()
-            }
-        }
-        .navigationTitle("Accounts")
-        .toolbar { toolbar }
-        .onAppear { setupIfNeeded() }
-        .onChange(of: env.companyContext?.companyId) { _, _ in setupIfNeeded() }
+        AccountsContent(holder: holder)
+            .navigationTitle("Accounts")
+            .toolbar { toolbar }
+            .onAppear { setupIfNeeded() }
+            .onChange(of: env.companyContext?.companyId) { _, _ in setupIfNeeded() }
     }
 
     @ToolbarContentBuilder
@@ -32,18 +26,45 @@ public struct AccountsView: View {
         }
     }
 
-    @ViewBuilder
-    private func content(vm: AccountsViewModel) -> some View {
+    private func setupIfNeeded() {
+        guard let ctx = env.companyContext, holder.vm == nil else { return }
+        holder.vm = AccountsViewModel(companyId: ctx.companyId, db: ctx.database)
+    }
+}
+
+@MainActor
+final class AccountsViewModelHolder: ObservableObject {
+    @Published var vm: AccountsViewModel?
+}
+
+@MainActor
+private struct AccountsContent: View {
+    @ObservedObject var holder: AccountsViewModelHolder
+
+    var body: some View {
+        if let vm = holder.vm {
+            AccountsBody(vm: vm)
+        } else {
+            ProgressView()
+        }
+    }
+}
+
+@MainActor
+private struct AccountsBody: View {
+    @ObservedObject var vm: AccountsViewModel
+
+    var body: some View {
         HSplitView {
-            groupsList(vm: vm)
+            groupsList
                 .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
-            accountsList(vm: vm)
+            accountsList
                 .frame(minWidth: 520)
         }
     }
 
     @ViewBuilder
-    private func groupsList(vm: AccountsViewModel) -> some View {
+    private var groupsList: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Groups")
                 .font(.headline)
@@ -57,65 +78,41 @@ public struct AccountsView: View {
                             Text("All groups")
                             Spacer()
                         }
-                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
-                ForEach(vm.groups) { g in
-                    HStack {
-                        Text(g.code)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                        Text(g.name)
-                        Spacer()
+                Section("Groups") {
+                    ForEach(vm.groups) { g in
+                        HStack {
+                            Text(g.name)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { vm.selectedGroupId = g.id }
                     }
-                    .tag(g.id as AccountGroup.ID?)
-                    .contentShape(Rectangle())
                 }
             }
         }
     }
 
     @ViewBuilder
-    private func accountsList(vm: AccountsViewModel) -> some View {
-        VStack(spacing: 0) {
+    private var accountsList: some View {
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
-                SearchBar(text: $vm.query, placeholder: "Search by name or code…")
-                Toggle("Show disabled", isOn: $vm.showDisabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                SearchBar(text: $vm.query, placeholder: "Search accounts")
+                Spacer()
             }
             .padding(12)
-            Divider()
-            Table(vm.filtered, columns: {
-                TableColumn("Code", value: \.code)
-                TableColumn("Name", value: \.name)
-                TableColumn("Group") { acc in
-                    Text(vm.groups.first(where: { $0.id == acc.groupId })?.name ?? "—")
-                }
-                TableColumn("Opening (₹)") { acc in
-                    Text(Currency.formatPaise(acc.openingBalancePaise))
-                        .monospacedDigit()
-                }
-                TableColumn("Status") { acc in
-                    StatusBadge(kind: acc.isActive ? .success : .neutral,
-                                text: acc.isActive ? "Active" : "Disabled")
-                }
-                TableColumn("Actions") { acc in
-                    HStack {
-                        Button("Disable") { vm.disable(acc.id) }
-                            .disabled(!acc.isActive)
+            List(vm.accounts) { account in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(account.name).font(.headline)
+                        Text(account.code).font(.caption).foregroundStyle(.secondary)
                     }
+                    Spacer()
+                    Text(Currency.formatPaise(account.openingBalancePaise)).monospacedDigit()
                 }
-            })
-        }
-    }
-
-    private func setupIfNeeded() {
-        guard let ctx = env.companyContext else { return }
-        if vm == nil || vm?.companyId != ctx.companyId {
-            vm = AccountsViewModel(companyId: ctx.companyId, db: ctx.database)
-            vm?.reload()
+            }
         }
     }
 }

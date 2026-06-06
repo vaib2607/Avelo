@@ -57,10 +57,10 @@ public struct CompanyPickerView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if entries.isEmpty {
             EmptyStateView(
-                systemImage: "building.2",
                 title: "No companies yet",
                 message: "Create a new company to get started. Everything stays on this Mac.",
-                actionLabel: "New Company"
+                systemImage: "building.2",
+                actionTitle: "New Company"
             ) {
                 router.present(.newCompany)
             }

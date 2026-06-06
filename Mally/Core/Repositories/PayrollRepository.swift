@@ -12,6 +12,8 @@ public struct PayrollRepository: Sendable {
         try db.queryOne(
             """
             SELECT id, company_id, code, name, designation, pan, bank_account_id, base_salary_paise,
+                   basic_paise, hra_paise, other_allowances_paise, bank_account, ifsc,
+                   pf_applicable, esi_applicable,
                    is_active, joined_on, end_date, created_at
             FROM mally_payroll_employees WHERE id = ?
             """,
@@ -19,9 +21,15 @@ public struct PayrollRepository: Sendable {
         ) { try Self.rowToEmployee($0) }
     }
 
+    public func findEmployee(id: PayrollEmployee.ID) throws -> PayrollEmployee? {
+        try findEmployeeById(id)
+    }
+
     public func listEmployeesForCompany(_ companyId: Company.ID, includeInactive: Bool = false) throws -> [PayrollEmployee] {
         let sql = """
             SELECT id, company_id, code, name, designation, pan, bank_account_id, base_salary_paise,
+                   basic_paise, hra_paise, other_allowances_paise, bank_account, ifsc,
+                   pf_applicable, esi_applicable,
                    is_active, joined_on, end_date, created_at
             FROM mally_payroll_employees
             WHERE company_id = ?\(includeInactive ? "" : " AND is_active = 1")
@@ -30,13 +38,19 @@ public struct PayrollRepository: Sendable {
         return try db.query(sql, bind: [.text(companyId.uuidString)]) { try Self.rowToEmployee($0) }
     }
 
+    public func listEmployees(companyId: Company.ID, activeOnly: Bool = true) throws -> [PayrollEmployee] {
+        try listEmployeesForCompany(companyId, includeInactive: !activeOnly)
+    }
+
     public func insertEmployee(_ e: PayrollEmployee) throws {
         try db.execute(
             """
             INSERT INTO mally_payroll_employees
             (id, company_id, code, name, designation, pan, bank_account_id, base_salary_paise,
+             basic_paise, hra_paise, other_allowances_paise, bank_account, ifsc,
+             pf_applicable, esi_applicable,
              is_active, joined_on, end_date, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(e.id.uuidString),
@@ -47,6 +61,13 @@ public struct PayrollRepository: Sendable {
                 .optionalText(e.pan),
                 .optionalText(e.bankAccountId?.uuidString),
                 .integer(e.baseSalaryPaise),
+                .integer(e.basicPaise),
+                .integer(e.hraPaise),
+                .integer(e.otherAllowancesPaise),
+                .optionalText(e.bankAccount),
+                .optionalText(e.ifsc),
+                .bool(e.pfApplicable),
+                .bool(e.esiApplicable),
                 .bool(e.isActive),
                 .date(e.joinedOn),
                 .optionalDate(e.endDate),
@@ -60,7 +81,11 @@ public struct PayrollRepository: Sendable {
             """
             UPDATE mally_payroll_employees SET
                 code = ?, name = ?, designation = ?, pan = ?, bank_account_id = ?,
-                base_salary_paise = ?, is_active = ?, joined_on = ?, end_date = ?
+                base_salary_paise = ?,
+                basic_paise = ?, hra_paise = ?, other_allowances_paise = ?,
+                bank_account = ?, ifsc = ?,
+                pf_applicable = ?, esi_applicable = ?,
+                is_active = ?, joined_on = ?, end_date = ?
             WHERE id = ?
             """,
             [
@@ -70,11 +95,25 @@ public struct PayrollRepository: Sendable {
                 .optionalText(e.pan),
                 .optionalText(e.bankAccountId?.uuidString),
                 .integer(e.baseSalaryPaise),
+                .integer(e.basicPaise),
+                .integer(e.hraPaise),
+                .integer(e.otherAllowancesPaise),
+                .optionalText(e.bankAccount),
+                .optionalText(e.ifsc),
+                .bool(e.pfApplicable),
+                .bool(e.esiApplicable),
                 .bool(e.isActive),
                 .date(e.joinedOn),
                 .optionalDate(e.endDate),
                 .text(e.id.uuidString)
             ]
+        )
+    }
+
+    public func deactivateEmployee(_ id: PayrollEmployee.ID) throws {
+        try db.execute(
+            "UPDATE mally_payroll_employees SET is_active = 0, end_date = COALESCE(end_date, DATE('now')) WHERE id = ?",
+            [.text(id.uuidString)]
         )
     }
 
@@ -90,8 +129,9 @@ public struct PayrollRepository: Sendable {
             """
             INSERT INTO mally_payroll_entries
             (id, company_id, employee_id, financial_year_id, voucher_id, month, year,
-             gross_paise, deductions_paise, net_paise, posted_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             working_days, paid_days, basic_paise, hra_paise, other_allowances_paise, overtime_paise,
+             gross_paise, deductions_paise, net_paise, pf_applicable, esi_applicable, posted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(e.id.uuidString),
@@ -101,9 +141,17 @@ public struct PayrollRepository: Sendable {
                 .optionalText(e.voucherId?.uuidString),
                 .integer(Int64(e.month)),
                 .integer(Int64(e.year)),
+                .real(Double(e.workingDays)),
+                .real(Double(e.paidDays)),
+                .integer(e.basicPaise),
+                .integer(e.hraPaise),
+                .integer(e.otherAllowancesPaise),
+                .integer(e.overtimePaise),
                 .integer(e.grossPaise),
                 .integer(e.deductionsPaise),
                 .integer(e.netPaise),
+                .bool(e.pfApplicable),
+                .bool(e.esiApplicable),
                 .timestamp(e.postedAt)
             ]
         )
@@ -115,6 +163,7 @@ public struct PayrollRepository: Sendable {
         public var financialYearId: FinancialYear.ID?
         public var year: Int?
         public var month: Int?
+        public var monthYear: (year: Int, month: Int)?
         public var limit: Int
         public var offset: Int
 
@@ -123,6 +172,7 @@ public struct PayrollRepository: Sendable {
                     financialYearId: FinancialYear.ID? = nil,
                     year: Int? = nil,
                     month: Int? = nil,
+                    monthYear: (year: Int, month: Int)? = nil,
                     limit: Int = 200,
                     offset: Int = 0) {
             self.companyId = companyId
@@ -130,6 +180,7 @@ public struct PayrollRepository: Sendable {
             self.financialYearId = financialYearId
             self.year = year
             self.month = month
+            self.monthYear = monthYear
             self.limit = limit
             self.offset = offset
         }
@@ -138,7 +189,8 @@ public struct PayrollRepository: Sendable {
     public func listEntries(filter: EntryFilter) throws -> [PayrollEntry] {
         var sql = """
             SELECT id, company_id, employee_id, financial_year_id, voucher_id, month, year,
-                   gross_paise, deductions_paise, net_paise, posted_at
+                   working_days, paid_days, basic_paise, hra_paise, other_allowances_paise, overtime_paise,
+                   gross_paise, deductions_paise, net_paise, pf_applicable, esi_applicable, posted_at
             FROM mally_payroll_entries
             WHERE company_id = ?
         """
@@ -151,11 +203,15 @@ public struct PayrollRepository: Sendable {
             sql += " AND financial_year_id = ?"
             bind.append(.text(fyId.uuidString))
         }
-        if let y = filter.year {
+        if let my = filter.monthYear {
+            sql += " AND year = ? AND month = ?"
+            bind.append(.integer(Int64(my.year)))
+            bind.append(.integer(Int64(my.month)))
+        } else if let y = filter.year {
             sql += " AND year = ?"
             bind.append(.integer(Int64(y)))
         }
-        if let m = filter.month {
+        if let m = filter.month, filter.monthYear == nil {
             sql += " AND month = ?"
             bind.append(.integer(Int64(m)))
         }
@@ -172,15 +228,21 @@ public struct PayrollRepository: Sendable {
         return PayrollEmployee(
             id: id,
             companyId: companyId,
-            code: r.text("code"),
+            employeeCode: r.text("code"),
             name: r.text("name"),
             designation: r.optionalText("designation"),
             pan: r.optionalText("pan"),
+            bankAccount: r.optionalText("bank_account"),
+            ifsc: r.optionalText("ifsc"),
             bankAccountId: bank,
-            baseSalaryPaise: r.int("base_salary_paise"),
+            basicPaise: r.int("basic_paise"),
+            hraPaise: r.int("hra_paise"),
+            otherAllowancesPaise: r.int("other_allowances_paise"),
+            pfApplicable: r.bool("pf_applicable"),
+            esiApplicable: r.bool("esi_applicable"),
             isActive: r.bool("is_active"),
             joinedOn: r.date("joined_on"),
-            endDate: r.optionalText("end_date").flatMap { DateFormatters.parseDate($0) },
+            endDate: r.optionalDate("end_date"),
             createdAt: r.timestamp("created_at")
         )
     }
@@ -202,6 +264,14 @@ public struct PayrollRepository: Sendable {
             grossPaise: r.int("gross_paise"),
             deductionsPaise: r.int("deductions_paise"),
             netPaise: r.int("net_paise"),
+            workingDays: r.real("working_days"),
+            paidDays: r.real("paid_days"),
+            basicPaise: r.int("basic_paise"),
+            hraPaise: r.int("hra_paise"),
+            otherAllowancesPaise: r.int("other_allowances_paise"),
+            overtimePaise: r.int("overtime_paise"),
+            pfApplicable: r.bool("pf_applicable"),
+            esiApplicable: r.bool("esi_applicable"),
             postedAt: r.timestamp("posted_at")
         )
     }

@@ -84,7 +84,7 @@ public struct ReportRepository: Sendable {
     // MARK: - Trial Balance
 
     public func trialBalance(asOfDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.TrialBalance {
-        let asOfStr = DateFormatters.isoDate(asOfDate)
+        let asOfStr = DateFormatters.formatIsoDate(asOfDate)
         let sql = """
             WITH movements AS (
                 SELECT l.account_id AS aid,
@@ -292,8 +292,10 @@ public struct ReportRepository: Sendable {
             asOfDate: asOfDate,
             assets: assetSections,
             liabilities: liabSections,
+            equity: [],
             totalAssetsPaise: totalAssets,
             totalLiabilitiesPaise: totalLiab,
+            totalEquityPaise: equity,
             balancingEquityPaise: equity
         )
     }
@@ -360,7 +362,7 @@ public struct ReportRepository: Sendable {
             totals[gname, default: 0] += net
         }
         return byGname.keys.sorted().map { gname in
-            ReportResult.BalanceSheetSection(title: gname, rows: byGname[gname] ?? [], totalPaise: totals[gname] ?? 0)
+            ReportResult.BalanceSheetSection(id: gname, title: gname, rows: byGname[gname] ?? [], totalPaise: totals[gname] ?? 0)
         }
     }
 
@@ -402,7 +404,7 @@ public struct ReportRepository: Sendable {
                 netAmt = dr - (cr + acct.openingBalancePaise)
             }
             let label = "\(c.accountCode.replacingOccurrences(of: "_", with: " "))"
-            let bucket = ReportResult.GstBucket(label: label, amountPaise: netAmt)
+            let bucket = ReportResult.GstBucket(id: label, label: label, amountPaise: netAmt)
             if c.sign > 0 { output.append(bucket) } else { input.append(bucket) }
             net += netAmt * Int64(c.sign)
         }
@@ -444,9 +446,9 @@ public struct ReportRepository: Sendable {
     public func outstanding(asOfDate: Date, direction: ReportResult.OutstandingReport.Direction, filter: ReportResult.ReportFilter) throws -> ReportResult.OutstandingReport {
         let codes: [String]
         switch direction {
-        case .receivables: codes = ["SUNDRY_DEBTORS"]
-        case .payables:    codes = ["SUNDRY_CREDITORS"]
-        case .both:        codes = ["SUNDRY_DEBTORS", "SUNDRY_CREDITORS"]
+        case .receivable, .receivables: codes = ["SUNDRY_DEBTORS"]
+        case .payable, .payables:      codes = ["SUNDRY_CREDITORS"]
+        case .both:                    codes = ["SUNDRY_DEBTORS", "SUNDRY_CREDITORS"]
         }
         let placeholders = Array(repeating: "?", count: codes.count).joined(separator: ",")
         let sql = """
@@ -477,15 +479,12 @@ public struct ReportRepository: Sendable {
             if total == 0 { continue }
             rows.append(ReportResult.OutstandingRow(
                 id: aid,
-                accountName: name,
-                totalPaise: total,
-                age0to30Paise: total,
-                age31to60Paise: 0,
-                age61to90Paise: 0,
-                age90PlusPaise: 0
+                partyName: name,
+                asOf: asOfDate,
+                amountPaise: total
             ))
         }
-        return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: rows, direction: direction)
+        return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: rows, direction: direction, totalPaise: rows.reduce(0) { $0 + $1.amountPaise })
     }
 
     // MARK: - Stock Valuation
@@ -502,6 +501,9 @@ public struct ReportRepository: Sendable {
                 itemCode: item.code,
                 itemName: item.name,
                 unit: item.unit,
+                quantity: Double(bal.onHandQty),
+                ratePaise: avg,
+                valuePaise: bal.onHandValuePaise,
                 openingQty: 0,
                 openingValuePaise: 0,
                 inQty: bal.inQty,

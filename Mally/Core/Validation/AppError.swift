@@ -1,6 +1,6 @@
 import Foundation
 
-public enum AppError: Error, Sendable, Equatable {
+public enum AppError: Error, Sendable, Equatable, Identifiable {
     case validation(ValidationError)
     case database(SQLiteError)
     case featureUnavailable(String)
@@ -36,6 +36,18 @@ public enum AppError: Error, Sendable, Equatable {
             return .database(sqliteErr)
         }
         return .unexpected(error.localizedDescription)
+    }
+
+    public var id: String {
+        switch self {
+        case .validation(let e):  return "validation-\(e.code.rawValue)"
+        case .database(let e):    return "database-\(e.message.hashValue)"
+        case .featureUnavailable(let s): return "unavail-\(s.hashValue)"
+        case .fileSystem(let s):   return "fs-\(s.hashValue)"
+        case .unexpected(let s):   return "unexpected-\(s.hashValue)"
+        case .businessRule(let s): return "biz-\(s.hashValue)"
+        case .notFound(let s):     return "404-\(s.hashValue)"
+        }
     }
 }
 

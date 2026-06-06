@@ -43,4 +43,30 @@ public enum IndianFinancialYear {
         guard let first = parts.first, let y = Int(first) else { return nil }
         return y
     }
+
+    public static func start(for date: Date) -> Date {
+        let cal = Calendar(identifier: .gregorian)
+        let y = cal.component(.year, from: date)
+        let m = cal.component(.month, from: date)
+        let startYear = m >= 4 ? y : (y - 1)
+        return startDate(ofFYStartingYear: startYear)
+    }
+
+    public static func end(for date: Date) -> Date {
+        let cal = Calendar(identifier: .gregorian)
+        let y = cal.component(.year, from: date)
+        let m = cal.component(.month, from: date)
+        let startYear = m >= 4 ? y : (y - 1)
+        return endDate(ofFYStartingYear: startYear)
+    }
+
+    public struct DetectedFY: Sendable {
+        public let label: String
+        public let start: Date
+        public let end: Date
+    }
+
+    public static func detect(now: Date = Date()) -> DetectedFY {
+        DetectedFY(label: fyLabel(for: now), start: start(for: now), end: end(for: now))
+    }
 }

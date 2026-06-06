@@ -162,7 +162,7 @@ public final class VoucherService: Sendable {
                 voucherId: reversalId,
                 accountId: line.accountId,
                 amountPaise: line.amountPaise,
-                side: line.side == .debit ? .credit : .debit,
+                side: line.side == EntrySide.debit ? EntrySide.credit : EntrySide.debit,
                 taxCode: line.taxCode,
                 costCenter: line.costCenter,
                 lineOrder: idx

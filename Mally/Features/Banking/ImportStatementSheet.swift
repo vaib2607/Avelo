@@ -76,7 +76,14 @@ public struct ImportStatementSheet: View {
             guard let d = iso.date(from: parts[0]) else { continue }
             guard let paise = Currency.parseRupeeInput(parts[1]) else { continue }
             let narration = parts[2...].joined(separator: ",")
-            entries.append(BankReconciliationService.StatementEntry(date: d, amountPaise: paise, narration: narration))
+            entries.append(BankReconciliationService.StatementEntry(
+                id: UUID(),
+                accountId: aid,
+                date: d,
+                amountPaise: paise,
+                narration: narration,
+                isCleared: false
+            ))
         }
         do {
             try BankReconciliationService(db: db, companyId: companyId)

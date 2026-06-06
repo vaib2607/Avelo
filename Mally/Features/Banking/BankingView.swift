@@ -3,36 +3,60 @@ import SwiftUI
 public struct BankingView: View {
 
     @EnvironmentObject private var env: AppEnvironment
-    @State private var vm: BankingViewModel?
+    @State private var holder = BankingViewModelHolder()
     @State private var showImport: Bool = false
 
     public init() {}
 
     public var body: some View {
-        Group {
-            if let vm = vm {
-                content(vm: vm)
-            } else { ProgressView() }
-        }
-        .navigationTitle("Banking")
-        .toolbar {
-            ToolbarItem {
-                Button { showImport = true } label: {
-                    Label("Import statement", systemImage: "tray.and.arrow.down")
+        BankingContent(holder: holder)
+            .navigationTitle("Banking")
+            .toolbar {
+                ToolbarItem {
+                    Button { showImport = true } label: {
+                        Label("Import statement", systemImage: "tray.and.arrow.down")
+                    }
                 }
             }
-        }
-        .onAppear { setup() }
-        .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
-        .sheet(isPresented: $showImport) {
-            if let ctx = env.companyContext {
-                ImportStatementSheet(companyId: ctx.companyId, db: ctx.database, accounts: vm?.accounts ?? [])
+            .onAppear { setup() }
+            .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .sheet(isPresented: $showImport) {
+                if let ctx = env.companyContext {
+                    ImportStatementSheet(companyId: ctx.companyId, db: ctx.database, accounts: holder.vm?.accounts ?? [])
+                }
             }
-        }
     }
 
-    @ViewBuilder
-    private func content(vm: BankingViewModel) -> some View {
+    private func setup() {
+        guard let ctx = env.companyContext else { return }
+        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
+            holder.vm = BankingViewModel(companyId: ctx.companyId, db: ctx.database)
+            holder.vm?.reload()
+        }
+    }
+}
+
+@MainActor
+final class BankingViewModelHolder: ObservableObject {
+    @Published var vm: BankingViewModel?
+}
+
+@MainActor
+private struct BankingContent: View {
+    @ObservedObject var holder: BankingViewModelHolder
+
+    var body: some View {
+        if let vm = holder.vm {
+            BankingBody(vm: vm)
+        } else { ProgressView() }
+    }
+}
+
+@MainActor
+private struct BankingBody: View {
+    @ObservedObject var vm: BankingViewModel
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Picker("Account", selection: $vm.selectedAccountId) {
@@ -97,14 +121,6 @@ public struct BankingView: View {
                         .padding(20)
                 }
             }
-        }
-    }
-
-    private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if vm == nil || vm?.companyId != ctx.companyId {
-            vm = BankingViewModel(companyId: ctx.companyId, db: ctx.database)
-            vm?.reload()
         }
     }
 }

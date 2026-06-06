@@ -93,14 +93,21 @@ public final class InventoryService: Sendable {
             companyId: companyId,
             itemId: itemId,
             date: date,
-            type: type,
-            quantity: quantity,
-            ratePaise: ratePaise,
+            movementType: type,
+            quantity: Int64(quantity),
+            unitCostPaise: ratePaise,
+            totalValuePaise: Int64(quantity) * ratePaise,
             voucherId: voucherId,
-            notes: notes
+            reason: notes
         )
         let v = StockMovementValidator().validate(StockMovementValidator.Input(
-            itemId: itemId, quantity: quantity, ratePaise: ratePaise, type: type
+            itemId: itemId,
+            date: date,
+            movementType: type,
+            quantity: Int64(quantity),
+            unitCostPaise: ratePaise,
+            totalValuePaise: Int64(quantity) * ratePaise,
+            currentOnHandQty: 0
         ))
         if case .invalid(let errs) = v {
             throw AppError.validation(errs[0])

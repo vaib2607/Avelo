@@ -53,13 +53,13 @@ public final class DashboardViewModel: ObservableObject {
                 let l = try report.ledger(accountId: id, financialYearId: fyId)
                 bankBalancePaise = l.closingBalancePaise
             }
-            receivablesPaise = (try accountId(for: "DEBTORS")).map {
-                let l = try report.ledger(accountId: $0, financialYearId: fyId)
-                return l.closingBalancePaise
+            receivablesPaise = accountId(for: "DEBTORS").map {
+                let l = (try? report.ledger(accountId: $0, financialYearId: fyId)) ?? nil
+                return l?.closingBalancePaise ?? 0
             } ?? 0
-            payablesPaise = (try accountId(for: "CREDITORS")).map {
-                let l = try report.ledger(accountId: $0, financialYearId: fyId)
-                return l.closingBalancePaise
+            payablesPaise = accountId(for: "CREDITORS").map {
+                let l = (try? report.ledger(accountId: $0, financialYearId: fyId)) ?? nil
+                return l?.closingBalancePaise ?? 0
             } ?? 0
 
             if let id = accountId(for: "GST_OUT") {

@@ -7,7 +7,7 @@ public struct MoneyTextField: View {
     public var isEditable: Bool = true
 
     @State private var text: String = ""
-    @State private var isFocused: Bool = false
+    @FocusState private var isFocused: Bool
 
     public init(paise: Binding<Int64>,
                 placeholder: String = "0.00",
@@ -54,5 +54,21 @@ public struct MoneyTextField: View {
         } else {
             text = format(paise)
         }
+    }
+}
+
+extension MoneyTextField {
+    public init(label: String, text: Binding<String>) {
+        let paiseBinding = Binding<Int64>(
+            get: { Currency.parseRupeeInput(text.wrappedValue) ?? 0 },
+            set: { newValue in
+                if newValue == 0 {
+                    text.wrappedValue = ""
+                } else {
+                    text.wrappedValue = Currency.formatAmountInput(paise: newValue)
+                }
+            }
+        )
+        self.init(paise: paiseBinding, placeholder: label)
     }
 }

@@ -1,9 +1,14 @@
 import Foundation
 
-public struct VoucherDraft: Hashable, Sendable {
-    public enum Mode: Hashable, Sendable {
+public struct VoucherDraft: Sendable, Hashable {
+    public enum Mode: Sendable, Hashable {
         case create
         case edit(originalVoucherId: Voucher.ID)
+
+        public var originalVoucherId: Voucher.ID? {
+            if case .edit(let id) = self { return id }
+            return nil
+        }
     }
 
     public struct Line: Identifiable, Hashable, Sendable {
@@ -31,9 +36,7 @@ public struct VoucherDraft: Hashable, Sendable {
             self.lineOrder = lineOrder
         }
 
-        public var isEmpty: Bool {
-            accountId == nil && amountPaise == 0
-        }
+        public var amount: String { Currency.formatAmountInput(paise: amountPaise) }
     }
 
     public var mode: Mode
@@ -44,50 +47,33 @@ public struct VoucherDraft: Hashable, Sendable {
     public var reference: String
     public var lines: [Line]
 
-    public init(mode: Mode = .create,
-                voucherTypeCode: VoucherType.Code = .journal,
-                date: Date = Date(),
+    public init(mode: Mode,
+                voucherTypeCode: VoucherType.Code,
+                date: Date,
                 partyAccountId: Account.ID? = nil,
                 narration: String = "",
                 reference: String = "",
-                lines: [Line]? = nil) {
+                lines: [Line] = []) {
         self.mode = mode
         self.voucherTypeCode = voucherTypeCode
         self.date = date
         self.partyAccountId = partyAccountId
         self.narration = narration
         self.reference = reference
-        if let lines = lines {
-            self.lines = lines
-        } else {
-            self.lines = [
-                Line(lineOrder: 0),
-                Line(side: .credit, lineOrder: 1)
-            ]
-        }
+        self.lines = lines
     }
 
-    public static var empty: VoucherDraft { VoucherDraft() }
-
     public var totalDebitPaise: Int64 {
-        lines.filter { $0.side == .debit }.reduce(0) { $0 + $1.amountPaise }
+        lines.filter { $0.side == EntrySide.debit }.reduce(0) { $0 + $1.amountPaise }
     }
 
     public var totalCreditPaise: Int64 {
-        lines.filter { $0.side == .credit }.reduce(0) { $0 + $1.amountPaise }
+        lines.filter { $0.side == EntrySide.credit }.reduce(0) { $0 + $1.amountPaise }
     }
 
-    public var differencePaise: Int64 {
-        totalDebitPaise - totalCreditPaise
-    }
+    public var differencePaise: Int64 { totalDebitPaise - totalCreditPaise }
 
-    public var isBalanced: Bool {
-        differencePaise == 0
-    }
-
-    public var nonEmptyLines: [Line] {
-        lines.filter { !$0.isEmpty }
-    }
+    public var isBalanced: Bool { differencePaise == 0 }
 
     public var filledLines: [Line] {
         lines.filter { $0.accountId != nil && $0.amountPaise > 0 }

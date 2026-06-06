@@ -37,7 +37,7 @@ public struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .mallyRequestBackup)) { _ in
             env.router.present(.backup)
         }
-        .sheet(item: $env.router.presentedSheet) { sheet in
+        .sheet(item: env.presentedSheetBinding) { sheet in
             sheetView(for: sheet)
         }
     }

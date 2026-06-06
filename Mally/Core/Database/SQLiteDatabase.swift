@@ -10,11 +10,11 @@ public enum SQLValue: Sendable {
     case blob(Data)
     case null
 
-    public static func date(_ d: Date) -> SQLValue { .text(DateFormatters.isoDate(d)) }
-    public static func timestamp(_ d: Date) -> SQLValue { .text(DateFormatters.isoTimestamp(d)) }
+    public static func date(_ d: Date) -> SQLValue { .text(DateFormatters.formatIsoDate(d)) }
+    public static func timestamp(_ d: Date) -> SQLValue { .text(DateFormatters.formatIsoTimestamp(d)) }
     public static func optionalText(_ s: String?) -> SQLValue { s.map { .text($0) } ?? .null }
-    public static func optionalDate(_ d: Date?) -> SQLValue { d.map { .text(DateFormatters.isoDate($0)) } ?? .null }
-    public static func optionalTimestamp(_ d: Date?) -> SQLValue { d.map { .text(DateFormatters.isoTimestamp($0)) } ?? .null }
+    public static func optionalDate(_ d: Date?) -> SQLValue { d.map { .text(DateFormatters.formatIsoDate($0)) } ?? .null }
+    public static func optionalTimestamp(_ d: Date?) -> SQLValue { d.map { .text(DateFormatters.formatIsoTimestamp($0)) } ?? .null }
     public static func bool(_ b: Bool) -> SQLValue { .integer(b ? 1 : 0) }
 }
 
@@ -94,12 +94,47 @@ public struct Row {
         return DateFormatters.parseTimestamp(s) ?? Date(timeIntervalSince1970: 0)
     }
 
+    public func optionalDate(_ name: String) -> Date? {
+        let i = index(of: name)
+        guard i >= 0, let stmt = stmt else { return nil }
+        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return nil }
+        let s = String(cString: sqlite3_column_text(stmt, i))
+        return DateFormatters.parseDate(s)
+    }
+
+    public func optionalDate(_ i: Int32) -> Date? {
+        guard i >= 0, let stmt = stmt else { return nil }
+        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return nil }
+        let s = String(cString: sqlite3_column_text(stmt, i))
+        return DateFormatters.parseDate(s)
+    }
+
     public func bool(_ name: String) -> Bool {
         int(name) != 0
     }
 
     public func bool(_ i: Int32) -> Bool {
         int(i) != 0
+    }
+
+    public func real(_ name: String) -> Double {
+        let i = index(of: name)
+        guard i >= 0, let stmt = stmt else { return 0 }
+        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return 0 }
+        return sqlite3_column_double(stmt, i)
+    }
+
+    public func real(_ i: Int32) -> Double {
+        guard i >= 0, let stmt = stmt else { return 0 }
+        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return 0 }
+        return sqlite3_column_double(stmt, i)
+    }
+
+    public func optionalReal(_ name: String) -> Double? {
+        let i = index(of: name)
+        guard i >= 0, let stmt = stmt else { return nil }
+        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return nil }
+        return sqlite3_column_double(stmt, i)
     }
 
     public func data(_ name: String) -> Data {
@@ -349,7 +384,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
     public func close() {
         sync {
             if let h = handle {
-                _ = execNoLock?("PRAGMA wal_checkpoint(TRUNCATE)")
+                _ = try? execNoLock("PRAGMA wal_checkpoint(TRUNCATE)")
                 sqlite3_close(h)
                 handle = nil
             }

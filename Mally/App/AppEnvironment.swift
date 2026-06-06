@@ -51,6 +51,7 @@ public final class AppEnvironment: ObservableObject {
             }
             self.companyContext = CompanyContext(
                 companyId: handle.companyId,
+                companyName: handle.companyName,
                 financialYear: fy,
                 database: handle.db
             )
@@ -84,15 +85,24 @@ public final class AppEnvironment: ObservableObject {
     public func clearBanner() {
         banner = nil
     }
+
+    public var presentedSheetBinding: Binding<RouterSheet?> {
+        Binding(
+            get: { self.router.presentedSheet },
+            set: { self.router.presentedSheet = $0 }
+        )
+    }
 }
 
 public struct CompanyContext: Sendable {
     public let companyId: Company.ID
+    public let companyName: String
     public let financialYear: FinancialYear
     public let database: SQLiteDatabase
 
-    public init(companyId: Company.ID, financialYear: FinancialYear, database: SQLiteDatabase) {
+    public init(companyId: Company.ID, companyName: String, financialYear: FinancialYear, database: SQLiteDatabase) {
         self.companyId = companyId
+        self.companyName = companyName
         self.financialYear = financialYear
         self.database = database
     }

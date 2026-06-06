@@ -1,19 +1,5 @@
 import Foundation
 
-public enum EntrySide: String, CaseIterable, Sendable, Codable, Identifiable {
-    case debit
-    case credit
-
-    public var id: String { rawValue }
-
-    public var displayName: String {
-        switch self {
-        case .debit:  return "Dr"
-        case .credit: return "Cr"
-        }
-    }
-}
-
 public enum OpeningBalanceSide: String, CaseIterable, Sendable, Codable, Identifiable {
     case debit
     case credit

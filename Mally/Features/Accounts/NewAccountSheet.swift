@@ -11,8 +11,11 @@ public struct NewAccountSheet: View {
     @State private var gstin: String = ""
     @State private var groups: [AccountGroup] = []
     @State private var canSave: Bool = false
+    private let existingId: Account.ID?
 
-    public init() {}
+    public init(existing: Account.ID? = nil) {
+        self.existingId = existing
+    }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -75,7 +78,7 @@ public struct NewAccountSheet: View {
         let paise = Currency.parseRupeeInput(opening) ?? 0
         let input = AccountInputValidator.Input(
             code: code, name: name, groupId: groupId,
-            openingBalancePaise: paise, gstin: gstin
+            openingBalancePaise: paise, gstin: gstin, existingAccountId: existingId
         )
         guard let ctx = env.companyContext else { canSave = false; return }
         let result = AccountInputValidator(db: ctx.database).validate(input, companyId: ctx.companyId)
@@ -90,7 +93,7 @@ public struct NewAccountSheet: View {
         let paise = Currency.parseRupeeInput(opening) ?? 0
         let input = AccountInputValidator.Input(
             code: code, name: name, groupId: groupId,
-            openingBalancePaise: paise, gstin: gstin
+            openingBalancePaise: paise, gstin: gstin, existingAccountId: existingId
         )
         do {
             _ = try AccountService(db: ctx.database, companyId: ctx.companyId).createAccount(input)
