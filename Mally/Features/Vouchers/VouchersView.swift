@@ -72,6 +72,23 @@ private struct VouchersBody: View {
         VStack(spacing: 0) {
             filterBar
             Divider()
+            if vm.vouchers.isEmpty {
+                EmptyStateView(
+                    title: vm.query.isEmpty && vm.typeFilter.isEmpty ? "No vouchers yet" : "No matching vouchers",
+                    message: "Press F5 for Payment, F6 for Receipt, F7 for Journal, F4 for Contra — or use the New menu above.",
+                    systemImage: "doc.text",
+                    actionTitle: "New Journal",
+                    action: { env.router.present(.newJournal) }
+                )
+            } else {
+                voucherTable
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var voucherTable: some View {
+        VStack(spacing: 0) {
             Table(vm.vouchers) {
                 TableColumn("Date") { v in
                     Text(DateFormatters.userDate.string(from: v.date))

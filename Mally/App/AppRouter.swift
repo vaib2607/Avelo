@@ -8,16 +8,27 @@ public final class AppRouter: ObservableObject {
     @Published public var presentedSheet: RouterSheet?
     @Published public var presentedAlert: RouterAlert?
 
+    /// Set when another screen requests the Reports view open a specific
+    /// account's ledger. Consumed (and cleared) by `ReportsView`.
+    @Published public var pendingLedgerAccountId: Account.ID?
+
     public init() {}
 
     public func reset() {
         selection = .dashboard
         presentedSheet = nil
         presentedAlert = nil
+        pendingLedgerAccountId = nil
     }
 
     public func go(_ destination: SidebarDestination) {
         selection = destination
+    }
+
+    /// Deep-links to the Reports view showing the given account's ledger.
+    public func openLedger(_ accountId: Account.ID) {
+        pendingLedgerAccountId = accountId
+        selection = .reports
     }
 
     public func present(_ sheet: RouterSheet) {
