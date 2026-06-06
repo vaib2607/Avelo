@@ -123,7 +123,7 @@ public struct InventoryRepository: Sendable {
                 .optionalText(m.voucherId?.uuidString),
                 .date(m.date),
                 .text(m.movementType.rawValue),
-                .integer(m.quantity),
+                .real(m.quantity),
                 .integer(m.unitCostPaise),
                 .integer(m.totalValuePaise),
                 .optionalText(m.referenceVoucherNumber),
@@ -191,40 +191,49 @@ public struct InventoryRepository: Sendable {
 
     public struct ItemBalance: Sendable {
         public let itemId: InventoryItem.ID
-        public let inQty: Int64
-        public let outQty: Int64
-        public let adjustmentQty: Int64
+        public let inQty: Double
+        public let outQty: Double
+        public let adjustmentQty: Double
         public let inValuePaise: Int64
         public let outValuePaise: Int64
-        public let onHandQty: Int64
+        public let onHandQty: Double
         public let onHandValuePaise: Int64
     }
 
     public func runningBalance(itemId: InventoryItem.ID, asOf: Date) throws -> ItemBalance {
         let asOfStr = DateFormatters.formatIsoDate(asOf)
-        let row: (Int64, Int64, Int64, Int64, Int64, Int64)? = try db.queryOne(
+        // Inbound types: in, opening, purchase, saleReturn, adjustmentIn
+        // Outbound types: out, sale, purchaseReturn, adjustmentOut
+        // Neutral/net types: adjustment
+        let row: (Double, Double, Double, Int64, Int64, Double)? = try db.queryOne(
             """
             SELECT
-                COALESCE(SUM(CASE WHEN movement_type = 'in'         THEN quantity ELSE 0 END), 0) AS in_q,
-                COALESCE(SUM(CASE WHEN movement_type = 'out'        THEN quantity ELSE 0 END), 0) AS out_q,
-                COALESCE(SUM(CASE WHEN movement_type = 'adjustment' THEN quantity ELSE 0 END), 0) AS adj_q,
-                COALESCE(SUM(CASE WHEN movement_type = 'in'         THEN total_value_paise ELSE 0 END), 0) AS in_v,
-                COALESCE(SUM(CASE WHEN movement_type = 'out'        THEN total_value_paise ELSE 0 END), 0) AS out_v,
-                COALESCE(SUM(CASE WHEN movement_type = 'in'         THEN quantity
-                                  WHEN movement_type = 'out'        THEN -quantity
-                                  WHEN movement_type = 'adjustment' THEN quantity
-                                  ELSE 0 END), 0) AS on_hand
+                COALESCE(SUM(CASE WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')
+                                  THEN quantity ELSE 0 END), 0) AS in_q,
+                COALESCE(SUM(CASE WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')
+                                  THEN quantity ELSE 0 END), 0) AS out_q,
+                COALESCE(SUM(CASE WHEN movement_type = 'adjustment'
+                                  THEN quantity ELSE 0 END), 0) AS adj_q,
+                COALESCE(SUM(CASE WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')
+                                  THEN total_value_paise ELSE 0 END), 0) AS in_v,
+                COALESCE(SUM(CASE WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')
+                                  THEN total_value_paise ELSE 0 END), 0) AS out_v,
+                COALESCE(SUM(CASE
+                    WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')  THEN  quantity
+                    WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')          THEN -quantity
+                    WHEN movement_type = 'adjustment'                                             THEN  quantity
+                    ELSE 0 END), 0) AS on_hand
             FROM mally_stock_movements
             WHERE item_id = ? AND date <= ?
             """,
             bind: [.text(itemId.uuidString), .text(asOfStr)]
-        ) { r in (r.int(0), r.int(1), r.int(2), r.int(3), r.int(4), r.int(5)) }
-        let inQty = row?.0 ?? 0
-        let outQty = row?.1 ?? 0
-        let adjQty = row?.2 ?? 0
-        let inVal = row?.3 ?? 0
-        let outVal = row?.4 ?? 0
-        let onHand = inQty - outQty + adjQty
+        ) { r in (r.real(0), r.real(1), r.real(2), r.int(3), r.int(4), r.real(5)) }
+        let inQty   = row?.0 ?? 0
+        let outQty  = row?.1 ?? 0
+        let adjQty  = row?.2 ?? 0
+        let inVal   = row?.3 ?? 0
+        let outVal  = row?.4 ?? 0
+        let onHand  = row?.5 ?? 0
         let onHandVal = inVal - outVal
         return ItemBalance(
             itemId: itemId,
@@ -273,7 +282,7 @@ public struct InventoryRepository: Sendable {
             itemId: itemId,
             date: r.date("date"),
             movementType: mt,
-            quantity: r.int("quantity"),
+            quantity: r.real("quantity"),
             unitCostPaise: r.int("unit_cost_paise"),
             totalValuePaise: r.int("total_value_paise"),
             voucherId: voucherId,

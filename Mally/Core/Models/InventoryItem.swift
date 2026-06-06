@@ -149,7 +149,7 @@ public struct StockMovement: Identifiable, Hashable, Sendable, Codable {
     public var voucherId: Voucher.ID?
     public var date: Date
     public var movementType: MovementType
-    public var quantity: Int64
+    public var quantity: Double
     public var unitCostPaise: Int64
     public var totalValuePaise: Int64
     public var referenceVoucherNumber: String?
@@ -161,7 +161,7 @@ public struct StockMovement: Identifiable, Hashable, Sendable, Codable {
                 itemId: InventoryItem.ID,
                 date: Date,
                 movementType: MovementType,
-                quantity: Int64,
+                quantity: Double,
                 unitCostPaise: Int64,
                 totalValuePaise: Int64,
                 voucherId: Voucher.ID? = nil,
@@ -179,30 +179,6 @@ public struct StockMovement: Identifiable, Hashable, Sendable, Codable {
         self.totalValuePaise = totalValuePaise
         self.referenceVoucherNumber = referenceVoucherNumber
         self.reason = reason
-        self.createdAt = createdAt
-    }
-
-    public init(id: ID = UUID(),
-                companyId: Company.ID,
-                itemId: InventoryItem.ID,
-                date: Date,
-                type: MovementType,
-                quantity: Double,
-                ratePaise: Int64,
-                voucherId: Voucher.ID? = nil,
-                notes: String? = nil,
-                createdAt: Date = Date()) {
-        self.id = id
-        self.companyId = companyId
-        self.itemId = itemId
-        self.voucherId = voucherId
-        self.date = date
-        self.movementType = type
-        self.quantity = Int64(quantity)
-        self.unitCostPaise = ratePaise
-        self.totalValuePaise = Int64(quantity) * ratePaise
-        self.referenceVoucherNumber = nil
-        self.reason = notes
         self.createdAt = createdAt
     }
 

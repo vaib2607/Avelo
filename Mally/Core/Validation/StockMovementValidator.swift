@@ -6,18 +6,18 @@ public struct StockMovementValidator: Sendable {
         public var itemId: InventoryItem.ID
         public var date: Date
         public var movementType: MovementType
-        public var quantity: Int64
+        public var quantity: Double
         public var unitCostPaise: Int64
         public var totalValuePaise: Int64
-        public var currentOnHandQty: Int64
+        public var currentOnHandQty: Double
 
         public init(itemId: InventoryItem.ID,
                     date: Date,
                     movementType: MovementType,
-                    quantity: Int64,
+                    quantity: Double,
                     unitCostPaise: Int64,
                     totalValuePaise: Int64,
-                    currentOnHandQty: Int64) {
+                    currentOnHandQty: Double) {
             self.itemId = itemId
             self.date = date
             self.movementType = movementType
@@ -49,8 +49,9 @@ public struct StockMovementValidator: Sendable {
             ))
         }
 
-        let expectedTotal = input.quantity * input.unitCostPaise
-        if expectedTotal != input.totalValuePaise {
+        // totalValuePaise = round(quantity × unitCostPaise); allow ±1 paise for rounding.
+        let expectedTotal = Int64((input.quantity * Double(input.unitCostPaise)).rounded())
+        if abs(expectedTotal - input.totalValuePaise) > 1 {
             errors.append(ValidationError(
                 code: .stockMovementCostMismatch,
                 field: "totalValue",
@@ -58,11 +59,13 @@ public struct StockMovementValidator: Sendable {
             ))
         }
 
-        if input.movementType == .stockOut && input.quantity > input.currentOnHandQty {
+        let outTypes: Set<MovementType> = [.stockOut, .sale, .purchaseReturn, .adjustmentOut]
+        if outTypes.contains(input.movementType) && input.quantity > input.currentOnHandQty {
             errors.append(ValidationError(
                 code: .quantityExceedsStock,
                 field: "quantity",
-                message: "Out quantity (\(input.quantity)) exceeds current stock (\(input.currentOnHandQty))."
+                message: String(format: "Out quantity (%.3f) exceeds current stock (%.3f).",
+                                input.quantity, input.currentOnHandQty)
             ))
         }
 
