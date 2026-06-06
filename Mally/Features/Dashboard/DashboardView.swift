@@ -206,24 +206,44 @@ private struct LabeledMoney: View {
 private struct AccountTreeStrip: View {
     @ObservedObject var cache: AccountTreeCache
 
-    var body: some View {
-        HStack(spacing: 16) {
-            Label {
-                Text("Account tree: \(cache.tree == nil ? "stale" : "ready")")
-            } icon: {
-                Image(systemName: cache.tree == nil ? "exclamationmark.triangle" : "checkmark.seal")
-                    .foregroundStyle(cache.tree == nil ? .orange : .green)
-            }
-            if let t = cache.tree {
-                Text("\(t.roots.count) root groups · \(t.allLedgers.count) ledgers")
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button("Rebuild") { cache.reload() }
-                .controlSize(.small)
+    /// Live net trial balance computed entirely in-memory from the tree.
+    /// Net presentation: each ledger contributes its signed balance to one side.
+    private var totals: (debit: Int64, credit: Int64) {
+        guard let t = cache.tree else { return (0, 0) }
+        var dr: Int64 = 0
+        var cr: Int64 = 0
+        for ledger in t.allLedgers where ledger.isActive {
+            let bal = ledger.balancePaise
+            if bal >= 0 { dr += bal } else { cr += -bal }
         }
-        .font(.caption)
-        .padding(8)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        return (dr, cr)
+    }
+
+    var body: some View {
+        let t = totals
+        let balanced = t.debit == t.credit
+        return GroupBox("Trial Balance (live)") {
+            HStack(spacing: 16) {
+                Label {
+                    Text(cache.tree == nil ? "stale" : (balanced ? "balanced" : "off by \(Currency.formatPaise(abs(t.debit - t.credit)))"))
+                } icon: {
+                    Image(systemName: cache.tree == nil ? "exclamationmark.triangle"
+                          : (balanced ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"))
+                        .foregroundStyle(cache.tree == nil ? .orange : (balanced ? .green : .red))
+                }
+                Divider().frame(height: 28)
+                LabeledMoney(title: "Total debit", paise: t.debit)
+                LabeledMoney(title: "Total credit", paise: t.credit)
+                if let tree = cache.tree {
+                    Divider().frame(height: 28)
+                    Text("\(tree.roots.count) groups · \(tree.allLedgers.count) ledgers")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Rebuild") { cache.reload() }
+                    .controlSize(.small)
+            }
+            .padding(6)
+        }
     }
 }

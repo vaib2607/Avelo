@@ -64,6 +64,28 @@ final class AccountTreeReconciliationTests: XCTestCase {
         XCTAssertEqual(sum, 0)
     }
 
+    func testLiveNetTrialBalanceTotalsTieOutWithSql() throws {
+        let tc = try TestCompany.make()
+        try seedActivity(tc)
+
+        let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db)
+        guard let tree = cache.ensureLoaded() else { return XCTFail("Tree failed to load") }
+
+        // Same net presentation the Dashboard's live trial-balance card uses.
+        var dr: Int64 = 0
+        var cr: Int64 = 0
+        for ledger in tree.allLedgers where ledger.isActive {
+            let bal = ledger.balancePaise
+            if bal >= 0 { dr += bal } else { cr += -bal }
+        }
+        XCTAssertEqual(dr, cr) // balanced books
+
+        let tb = try ReportService(db: tc.db, companyId: tc.companyId)
+            .trialBalance(asOfDate: tc.fy.endDate)
+        let sqlNet = tb.rows.reduce(Int64(0)) { $0 + ($1.debitPaise - $1.creditPaise) }
+        XCTAssertEqual(dr - cr, sqlNet)
+    }
+
     func testGroupBalanceEqualsSumOfChildren() throws {
         let tc = try TestCompany.make()
         try seedActivity(tc)
