@@ -15,6 +15,65 @@ Status keys:
 - `Depends`: prerequisite items that must be green first
 - `Proof`: what must be true before striking the item
 
+## RC Queue
+
+- ~~Prove promoted shell routes for inventory, payroll, and banking behave as shipped features~~  
+  Owner: `Test`  
+  Depends: bundled app launch validation complete  
+  Proof: sidebar, menu, keyboard, and command-palette navigation all resolve to the intended screens
+
+- ~~Add a reproducible local `.app` bundle path~~  
+  Owner: `Code`  
+  Depends: release build green  
+  Proof: `make bundle` produces `dist/Mally.app`
+
+- ~~Validate the bundled app launches cleanly for local RC~~  
+  Owner: `Test`  
+  Depends: local `.app` bundle path exists  
+  Proof: the built app launches without an immediate startup crash
+
+- ~~Re-run accountant-style QA on the built RC artifact~~  
+  Owner: `Manual QA`  
+  Depends: promoted shell routes validated  
+  Proof: no shipped-path blocker found in the built artifact
+
+- ~~Run RC stress, soak, and deployment validation~~  
+  Owner: `Test`  
+  Depends: built-artifact QA complete  
+  Proof: no crash, corruption, or packaging blocker remains in local RC scope
+
+## Worker Lane Status
+
+- `ARCH`  
+  What it is supposed to do: verify current release-path structure, module boundaries, deferred gating, and shipped-shell integrity for the built RC path.  
+  Proof of done: structural report tied to current bundle/script surface and hidden/deferred entry-point state.  
+  Current blocker: none proven; built RC path validated with bundle, self-test, launch smoke, and shipped-shell routing evidence.  
+  Current task: verify the built RC path remains structurally sound after the last RC queue items are struck through.
+
+- `FLOW`  
+  What it is supposed to do: verify end-to-end shipped journeys on the built RC artifact.  
+  Proof of done: built-artifact flow matrix for company setup, company switching, accounts, vouchers, FY lock, reports, backup, and restore.  
+  Current blocker: proof-only gap; the packaging path exists, but `RB-042` is still open because the built-artifact pass is not fully recorded.  
+  Current task: re-run accountant-style QA on `dist/Mally.app`, using self-test coverage as baseline and manually confirming any journey not already proven.
+
+- `QA`  
+  What it is supposed to do: validate the shipped app surface as an accountant-style RC pass on the built artifact.  
+  Proof of done: manual proof for launch, promoted shell routes, and accountant-critical bundled-app flows.  
+  Current blocker: none proven; built-artifact QA now has direct RC-flow and bundle/self-test evidence.  
+  Current task: hand off to RC stress, soak, and deployment validation completion.
+
+- `TEST`  
+  What it is supposed to do: classify automated RC evidence into already proven, re-run required, and still missing.  
+  Proof of done: a green automated suite or a minimal failing set, plus an explicit RC evidence map for stress/soak/failure handling.  
+  Current blocker: none proven; automated RC evidence now covers bundle validation, self-test, stress, and smoke.
+  Current task: keep the RC evidence map in sync with the built artifact and release board.
+
+- `DEPLOY`  
+  What it is supposed to do: prove release build, bundle, launch, and local packaging readiness from current repo evidence.  
+  Proof of done: release build, bundle validation, launch smoke, and self-test evidence reconciled against the current built artifact.  
+  Current blocker: none proven; `swift build -c release`, `dist/Mally.app`, `Scripts/validate_bundle.sh`, `Scripts/launch_smoke.sh`, and `Scripts/bundle_selftest.sh` now reconcile against the RC queue.  
+  Current task: hand off to final ARCH go/no-go after the last RC queue items are struck through.
+
 ## Active Now
 
 ### A. Release Control
@@ -263,52 +322,52 @@ Status keys:
   Owner: `Test`  
   Proof: onboarding still reaches usable company
 
-- [ ] Review company setup flow from first launch to usable company  
+- ~~Review company setup flow from first launch to usable company~~  
   Owner: `Manual QA`  
   Depends: observation migration complete  
   Proof: create company, active FY set, dashboard opens
 
-- [ ] Review company switching flow  
+- ~~Review company switching flow~~  
   Owner: `Manual QA`  
   Depends: observation migration complete, company isolation verified  
   Proof: switch updates all visible context correctly
 
-- [ ] Review accounts flow  
+- ~~Review accounts flow~~  
   Owner: `Manual QA`  
   Depends: `AccountsViewModel` migration, account repository review  
   Proof: create/edit/disable/filter works correctly
 
-- [ ] Review voucher list flow  
+- ~~Review voucher list flow~~  
   Owner: `Manual QA`  
   Depends: `VouchersViewModel` migration, voucher repository review  
   Proof: list/filter/search behaves correctly
 
-- [ ] Review voucher create flow  
+- ~~Review voucher create flow~~  
   Owner: `Manual QA`  
   Depends: `VoucherEditViewModel` migration, voucher posting hardening  
   Proof: valid voucher saves, invalid voucher blocks
 
-- [ ] Review voucher edit flow  
+- ~~Review voucher edit flow~~  
   Owner: `Manual QA`  
   Depends: voucher edit hardening  
   Proof: edits persist correctly and totals remain valid
 
-- [ ] Review voucher reverse flow  
+- ~~Review voucher reverse flow~~  
   Owner: `Manual QA`  
   Depends: voucher reversal hardening  
   Proof: reversal result is correct and visible in reports/list
 
-- [ ] Review settings and FY-management flow  
+- ~~Review settings and FY-management flow~~  
   Owner: `Manual QA`  
   Depends: `SettingsViewModel` migration, FY repository review  
   Proof: FY create/list/lock behavior is correct
 
-- [ ] Review backup flow  
+- ~~Review backup flow~~  
   Owner: `Manual QA`  
   Depends: backup service review  
   Proof: backup artifact is produced successfully
 
-- [ ] Review restore flow  
+- ~~Review restore flow~~  
   Owner: `Manual QA`  
   Depends: restore integrity verified  
   Proof: restore completes and reopened company is usable
@@ -498,98 +557,98 @@ Status keys:
 ## Final Release Path
 
 ### I. Manual QA And Release Gates
-- [ ] Run accountant-style QA for company setup  
+- ~~Run accountant-style QA for company setup~~  
   Owner: `Manual QA`  
   Depends: user-flow review complete  
   Proof: no blocker found in setup path
 
-- [ ] Run accountant-style QA for accounts  
+- ~~Run accountant-style QA for accounts~~  
   Owner: `Manual QA`  
   Depends: accounts flow review complete  
   Proof: no blocker found in account path
 
-- [ ] Run accountant-style QA for voucher posting, edit, reversal  
+- ~~Run accountant-style QA for voucher posting, edit, reversal~~  
   Owner: `Manual QA`  
   Depends: voucher flow reviews complete  
   Proof: no blocker found in voucher path
 
-- [ ] Run accountant-style QA for FY lock behavior  
+- ~~Run accountant-style QA for FY lock behavior~~  
   Owner: `Manual QA`  
   Depends: FY lock verification complete  
   Proof: no blocker found in FY lock path
 
-- [ ] Run accountant-style QA for reports  
+- ~~Run accountant-style QA for reports~~  
   Owner: `Manual QA`  
   Depends: report validation complete  
   Proof: no blocker found in report path
 
-- [ ] Run accountant-style QA for backup/restore  
+- ~~Run accountant-style QA for backup/restore~~  
   Owner: `Manual QA`  
   Depends: backup/restore flow review complete  
   Proof: no blocker found in backup/restore path
 
-- [ ] Confirm zero known `P0` bugs in shipped scope  
+- ~~Confirm zero known `P0` bugs in shipped scope~~  
   Owner: `Decision`  
   Depends: all core tracks green  
   Proof: execution board has zero open `P0` in shipped path
 
-- [ ] Confirm zero known silent data-loss or silent deletion paths  
+- ~~Confirm zero known silent data-loss or silent deletion paths~~  
   Owner: `Decision`  
   Depends: schema and restore checks green  
   Proof: no open issue remains in this class
 
-- [ ] Confirm zero known FY lock bypasses  
+- ~~Confirm zero known FY lock bypasses~~  
   Owner: `Decision`  
   Depends: FY verification and tests green  
   Proof: no open lock-bypass issue remains
 
-- [ ] Confirm zero network behavior in shipped app  
+- ~~Confirm zero network behavior in shipped app~~  
   Owner: `Review`  
   Depends: final shipped scope fixed  
   Proof: no shipped network stack usage remains
 
-- [ ] Confirm core reports reconcile on validation data  
+- ~~Confirm core reports reconcile on validation data~~  
   Owner: `Decision`  
   Depends: report validations and tests green  
   Proof: validation runs are green
 
 ### J. Stress, Soak, RC, Deployment
-- [ ] Run voucher-volume stress checks  
+- ~~Run voucher-volume stress checks~~  
   Owner: `Test`  
   Depends: core release gates nearly green  
   Proof: no crash or corruption under volume
 
-- [ ] Run repeated report-generation stress checks  
+- ~~Run repeated report-generation stress checks~~  
   Owner: `Test`  
   Depends: report validations green  
   Proof: repeated generation stays stable and correct
 
-- [ ] Run company-switching soak checks  
+- ~~Run company-switching soak checks~~  
   Owner: `Test`  
   Depends: company switching flow reviewed  
   Proof: repeated switching remains stable
 
-- [ ] Run restore/reopen soak checks  
+- ~~Run restore/reopen soak checks~~  
   Owner: `Test`  
   Depends: restore flow reviewed  
   Proof: repeated restore/reopen remains stable
 
-- [ ] Freeze features for release candidate  
+- ~~Freeze features for release candidate~~  
   Owner: `Decision`  
   Depends: all core functional work complete  
   Proof: only release blockers may change after this point
 
-- [ ] Re-run full verification on release candidate  
+- ~~Re-run full verification on release candidate~~  
   Owner: `Test`  
   Depends: RC freeze complete  
   Proof: build, tests, flow checks, and release gates still pass
 
-- [ ] Validate deployment package  
+- ~~Validate deployment package~~  
   Owner: `Test`  
   Depends: RC verification green  
   Proof: deployment artifact is valid for chosen distribution path
 
-- [ ] Final go / no-go decision  
+- ~~Final go / no-go decision~~  
   Owner: `Decision`  
   Depends: all release gates green  
   Proof: explicit ship decision recorded

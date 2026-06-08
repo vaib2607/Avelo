@@ -31,6 +31,9 @@ public struct CommandPaletteSheet: View {
         nav("Accounts", "book", .accounts)
         nav("Vouchers", "doc.text", .vouchers)
         nav("Reports", "chart.bar", .reports)
+        nav("Inventory", "shippingbox", .inventory)
+        nav("Payroll", "person.3", .payroll)
+        nav("Banking", "building.columns", .banking)
         nav("Audit", "lock.shield", .audit)
         nav("Settings", "gearshape", .settings)
 

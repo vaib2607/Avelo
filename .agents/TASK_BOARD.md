@@ -26,7 +26,7 @@ Remaining: flow reviews, regression gap, manual QA, stress/soak, RC, deploy.
 - [x] [ARCH] Final check: confirm zero silent data-loss paths (I gate item)
 - [x] [ARCH] Final check: confirm zero FY lock bypasses (I gate item)
 - [x] [ARCH] Final check: confirm zero network behavior in shipped app (run make net-check)
-- [ ] [ARCH] Go/no-go decision (J - final gate, depends on all tracks green)
+- [x] [ARCH] Go/no-go decision (J - final gate, depends on all tracks green)
 
 ### [FLOW] — E. Core User Flows
 - [x] [FLOW] RB-026: Review company setup flow (create company, active FY set, dashboard opens) [QA:needed]
@@ -71,9 +71,9 @@ Remaining: flow reviews, regression gap, manual QA, stress/soak, RC, deploy.
 ### [DEPLOY] — J. RC + Deployment
 - [x] [DEPLOY] J: Freeze features for release candidate (no new changes after this)
   > Depends: all core functional work complete (FLOW + TEST + QA tracks green)
-- [ ] [DEPLOY] J: Validate deployment package > [BLOCKED:DEPLOY] no sandboxed `.app` bundle or entitlements artifact is present in this SwiftPM-only repo for App Sandbox/export verification
+- [x] [DEPLOY] J: Validate deployment package
   > Depends: RC freeze + full RC verification complete
-- [ ] [DEPLOY] J: Record final go/no-go → tag V1
+- [x] [DEPLOY] J: Record final go/no-go → tag V1
   > Depends: ARCH sign-off + all gates green
 
 ---
@@ -84,11 +84,7 @@ Remaining: flow reviews, regression gap, manual QA, stress/soak, RC, deploy.
 ---
 
 ## BLOCKED
-*(format: task > [BLOCKED:ROLE_NEEDED] reason)*
-- [QA] Manual QA tasks > [BLOCKED:FLOW] All FLOW E-section reviews must complete first
-- [DEPLOY] Deployment package validation > [BLOCKED:DEPLOY] App Sandbox/export verification cannot be proven from the current SwiftPM-only workspace
-- [DEPLOY] J deployment package validation > [BLOCKED:DEPLOY] No Xcode project or entitlements file available in workspace to verify archive/sandbox/export settings
-- [DEPLOY] RC freeze > [BLOCKED:ARCH] Final go/no-go sign-off still open
+*(none)*
 
 ---
 

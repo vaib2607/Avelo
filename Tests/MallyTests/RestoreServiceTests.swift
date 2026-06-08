@@ -156,4 +156,108 @@ final class RestoreServiceTests: XCTestCase {
             await restoreManager.closeCompany(id: restored.id)
         }
     }
+
+    func testRestoreRejectsDuplicateCompanyNameClearly() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let sourceCompany = try await CompanyService.create(
+            companyInput: .init(name: "Duplicate Restore Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: sourceManager
+        )
+
+        let backupURL = sourceRoot.appendingPathComponent("duplicate-restore.mallybackup")
+        _ = try await BackupService(manager: sourceManager).export(
+            companyId: sourceCompany.id,
+            companyName: "Duplicate Restore Co",
+            to: backupURL
+        )
+
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot)
+        _ = try await CompanyService.create(
+            companyInput: .init(name: "Duplicate Restore Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: targetManager
+        )
+
+        do {
+            _ = try await RestoreService(manager: targetManager).restore(from: backupURL)
+            XCTFail("Expected restore to reject duplicate company names")
+        } catch {
+            guard case AppError.businessRule(let message) = AppError.wrap(error) else {
+                return XCTFail("Expected businessRule error, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("already exists"))
+        }
+    }
+
+    func testRestoreFailsClearlyWhenDestinationCompanyFileCannotBeWritten() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            let companiesDir = targetRoot.appendingPathComponent("Companies", isDirectory: true)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: companiesDir.path)
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let sourceCompany = try await CompanyService.create(
+            companyInput: .init(name: "Restore Permission Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: sourceManager
+        )
+
+        let backupURL = sourceRoot.appendingPathComponent("restore-permission.mallybackup")
+        _ = try await BackupService(manager: sourceManager).export(
+            companyId: sourceCompany.id,
+            companyName: "Restore Permission Co",
+            to: backupURL
+        )
+
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot)
+        let companiesDirectory = await targetManager.companiesDirectory
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o555],
+            ofItemAtPath: companiesDirectory.path
+        )
+
+        do {
+            _ = try await RestoreService(manager: targetManager).restore(from: backupURL)
+            XCTFail("Expected restore to fail when the destination company directory is not writable")
+        } catch {
+            guard case AppError.fileSystem(let message) = AppError.wrap(error) else {
+                return XCTFail("Expected fileSystem error, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("copy backup"))
+        }
+    }
 }

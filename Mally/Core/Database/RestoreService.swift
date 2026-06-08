@@ -32,6 +32,73 @@ public struct RestoreService: Sendable {
         BEGIN SELECT RAISE(ABORT, 'Audit events are immutable'); END;
         """
     ]
+    private static let lockedFinancialYearTriggerNames: [String] = [
+        "trg_mally_voucher_fy_locked_insert",
+        "trg_mally_voucher_fy_locked_update",
+        "trg_mally_voucher_fy_locked_delete",
+        "trg_mally_lines_fy_locked_insert",
+        "trg_mally_lines_fy_locked_update",
+        "trg_mally_lines_fy_locked_delete"
+    ]
+    private static let lockedFinancialYearTriggerSQL: [String] = [
+        """
+        CREATE TRIGGER trg_mally_voucher_fy_locked_insert
+        BEFORE INSERT ON mally_vouchers
+        WHEN (SELECT is_locked FROM mally_financial_years WHERE id = NEW.financial_year_id) = 1
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; new vouchers are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_mally_voucher_fy_locked_update
+        BEFORE UPDATE ON mally_vouchers
+        WHEN (SELECT is_locked FROM mally_financial_years WHERE id = OLD.financial_year_id) = 1
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; voucher edits are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_mally_voucher_fy_locked_delete
+        BEFORE DELETE ON mally_vouchers
+        WHEN (SELECT is_locked FROM mally_financial_years WHERE id = OLD.financial_year_id) = 1
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; voucher deletes are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_mally_lines_fy_locked_insert
+        BEFORE INSERT ON mally_ledger_lines
+        WHEN NEW.voucher_id IN (
+            SELECT id FROM mally_vouchers
+            WHERE financial_year_id IN (SELECT id FROM mally_financial_years WHERE is_locked = 1)
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_mally_lines_fy_locked_update
+        BEFORE UPDATE ON mally_ledger_lines
+        WHEN OLD.voucher_id IN (
+            SELECT id FROM mally_vouchers
+            WHERE financial_year_id IN (SELECT id FROM mally_financial_years WHERE is_locked = 1)
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_mally_lines_fy_locked_delete
+        BEFORE DELETE ON mally_ledger_lines
+        WHEN OLD.voucher_id IN (
+            SELECT id FROM mally_vouchers
+            WHERE financial_year_id IN (SELECT id FROM mally_financial_years WHERE is_locked = 1)
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked');
+        END;
+        """
+    ]
 
     public init(manager: DatabaseManager) {
         self.manager = manager
@@ -136,6 +203,7 @@ public struct RestoreService: Sendable {
         try db.execute("PRAGMA foreign_keys = OFF")
         do {
             try dropAuditImmutabilityTriggers(db: db)
+            try dropLockedFinancialYearTriggers(db: db)
             try db.write { tx in
                 try tx.execute(
                     "UPDATE mally_companies SET id = ?, name = ?, updated_at = ? WHERE id = ?",
@@ -156,6 +224,7 @@ public struct RestoreService: Sendable {
 
                 try writeRestoreAuditEvent(db: tx, companyId: restoredCompanyId)
             }
+            try recreateLockedFinancialYearTriggers(db: db)
             try recreateAuditImmutabilityTriggers(db: db)
 
             let foreignKeyIssues = try db.query("PRAGMA foreign_key_check") { _ in true }
@@ -163,6 +232,7 @@ public struct RestoreService: Sendable {
                 throw AppError.database(.schemaMismatch("Restore left foreign-key violations in the restored company database."))
             }
         } catch {
+            try? recreateLockedFinancialYearTriggers(db: db)
             try? recreateAuditImmutabilityTriggers(db: db)
             try? db.execute("PRAGMA foreign_keys = ON")
             throw error
@@ -186,6 +256,18 @@ public struct RestoreService: Sendable {
 
     private static func recreateAuditImmutabilityTriggers(db: SQLiteDatabase) throws {
         for sql in auditImmutabilityTriggerSQL {
+            try db.execute(sql)
+        }
+    }
+
+    private static func dropLockedFinancialYearTriggers(db: SQLiteDatabase) throws {
+        for triggerName in lockedFinancialYearTriggerNames {
+            try db.execute("DROP TRIGGER IF EXISTS \(triggerName)")
+        }
+    }
+
+    private static func recreateLockedFinancialYearTriggers(db: SQLiteDatabase) throws {
+        for sql in lockedFinancialYearTriggerSQL {
             try db.execute(sql)
         }
     }

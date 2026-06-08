@@ -4,6 +4,31 @@ import XCTest
 @MainActor
 final class AppEnvironmentFlowTests: XCTestCase {
 
+    func testBootstrapSurfacesStartupDegradationAsGlobalError() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manager = try DatabaseManager(appSupportDirectory: root)
+        let registryDb = try await SQLiteDatabase(path: manager.registryPath)
+        defer { registryDb.close() }
+
+        let startupError = AppError.database(.openFailed("Temporary data location in use"))
+        let env = AppEnvironment(
+            manager: manager,
+            router: AppRouter(),
+            keyboard: KeyboardRouter(),
+            registry: RegistryRepository(db: registryDb),
+            backupService: BackupService(manager: manager),
+            startupError: startupError
+        )
+
+        await env.bootstrap()
+
+        XCTAssertEqual(env.globalError?.id, startupError.id)
+        XCTAssertEqual(env.globalError?.localizedMessage, startupError.localizedMessage)
+    }
+
     func testOpenCompanyAfterCreateSetsUsableContext() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -210,5 +235,46 @@ final class AppEnvironmentFlowTests: XCTestCase {
             XCTAssertNil(env.router.presentedSheet)
             XCTAssertEqual(env.banner?.message, "Company opened.")
         }
+    }
+
+    func testCloseCompanyClearsVisibleContextAndRouterState() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manager = try DatabaseManager(appSupportDirectory: root)
+        let registryDb = try await SQLiteDatabase(path: manager.registryPath)
+        defer { registryDb.close() }
+
+        let env = AppEnvironment(
+            manager: manager,
+            router: AppRouter(),
+            keyboard: KeyboardRouter(),
+            registry: RegistryRepository(db: registryDb),
+            backupService: BackupService(manager: manager)
+        )
+
+        let company = try await CompanyService.create(
+            companyInput: .init(name: "Close Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: manager
+        )
+
+        await env.openCompany(company.id)
+        env.router.selection = .reports
+        env.router.present(.newVoucher)
+
+        env.closeCompany()
+
+        XCTAssertNil(env.companyContext)
+        XCTAssertNil(env.accountTree)
+        XCTAssertEqual(env.router.selection, .dashboard)
+        XCTAssertNil(env.router.presentedSheet)
     }
 }

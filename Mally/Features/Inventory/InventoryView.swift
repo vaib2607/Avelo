@@ -3,13 +3,13 @@ import SwiftUI
 public struct InventoryView: View {
 
     @Environment(AppEnvironment.self) private var env
-    @State private var holder = InventoryViewModelHolder()
+    @State private var vm: InventoryViewModel?
     @State private var showMovement: InventoryItem.ID?
 
     public init() {}
 
     public var body: some View {
-        InventoryContent(holder: holder, showMovement: $showMovement)
+        InventoryContent(vm: vm, showMovement: $showMovement)
             .navigationTitle("Inventory")
             .toolbar {
                 ToolbarItem {
@@ -23,28 +23,27 @@ public struct InventoryView: View {
     }
 
     private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
-            holder.vm = InventoryViewModel(companyId: ctx.companyId, db: ctx.database)
-            holder.vm?.reload()
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        if vm == nil || vm?.companyId != ctx.companyId {
+            let model = InventoryViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            vm = model
         }
     }
-}
-
-@MainActor
-final class InventoryViewModelHolder: ObservableObject {
-    @Published var vm: InventoryViewModel?
 }
 
 private struct IdWrap: Identifiable { let id: InventoryItem.ID }
 
 @MainActor
 private struct InventoryContent: View {
-    @ObservedObject var holder: InventoryViewModelHolder
+    let vm: InventoryViewModel?
     @Binding var showMovement: InventoryItem.ID?
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             InventoryBody(vm: vm, showMovement: $showMovement)
         } else {
             ProgressView()
@@ -54,7 +53,7 @@ private struct InventoryContent: View {
 
 @MainActor
 private struct InventoryBody: View {
-    @ObservedObject var vm: InventoryViewModel
+    @Bindable var vm: InventoryViewModel
     @Binding var showMovement: InventoryItem.ID?
 
     var body: some View {

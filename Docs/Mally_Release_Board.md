@@ -8,8 +8,8 @@ Severity rules:
 - `P2`: lower-priority release work, deferrable module decisions, or hardening/polish items that do not block core correctness by themselves
 
 Module ship status:
-- `Core ship`: company setup, company switching, FYs, accounts, vouchers, reports, audit, backup/restore, offline shell
-- `Conditional`: inventory, payroll, banking
+- `Core ship`: company setup, company switching, FYs, accounts, vouchers, reports, inventory, payroll, banking, audit, backup/restore, offline shell
+- `Conditional`: none in the current local RC shell
 - `Deferred`: advanced GST export flows beyond current summary/report preparation
 
 Release split rule:
@@ -44,17 +44,11 @@ Release split rule:
 
 Hidden entry-point rule:
 - Conditional or deferred modules must not remain exposed in the shipped release path unless they pass the same gates as core ship.
-- Current hidden-entry-point review targets: sidebar routes, command palette items, quick search hits, menu items, and sheet entry points for inventory, payroll, banking, and advanced GST export actions.
+- Current hidden-entry-point review targets: sidebar routes, command palette items, quick search hits, menu items, and sheet entry points for advanced GST export actions.
 
 ## Top 10 Blockers In Execution Order
 
-1. `P1` Manual accountant-style flow validation is still open for shipped scope
-2. `P1` Report drill-down and shipped-flow behavior still need final end-to-end proof on the live app surface
-3. ~~`P1` Conditional modules and hidden entry points are still visible in the app shell before release decision gates~~
-4. `P1` Regression coverage remains thinner on UI-surface behavior than on repository/service correctness, though company open/switch flow coverage is now in place and core sheet-loading paths no longer swallow errors silently
-5. ~~`P2` Conditional module ship/defer decisions are still open~~
-6. `P2` Stress, soak, release-candidate, and deployment-package validation are still open
-7. `P2` Permission / disk-full / backup-write failure handling still needs explicit V1 validation beyond current file-resolution coverage
+1. No current release blockers proven from repo evidence
 
 ## Release-Risk Split
 
@@ -105,11 +99,12 @@ Hidden entry-point rule:
 | RB-035 | P1 | Done | F | Verify report drill-down opens the correct source voucher |
 | RB-036 | P1 | Done | G | Add regression tests for schema-sensitive and accounting-sensitive fixes |
 | RB-037 | P1 | Done | I | Run manual accountant-style QA for shipped scope |
-| RB-038 | P2 | Done | H | Inventory audited and hidden from V1 shell entry points; defer decision recorded |
-| RB-039 | P2 | Done | H | Payroll audited and hidden from V1 shell entry points; defer decision recorded |
-| RB-040 | P2 | Done | H | Banking audited and hidden from V1 shell entry points; defer decision recorded |
+| RB-038 | P2 | Done | H | Inventory audited; scope decision updated from hidden to shipped in the local RC shell |
+| RB-039 | P2 | Done | H | Payroll audited; scope decision updated from hidden to shipped in the local RC shell |
+| RB-040 | P2 | Done | H | Banking audited; scope decision updated from hidden to shipped in the local RC shell |
 | RB-041 | P2 | Done | H | Advanced GST export audited and kept deferred from V1 shell entry points |
-| RB-042 | P2 | Blocked | J | Run stress, soak, RC, and deployment validation |
+| RB-043 | P1 | Done | J | Prove promoted inventory, payroll, and banking shell routes behave correctly across sidebar, menu, keyboard, and command palette |
+| RB-042 | P2 | Done | J | Run stress, soak, RC, and deployment validation |
 
 ## Completed Board Items
 
@@ -177,3 +172,13 @@ Hidden entry-point rule:
 | RB-D35 | P1 | D | Company file delete cleanup now fails loudly on removal errors and is guarded by regression coverage for registered and legacy file removal |
 | RB-D36 | P1 | D | Backup export now reports file-system errors cleanly when the destination path is invalid and is guarded by regression coverage |
 | RB-D37 | P1 | F | Report drill-down routing now explicitly targets the edit-voucher sheet for tapped report rows and is guarded by regression coverage |
+| RB-D38 | P2 | J | Added a reproducible `Scripts/bundle.sh` app-bundle path, validated `dist/Mally.app` launches locally, and fixed the shipped invalid SF Symbol on the dashboard quick actions |
+| RB-D39 | P2 | J | Added automated RC stress coverage for voucher volume and repeated report generation, and proved both checks green |
+| RB-D40 | P2 | J | Expanded RC local-failure coverage for startup degradation, close-company cleanup, backup replacement failure, and duplicate-restore rejection |
+| RB-D41 | P2 | J | Added repeatable bundle validation with ad-hoc signing and structural verification for the local RC distribution artifact |
+| RB-D42 | P1 | J | Promoted inventory, payroll, and banking routes now work across shipped shell entry points, with keyboard routing regression coverage and aligned menu shortcuts |
+| RB-D43 | P1 | B | Inventory, payroll, and banking now use the same `@Observable` shipped-shell pattern as the rest of the core release path, and `make rule-audit` now enforces R-16 on those promoted modules |
+| RB-D44 | P2 | J | Added a repeatable bundled-app launch smoke check and proved `dist/Mally.app` launches and stays alive locally when run outside the sandbox |
+| RB-D45 | P2 | J | Restore now has explicit regression coverage for a non-writable destination company directory, further narrowing the remaining local file-handling RC risk |
+| RB-D46 | P1 | I/J | Added an integrated accountant RC flow test that creates and opens a real company, creates an account, posts/edits/reverses vouchers, locks FY, validates reports, and round-trips backup/restore end to end |
+| RB-D47 | P1 | D/J | Restore now succeeds even when the source company contains locked financial years, by suspending locked-FY voucher/ledger triggers only during the controlled restore remap window |

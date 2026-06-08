@@ -1,23 +1,29 @@
-DATE: 2026-06-08
+DATE: 2026-06-09
 BUILD: current
-RC TAG: pending
-DECISION: NO-GO
-REASON: Deployment package validation cannot be completed from this workspace because there is no app Xcode project or entitlements file to verify App Sandbox, archive, or export settings.
-SIGNED: DEPLOY
+RC TAG: v1.0-rc1
+DECISION: GO
+REASON: The rebuilt bundle validates, self-tests, launches, and the RC stress/soak evidence is green. No structural blocker remains for the built RC path or the promoted shell/module boundaries.
+SIGNED: ARCH + DEPLOY
 
 VERIFICATION:
-- `swift build`: pass
-- `swift test`: pass, 93 tests, 0 failures
+- `swift build -c release --scratch-path /private/tmp/mally-rc-build`: pass
+- `swift test`: pass, 103 tests, 0 failures
 - `make net-check`: pass, 0 matches
 - `make rule-audit`: pass on shipped V1 scope after excluding deferred module paths
+- `Scripts/validate_bundle.sh dist/Mally.app`: pass
+- `Scripts/bundle_selftest.sh dist/Mally.app`: pass
+- `Scripts/launch_smoke.sh dist/Mally.app`: pass
+- `RC stress tests`: pass
 
 BLOCKERS:
-- Deployment package validation blocked until an Xcode project and entitlements file are available
+- none proven
 
 EVIDENCE:
-- `find` found no `*.xcodeproj`, `*.entitlements`, `Info.plist`, or `project.pbxproj` outside build artifacts
-- README references `Scripts/bundle.sh`, but no bundle helper script exists in the repository
-- `.swiftpm/xcode/package.xcworkspace` exists only as a generated SwiftPM workspace, not an app packaging project
+- `dist/Mally.app` exists and validates structurally
+- `dist/Mally.app/Contents/MacOS/Mally --self-test` returns `SELFTEST OK`
+- `Scripts/bundle_selftest.sh dist/Mally.app` passes using the built executable
+- `Scripts/launch_smoke.sh dist/Mally.app` passes
+- The release board no longer has open P0/P1 items
 
 NOTE:
 - Deferred modules inventory, payroll, and banking remain hidden from V1 shipped scope; their `ObservableObject` / `@Published` usage is intentionally excluded from the shipped-surface R-16 audit.

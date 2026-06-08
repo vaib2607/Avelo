@@ -26,7 +26,7 @@ public struct SidebarView: View {
                 }
             }
             Section("Modules") {
-                ForEach(SidebarDestination.v1VisibleCases) { dest in
+                ForEach(SidebarDestination.visibleCases) { dest in
                     NavigationLink(value: dest) {
                         Label(dest.title, systemImage: dest.systemImage)
                     }
