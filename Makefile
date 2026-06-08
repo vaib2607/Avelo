@@ -1,4 +1,4 @@
-# MALLY Makefile — Swift Package Manager
+# AVELO Makefile — Swift Package Manager
 # Run from repo root.
 
 SRC_DIR := .
@@ -56,17 +56,17 @@ r16-check:
 	@echo "=== R-16 CHECK ==="
 	@violations=$$(grep -rn --include="*.swift" \
 	  -e "ObservableObject" -e "@Published" -e "@EnvironmentObject" \
-	  $(SRC_DIR)/Mally/App \
-	  $(SRC_DIR)/Mally/Core \
-	  $(SRC_DIR)/Mally/Features/Accounts \
-	  $(SRC_DIR)/Mally/Features/Audit \
-	  $(SRC_DIR)/Mally/Features/Banking \
-	  $(SRC_DIR)/Mally/Features/Inventory \
-	  $(SRC_DIR)/Mally/Features/Onboarding \
-	  $(SRC_DIR)/Mally/Features/Payroll \
-	  $(SRC_DIR)/Mally/Features/Reports \
-	  $(SRC_DIR)/Mally/Features/Settings \
-	  $(SRC_DIR)/Mally/Features/Vouchers \
+	  $(SRC_DIR)/Avelo/App \
+	  $(SRC_DIR)/Avelo/Core \
+	  $(SRC_DIR)/Avelo/Features/Accounts \
+	  $(SRC_DIR)/Avelo/Features/Audit \
+	  $(SRC_DIR)/Avelo/Features/Banking \
+	  $(SRC_DIR)/Avelo/Features/Inventory \
+	  $(SRC_DIR)/Avelo/Features/Onboarding \
+	  $(SRC_DIR)/Avelo/Features/Payroll \
+	  $(SRC_DIR)/Avelo/Features/Reports \
+	  $(SRC_DIR)/Avelo/Features/Settings \
+	  $(SRC_DIR)/Avelo/Features/Vouchers \
 	  | grep -v ".build" | grep -v Test); \
 	if [ -n "$$violations" ]; then \
 	  echo "$$violations"; echo "FAIL"; exit 1; \
@@ -77,20 +77,20 @@ r15-check:
 	@echo "=== R-15 CHECK ==="
 	@grep -rn --include="*.swift" \
 	  -e 'TODO' -e 'FIXME' -e 'fatalError("Not implemented")' \
-	  $(SRC_DIR)/Mally | grep -v ".build" || echo "PASS: R-15 clean"
+	  $(SRC_DIR)/Avelo | grep -v ".build" || echo "PASS: R-15 clean"
 
 # R-4 check: no Double/Float in money paths
 r4-check:
 	@echo "=== R-4 CHECK (Double in money) ==="
 	@grep -rn --include="*.swift" \
 	  -e "Double.*paise\|paise.*Double\|Float.*amount\|amount.*Float" \
-	  $(SRC_DIR)/Mally | grep -v ".build" || echo "PASS: R-4 check clean (manual review still needed)"
+	  $(SRC_DIR)/Avelo | grep -v ".build" || echo "PASS: R-4 check clean (manual review still needed)"
 
 # Full rule audit
 rule-audit: net-check r16-check r15-check r4-check
 	@echo ""
 	@echo "Manual checks still needed: R-2, R-3, R-5, R-6, R-8, R-9, R-10, R-11, R-12, R-13, R-17, R-18"
-	@echo "See Docs/Mally_Rules.md"
+	@echo "See Docs/Avelo_Rules.md"
 
 # Show full task board
 board:

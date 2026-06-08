@@ -40,7 +40,7 @@ def read_file(filepath):
         return f.read()
 
 def main():
-    print("🚀 Starting Mally Autonomous Pipeline...")
+    print("🚀 Starting Avelo Autonomous Pipeline...")
     
     # 1. Read the Task Board
     if not os.path.exists(BOARD_PATH):

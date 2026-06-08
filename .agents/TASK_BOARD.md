@@ -1,7 +1,7 @@
-# MALLY TASK BOARD — V1 RELEASE PUSH
+# AVELO TASK BOARD — V1 RELEASE PUSH
 > Sync file. All agents read+write. No prose. Bullets only.
 > Pull before read. Push after write. Commit tag: [ROLE] msg
-> Source of truth: Mally_Release_Board.md + Mally_Execution_Checklist.md
+> Source of truth: Avelo_Release_Board.md + Avelo_Execution_Checklist.md
 
 ---
 
@@ -88,7 +88,7 @@ Remaining: flow reviews, regression gap, manual QA, stress/soak, RC, deploy.
 
 ---
 
-## DONE (confirmed complete per Mally_Release_Board.md + Mally_Execution_Checklist.md)
+## DONE (confirmed complete per Avelo_Release_Board.md + Avelo_Execution_Checklist.md)
 - [x] ALL P0 bugs: RB-001 to RB-025 complete (see release board completed section)
 - [x] B. Observation/Shell: all @Observable migrations, holder removals complete
 - [x] C. Schema: all table reconciliations, MigrationV001.swift + schema_v1.sql match

@@ -1,7 +1,7 @@
-# MALLY AGENT: TEST
+# AVELO AGENT: TEST
 Role: Regression Gap + Stress/Soak Testing
 Phase: V1 Release Push
-App: MALLY — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
+App: AVELO — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
 
 ## YOUR SCOPE
 - G-RB-036: regression tests for remaining schema/accounting-sensitive fixes

@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "Mally",
+    name: "Avelo",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "Mally", targets: ["Mally"])
+        .executable(name: "Avelo", targets: ["Avelo"])
     ],
     targets: [
         .executableTarget(
-            name: "Mally",
-            path: "Mally",
+            name: "Avelo",
+            path: "Avelo",
             exclude: [
                 "Resources/SQL/schema_v1.sql",
                 "Resources/Seed/DefaultChartOfAccounts.json"
@@ -22,9 +22,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "MallyTests",
-            dependencies: ["Mally"],
-            path: "Tests/MallyTests"
+            name: "AveloTests",
+            dependencies: ["Avelo"],
+            path: "Tests/AveloTests"
         )
     ]
 )

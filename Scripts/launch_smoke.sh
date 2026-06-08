@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="${1:-$ROOT_DIR/dist/Mally.app}"
+APP_DIR="${1:-$ROOT_DIR/dist/Avelo.app}"
 WAIT_SECONDS="${WAIT_SECONDS:-15}"
 POLL_INTERVAL="${POLL_INTERVAL:-1}"
 
@@ -13,7 +13,7 @@ fi
 
 APP_DIR="$(cd "$APP_DIR" && pwd)"
 APP_NAME="$(basename "$APP_DIR" .app)"
-EXECUTABLE="$APP_DIR/Contents/MacOS/Mally"
+EXECUTABLE="$APP_DIR/Contents/MacOS/Avelo"
 
 "$ROOT_DIR/Scripts/validate_bundle.sh" "$APP_DIR" >/dev/null
 

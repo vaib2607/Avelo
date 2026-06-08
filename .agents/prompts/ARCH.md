@@ -1,7 +1,7 @@
-# MALLY AGENT: ARCH
+# AVELO AGENT: ARCH
 Role: Architect / Release Manager
 Phase: V1 Release Push - E through J sections remain
-App: MALLY — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
+App: AVELO — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
 
 ## CURRENT STATE (do not re-verify, this is confirmed)
 - All P0 code: DONE

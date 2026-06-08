@@ -1,4 +1,4 @@
-# MALLY STRESS / SOAK SCRIPTS
+# AVELO STRESS / SOAK SCRIPTS
 
 - Voucher Volume Stress
   - Seed a fresh in-memory company through the test harness.
