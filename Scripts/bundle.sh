@@ -23,6 +23,7 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 cp "$EXECUTABLE_PATH" "$MACOS_DIR/$EXECUTABLE_NAME"
 cp "$SEED_RESOURCE" "$RESOURCES_DIR/DefaultChartOfAccounts.json"
+printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -41,6 +42,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <string>Avelo</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
   <key>CFBundleShortVersionString</key>
   <string>0.1.0</string>
   <key>CFBundleVersion</key>
