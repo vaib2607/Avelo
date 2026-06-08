@@ -2,17 +2,21 @@ import SwiftUI
 
 public struct AccountsView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @State private var holder = AccountsViewModelHolder()
+    @Environment(AppEnvironment.self) private var env
+    @State private var vm: AccountsViewModel?
 
     public init() {}
 
     public var body: some View {
-        AccountsContent(holder: holder)
+        AccountsContent(vm: vm)
             .navigationTitle("Accounts")
             .toolbar { toolbar }
-            .onAppear { setupIfNeeded() }
-            .onChange(of: env.companyContext?.companyId) { _, _ in setupIfNeeded() }
+            .task(id: reloadKey) { setupIfNeeded() }
+    }
+
+    private var reloadKey: String {
+        let company = env.companyContext?.companyId.uuidString ?? "none"
+        return "\(company)-\(env.dataRevision)"
     }
 
     @ToolbarContentBuilder
@@ -27,22 +31,24 @@ public struct AccountsView: View {
     }
 
     private func setupIfNeeded() {
-        guard let ctx = env.companyContext, holder.vm == nil else { return }
-        holder.vm = AccountsViewModel(companyId: ctx.companyId, db: ctx.database)
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        if vm == nil || vm?.companyId != ctx.companyId {
+            let model = AccountsViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            vm = model
+        }
     }
 }
 
 @MainActor
-final class AccountsViewModelHolder: ObservableObject {
-    @Published var vm: AccountsViewModel?
-}
-
-@MainActor
 private struct AccountsContent: View {
-    @ObservedObject var holder: AccountsViewModelHolder
+    let vm: AccountsViewModel?
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             AccountsBody(vm: vm)
         } else {
             ProgressView()
@@ -52,8 +58,8 @@ private struct AccountsContent: View {
 
 @MainActor
 private struct AccountsBody: View {
-    @EnvironmentObject private var env: AppEnvironment
-    @ObservedObject var vm: AccountsViewModel
+    @Environment(AppEnvironment.self) private var env
+    @Bindable var vm: AccountsViewModel
 
     var body: some View {
         HSplitView {
@@ -101,10 +107,12 @@ private struct AccountsBody: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search accounts")
+                Toggle("Show disabled", isOn: $vm.showDisabled)
+                    .toggleStyle(.switch)
                 Spacer()
             }
             .padding(12)
-            List(vm.accounts) { account in
+            List(vm.filtered) { account in
                 HStack {
                     VStack(alignment: .leading) {
                         Text(account.name).font(.headline)
@@ -113,12 +121,28 @@ private struct AccountsBody: View {
                     Spacer()
                     Text(Currency.formatPaise(account.openingBalancePaise)).monospacedDigit()
                     Button {
+                        env.router.present(.editAccount(account.id))
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    .buttonStyle(.borderless)
+                    Button {
                         env.router.openLedger(account.id)
                     } label: {
                         Label("Ledger", systemImage: "list.bullet.rectangle")
                     }
                     .buttonStyle(.borderless)
                     .help("Open this account's ledger")
+                    if account.isActive {
+                        Button {
+                            vm.disable(account.id)
+                            env.markAccountTreeDirty()
+                            env.notifyDataChanged()
+                        } label: {
+                            Label("Disable", systemImage: "minus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                    }
                 }
                 .contentShape(Rectangle())
             }

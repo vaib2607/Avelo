@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// Threadsafe lazy cache for the per-company `AccountTree`.
 ///
@@ -6,12 +7,13 @@ import Foundation
 /// All public accessors are `@MainActor` because the underlying tree is
 /// observed by SwiftUI views.
 @MainActor
-public final class AccountTreeCache: ObservableObject {
+@Observable
+public final class AccountTreeCache {
 
-    @Published public private(set) var tree: AccountTree?
-    @Published public private(set) var isDirty: Bool = true
-    @Published public private(set) var isLoading: Bool = false
-    @Published public private(set) var lastError: AppError?
+    public private(set) var tree: AccountTree?
+    public private(set) var isDirty: Bool = true
+    public private(set) var isLoading: Bool = false
+    public private(set) var lastError: AppError?
 
     public let companyId: Company.ID
     private let database: SQLiteDatabase

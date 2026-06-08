@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct StockMovementSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     let itemId: InventoryItem.ID
 
     @State private var type: InventoryItem.MovementType = .purchase

@@ -25,6 +25,11 @@ public final class VoucherService: Sendable {
         public let inventoryPrompt: InventoryPromptContext?
     }
 
+    struct VoucherAuditSnapshot: Sendable, Codable {
+        let voucher: Voucher
+        let lines: [LedgerLine]
+    }
+
     public func post(draft: VoucherDraft, in fy: FinancialYear) throws -> PostResult {
         let result = try validate(draft: draft, in: fy)
         if case .invalid(let errs) = result {
@@ -79,10 +84,10 @@ public final class VoucherService: Sendable {
                 action: .voucherPosted,
                 entityType: "voucher",
                 entityId: voucher.id.uuidString,
-                snapshotAfter: voucher
+                snapshotAfter: VoucherAuditSnapshot(voucher: voucher, lines: lines)
             )
             for line in lines {
-                try? AccountRepository(db: tx).markUsed(line.accountId)
+                try AccountRepository(db: tx).markUsed(line.accountId)
             }
         }
 
@@ -94,7 +99,17 @@ public final class VoucherService: Sendable {
         guard let existing = try repository.findById(voucherId) else {
             throw AppError.notFound("Voucher")
         }
-        let result = try validate(draft: newDraft, in: fy, existingVoucherId: voucherId)
+        guard let existingFY = try FinancialYearRepository(db: db).findById(existing.financialYearId) else {
+            throw AppError.notFound("Financial year")
+        }
+        if existing.isReversal {
+            throw AppError.businessRule("Reversal vouchers cannot be edited.")
+        }
+        if try repository.hasReversal(for: voucherId) {
+            throw AppError.businessRule("This voucher has already been reversed and cannot be edited in place.")
+        }
+        let existingLines = try linesRepository.findForVoucher(voucherId)
+        let result = try validate(draft: newDraft, in: existingFY, existingVoucherId: voucherId)
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
         }
@@ -127,9 +142,12 @@ public final class VoucherService: Sendable {
                 action: .voucherEdited,
                 entityType: "voucher",
                 entityId: voucherId.uuidString,
-                snapshotBefore: existing,
-                snapshotAfter: updated
+                snapshotBefore: VoucherAuditSnapshot(voucher: existing, lines: existingLines),
+                snapshotAfter: VoucherAuditSnapshot(voucher: updated, lines: newLines)
             )
+            for line in newLines {
+                try AccountRepository(db: tx).markUsed(line.accountId)
+            }
         }
         return updated
     }
@@ -141,22 +159,22 @@ public final class VoucherService: Sendable {
         guard let originalFY = try FinancialYearRepository(db: db).findById(original.financialYearId) else {
             throw AppError.notFound("Financial year")
         }
-        if try fiscalLockChecker.isLocked(financialYearId: originalFY.id) {
-            throw AppError.businessRule("Cannot reverse: source financial year is locked.")
+        if original.isReversal {
+            throw AppError.businessRule("A reversal voucher cannot be reversed again.")
         }
+        if try repository.hasReversal(for: voucherId) {
+            throw AppError.businessRule("This voucher has already been reversed.")
+        }
+        let targetFY = try reversalFinancialYear(for: originalFY)
         let originalLines = try linesRepository.findForVoucher(voucherId)
         let number = try sequenceRepository.nextNumber(
             companyId: companyId,
-            financialYearId: originalFY.id,
+            financialYearId: targetFY.id,
             typeCode: original.voucherTypeCode
         )
         let reversalId = UUID()
         let now = Date()
-        // The reversal must fall inside the original voucher's financial year
-        // (enforced by trg_mally_voucher_date_in_fy). Use "now" when it lands in
-        // the period; otherwise clamp to the FY's last day so reversals of
-        // earlier (still-open) years remain postable.
-        let reversalDate: Date = originalFY.contains(date: now) ? now : originalFY.endDate
+        let reversalDate: Date = targetFY.contains(date: now) ? now : targetFY.endDate
         let flippedLines: [LedgerLine] = originalLines.enumerated().map { (idx, line) in
             LedgerLine(
                 id: UUID(),
@@ -173,7 +191,7 @@ public final class VoucherService: Sendable {
         let reversal = Voucher(
             id: reversalId,
             companyId: companyId,
-            financialYearId: originalFY.id,
+            financialYearId: targetFY.id,
             voucherTypeCode: original.voucherTypeCode,
             number: number,
             date: reversalDate,
@@ -191,15 +209,17 @@ public final class VoucherService: Sendable {
             let lRepo = LedgerLineRepository(db: tx)
             try vRepo.insert(reversal)
             try lRepo.insertBatch(flippedLines)
-            try vRepo.markReversal(originalId: voucherId, reversalId: reversalId)
             try AuditService(db: tx, companyId: companyId).record(
                 action: .voucherReversed,
                 entityType: "voucher",
                 entityId: reversalId.uuidString,
-                snapshotBefore: original,
-                snapshotAfter: reversal,
+                snapshotBefore: VoucherAuditSnapshot(voucher: original, lines: originalLines),
+                snapshotAfter: VoucherAuditSnapshot(voucher: reversal, lines: flippedLines),
                 reason: reason
             )
+            for line in flippedLines {
+                try AccountRepository(db: tx).markUsed(line.accountId)
+            }
         }
         return reversal
     }
@@ -236,7 +256,6 @@ public final class VoucherService: Sendable {
             date: voucher.date,
             partyAccountId: voucher.partyAccountId,
             narration: voucher.narration,
-            reference: "",
             lines: lines.enumerated().map { (idx, line) in
                 VoucherDraft.Line(
                     accountId: line.accountId,
@@ -248,5 +267,17 @@ public final class VoucherService: Sendable {
                 )
             }
         )
+    }
+
+    private func reversalFinancialYear(for originalFY: FinancialYear) throws -> FinancialYear {
+        if !originalFY.isLocked {
+            return originalFY
+        }
+
+        let openYears = try FinancialYearRepository(db: db).findOpenForCompany(companyId)
+        guard let target = openYears.sorted(by: { $0.startDate > $1.startDate }).first else {
+            throw AppError.businessRule("Cannot reverse voucher because there is no open financial year available.")
+        }
+        return target
     }
 }

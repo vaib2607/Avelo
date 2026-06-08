@@ -26,11 +26,8 @@ public struct ShortcutHelpSheet: View {
                         ("Cmd+2", "Open Accounts"),
                         ("Cmd+3", "Open Vouchers"),
                         ("Cmd+4", "Open Reports"),
-                        ("Cmd+5", "Open Inventory"),
-                        ("Cmd+6", "Open Payroll"),
-                        ("Cmd+7", "Open Banking"),
-                        ("Cmd+8", "Open Audit log"),
-                        ("Cmd+9", "Open Settings"),
+                        ("Cmd+5", "Open Audit log"),
+                        ("Cmd+6", "Open Settings"),
                     ])
 
                     section("Vouchers (function keys)", rows: [

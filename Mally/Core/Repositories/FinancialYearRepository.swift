@@ -75,8 +75,8 @@ public struct FinancialYearRepository: Sendable {
     }
 
     static func rowToFinancialYear(_ r: Row) throws -> FinancialYear {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
+        let id = try UUIDParsing.required(r.text("id"), field: "mally_financial_years.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "mally_financial_years.company_id")
         return FinancialYear(
             id: id,
             companyId: companyId,

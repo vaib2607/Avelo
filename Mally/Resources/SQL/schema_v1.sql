@@ -87,7 +87,6 @@ CREATE TABLE mally_accounts (
     updated_at TEXT NOT NULL,
     CHECK(length(trim(code)) > 0),
     CHECK(length(trim(name)) > 0),
-    CHECK(opening_balance_paise >= 0),
     CHECK(length(gstin) = 15 OR gstin IS NULL),
     UNIQUE(company_id, code)
 );
@@ -182,7 +181,7 @@ END;
 CREATE TABLE mally_ledger_lines (
     id TEXT NOT NULL PRIMARY KEY,
     company_id TEXT NOT NULL REFERENCES mally_companies(id),
-    voucher_id TEXT NOT NULL REFERENCES mally_vouchers(id) ON DELETE CASCADE,
+    voucher_id TEXT NOT NULL REFERENCES mally_vouchers(id),
     account_id TEXT NOT NULL REFERENCES mally_accounts(id),
     amount_paise INTEGER NOT NULL CHECK(amount_paise > 0),
     side TEXT NOT NULL CHECK(side IN ('debit','credit')),
@@ -292,7 +291,24 @@ CREATE TABLE mally_audit_events (
     company_id TEXT NOT NULL REFERENCES mally_companies(id),
     timestamp TEXT NOT NULL,
     actor TEXT NOT NULL DEFAULT 'user',
-    action TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN (
+        'companyCreated','companyUpdated',
+        'financialYearCreated','financialYearLocked','financialYearClosed',
+        'accountCreated','accountUpdated','accountDisabled',
+        'voucherPosted','voucherEdited','voucherReversed',
+        'openingBalancePosted',
+        'stockItemCreated','stockItemUpdated','stockItemDisabled',
+        'stockMovementPosted','stockMovementReversed',
+        'payrollEmployeeCreated','payrollEmployeeUpdated','payrollEmployeeTerminated',
+        'salaryPosted',
+        'backupExported','backupImported',
+        'companySwitched','financialYearSwitched',
+        'inventoryModeChanged','fyUnlocked','inventoryEnabled',
+        'itemCreated','itemUpdated','itemArchived','itemAccountLinked','stockMoved',
+        'employeeCreated','employeeUpdated','employeeDeactivated',
+        'payrollEntryPosted',
+        'bankStatementImported','bankStatementLineCleared','bankReconciled'
+    )),
     entity_type TEXT NOT NULL,
     entity_id TEXT NOT NULL,
     snapshot_before_json TEXT,

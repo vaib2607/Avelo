@@ -1,11 +1,13 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class SettingsViewModel: ObservableObject {
+@Observable
+public final class SettingsViewModel {
 
-    @Published public var financialYears: [FinancialYear] = []
-    @Published public var isLoading: Bool = false
-    @Published public var error: AppError?
+    public var financialYears: [FinancialYear] = []
+    public var isLoading: Bool = false
+    public var error: AppError?
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase

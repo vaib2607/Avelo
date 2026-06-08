@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct AboutSheet: View {
 
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppRouter.self) private var router
 
     public init() {}
 

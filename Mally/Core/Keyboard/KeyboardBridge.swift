@@ -1,20 +1,22 @@
 import Foundation
 import SwiftUI
+import Observation
 
 /// View-side bridge that translates `KeyboardCommand`s into router actions.
 ///
 /// Lives in the SwiftUI environment so any view can observe and react.
 @MainActor
-public final class KeyboardBridge: ObservableObject {
+@Observable
+public final class KeyboardBridge {
 
-    @Published public var lastCommand: KeyboardCommand?
-    @Published public var quickSearchActive: Bool = false
-    @Published public var commandPaletteActive: Bool = false
-    @Published public var shortcutHelpActive: Bool = false
+    public var lastCommand: KeyboardCommand?
+    public var quickSearchActive: Bool = false
+    public var commandPaletteActive: Bool = false
+    public var shortcutHelpActive: Bool = false
 
     /// Transient hint shown when a voucher function key is pressed while a
     /// sheet is open. Auto-clears shortly after being set.
-    @Published public var suppressedKeyFlash: String?
+    public var suppressedKeyFlash: String?
 
     private weak var router: AppRouter?
     private var flashGeneration: Int = 0
@@ -45,11 +47,10 @@ public final class KeyboardBridge: ObservableObject {
         case .openAccounts:      router?.go(.accounts)
         case .openVouchers:      router?.go(.vouchers)
         case .openReports:       router?.go(.reports)
-        case .openInventory:     router?.go(.inventory)
-        case .openPayroll:       router?.go(.payroll)
-        case .openBanking:       router?.go(.banking)
         case .openAudit:         router?.go(.audit)
         case .openSettings:      router?.go(.settings)
+        case .openInventory, .openPayroll, .openBanking:
+            break
 
         case .newVoucher(let type):
             router?.present(sheet(for: type))

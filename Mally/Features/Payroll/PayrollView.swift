@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct PayrollView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
+    @Environment(AppEnvironment.self) private var env
     @State private var holder = PayrollViewModelHolder()
     @State private var postFor: PayrollEmployee.ID?
 

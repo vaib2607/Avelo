@@ -2,40 +2,43 @@ import SwiftUI
 
 public struct AuditView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @State private var holder = AuditViewModelHolder()
+    @Environment(AppEnvironment.self) private var env
+    @State private var vm: AuditViewModel?
     @State private var selected: AuditEvent?
 
     public init() {}
 
     public var body: some View {
-        AuditContent(holder: holder, selected: $selected)
+        AuditContent(vm: vm, selected: $selected)
             .navigationTitle("Audit Log")
-            .onAppear { setup() }
-            .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .task(id: reloadKey) { setup() }
+    }
+
+    private var reloadKey: String {
+        let company = env.companyContext?.companyId.uuidString ?? "none"
+        return "\(company)-\(env.dataRevision)"
     }
 
     private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
-            holder.vm = AuditViewModel(companyId: ctx.companyId, db: ctx.database)
-            holder.vm?.reload()
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        if vm == nil || vm?.companyId != ctx.companyId {
+            let model = AuditViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            vm = model
         }
     }
 }
 
 @MainActor
-final class AuditViewModelHolder: ObservableObject {
-    @Published var vm: AuditViewModel?
-}
-
-@MainActor
 private struct AuditContent: View {
-    @ObservedObject var holder: AuditViewModelHolder
+    let vm: AuditViewModel?
     @Binding var selected: AuditEvent?
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             AuditBody(vm: vm, selected: $selected)
         } else { ProgressView() }
     }
@@ -43,7 +46,7 @@ private struct AuditContent: View {
 
 @MainActor
 private struct AuditBody: View {
-    @ObservedObject var vm: AuditViewModel
+    @Bindable var vm: AuditViewModel
     @Binding var selected: AuditEvent?
 
     var body: some View {

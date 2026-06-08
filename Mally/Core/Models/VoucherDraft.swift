@@ -44,7 +44,6 @@ public struct VoucherDraft: Sendable, Hashable {
     public var date: Date
     public var partyAccountId: Account.ID?
     public var narration: String
-    public var reference: String
     public var lines: [Line]
 
     public init(mode: Mode,
@@ -52,14 +51,12 @@ public struct VoucherDraft: Sendable, Hashable {
                 date: Date,
                 partyAccountId: Account.ID? = nil,
                 narration: String = "",
-                reference: String = "",
                 lines: [Line] = []) {
         self.mode = mode
         self.voucherTypeCode = voucherTypeCode
         self.date = date
         self.partyAccountId = partyAccountId
         self.narration = narration
-        self.reference = reference
         self.lines = lines
     }
 

@@ -7,6 +7,7 @@ public struct AccountInputValidator: Sendable {
         public var name: String
         public var groupId: AccountGroup.ID?
         public var openingBalancePaise: Int64
+        public var openingBalanceSide: OpeningBalanceSide
         public var gstin: String?
         public var existingAccountId: Account.ID?
 
@@ -14,12 +15,14 @@ public struct AccountInputValidator: Sendable {
                     name: String,
                     groupId: AccountGroup.ID?,
                     openingBalancePaise: Int64,
+                    openingBalanceSide: OpeningBalanceSide = .debit,
                     gstin: String?,
                     existingAccountId: Account.ID?) {
             self.code = code
             self.name = name
             self.groupId = groupId
             self.openingBalancePaise = openingBalancePaise
+            self.openingBalanceSide = openingBalanceSide
             self.gstin = gstin
             self.existingAccountId = existingAccountId
         }
@@ -48,19 +51,27 @@ public struct AccountInputValidator: Sendable {
                 message: "Account code may only contain letters, digits, and underscore."
             ))
         } else {
-            let existing: Int64? = try? db.queryOne(
-                "SELECT COUNT(*) FROM mally_accounts WHERE company_id = ? AND code = ? AND id != ?",
-                bind: [
-                    .text(companyId.uuidString),
-                    .text(trimmedCode),
-                    .text(input.existingAccountId?.uuidString ?? "")
-                ]
-            ) { r in r.int(0) }
-            if (existing ?? 0) > 0 {
+            do {
+                let existing: Int64? = try db.queryOne(
+                    "SELECT COUNT(*) FROM mally_accounts WHERE company_id = ? AND code = ? AND id != ?",
+                    bind: [
+                        .text(companyId.uuidString),
+                        .text(trimmedCode),
+                        .text(input.existingAccountId?.uuidString ?? "")
+                    ]
+                ) { r in r.int(0) }
+                if (existing ?? 0) > 0 {
+                    errors.append(ValidationError(
+                        code: .accountCodeDuplicate,
+                        field: "code",
+                        message: "An account with this code already exists."
+                    ))
+                }
+            } catch {
                 errors.append(ValidationError(
-                    code: .accountCodeDuplicate,
+                    code: .internal,
                     field: "code",
-                    message: "An account with this code already exists."
+                    message: "Unable to validate account code uniqueness."
                 ))
             }
         }

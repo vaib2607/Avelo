@@ -106,10 +106,10 @@ public struct LedgerLineRepository: Sendable {
     }
 
     static func rowToLine(_ r: Row) throws -> LedgerLine {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
-        let voucherId = UUID(uuidString: r.text("voucher_id")) ?? UUID()
-        let accountId = UUID(uuidString: r.text("account_id")) ?? UUID()
+        let id = try UUIDParsing.required(r.text("id"), field: "mally_ledger_lines.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "mally_ledger_lines.company_id")
+        let voucherId = try UUIDParsing.required(r.text("voucher_id"), field: "mally_ledger_lines.voucher_id")
+        let accountId = try UUIDParsing.required(r.text("account_id"), field: "mally_ledger_lines.account_id")
         let sideRaw = r.text("side")
         let side = EntrySide(rawValue: sideRaw) ?? .debit
         return LedgerLine(

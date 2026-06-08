@@ -43,3 +43,6 @@ Package.resolved
 *.swp
 *.swo
 *~
+
+# opencode project config (machine-local, references ~/path skills)
+.opencode/

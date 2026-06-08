@@ -1,17 +1,19 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class VouchersViewModel: ObservableObject {
+@Observable
+public final class VouchersViewModel {
 
-    @Published public var vouchers: [Voucher] = []
-    @Published public var accounts: [Account] = []
-    @Published public var filter: VoucherRepository.Filter
-    @Published public var query: String = ""
-    @Published public var typeFilter: Set<VoucherType.Code> = []
-    @Published public var fromDate: Date?
-    @Published public var toDate: Date?
-    @Published public var isLoading: Bool = false
-    @Published public var error: AppError?
+    public var vouchers: [Voucher] = []
+    public var accounts: [Account] = []
+    public var filter: VoucherRepository.Filter
+    public var query: String = ""
+    public var typeFilter: Set<VoucherType.Code> = []
+    public var fromDate: Date?
+    public var toDate: Date?
+    public var isLoading: Bool = false
+    public var error: AppError?
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase

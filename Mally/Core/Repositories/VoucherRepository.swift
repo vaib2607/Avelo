@@ -9,7 +9,7 @@ public struct VoucherRepository: Sendable {
     }
 
     public func findById(_ id: Voucher.ID) throws -> Voucher? {
-        try db.queryOne(Self.selectAllSQL + " WHERE id = ?", bind: [.text(id.uuidString)]) {
+        try db.queryOne(Self.selectAllSQL + " WHERE v.id = ?", bind: [.text(id.uuidString)]) {
             try Self.rowToVoucher($0)
         }
     }
@@ -56,42 +56,50 @@ public struct VoucherRepository: Sendable {
     }
 
     public func list(filter: Filter) throws -> [Voucher] {
-        var sql = Self.selectAllSQL + " WHERE company_id = ?"
+        var sql = Self.selectAllSQL + " WHERE v.company_id = ?"
         var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
         if let fy = filter.financialYearId {
-            sql += " AND financial_year_id = ?"
+            sql += " AND v.financial_year_id = ?"
             bind.append(.text(fy.uuidString))
         }
         if let from = filter.fromDate {
-            sql += " AND date >= ?"
+            sql += " AND v.date >= ?"
             bind.append(.date(from))
         }
         if let to = filter.toDate {
-            sql += " AND date <= ?"
+            sql += " AND v.date <= ?"
             bind.append(.date(to))
         }
         if let party = filter.partyAccountId {
-            sql += " AND party_account_id = ?"
+            sql += " AND v.party_account_id = ?"
             bind.append(.text(party.uuidString))
         }
         if !filter.voucherTypeCodes.isEmpty {
             let placeholders = Array(repeating: "?", count: filter.voucherTypeCodes.count).joined(separator: ",")
-            sql += " AND voucher_type_code IN (\(placeholders))"
+            sql += " AND v.voucher_type_code IN (\(placeholders))"
             for code in filter.voucherTypeCodes {
                 bind.append(.text(code.rawValue))
             }
         }
         if let n = filter.narrationContains, !n.isEmpty {
-            sql += " AND narration LIKE ?"
+            sql += " AND v.narration LIKE ?"
             bind.append(.text("%\(n)%"))
         }
+        if let search = filter.searchText?.trimmingCharacters(in: .whitespacesAndNewlines), !search.isEmpty {
+            sql += " AND (v.number LIKE ? OR v.narration LIKE ? OR a.name LIKE ? OR a.code LIKE ?)"
+            let term = "%\(search)%"
+            bind.append(.text(term))
+            bind.append(.text(term))
+            bind.append(.text(term))
+            bind.append(.text(term))
+        }
         if filter.onlyReversed {
-            sql += " AND is_reversal = 1"
+            sql += " AND v.is_reversal = 1"
         }
         if filter.onlyUnreversed {
-            sql += " AND is_reversal = 0"
+            sql += " AND v.is_reversal = 0"
         }
-        sql += " ORDER BY date DESC, number DESC LIMIT ? OFFSET ?"
+        sql += " ORDER BY v.date DESC, v.number DESC LIMIT ? OFFSET ?"
         bind.append(.integer(Int64(filter.limit)))
         bind.append(.integer(Int64(filter.offset)))
         return try db.query(sql, bind: bind) { try Self.rowToVoucher($0) }
@@ -102,8 +110,8 @@ public struct VoucherRepository: Sendable {
             """
             INSERT INTO mally_vouchers
             (id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
-             narration, reference, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             narration, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(voucher.id.uuidString),
@@ -114,7 +122,6 @@ public struct VoucherRepository: Sendable {
                 .date(voucher.date),
                 .optionalText(voucher.partyAccountId?.uuidString),
                 .text(voucher.narration),
-                .text(voucher.reference),
                 .bool(voucher.isReversal),
                 .optionalText(voucher.reversalOfId?.uuidString),
                 .bool(voucher.isPosted),
@@ -150,20 +157,29 @@ public struct VoucherRepository: Sendable {
         )
     }
 
+    public func hasReversal(for originalId: Voucher.ID) throws -> Bool {
+        let count: Int64? = try db.queryOne(
+            "SELECT COUNT(*) FROM mally_vouchers WHERE reversal_of_id = ? AND is_reversal = 1",
+            bind: [.text(originalId.uuidString)]
+        ) { $0.int(0) }
+        return (count ?? 0) > 0
+    }
+
     static let selectAllSQL: String = """
-        SELECT id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
-               narration, reference, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at
-        FROM mally_vouchers
+        SELECT v.id, v.company_id, v.financial_year_id, v.voucher_type_code, v.number, v.date, v.party_account_id,
+               v.narration, v.is_reversal, v.reversal_of_id, v.is_posted, v.total_paise, v.created_at, v.updated_at
+        FROM mally_vouchers v
+        LEFT JOIN mally_accounts a ON a.id = v.party_account_id
     """
 
     static func rowToVoucher(_ r: Row) throws -> Voucher {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
-        let fyId = UUID(uuidString: r.text("financial_year_id")) ?? UUID()
+        let id = try UUIDParsing.required(r.text("id"), field: "mally_vouchers.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "mally_vouchers.company_id")
+        let fyId = try UUIDParsing.required(r.text("financial_year_id"), field: "mally_vouchers.financial_year_id")
         let codeRaw = r.text("voucher_type_code")
         let code = VoucherType.Code(rawValue: codeRaw) ?? .journal
-        let party = r.optionalText("party_account_id").flatMap { UUID(uuidString: $0) }
-        let reversalOf = r.optionalText("reversal_of_id").flatMap { UUID(uuidString: $0) }
+        let party = try UUIDParsing.optional(r.optionalText("party_account_id"), field: "mally_vouchers.party_account_id")
+        let reversalOf = try UUIDParsing.optional(r.optionalText("reversal_of_id"), field: "mally_vouchers.reversal_of_id")
         return Voucher(
             id: id,
             companyId: companyId,
@@ -177,7 +193,6 @@ public struct VoucherRepository: Sendable {
             reversalOfId: reversalOf,
             isPosted: r.bool("is_posted"),
             totalPaise: r.int("total_paise"),
-            reference: r.optionalText("reference") ?? "",
             createdAt: r.timestamp("created_at"),
             updatedAt: r.timestamp("updated_at")
         )

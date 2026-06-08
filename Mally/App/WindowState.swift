@@ -1,14 +1,15 @@
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 @MainActor
-public final class WindowState: ObservableObject {
+@Observable
+public final class WindowState {
 
-    @Published public var columnVisibility: NavigationSplitViewVisibility = .all
-    @Published public var isSidebarShown: Bool = true
-    @Published public var selectedLedgerAccountId: Account.ID?
-    @Published public var reportSelection: ReportSelection = .trialBalance
+    public var columnVisibility: NavigationSplitViewVisibility = .all
+    public var isSidebarShown: Bool = true
+    public var selectedLedgerAccountId: Account.ID?
+    public var reportSelection: ReportSelection = .trialBalance
 
     public init() {}
 

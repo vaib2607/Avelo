@@ -2,18 +2,22 @@ import SwiftUI
 
 public struct VouchersView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @State private var holder = VouchersViewModelHolder()
+    @Environment(AppEnvironment.self) private var env
+    @State private var vm: VouchersViewModel?
     @State private var showTypeFilter: Bool = false
 
     public init() {}
 
     public var body: some View {
-        VouchersContent(holder: holder, showTypeFilter: $showTypeFilter)
+        VouchersContent(vm: vm, showTypeFilter: $showTypeFilter)
             .navigationTitle("Vouchers")
             .toolbar { toolbar }
-            .onAppear { setup() }
-            .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .task(id: reloadKey) { setup() }
+    }
+
+    private var reloadKey: String {
+        let company = env.companyContext?.companyId.uuidString ?? "none"
+        return "\(company)-\(env.dataRevision)"
     }
 
     @ToolbarContentBuilder
@@ -35,26 +39,25 @@ public struct VouchersView: View {
     }
 
     private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
-            holder.vm = VouchersViewModel(companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id)
-            holder.vm?.reload()
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        if vm == nil || vm?.companyId != ctx.companyId {
+            let model = VouchersViewModel(companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id)
+            model.reload()
+            vm = model
         }
     }
 }
 
 @MainActor
-final class VouchersViewModelHolder: ObservableObject {
-    @Published var vm: VouchersViewModel?
-}
-
-@MainActor
 private struct VouchersContent: View {
-    @ObservedObject var holder: VouchersViewModelHolder
+    let vm: VouchersViewModel?
     @Binding var showTypeFilter: Bool
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             VouchersBody(vm: vm, showTypeFilter: $showTypeFilter)
         } else {
             ProgressView()
@@ -64,8 +67,8 @@ private struct VouchersContent: View {
 
 @MainActor
 private struct VouchersBody: View {
-    @EnvironmentObject private var env: AppEnvironment
-    @ObservedObject var vm: VouchersViewModel
+    @Environment(AppEnvironment.self) private var env
+    @Bindable var vm: VouchersViewModel
     @Binding var showTypeFilter: Bool
 
     var body: some View {

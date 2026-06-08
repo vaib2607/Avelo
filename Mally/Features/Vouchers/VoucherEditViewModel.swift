@@ -1,17 +1,18 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class VoucherEditViewModel: ObservableObject {
+@Observable
+public final class VoucherEditViewModel {
 
-    @Published public var draft: VoucherDraft
-    @Published public var accounts: [Account] = []
-    @Published public var validation: ValidationResult = .valid
-    @Published public var validationErrors: [ValidationError] = []
-    @Published public var narration: String = ""
-    @Published public var reference: String = ""
-    @Published public var date: Date = Date()
-    @Published public var partyAccountId: Account.ID?
-    @Published public var lines: [LineRow] = [LineRow()]
+    public var draft: VoucherDraft
+    public var accounts: [Account] = []
+    public var validation: ValidationResult = .valid
+    public var validationErrors: [ValidationError] = []
+    public var narration: String = ""
+    public var date: Date = Date()
+    public var partyAccountId: Account.ID?
+    public var lines: [LineRow] = [LineRow()]
 
     public let mode: VoucherDraft.Mode
     public let companyId: Company.ID
@@ -28,7 +29,7 @@ public final class VoucherEditViewModel: ObservableObject {
                 mode: .edit(originalVoucherId: eid),
                 voucherTypeCode: initialType,
                 date: Date(),
-                partyAccountId: nil, narration: "", reference: "",
+                partyAccountId: nil, narration: "",
                 lines: []
             )
         } else {
@@ -37,7 +38,7 @@ public final class VoucherEditViewModel: ObservableObject {
                 mode: .create,
                 voucherTypeCode: initialType,
                 date: Date(),
-                partyAccountId: nil, narration: "", reference: "",
+                partyAccountId: nil, narration: "",
                 lines: []
             )
         }
@@ -74,7 +75,6 @@ public final class VoucherEditViewModel: ObservableObject {
                 if let existing = try svc.findById(vid) {
                     self.draft = try svc.loadDraft(from: vid)
                     self.narration = existing.narration
-                    self.reference = ""
                     self.date = existing.date
                     self.partyAccountId = existing.partyAccountId
                     let lines = try svc.lines(for: vid)
@@ -121,7 +121,6 @@ public final class VoucherEditViewModel: ObservableObject {
         d.date = date
         d.partyAccountId = partyAccountId
         d.narration = narration
-        d.reference = reference
         d.lines = lines.enumerated().map { (idx, row) in
             VoucherDraft.Line(
                 accountId: row.accountId,

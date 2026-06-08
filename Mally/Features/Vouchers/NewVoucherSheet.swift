@@ -2,9 +2,9 @@ import SwiftUI
 
 public struct NewVoucherSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
-    @State private var holder = VoucherEditHolder()
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
+    @State private var vm: VoucherEditViewModel?
     let initialType: VoucherType.Code
 
     public init(initialType: VoucherType.Code) {
@@ -12,20 +12,29 @@ public struct NewVoucherSheet: View {
     }
 
     public var body: some View {
-        NewVoucherEditor(holder: holder, initialType: initialType, onPost: post(vm:))
+        NewVoucherEditor(vm: vm, initialType: initialType, onPost: post(vm:))
             .frame(minWidth: 880, minHeight: 640)
-            .environmentObject(router)
-            .onAppear { setup() }
+            .environment(router)
+            .task(id: env.companyContext?.companyId) { setup() }
     }
 
     private func setup() {
-        guard let ctx = env.companyContext, holder.vm == nil else { return }
-        let model = VoucherEditViewModel(companyId: ctx.companyId, db: ctx.database,
-                                         fyId: ctx.financialYear.id, initialType: initialType)
-        let accounts = (try? AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()) ?? []
-        model.load(accounts: accounts, initialDate: ctx.financialYear.startDate)
-        model.revalidate()
-        holder.vm = model
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        guard vm == nil || vm?.companyId != ctx.companyId else { return }
+        do {
+            let model = VoucherEditViewModel(companyId: ctx.companyId, db: ctx.database,
+                                             fyId: ctx.financialYear.id, initialType: initialType)
+            let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
+            model.load(accounts: accounts, initialDate: ctx.financialYear.startDate)
+            model.revalidate()
+            vm = model
+        } catch {
+            vm = nil
+            env.showError(AppError.wrap(error))
+        }
     }
 
     private func post(vm: VoucherEditViewModel) {
@@ -34,6 +43,7 @@ public struct NewVoucherSheet: View {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
             _ = try svc.post(draft: vm.buildDraft(), in: ctx.financialYear)
             env.markAccountTreeDirty()
+            env.notifyDataChanged()
             env.showSuccess("Voucher posted.")
             router.presentedSheet = nil
         } catch {
@@ -44,13 +54,13 @@ public struct NewVoucherSheet: View {
 
 @MainActor
 private struct NewVoucherEditor: View {
-    @ObservedObject var holder: VoucherEditHolder
+    let vm: VoucherEditViewModel?
     let initialType: VoucherType.Code
     let onPost: (VoucherEditViewModel) -> Void
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppRouter.self) private var router
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             NewVoucherBody(vm: vm, initialType: initialType, onPost: onPost)
         } else {
             ProgressView()
@@ -60,10 +70,10 @@ private struct NewVoucherEditor: View {
 
 @MainActor
 private struct NewVoucherBody: View {
-    @ObservedObject var vm: VoucherEditViewModel
+    @Bindable var vm: VoucherEditViewModel
     let initialType: VoucherType.Code
     let onPost: (VoucherEditViewModel) -> Void
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppRouter.self) private var router
 
     var body: some View {
         VStack(spacing: 0) {
@@ -108,7 +118,6 @@ private struct NewVoucherBody: View {
                 AccountPicker(selection: $vm.partyAccountId,
                               accounts: vm.accounts,
                               placeholder: "Party (optional)")
-                TextField("Reference (optional)", text: $vm.reference)
                 TextField("Narration", text: $vm.narration, axis: .vertical)
                     .lineLimit(2...4)
             }
@@ -196,9 +205,4 @@ private struct NewVoucherBody: View {
         }
         .padding(16)
     }
-}
-
-@MainActor
-final class VoucherEditHolder: ObservableObject {
-    @Published var vm: VoucherEditViewModel?
 }

@@ -89,7 +89,12 @@ public final class InventoryService: Sendable {
                                voucherId: Voucher.ID? = nil,
                                notes: String? = nil) throws {
         let totalValuePaise = Int64((quantity * Double(ratePaise)).rounded())
-        let onHand = (try? repository.runningBalance(itemId: itemId, asOf: date))?.onHandQty ?? 0
+        let onHand: Double
+        do {
+            onHand = try repository.runningBalance(itemId: itemId, asOf: date).onHandQty
+        } catch {
+            throw AppError.wrap(error)
+        }
         let v = StockMovementValidator().validate(StockMovementValidator.Input(
             itemId: itemId,
             date: date,

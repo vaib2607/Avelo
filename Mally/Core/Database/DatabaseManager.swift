@@ -57,7 +57,7 @@ public final actor DatabaseManager {
         return try reg.query("SELECT id, name, sqlite_file_name, last_opened_at, created_at FROM mally_registry_companies ORDER BY name COLLATE NOCASE") { row in
             let lastOpened: Date? = row.optionalText("last_opened_at").flatMap { DateFormatters.parseTimestamp($0) }
             return CompanyRegistryEntry(
-                id: UUID(uuidString: row.text("id")) ?? UUID(),
+                id: try UUIDParsing.required(row.text("id"), field: "mally_registry_companies.id"),
                 name: row.text("name"),
                 sqliteFileName: row.text("sqlite_file_name"),
                 lastOpenedAt: lastOpened,
@@ -107,7 +107,7 @@ public final actor DatabaseManager {
 
     public func openCompany(id: UUID) throws -> CompanyHandle {
         if let existing = openHandles[id] { return existing }
-        let url = companiesDirectory.appendingPathComponent("\(id.uuidString).sqlite")
+        let url = try companyFileURL(id: id)
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             throw AppError.notFound("Company file not found: \(url.lastPathComponent)")
@@ -117,13 +117,13 @@ public final actor DatabaseManager {
         if current < SchemaVersion.current.rawValue {
             try MigrationRunner().runMigrations(on: db)
         }
-        let companyName: String
-        if let reg = registryDb, let entry = try? RegistryRepository(db: reg).findById(id) {
-            companyName = entry.name
-        } else {
-            companyName = ""
+        guard let reg = registryDb else {
+            throw AppError.database(.openFailed("registry not open"))
         }
-        let handle = CompanyHandle(companyId: id, companyName: companyName, db: db)
+        guard let entry = try RegistryRepository(db: reg).findById(id) else {
+            throw AppError.notFound("Registry entry missing for company \(id.uuidString)")
+        }
+        let handle = CompanyHandle(companyId: id, companyName: entry.name, db: db)
         openHandles[id] = handle
         try touchLastOpened(id: id)
         return handle
@@ -148,16 +148,52 @@ public final actor DatabaseManager {
         openHandles[id]
     }
 
+    public func companyFileURL(id: UUID) throws -> URL {
+        let legacyURL = companiesDirectory.appendingPathComponent("\(id.uuidString).sqlite")
+        let fm = FileManager.default
+
+        guard let reg = registryDb else {
+            return legacyURL
+        }
+
+        let entry = try RegistryRepository(db: reg).findById(id)
+        guard let entry else {
+            return legacyURL
+        }
+
+        let registeredURL = companiesDirectory.appendingPathComponent(entry.sqliteFileName)
+        if fm.fileExists(atPath: registeredURL.path) {
+            return registeredURL
+        }
+        if fm.fileExists(atPath: legacyURL.path) {
+            return legacyURL
+        }
+
+        throw AppError.notFound(
+            "Company file missing. Expected \(entry.sqliteFileName). Re-link or restore the company file before opening it."
+        )
+    }
+
     public func deleteCompanyFiles(id: UUID) throws {
         closeCompany(id: id)
-        let url = companiesDirectory.appendingPathComponent("\(id.uuidString).sqlite")
-        let wal = URL(fileURLWithPath: url.path + "-wal")
-        let shm = URL(fileURLWithPath: url.path + "-shm")
         let fm = FileManager.default
-        try? fm.removeItem(at: wal)
-        try? fm.removeItem(at: shm)
-        if fm.fileExists(atPath: url.path) {
-            try fm.removeItem(at: url)
+
+        let primaryURL = try companyFileURL(id: id)
+        let legacyURL = companiesDirectory.appendingPathComponent("\(id.uuidString).sqlite")
+        let urls = Set([primaryURL, legacyURL])
+
+        for url in urls {
+            let walURL = URL(fileURLWithPath: url.path + "-wal")
+            if fm.fileExists(atPath: walURL.path) {
+                try fm.removeItem(at: walURL)
+            }
+            let shmURL = URL(fileURLWithPath: url.path + "-shm")
+            if fm.fileExists(atPath: shmURL.path) {
+                try fm.removeItem(at: shmURL)
+            }
+            if fm.fileExists(atPath: url.path) {
+                try fm.removeItem(at: url)
+            }
         }
     }
 }

@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct ManagePayrollSheet: View {
 
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppRouter.self) private var router
 
     public init() {}
 

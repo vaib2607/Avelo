@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct CloseFinancialYearSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     let fyId: FinancialYear.ID
 
     public init(fyId: FinancialYear.ID) { self.fyId = fyId }
@@ -41,6 +41,7 @@ public struct CloseFinancialYearSheet: View {
         guard let ctx = env.companyContext else { return }
         do {
             try FinancialYearService(db: ctx.database, companyId: ctx.companyId).close(fyId)
+            env.notifyDataChanged()
             env.showSuccess("Financial year closed.")
             router.presentedSheet = nil
         } catch {

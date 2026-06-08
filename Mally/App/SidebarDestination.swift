@@ -48,11 +48,23 @@ public enum SidebarDestination: String, CaseIterable, Identifiable, Hashable, Se
         case .vouchers:  return "2"
         case .accounts:  return "3"
         case .reports:   return "4"
-        case .inventory: return "5"
-        case .payroll:   return "6"
-        case .banking:   return "7"
-        case .audit:     return "8"
-        case .settings:  return "9"
+        case .inventory, .payroll, .banking:
+            return nil
+        case .audit:     return "5"
+        case .settings:  return "6"
         }
+    }
+
+    public var isV1Visible: Bool {
+        switch self {
+        case .inventory, .payroll, .banking:
+            return false
+        case .dashboard, .vouchers, .accounts, .reports, .audit, .settings:
+            return true
+        }
+    }
+
+    public static var v1VisibleCases: [SidebarDestination] {
+        allCases.filter(\.isV1Visible)
     }
 }

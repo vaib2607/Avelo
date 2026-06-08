@@ -146,12 +146,15 @@ public struct AccountRepository: Sendable {
             "UPDATE mally_accounts SET last_used_at = ? WHERE id = ?",
             [.timestamp(Date()), .text(id.uuidString)]
         )
+        if db.changes() == 0 {
+            throw AppError.notFound("Account not found for usage update")
+        }
     }
 
     static func rowToAccount(_ r: Row) throws -> Account {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
-        let groupId = UUID(uuidString: r.text("group_id")) ?? UUID()
+        let id = try UUIDParsing.required(r.text("id"), field: "mally_accounts.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "mally_accounts.company_id")
+        let groupId = try UUIDParsing.required(r.text("group_id"), field: "mally_accounts.group_id")
         let sideRaw = r.text("opening_balance_side")
         let side = OpeningBalanceSide(rawValue: sideRaw) ?? .debit
         return Account(

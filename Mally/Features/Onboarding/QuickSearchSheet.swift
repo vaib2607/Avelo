@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Quick search (Cmd+/). Finds accounts, inventory items, and employees by
+/// Quick search (Cmd+/). Finds accounts by
 /// code or name; Up/Down to move, Return to open, Esc to dismiss.
 public struct QuickSearchSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
+    @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
 
     @State private var query: String = ""
@@ -15,7 +15,7 @@ public struct QuickSearchSheet: View {
 
     public init() {}
 
-    private enum Kind: String { case account = "Ledger", item = "Item", employee = "Employee" }
+    private enum Kind: String { case account = "Ledger" }
 
     private struct Hit: Identifiable {
         let id = UUID()
@@ -37,7 +37,7 @@ public struct QuickSearchSheet: View {
         VStack(spacing: 0) {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search accounts, items, employees…", text: $query)
+                TextField("Search accounts…", text: $query)
                     .textFieldStyle(.plain)
                     .font(.title3)
                     .focused($fieldFocused)
@@ -134,14 +134,6 @@ public struct QuickSearchSheet: View {
             let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
             for a in accounts {
                 out.append(Hit(kind: .account, code: a.code, title: a.name) { $0.openLedger(a.id) })
-            }
-            let items = try InventoryService(db: ctx.database, companyId: ctx.companyId).listItems()
-            for i in items {
-                out.append(Hit(kind: .item, code: i.code, title: i.name) { $0.go(.inventory) })
-            }
-            let employees = try PayrollService(db: ctx.database, companyId: ctx.companyId).listEmployees()
-            for e in employees {
-                out.append(Hit(kind: .employee, code: e.code, title: e.name) { $0.go(.payroll) })
             }
             self.items = out
         } catch {
