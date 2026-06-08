@@ -1,19 +1,21 @@
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 @MainActor
-public final class AppEnvironment: ObservableObject {
+@Observable
+public final class AppEnvironment {
 
-    @Published public var companyContext: CompanyContext?
-    @Published public var globalError: AppError?
-    @Published public var banner: BannerPayload?
-    @Published public var isBusy: Bool = false
-    @Published public var accountTree: AccountTreeCache?
+    public var companyContext: CompanyContext?
+    public var globalError: AppError?
+    public var banner: BannerPayload?
+    public var isBusy: Bool = false
+    public var accountTree: AccountTreeCache?
+    public var dataRevision: Int = 0
 
     /// Non-nil when the app could not open its normal data location and had to
     /// degrade (e.g. to a temporary directory). Surfaced to the user on launch.
-    @Published public var startupError: AppError?
+    public var startupError: AppError?
 
     public let manager: DatabaseManager
     public let router: AppRouter
@@ -21,6 +23,7 @@ public final class AppEnvironment: ObservableObject {
     public let registry: RegistryRepository
     public let backupService: BackupService
 
+    @MainActor
     public init() {
         self.router = AppRouter()
         self.keyboard = KeyboardRouter()
@@ -30,6 +33,21 @@ public final class AppEnvironment: ObservableObject {
         self.registry = RegistryRepository(db: bootstrap.stores.registryDb)
         self.backupService = BackupService(manager: bootstrap.stores.manager)
         self.startupError = bootstrap.error
+    }
+
+    @MainActor
+    init(manager: DatabaseManager,
+         router: AppRouter,
+         keyboard: KeyboardRouter,
+         registry: RegistryRepository,
+         backupService: BackupService,
+         startupError: AppError? = nil) {
+        self.manager = manager
+        self.router = router
+        self.keyboard = keyboard
+        self.registry = registry
+        self.backupService = backupService
+        self.startupError = startupError
     }
 
     private struct Stores {
@@ -115,6 +133,10 @@ public final class AppEnvironment: ObservableObject {
 
     public func markAccountTreeDirty() {
         accountTree?.invalidate()
+    }
+
+    public func notifyDataChanged() {
+        dataRevision &+= 1
     }
 
     public func showError(_ error: AppError) {

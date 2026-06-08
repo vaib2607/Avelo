@@ -42,7 +42,7 @@ public struct ReportRepository: Sendable {
 
         let rawRows: [(Voucher.ID, Date, String, VoucherType.Code, String, Int64, EntrySide, Int)] = try db.query(sql, bind: bind) { r in
             (
-                UUID(uuidString: r.text("vid")) ?? UUID(),
+                try UUIDParsing.required(r.text("vid"), field: "report.ledger.voucher_id"),
                 r.date("vdate"),
                 r.text("vnum"),
                 VoucherType.Code(rawValue: r.text("vtype")) ?? .journal,
@@ -117,7 +117,7 @@ public struct ReportRepository: Sendable {
         struct Raw: Sendable { let id: Account.ID; let code: String; let name: String; let ob: Int64; let obs: String; let gcode: String; let gname: String; let parent: String? }
         let raws: [Raw] = try db.query(sql, bind: bind) { r in
             Raw(
-                id: UUID(uuidString: r.text("aid")) ?? UUID(),
+                id: try UUIDParsing.required(r.text("aid"), field: "report.trial_balance.account_id"),
                 code: r.text("acode"),
                 name: r.text("aname"),
                 ob: r.int("ob"),
@@ -134,9 +134,15 @@ public struct ReportRepository: Sendable {
         var totalDr: Int64 = 0
         var totalCr: Int64 = 0
         for raw in raws {
-            let movement: (Int64, Int64)? = try? db.queryOne(
-                "SELECT SUM(CASE WHEN side='debit' THEN amount_paise ELSE 0 END) AS dr, SUM(CASE WHEN side='credit' THEN amount_paise ELSE 0 END) AS cr FROM mally_ledger_lines WHERE account_id = ?",
-                bind: [.text(raw.id.uuidString)]
+            let movement: (Int64, Int64)? = try db.queryOne(
+                """
+                SELECT COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
+                       COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
+                FROM mally_ledger_lines l
+                JOIN mally_vouchers v ON v.id = l.voucher_id
+                WHERE l.account_id = ? AND v.date <= ?
+                """,
+                bind: [.text(raw.id.uuidString), .date(asOfDate)]
             ) { r in (r.int("dr"), r.int("cr")) }
             let moveDr = movement?.0 ?? 0
             let moveCr = movement?.1 ?? 0
@@ -218,7 +224,7 @@ public struct ReportRepository: Sendable {
         sql += " ORDER BY g.sort_order, g.code, a.code"
         let raws: [(Account.ID, String, String, Int64, String, String)] = try db.query(sql, bind: bind) { r in
             (
-                UUID(uuidString: r.text("id")) ?? UUID(),
+                try UUIDParsing.required(r.text("id"), field: "report.profit_loss.account_id"),
                 r.text("code"),
                 r.text("name"),
                 r.int("ob"),
@@ -229,7 +235,7 @@ public struct ReportRepository: Sendable {
         var rows: [ReportResult.TrialBalanceRow] = []
         var sectionTotal: Int64 = 0
         for (id, code, name, ob, obs, gcode) in raws {
-            let move: (Int64, Int64)? = try? db.queryOne(
+            let move: (Int64, Int64)? = try db.queryOne(
                 """
                 SELECT SUM(CASE WHEN l.side='debit'  THEN l.amount_paise ELSE 0 END) AS dr,
                        SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END) AS cr
@@ -321,7 +327,7 @@ public struct ReportRepository: Sendable {
         sql += " ORDER BY g.sort_order, g.code, a.code"
         let raws: [(Account.ID, String, String, Int64, String, String, String)] = try db.query(sql, bind: bind) { r in
             (
-                UUID(uuidString: r.text("id")) ?? UUID(),
+                try UUIDParsing.required(r.text("id"), field: "report.balance_sheet.account_id"),
                 r.text("code"),
                 r.text("name"),
                 r.int("ob"),
@@ -333,7 +339,7 @@ public struct ReportRepository: Sendable {
         var byGname: [String: [ReportResult.TrialBalanceRow]] = [:]
         var totals: [String: Int64] = [:]
         for (id, code, name, ob, obs, gcode, gname) in raws {
-            let move: (Int64, Int64)? = try? db.queryOne(
+            let move: (Int64, Int64)? = try db.queryOne(
                 """
                 SELECT SUM(CASE WHEN l.side='debit'  THEN l.amount_paise ELSE 0 END) AS dr,
                        SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END) AS cr
@@ -385,7 +391,7 @@ public struct ReportRepository: Sendable {
         for c in codes {
             let acct = try AccountRepository(db: db).findByCode(c.accountCode, companyId: filter.companyId)
             guard let acct else { continue }
-            let totals: (Int64, Int64)? = try? db.queryOne(
+            let totals: (Int64, Int64)? = try db.queryOne(
                 """
                 SELECT SUM(CASE WHEN l.side='debit'  THEN l.amount_paise ELSE 0 END) AS dr,
                        SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END) AS cr
@@ -401,7 +407,7 @@ public struct ReportRepository: Sendable {
             if acct.openingBalanceSide == .debit {
                 netAmt = (dr + acct.openingBalancePaise) - cr
             } else {
-                netAmt = dr - (cr + acct.openingBalancePaise)
+                netAmt = (cr + acct.openingBalancePaise) - dr
             }
             let label = "\(c.accountCode.replacingOccurrences(of: "_", with: " "))"
             let bucket = ReportResult.GstBucket(id: label, label: label, amountPaise: netAmt)
@@ -429,7 +435,7 @@ public struct ReportRepository: Sendable {
             let total = r.int("total_paise")
             let half = total / 2
             return ReportResult.DayBookRow(
-                id: UUID(uuidString: r.text("id")) ?? UUID(),
+                id: try UUIDParsing.required(r.text("id"), field: "report.day_book.voucher_id"),
                 timestamp: r.timestamp("created_at"),
                 voucherNumber: r.text("number"),
                 voucherTypeCode: VoucherType.Code(rawValue: r.text("voucher_type_code")) ?? .journal,
@@ -454,18 +460,17 @@ public struct ReportRepository: Sendable {
         let sql = """
             SELECT a.id, a.name, a.code
             FROM mally_accounts a
-            JOIN mally_account_groups g ON g.id = a.group_id
-            WHERE a.company_id = ? AND g.code IN (\(placeholders)) AND a.is_active = 1
+            WHERE a.company_id = ? AND a.code IN (\(placeholders)) AND a.is_active = 1
             ORDER BY a.code
         """
         var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
         for c in codes { bind.append(.text(c)) }
         let accounts: [(Account.ID, String, String)] = try db.query(sql, bind: bind) { r in
-            (UUID(uuidString: r.text("id")) ?? UUID(), r.text("name"), r.text("code"))
+            (try UUIDParsing.required(r.text("id"), field: "report.outstanding.account_id"), r.text("name"), r.text("code"))
         }
         var rows: [ReportResult.OutstandingRow] = []
         for (aid, name, _) in accounts {
-            let total: Int64 = (try? db.queryOne(
+            let total: Int64 = (try db.queryOne(
                 """
                 SELECT
                   COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END),0)

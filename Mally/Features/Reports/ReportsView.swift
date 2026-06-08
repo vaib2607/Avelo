@@ -2,35 +2,39 @@ import SwiftUI
 
 public struct ReportsView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @State private var holder = ReportsViewModelHolder()
+    @Environment(AppEnvironment.self) private var env
+    @State private var vm: ReportsViewModel?
 
     public init() {}
 
     public var body: some View {
-        ReportsContent(holder: holder)
+        ReportsContent(vm: vm)
             .navigationTitle("Reports")
             .onAppear { setup(); consumePendingLedger() }
             .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .onChange(of: env.dataRevision) { _, _ in setup(); vm?.reload() }
             .onChange(of: env.router.pendingLedgerAccountId) { _, _ in consumePendingLedger() }
     }
 
     private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        if vm == nil || vm?.companyId != ctx.companyId {
             let model = ReportsViewModel(companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id)
             model.asOf = ctx.financialYear.endDate
             model.fromDate = ctx.financialYear.startDate
             model.toDate = ctx.financialYear.endDate
             model.reload()
-            holder.vm = model
+            vm = model
         }
     }
 
     /// Applies a deep-link request from elsewhere (e.g. AccountsView) to show a
     /// specific account's ledger, then clears the request.
     private func consumePendingLedger() {
-        guard let accountId = env.router.pendingLedgerAccountId, let vm = holder.vm else { return }
+        guard let accountId = env.router.pendingLedgerAccountId, let vm else { return }
         vm.selection = .ledger
         vm.ledgerAccountId = accountId
         vm.reload()
@@ -39,16 +43,11 @@ public struct ReportsView: View {
 }
 
 @MainActor
-final class ReportsViewModelHolder: ObservableObject {
-    @Published var vm: ReportsViewModel?
-}
-
-@MainActor
 private struct ReportsContent: View {
-    @ObservedObject var holder: ReportsViewModelHolder
+    let vm: ReportsViewModel?
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             ReportsBody(vm: vm)
         } else {
             ProgressView()
@@ -58,7 +57,8 @@ private struct ReportsContent: View {
 
 @MainActor
 private struct ReportsBody: View {
-    @ObservedObject var vm: ReportsViewModel
+    @Environment(AppEnvironment.self) private var env
+    @Bindable var vm: ReportsViewModel
 
     var body: some View {
         HSplitView {
@@ -155,7 +155,10 @@ private struct ReportsBody: View {
                         .foregroundStyle(.green)
                 }
                 Table(rows) {
-                    TableColumn("Account", value: \.accountName)
+                    TableColumn("Account") { r in
+                        Button(r.accountName) { openLedger(r.id) }
+                            .buttonStyle(.plain)
+                    }
                     TableColumn("Group", value: \.groupPath)
                     TableColumn("Debit (₹)") { r in
                         Text(Currency.formatPaise(r.debitPaise)).monospacedDigit()
@@ -179,7 +182,10 @@ private struct ReportsBody: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Income").font(.headline)
                 Table(pl.income) {
-                    TableColumn("Account", value: \.accountName)
+                    TableColumn("Account") { r in
+                        Button(r.accountName) { openLedger(r.id) }
+                            .buttonStyle(.plain)
+                    }
                     TableColumn("Amount (₹)", content: { (r: ReportResult.TrialBalanceRow) in
                         Text(Currency.formatPaise(r.debitPaise - r.creditPaise)).monospacedDigit()
                     })
@@ -188,7 +194,10 @@ private struct ReportsBody: View {
                 Divider()
                 Text("Expense").font(.headline)
                 Table(pl.expenses) {
-                    TableColumn("Account", value: \.accountName)
+                    TableColumn("Account") { r in
+                        Button(r.accountName) { openLedger(r.id) }
+                            .buttonStyle(.plain)
+                    }
                     TableColumn("Amount (₹)", content: { (r: ReportResult.TrialBalanceRow) in
                         Text(Currency.formatPaise(r.creditPaise - r.debitPaise)).monospacedDigit()
                     })
@@ -210,7 +219,10 @@ private struct ReportsBody: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Assets").font(.headline)
                     Table(bs.assets.flatMap { $0.rows }) {
-                        TableColumn("Account", value: \.accountName)
+                        TableColumn("Account") { r in
+                            Button(r.accountName) { openLedger(r.id) }
+                                .buttonStyle(.plain)
+                        }
                         TableColumn("Amount (₹)") { r in
                             Text(Currency.formatPaise(r.debitPaise - r.creditPaise)).monospacedDigit()
                         }
@@ -220,7 +232,10 @@ private struct ReportsBody: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Liabilities").font(.headline)
                     Table(bs.liabilities.flatMap { $0.rows }) {
-                        TableColumn("Account", value: \.accountName)
+                        TableColumn("Account") { r in
+                            Button(r.accountName) { openLedger(r.id) }
+                                .buttonStyle(.plain)
+                        }
                         TableColumn("Amount (₹)") { r in
                             Text(Currency.formatPaise(r.creditPaise - r.debitPaise)).monospacedDigit()
                         }
@@ -229,7 +244,10 @@ private struct ReportsBody: View {
                     Divider()
                     Text("Equity").font(.headline)
                     Table(bs.equity.flatMap { $0.rows }) {
-                        TableColumn("Account", value: \.accountName)
+                        TableColumn("Account") { r in
+                            Button(r.accountName) { openLedger(r.id) }
+                                .buttonStyle(.plain)
+                        }
                         TableColumn("Amount (₹)") { r in
                             Text(Currency.formatPaise(r.creditPaise - r.debitPaise)).monospacedDigit()
                         }
@@ -277,7 +295,8 @@ private struct ReportsBody: View {
                     Text(DateFormatters.userDate.string(from: r.date))
                 }
                 TableColumn("Voucher") { r in
-                    Text(r.voucherNumber)
+                    Button(r.voucherNumber) { openVoucher(r.id) }
+                        .buttonStyle(.plain)
                 }
                 TableColumn("Type") { r in
                     Text(r.voucherTypeCode.rawValue)
@@ -301,7 +320,10 @@ private struct ReportsBody: View {
                     TableColumn("Date") { e in
                         Text(DateFormatters.userDate.string(from: e.date))
                     }
-                    TableColumn("Voucher", value: \.voucherNumber)
+                    TableColumn("Voucher") { e in
+                        Button(e.voucherNumber) { openVoucher(e.voucherId) }
+                            .buttonStyle(.plain)
+                    }
                     TableColumn("Particulars", value: \.narration)
                     TableColumn("Debit (₹)") { e in
                         Text(Currency.formatPaise(e.debitPaise)).monospacedDigit()
@@ -326,7 +348,10 @@ private struct ReportsBody: View {
     private var outstandingSection: some View {
         if let o = vm.outstanding {
             Table(o.rows) {
-                TableColumn("Account", value: \.partyName)
+                TableColumn("Account") { r in
+                    Button(r.partyName) { openLedger(r.id) }
+                        .buttonStyle(.plain)
+                }
                 TableColumn("Amount (₹)") { r in
                     Text(Currency.formatPaise(r.amountPaise)).monospacedDigit()
                 }
@@ -353,5 +378,22 @@ private struct ReportsBody: View {
             }
             Text("Total: \(Currency.formatPaise(s.totalPaise))").monospacedDigit().bold()
         } else { Text("No data.").foregroundStyle(.secondary) }
+    }
+
+    private func openVoucher(_ id: Voucher.ID) {
+        ReportsNavigation.openVoucher(id, router: env.router)
+    }
+
+    private func openLedger(_ accountId: Account.ID) {
+        vm.selection = .ledger
+        vm.ledgerAccountId = accountId
+        vm.reload()
+    }
+}
+
+@MainActor
+enum ReportsNavigation {
+    static func openVoucher(_ voucherId: Voucher.ID, router: AppRouter) {
+        router.present(.editVoucher(voucherId))
     }
 }

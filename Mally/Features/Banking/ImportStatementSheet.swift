@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct ImportStatementSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     let companyId: Company.ID
     let db: SQLiteDatabase
     let accounts: [Account]

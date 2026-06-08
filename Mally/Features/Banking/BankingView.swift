@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct BankingView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
+    @Environment(AppEnvironment.self) private var env
     @State private var holder = BankingViewModelHolder()
     @State private var showImport: Bool = false
 

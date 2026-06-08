@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct CompanyPickerView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
 
     @State private var entries: [CompanyRegistryEntry] = []
     @State private var isLoading: Bool = true
@@ -17,7 +17,7 @@ public struct CompanyPickerView: View {
             content
         }
         .frame(minWidth: 720, minHeight: 480)
-        .task { await reload() }
+        .task(id: env.dataRevision) { await reload() }
     }
 
     @ViewBuilder

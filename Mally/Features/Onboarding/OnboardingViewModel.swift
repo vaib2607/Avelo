@@ -1,19 +1,21 @@
 import SwiftUI
 import AppKit
+import Observation
 
 @MainActor
-public final class OnboardingViewModel: ObservableObject {
+@Observable
+public final class OnboardingViewModel {
 
-    @Published public var companyName: String = ""
-    @Published public var pan: String = ""
-    @Published public var gstin: String = ""
-    @Published public var fyLabel: String = ""
-    @Published public var fyStart: Date = IndianFinancialYear.start(for: Date())
-    @Published public var fyEnd: Date = IndianFinancialYear.end(for: Date())
-    @Published public var booksBegin: Date = IndianFinancialYear.start(for: Date())
-    @Published public var enableInventory: Bool = false
-    @Published public var inventoryMode: InventoryLinkMode = .autoPrompt
-    @Published public var canCreate: Bool = false
+    public var companyName: String = ""
+    public var pan: String = ""
+    public var gstin: String = ""
+    public var fyLabel: String = ""
+    public var fyStart: Date = IndianFinancialYear.start(for: Date())
+    public var fyEnd: Date = IndianFinancialYear.end(for: Date())
+    public var booksBegin: Date = IndianFinancialYear.start(for: Date())
+    public var enableInventory: Bool = false
+    public var inventoryMode: InventoryLinkMode = .autoPrompt
+    public var canCreate: Bool = false
 
     public init() {
         let fy = IndianFinancialYear.detect()

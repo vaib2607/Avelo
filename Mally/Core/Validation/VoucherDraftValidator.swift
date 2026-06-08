@@ -115,42 +115,67 @@ public struct VoucherDraftValidator: Sendable {
             break
         }
 
-        if let fyId = try? fyIdForDate(draft.date, companyId: companyId) {
-            if fyId != financialYearId {
+        do {
+            if let fyId = try fyIdForDate(draft.date, companyId: companyId) {
+                if fyId != financialYearId {
+                    errors.append(ValidationError(
+                        code: .voucherDateOutsideFY,
+                        field: "date",
+                        message: "Date \(DateFormatters.formatDisplayDate(draft.date)) is outside the active financial year."
+                    ))
+                }
+            } else {
                 errors.append(ValidationError(
                     code: .voucherDateOutsideFY,
                     field: "date",
-                    message: "Date \(DateFormatters.formatDisplayDate(draft.date)) is outside the active financial year."
+                    message: "Date \(DateFormatters.formatDisplayDate(draft.date)) is not within any open financial year."
                 ))
             }
-        } else {
+        } catch {
             errors.append(ValidationError(
-                code: .voucherDateOutsideFY,
+                code: .internal,
                 field: "date",
-                message: "Date \(DateFormatters.formatDisplayDate(draft.date)) is not within any open financial year."
+                message: "Unable to validate the voucher date against financial years."
             ))
         }
 
-        if (try? fiscalLockChecker.isLocked(financialYearId: financialYearId)) == true {
-            if existingVoucherId == nil {
+        do {
+            if try fiscalLockChecker.isLocked(financialYearId: financialYearId) {
                 errors.append(ValidationError(
                     code: .voucherFYLocked,
                     field: "date",
-                    message: "Financial year is locked; new vouchers are not allowed."
+                    message: existingVoucherId == nil
+                        ? "Financial year is locked; new vouchers are not allowed."
+                        : "Financial year is locked; voucher edits are not allowed."
                 ))
             }
+        } catch {
+            errors.append(ValidationError(
+                code: .internal,
+                field: "date",
+                message: "Unable to validate fiscal-year lock state."
+            ))
         }
 
         for line in filled {
-            if let acc = line.accountId,
-               let isActive = try? isAccountActive(acc, companyId: companyId),
-               !isActive {
-                errors.append(ValidationError(
-                    code: .voucherAccountInactive,
-                    field: "lines",
-                    message: "Account is inactive."
-                ))
-                break
+            if let acc = line.accountId {
+                do {
+                    if try isAccountActive(acc, companyId: companyId) == false {
+                        errors.append(ValidationError(
+                            code: .voucherAccountInactive,
+                            field: "lines",
+                            message: "Account is inactive."
+                        ))
+                        break
+                    }
+                } catch {
+                    errors.append(ValidationError(
+                        code: .internal,
+                        field: "lines",
+                        message: "Unable to validate account activity."
+                    ))
+                    break
+                }
             }
         }
 

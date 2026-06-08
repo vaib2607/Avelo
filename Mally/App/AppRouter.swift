@@ -1,16 +1,17 @@
 import Foundation
-import Combine
+import Observation
 
 @MainActor
-public final class AppRouter: ObservableObject {
+@Observable
+public final class AppRouter {
 
-    @Published public var selection: SidebarDestination = .dashboard
-    @Published public var presentedSheet: RouterSheet?
-    @Published public var presentedAlert: RouterAlert?
+    public var selection: SidebarDestination = .dashboard
+    public var presentedSheet: RouterSheet?
+    public var presentedAlert: RouterAlert?
 
     /// Set when another screen requests the Reports view open a specific
     /// account's ledger. Consumed (and cleared) by `ReportsView`.
-    @Published public var pendingLedgerAccountId: Account.ID?
+    public var pendingLedgerAccountId: Account.ID?
 
     public init() {}
 
@@ -59,6 +60,7 @@ public enum RouterSheet: Identifiable, Sendable {
     case editVoucher(Voucher.ID)
     case reverseVoucher(Voucher.ID)
     case newAccount
+    case editAccount(Account.ID)
     case newFinancialYear
     case newEmployee
     case newItem
@@ -87,6 +89,7 @@ public enum RouterSheet: Identifiable, Sendable {
         case .editVoucher(let id): return "editVoucher-\(id.uuidString)"
         case .reverseVoucher(let id): return "reverseVoucher-\(id.uuidString)"
         case .newAccount: return "newAccount"
+        case .editAccount(let id): return "editAccount-\(id.uuidString)"
         case .newFinancialYear: return "newFinancialYear"
         case .newEmployee: return "newEmployee"
         case .newItem: return "newItem"

@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct ReverseVoucherSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     let voucherId: Voucher.ID
     @State private var reason: String = ""
 
@@ -50,6 +50,8 @@ public struct ReverseVoucherSheet: View {
         do {
             _ = try VoucherService(db: ctx.database, companyId: ctx.companyId)
                 .reverse(voucherId, reason: reason.isEmpty ? nil : reason)
+            env.markAccountTreeDirty()
+            env.notifyDataChanged()
             env.showSuccess("Voucher reversed.")
             router.presentedSheet = nil
         } catch {

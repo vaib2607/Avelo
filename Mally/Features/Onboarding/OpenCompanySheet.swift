@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct OpenCompanySheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     @State private var entries: [CompanyRegistryEntry] = []
     @State private var query: String = ""
 
@@ -43,7 +43,11 @@ public struct OpenCompanySheet: View {
         }
         .frame(minWidth: 480, minHeight: 420)
         .task {
-            entries = (try? env.registry.listAll()) ?? []
+            do {
+                entries = try env.registry.listAll()
+            } catch {
+                env.showError(AppError.wrap(error))
+            }
         }
     }
 

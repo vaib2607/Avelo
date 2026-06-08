@@ -23,15 +23,18 @@ struct TestCompany {
     static func make() throws -> TestCompany {
         let db = try SQLiteDatabase(path: ":memory:")
         try MigrationRunner().runMigrations(on: db)
+        return try seed(into: db, companyId: UUID(), companyName: "Test Co")
+    }
 
-        let companyId = UUID()
+    static func seed(into db: SQLiteDatabase,
+                     companyId: Company.ID,
+                     companyName: String = "Test Co") throws -> TestCompany {
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO mally_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            [.text(companyId.uuidString), .text("Test Co"), .text(now), .text(now)]
+            [.text(companyId.uuidString), .text(companyName), .text(now), .text(now)]
         )
 
-        // FY 2024-25
         let fyId = UUID()
         let start = DateFormatters.parseDate("2024-04-01")!
         let end = DateFormatters.parseDate("2025-03-31")!
@@ -89,7 +92,6 @@ struct TestCompany {
         let income = try insertGroup("4000", "Sales Accounts", "income", sort: 2)
         let expense = try insertGroup("5000", "Indirect Expenses", "expense", sort: 3)
 
-        // Opening: Cash Dr 100.00, Capital Cr 100.00 -> books balanced at opening.
         let cash = try insertAccount("1001", "Cash", group: assets, openingPaise: 10000, side: "debit")
         let capitalAcc = try insertAccount("3001", "Capital", group: capital, openingPaise: 10000, side: "credit")
         let sales = try insertAccount("4001", "Sales", group: income, openingPaise: 0, side: "credit")

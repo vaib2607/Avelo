@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import Observation
 
 public enum KeyboardCommand: Sendable, Equatable {
     case openDashboard
@@ -47,11 +48,12 @@ public enum KeyboardContext: Equatable, Sendable {
 }
 
 @MainActor
-public final class KeyboardRouter: ObservableObject {
+@Observable
+public final class KeyboardRouter {
 
-    @Published public private(set) var context: KeyboardContext = .idle
-    @Published public private(set) var pendingBuffer: String = ""
-    @Published public var lastCommand: KeyboardCommand?
+    public private(set) var context: KeyboardContext = .idle
+    public private(set) var pendingBuffer: String = ""
+    public var lastCommand: KeyboardCommand?
 
     public var onCommand: ((KeyboardCommand) -> Void)?
 

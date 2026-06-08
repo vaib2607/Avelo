@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct SettingsView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
+    @Environment(AppEnvironment.self) private var env
     @State private var vm: SettingsViewModel?
 
     public init() {}
@@ -12,12 +12,18 @@ public struct SettingsView: View {
             if let vm = vm { content(vm: vm) } else { ProgressView() }
         }
         .navigationTitle("Settings")
-        .onAppear { setup() }
-        .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+        .task(id: reloadKey) { setup() }
+    }
+
+    private var reloadKey: String {
+        let company = env.companyContext?.companyId.uuidString ?? "none"
+        return "\(company)-\(env.dataRevision)"
     }
 
     @ViewBuilder
     private func content(vm: SettingsViewModel) -> some View {
+        @Bindable var vm = vm
+
         Form {
             Section("Company") {
                 if let ctx = env.companyContext {
@@ -70,10 +76,14 @@ public struct SettingsView: View {
     }
 
     private func setup() {
-        guard let ctx = env.companyContext else { return }
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
         if vm == nil || vm?.companyId != ctx.companyId {
-            vm = SettingsViewModel(companyId: ctx.companyId, db: ctx.database)
-            vm?.reload()
+            let model = SettingsViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            vm = model
         }
     }
 }

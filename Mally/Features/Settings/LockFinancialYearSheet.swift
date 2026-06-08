@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct LockFinancialYearSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     let fyId: FinancialYear.ID
     @State private var reason: String = ""
 
@@ -45,6 +45,7 @@ public struct LockFinancialYearSheet: View {
         do {
             try FinancialYearService(db: ctx.database, companyId: ctx.companyId)
                 .lock(fyId, reason: reason.isEmpty ? nil : reason)
+            env.notifyDataChanged()
             env.showSuccess("Financial year locked.")
             router.presentedSheet = nil
         } catch {

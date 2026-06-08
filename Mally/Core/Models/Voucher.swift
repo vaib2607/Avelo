@@ -17,7 +17,6 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
     public var totalPaise: Int64
     public let createdAt: Date
     public var updatedAt: Date
-    public var reference: String
 
     public init(id: ID = UUID(),
                 companyId: Company.ID,
@@ -31,7 +30,6 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
                 reversalOfId: ID? = nil,
                 isPosted: Bool = true,
                 totalPaise: Int64 = 0,
-                reference: String = "",
                 createdAt: Date = Date(),
                 updatedAt: Date = Date()) {
         self.id = id
@@ -46,7 +44,6 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
         self.reversalOfId = reversalOfId
         self.isPosted = isPosted
         self.totalPaise = totalPaise
-        self.reference = reference
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

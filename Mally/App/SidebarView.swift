@@ -2,13 +2,16 @@ import SwiftUI
 
 public struct SidebarView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
-    @EnvironmentObject private var windowState: WindowState
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
+    @Environment(WindowState.self) private var windowState
 
     public init() {}
 
     public var body: some View {
+        @Bindable var router = router
+        @Bindable var windowState = windowState
+
         List(selection: $router.selection) {
             Section("Workspace") {
                 if let ctx = env.companyContext {
@@ -23,7 +26,7 @@ public struct SidebarView: View {
                 }
             }
             Section("Modules") {
-                ForEach(SidebarDestination.allCases) { dest in
+                ForEach(SidebarDestination.v1VisibleCases) { dest in
                     NavigationLink(value: dest) {
                         Label(dest.title, systemImage: dest.systemImage)
                     }
@@ -48,7 +51,7 @@ public struct SidebarView: View {
 
     private var currentCompanyName: String {
         guard let ctx = env.companyContext else { return "" }
-        return ctx.companyId.uuidString
+        return ctx.companyName
     }
 
     @ViewBuilder

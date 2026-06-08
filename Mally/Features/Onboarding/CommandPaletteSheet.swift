@@ -5,7 +5,7 @@ import SwiftUI
 /// Up/Down to move, Return to run, Esc to dismiss.
 public struct CommandPaletteSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
+    @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
 
     @State private var query: String = ""
@@ -31,9 +31,6 @@ public struct CommandPaletteSheet: View {
         nav("Accounts", "book", .accounts)
         nav("Vouchers", "doc.text", .vouchers)
         nav("Reports", "chart.bar", .reports)
-        nav("Inventory", "shippingbox", .inventory)
-        nav("Payroll", "person.3", .payroll)
-        nav("Banking", "building.columns", .banking)
         nav("Audit", "lock.shield", .audit)
         nav("Settings", "gearshape", .settings)
 
@@ -50,8 +47,6 @@ public struct CommandPaletteSheet: View {
         voucher("Debit Note", "F11", .newDebitNote)
 
         out.append(Command(title: "New Account", subtitle: "Create", symbol: "plus.circle") { $0.present(.newAccount) })
-        out.append(Command(title: "New Inventory Item", subtitle: "Create", symbol: "plus.circle") { $0.present(.newItem) })
-        out.append(Command(title: "New Employee", subtitle: "Create", symbol: "plus.circle") { $0.present(.newEmployee) })
         out.append(Command(title: "Backup Company", subtitle: "Action", symbol: "externaldrive") { $0.present(.backup) })
         return out
     }

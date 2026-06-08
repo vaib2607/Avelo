@@ -83,6 +83,22 @@ public struct AuditRepository: Sendable {
             sql += " AND entity_id = ?"
             bind.append(.text(eid))
         }
+        if let search = filter.searchText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !search.isEmpty {
+            let needle = "%\(search.lowercased())%"
+            sql += """
+                 AND (
+                    lower(actor) LIKE ?
+                    OR lower(action) LIKE ?
+                    OR lower(entity_type) LIKE ?
+                    OR lower(entity_id) LIKE ?
+                    OR lower(COALESCE(reason, '')) LIKE ?
+                    OR lower(COALESCE(snapshot_before_json, '')) LIKE ?
+                    OR lower(COALESCE(snapshot_after_json, '')) LIKE ?
+                 )
+            """
+            bind.append(contentsOf: Array(repeating: .text(needle), count: 7))
+        }
         if let from = filter.fromDate {
             sql += " AND timestamp >= ?"
             bind.append(.timestamp(from))
@@ -106,10 +122,18 @@ public struct AuditRepository: Sendable {
     }
 
     static func rowToEvent(_ r: Row) throws -> AuditEvent {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
+        let idRaw = r.text("id")
+        guard let id = UUID(uuidString: idRaw) else {
+            throw AppError.database(.rowReadFailed("Invalid audit event id: \(idRaw)"))
+        }
+        let companyIdRaw = r.text("company_id")
+        guard let companyId = UUID(uuidString: companyIdRaw) else {
+            throw AppError.database(.rowReadFailed("Invalid audit company id: \(companyIdRaw)"))
+        }
         let actionRaw = r.text("action")
-        let action = AuditAction(rawValue: actionRaw) ?? .voucherPosted
+        guard let action = AuditAction(rawValue: actionRaw) else {
+            throw AppError.database(.rowReadFailed("Unknown audit action: \(actionRaw)"))
+        }
         return AuditEvent(
             id: id,
             companyId: companyId,

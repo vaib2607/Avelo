@@ -3,8 +3,8 @@ import AppKit
 
 public struct RestoreSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     @State private var status: String = ""
     @State private var isWorking: Bool = false
 
@@ -13,7 +13,7 @@ public struct RestoreSheet: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Restore Backup").font(.title2.bold())
-            Text("Choose a Mally backup .zip file. A new company is created from its contents; your existing data is not modified.")
+            Text("Choose a Mally `.mallybackup` file. A new company is created from its contents; your existing data is not modified.")
                 .foregroundStyle(.secondary)
             HStack {
                 if isWorking { ProgressView() }
@@ -48,9 +48,12 @@ public struct RestoreSheet: View {
                 let result = await NSPanelBridge.runOpen(panel)
                 if result == .OK, let url = panel.url {
                     let restore = RestoreService(manager: env.manager)
-                    let newId = try await restore.restore(from: url)
+                    let restored = try await restore.restore(from: url)
+                    await env.openCompany(restored.id)
+                    env.notifyDataChanged()
                     env.showSuccess("Restored as new company.")
-                    status = "New company id: \(newId.id.uuidString.prefix(8))"
+                    status = "Opened restored company \(restored.name)."
+                    router.presentedSheet = nil
                 }
             } catch {
                 env.showError(AppError.wrap(error))

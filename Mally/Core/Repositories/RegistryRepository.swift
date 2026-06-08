@@ -14,7 +14,7 @@ public struct RegistryRepository: Sendable {
         ) { r in
             let last = r.optionalText("last_opened_at").flatMap { DateFormatters.parseTimestamp($0) }
             return CompanyRegistryEntry(
-                id: UUID(uuidString: r.text("id")) ?? UUID(),
+                id: try UUIDParsing.required(r.text("id"), field: "mally_registry_companies.id"),
                 name: r.text("name"),
                 sqliteFileName: r.text("sqlite_file_name"),
                 lastOpenedAt: last,

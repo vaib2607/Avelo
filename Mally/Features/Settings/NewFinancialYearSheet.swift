@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct NewFinancialYearSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
 
     @State private var label: String = ""
     @State private var start: Date = IndianFinancialYear.start(for: Date().addingTimeInterval(365 * 86400))
@@ -61,6 +61,7 @@ public struct NewFinancialYearSheet: View {
             _ = try FinancialYearService(db: ctx.database, companyId: ctx.companyId).create(
                 label: label, startDate: start, endDate: end, booksBeginDate: booksBegin
             )
+            env.notifyDataChanged()
             env.showSuccess("Financial year created.")
             router.presentedSheet = nil
         } catch {

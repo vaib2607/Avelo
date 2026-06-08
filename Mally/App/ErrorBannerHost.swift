@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct ErrorBannerHost: View {
 
-    @EnvironmentObject private var env: AppEnvironment
+    @Environment(AppEnvironment.self) private var env
 
     public init() {}
 

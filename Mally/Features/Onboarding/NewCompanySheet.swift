@@ -2,13 +2,15 @@ import SwiftUI
 
 public struct NewCompanySheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
-    @StateObject private var vm = OnboardingViewModel()
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
+    @State private var vm = OnboardingViewModel()
 
     public init() {}
 
     public var body: some View {
+        @Bindable var vm = vm
+
         VStack(spacing: 0) {
             header
             Divider()
@@ -108,7 +110,7 @@ public struct NewCompanySheet: View {
         Task {
             defer { env.isBusy = false }
             do {
-                _ = try await CompanyService.create(
+                let company = try await CompanyService.create(
                     companyInput: CompanyInputValidator.Input(name: vm.companyName, gstin: vm.gstin, pan: vm.pan),
                     fyInput: FinancialYearInputValidator.Input(
                         label: vm.fyLabel, startDate: vm.fyStart, endDate: vm.fyEnd, booksBeginDate: vm.booksBegin
@@ -116,15 +118,14 @@ public struct NewCompanySheet: View {
                     seedDefaults: true,
                     manager: env.manager
                 )
+                await env.openCompany(company.id)
                 if vm.enableInventory {
-                    if let id = try? env.registry.firstId(named: vm.companyName) {
-                        let ctx = await env.manager.openHandle(id: id)
-                        if let ctx = ctx {
-                            let svc = CompanyService(db: ctx.db, companyId: id, manager: env.manager)
-                            try svc.setInventoryMode(enabled: true, linkMode: vm.inventoryMode)
-                        }
+                    if let ctx = env.companyContext {
+                        let svc = CompanyService(db: ctx.database, companyId: ctx.companyId, manager: env.manager)
+                        try svc.setInventoryMode(enabled: true, linkMode: vm.inventoryMode)
                     }
                 }
+                env.notifyDataChanged()
                 env.showSuccess("Company created.")
                 router.presentedSheet = nil
             } catch {

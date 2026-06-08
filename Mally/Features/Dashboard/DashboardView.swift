@@ -2,12 +2,14 @@ import SwiftUI
 
 public struct DashboardView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @StateObject private var vm = DashboardViewModel()
+    @Environment(AppEnvironment.self) private var env
+    @State private var vm = DashboardViewModel()
 
     public init() {}
 
     public var body: some View {
+        @Bindable var vm = vm
+
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
@@ -21,7 +23,12 @@ public struct DashboardView: View {
             .padding(20)
         }
         .navigationTitle("Dashboard")
-        .task(id: env.companyContext?.companyId) { reload() }
+        .task(id: reloadKey) { reload() }
+    }
+
+    private var reloadKey: String {
+        let company = env.companyContext?.companyId.uuidString ?? "none"
+        return "\(company)-\(env.dataRevision)"
     }
 
     @ViewBuilder
@@ -204,7 +211,7 @@ private struct LabeledMoney: View {
 }
 
 private struct AccountTreeStrip: View {
-    @ObservedObject var cache: AccountTreeCache
+    @Bindable var cache: AccountTreeCache
 
     /// Live net trial balance computed entirely in-memory from the tree.
     /// Net presentation: each ledger contributes its signed balance to one side.

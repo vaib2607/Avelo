@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct PostSalarySheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     let employeeId: PayrollEmployee.ID
 
     @State private var monthYear: Int = Calendar.current.component(.year, from: Date()) * 100

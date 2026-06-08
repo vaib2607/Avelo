@@ -57,31 +57,37 @@ public final class FinancialYearService: Sendable {
     }
 
     public func lock(_ id: FinancialYear.ID, reason: String? = nil) throws {
-        try repository.lock(id)
-        try audit.record(
-            action: .financialYearLocked,
-            entityType: "financial_year",
-            entityId: id.uuidString,
-            reason: reason
-        )
+        try db.write { tx in
+            try FinancialYearRepository(db: tx).lock(id)
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .financialYearLocked,
+                entityType: "financial_year",
+                entityId: id.uuidString,
+                reason: reason
+            )
+        }
     }
 
     public func unlock(_ id: FinancialYear.ID, reason: String? = nil) throws {
-        try repository.unlock(id)
-        try audit.record(
-            action: .fyUnlocked,
-            entityType: "financial_year",
-            entityId: id.uuidString,
-            reason: reason
-        )
+        try db.write { tx in
+            try FinancialYearRepository(db: tx).unlock(id)
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .fyUnlocked,
+                entityType: "financial_year",
+                entityId: id.uuidString,
+                reason: reason
+            )
+        }
     }
 
     public func close(_ id: FinancialYear.ID) throws {
-        try repository.markClosed(id)
-        try audit.record(
-            action: .financialYearClosed,
-            entityType: "financial_year",
-            entityId: id.uuidString
-        )
+        try db.write { tx in
+            try FinancialYearRepository(db: tx).markClosed(id)
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .financialYearClosed,
+                entityType: "financial_year",
+                entityId: id.uuidString
+            )
+        }
     }
 }

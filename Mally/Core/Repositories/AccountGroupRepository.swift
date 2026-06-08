@@ -82,10 +82,9 @@ public struct AccountGroupRepository: Sendable {
     }
 
     static func rowToGroup(_ r: Row) throws -> AccountGroup {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
-        let parentIdStr = r.optionalText("parent_group_id")
-        let parentId = parentIdStr.flatMap { UUID(uuidString: $0) }
+        let id = try UUIDParsing.required(r.text("id"), field: "mally_account_groups.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "mally_account_groups.company_id")
+        let parentId = try UUIDParsing.optional(r.optionalText("parent_group_id"), field: "mally_account_groups.parent_group_id")
         let natureRaw = r.text("nature")
         let nature = AccountNature(rawValue: natureRaw) ?? .assets
         return AccountGroup(

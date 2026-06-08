@@ -51,6 +51,27 @@ final class AccountTreeReconciliationTests: XCTestCase {
         XCTAssertEqual(tree.findLedger(tc.capitalId)?.balancePaise, -10000)
     }
 
+    func testTrialBalanceSeededTotalsMatchExpectedFixture() throws {
+        let tc = try TestCompany.make()
+        try seedActivity(tc)
+
+        let tb = try ReportService(db: tc.db, companyId: tc.companyId)
+            .trialBalance(asOfDate: tc.fy.endDate)
+
+        XCTAssertEqual(tb.totalDebitPaise, 80000)
+        XCTAssertEqual(tb.totalCreditPaise, 80000)
+
+        let rowsById = Dictionary(uniqueKeysWithValues: tb.rows.map { ($0.id, $0) })
+        XCTAssertEqual(rowsById[tc.cashId]?.debitPaise, 60000)
+        XCTAssertEqual(rowsById[tc.cashId]?.creditPaise, 20000)
+        XCTAssertEqual(rowsById[tc.salesId]?.debitPaise, 0)
+        XCTAssertEqual(rowsById[tc.salesId]?.creditPaise, 50000)
+        XCTAssertEqual(rowsById[tc.rentId]?.debitPaise, 20000)
+        XCTAssertEqual(rowsById[tc.rentId]?.creditPaise, 0)
+        XCTAssertEqual(rowsById[tc.capitalId]?.debitPaise, 0)
+        XCTAssertEqual(rowsById[tc.capitalId]?.creditPaise, 10000)
+    }
+
     func testBooksAreBalancedAcrossAllLedgers() throws {
         let tc = try TestCompany.make()
         try seedActivity(tc)
@@ -84,6 +105,51 @@ final class AccountTreeReconciliationTests: XCTestCase {
             .trialBalance(asOfDate: tc.fy.endDate)
         let sqlNet = tb.rows.reduce(Int64(0)) { $0 + ($1.debitPaise - $1.creditPaise) }
         XCTAssertEqual(dr - cr, sqlNet)
+    }
+
+    func testTrialBalanceLiveTotalsMatchAuthoritativeSql() throws {
+        let tc = try TestCompany.make()
+        try seedActivity(tc)
+
+        let tb = try ReportService(db: tc.db, companyId: tc.companyId)
+            .trialBalance(asOfDate: tc.fy.endDate)
+
+        let sqlRows = try tc.db.query(
+            """
+            SELECT a.id,
+                   a.opening_balance_paise AS ob,
+                   a.opening_balance_side AS obs,
+                   COALESCE(SUM(CASE WHEN l.side = 'debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN l.side = 'credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
+            FROM mally_accounts a
+            LEFT JOIN mally_ledger_lines l ON l.account_id = a.id
+            LEFT JOIN mally_vouchers v ON v.id = l.voucher_id
+            WHERE a.company_id = ?
+              AND a.is_active = 1
+              AND (v.id IS NULL OR v.date <= ?)
+            GROUP BY a.id, a.opening_balance_paise, a.opening_balance_side
+            """,
+            bind: [.text(tc.companyId.uuidString), .date(tc.fy.endDate)]
+        ) { row in
+            (
+                try UUIDParsing.required(row.text("id"), field: "sql.trial_balance.account_id"),
+                row.int("ob"),
+                row.text("obs"),
+                row.int("dr"),
+                row.int("cr")
+            )
+        }
+
+        var expectedDebit: Int64 = 0
+        var expectedCredit: Int64 = 0
+        for (_, openingBalance, openingSide, debitMovement, creditMovement) in sqlRows {
+            let signedOpening = openingSide == "debit" ? openingBalance : -openingBalance
+            expectedDebit += (signedOpening > 0 ? signedOpening : 0) + debitMovement
+            expectedCredit += (signedOpening < 0 ? -signedOpening : 0) + creditMovement
+        }
+
+        XCTAssertEqual(tb.totalDebitPaise, expectedDebit)
+        XCTAssertEqual(tb.totalCreditPaise, expectedCredit)
     }
 
     func testGroupBalanceEqualsSumOfChildren() throws {

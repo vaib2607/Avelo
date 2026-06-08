@@ -2,13 +2,19 @@ import SwiftUI
 
 public struct RootView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var keyboardBridge: KeyboardBridge
-    @StateObject private var windowState = WindowState()
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
+    @Environment(KeyboardBridge.self) private var keyboardBridge
+    @State private var windowState = WindowState()
 
     public init() {}
 
     public var body: some View {
+        @Bindable var env = env
+        @Bindable var router = router
+        @Bindable var keyboardBridge = keyboardBridge
+        @Bindable var windowState = windowState
+
         Group {
             if env.companyContext == nil {
                 CompanyPickerView()
@@ -22,7 +28,7 @@ public struct RootView: View {
                 .navigationSplitViewStyle(.balanced)
             }
         }
-        .environmentObject(windowState)
+        .environment(windowState)
         .overlay(alignment: .top) {
             ErrorBannerHost()
         }
@@ -41,18 +47,21 @@ public struct RootView: View {
         .animation(.easeInOut(duration: 0.2), value: keyboardBridge.suppressedKeyFlash)
         .task {
             await env.bootstrap()
-            keyboardBridge.attach(router: env.router)
+            keyboardBridge.attach(router: router)
         }
-        .alert(item: $env.globalError) { err in
+        .alert(item: Binding(
+            get: { env.globalError },
+            set: { env.globalError = $0 }
+        )) { err in
             Alert(title: Text("Error"),
                   message: Text(err.localizedMessage),
                   dismissButton: .default(Text("OK")) { env.globalError = nil })
         }
         .onReceive(NotificationCenter.default.publisher(for: .mallyRequestNewCompany)) { _ in
-            env.router.present(.newCompany)
+            router.present(.newCompany)
         }
         .onReceive(NotificationCenter.default.publisher(for: .mallyRequestBackup)) { _ in
-            env.router.present(.backup)
+            router.present(.backup)
         }
         .sheet(item: env.presentedSheetBinding) { sheet in
             sheetView(for: sheet)
@@ -74,14 +83,14 @@ public struct RootView: View {
 
     @ViewBuilder
     private var detailView: some View {
-        switch env.router.selection {
+        switch router.selection {
         case .dashboard: DashboardView()
         case .vouchers:  VouchersView()
         case .accounts:  AccountsView()
         case .reports:   ReportsView()
-        case .inventory: InventoryView()
-        case .payroll:   PayrollView()
-        case .banking:   BankingView()
+        case .inventory: UnavailableModuleView(title: "Inventory")
+        case .payroll:   UnavailableModuleView(title: "Payroll")
+        case .banking:   UnavailableModuleView(title: "Banking")
         case .audit:     AuditView()
         case .settings:  SettingsView()
         }
@@ -102,6 +111,7 @@ public struct RootView: View {
         case .editVoucher(let id):  EditVoucherSheet(voucherId: id)
         case .reverseVoucher(let id): ReverseVoucherSheet(voucherId: id)
         case .newAccount:           NewAccountSheet()
+        case .editAccount(let id):  NewAccountSheet(existing: id)
         case .newFinancialYear:     NewFinancialYearSheet()
         case .newEmployee:          NewEmployeeSheet()
         case .newItem:              NewItemSheet()
@@ -110,6 +120,19 @@ public struct RootView: View {
         case .manageInventory:      ManageInventorySheet()
         case .managePayroll:        ManagePayrollSheet()
         }
+    }
+}
+
+private struct UnavailableModuleView: View {
+    let title: String
+
+    var body: some View {
+        ContentUnavailableView(
+            "\(title) is not in V1",
+            systemImage: "lock.fill",
+            description: Text("This module is hidden until it is approved for the V1 release path.")
+        )
+        .navigationTitle(title)
     }
 }
 

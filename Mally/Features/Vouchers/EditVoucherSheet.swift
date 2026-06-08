@@ -2,9 +2,9 @@ import SwiftUI
 
 public struct EditVoucherSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
     let voucherId: Voucher.ID
+    @State private var voucher: Voucher?
 
     public init(voucherId: Voucher.ID) {
         self.voucherId = voucherId
@@ -12,39 +12,64 @@ public struct EditVoucherSheet: View {
 
     public var body: some View {
         Group {
-            if let ctx = env.companyContext,
-               let voucher = try? VoucherService(db: ctx.database, companyId: ctx.companyId).findById(voucherId) {
+            if let voucher {
                 EditVoucherEditor(voucher: voucher)
             } else {
                 ProgressView()
             }
         }
         .frame(minWidth: 880, minHeight: 640)
+        .task(id: env.companyContext?.companyId) { loadVoucher() }
+    }
+
+    private func loadVoucher() {
+        guard let ctx = env.companyContext else {
+            voucher = nil
+            return
+        }
+        do {
+            guard let found = try VoucherService(db: ctx.database, companyId: ctx.companyId).findById(voucherId) else {
+                throw AppError.notFound("Voucher")
+            }
+            voucher = found
+        } catch {
+            voucher = nil
+            env.showError(AppError.wrap(error))
+        }
     }
 }
 
 private struct EditVoucherEditor: View {
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
-    @State private var holder = VoucherEditHolder()
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
+    @State private var vm: VoucherEditViewModel?
     let voucher: Voucher
 
     var body: some View {
-        EditInner(holder: holder, voucherNumber: voucher.number, onSave: save(vm:))
-            .environmentObject(router)
-            .onAppear { setup() }
+        EditInner(vm: vm, voucherNumber: voucher.number, onSave: save(vm:))
+            .environment(router)
+            .task(id: env.companyContext?.companyId) { setup() }
     }
 
     private func setup() {
-        guard let ctx = env.companyContext, holder.vm == nil else { return }
-        let model = VoucherEditViewModel(
-            companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id,
-            initialType: voucher.voucherTypeCode, existingId: voucher.id
-        )
-        let accounts = (try? AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()) ?? []
-        model.load(accounts: accounts, initialDate: ctx.financialYear.startDate)
-        model.revalidate()
-        holder.vm = model
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        guard vm == nil || vm?.companyId != ctx.companyId else { return }
+        do {
+            let model = VoucherEditViewModel(
+                companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id,
+                initialType: voucher.voucherTypeCode, existingId: voucher.id
+            )
+            let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
+            model.load(accounts: accounts, initialDate: ctx.financialYear.startDate)
+            model.revalidate()
+            vm = model
+        } catch {
+            vm = nil
+            env.showError(AppError.wrap(error))
+        }
     }
 
     private func save(vm: VoucherEditViewModel) {
@@ -53,6 +78,7 @@ private struct EditVoucherEditor: View {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
             _ = try svc.edit(voucher.id, with: vm.buildDraft(), in: ctx.financialYear)
             env.markAccountTreeDirty()
+            env.notifyDataChanged()
             env.showSuccess("Voucher updated.")
             router.presentedSheet = nil
         } catch {
@@ -63,13 +89,13 @@ private struct EditVoucherEditor: View {
 
 @MainActor
 private struct EditInner: View {
-    @ObservedObject var holder: VoucherEditHolder
+    let vm: VoucherEditViewModel?
     let voucherNumber: String
     let onSave: (VoucherEditViewModel) -> Void
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppRouter.self) private var router
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             EditVoucherBody(vm: vm, voucherNumber: voucherNumber, onSave: onSave)
         } else {
             ProgressView()
@@ -79,10 +105,10 @@ private struct EditInner: View {
 
 @MainActor
 private struct EditVoucherBody: View {
-    @ObservedObject var vm: VoucherEditViewModel
+    @Bindable var vm: VoucherEditViewModel
     let voucherNumber: String
     let onSave: (VoucherEditViewModel) -> Void
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppRouter.self) private var router
 
     var body: some View {
         VStack(spacing: 0) {

@@ -54,7 +54,7 @@ public final class AccountService: Sendable {
             code: input.code,
             name: input.name,
             openingBalancePaise: input.openingBalancePaise,
-            openingBalanceSide: input.openingBalancePaise == 0 ? .debit : .debit,
+            openingBalanceSide: input.openingBalanceSide,
             gstin: input.gstin
         )
         try db.write { tx in

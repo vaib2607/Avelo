@@ -1,24 +1,26 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class ReportsViewModel: ObservableObject {
+@Observable
+public final class ReportsViewModel {
 
-    @Published public var selection: ReportSelection = .trialBalance
-    @Published public var fromDate: Date = Date()
-    @Published public var toDate: Date = Date()
-    @Published public var asOf: Date = Date()
-    @Published public var trialBalance: [ReportResult.TrialBalanceRow] = []
-    @Published public var profitLoss: ReportResult.ProfitLoss?
-    @Published public var balanceSheet: ReportResult.BalanceSheet?
-    @Published public var gstSummary: ReportResult.GstSummary?
-    @Published public var dayBook: [ReportResult.DayBookRow] = []
-    @Published public var ledger: ReportResult.LedgerReport?
-    @Published public var outstanding: ReportResult.OutstandingReport?
-    @Published public var stockValuation: ReportResult.StockValuationReport?
-    @Published public var ledgerAccountId: Account.ID?
-    @Published public var accounts: [Account] = []
-    @Published public var isLoading: Bool = false
-    @Published public var error: AppError?
+    public var selection: ReportSelection = .trialBalance
+    public var fromDate: Date = Date()
+    public var toDate: Date = Date()
+    public var asOf: Date = Date()
+    public var trialBalance: [ReportResult.TrialBalanceRow] = []
+    public var profitLoss: ReportResult.ProfitLoss?
+    public var balanceSheet: ReportResult.BalanceSheet?
+    public var gstSummary: ReportResult.GstSummary?
+    public var dayBook: [ReportResult.DayBookRow] = []
+    public var ledger: ReportResult.LedgerReport?
+    public var outstanding: ReportResult.OutstandingReport?
+    public var stockValuation: ReportResult.StockValuationReport?
+    public var ledgerAccountId: Account.ID?
+    public var accounts: [Account] = []
+    public var isLoading: Bool = false
+    public var error: AppError?
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase

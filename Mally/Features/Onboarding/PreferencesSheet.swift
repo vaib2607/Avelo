@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct PreferencesSheet: View {
 
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppRouter.self) private var router
     @AppStorage("mally.prefs.dateFormat") private var dateFormat: String = "dd/MM/yyyy"
     @AppStorage("mally.prefs.currencyLocale") private var currencyLocale: String = "en_IN"
     @AppStorage("mally.prefs.confirmBeforePost") private var confirmPost: Bool = true

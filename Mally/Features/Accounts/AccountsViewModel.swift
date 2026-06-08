@@ -1,15 +1,17 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class AccountsViewModel: ObservableObject {
+@Observable
+public final class AccountsViewModel {
 
-    @Published public var accounts: [Account] = []
-    @Published public var groups: [AccountGroup] = []
-    @Published public var query: String = ""
-    @Published public var selectedGroupId: AccountGroup.ID?
-    @Published public var showDisabled: Bool = false
-    @Published public var isLoading: Bool = false
-    @Published public var error: AppError?
+    public var accounts: [Account] = []
+    public var groups: [AccountGroup] = []
+    public var query: String = ""
+    public var selectedGroupId: AccountGroup.ID?
+    public var showDisabled: Bool = false
+    public var isLoading: Bool = false
+    public var error: AppError?
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase

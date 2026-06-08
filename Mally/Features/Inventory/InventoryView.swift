@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct InventoryView: View {
 
-    @EnvironmentObject private var env: AppEnvironment
+    @Environment(AppEnvironment.self) private var env
     @State private var holder = InventoryViewModelHolder()
     @State private var showMovement: InventoryItem.ID?
 

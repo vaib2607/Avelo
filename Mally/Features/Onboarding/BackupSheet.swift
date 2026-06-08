@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct BackupSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
     @State private var status: String = ""
     @State private var isWorking: Bool = false
 
@@ -42,7 +42,7 @@ public struct BackupSheet: View {
             defer { isWorking = false }
             do {
                 let panel = NSSavePanel()
-                panel.nameFieldStringValue = "MallyBackup-\(ctx.companyId.uuidString.prefix(8)).zip"
+                panel.nameFieldStringValue = "MallyBackup-\(ctx.companyId.uuidString.prefix(8)).mallybackup"
                 panel.canCreateDirectories = true
                 let result = await NSPanelBridge.runSave(panel)
                 if result == .OK, let url = panel.url {

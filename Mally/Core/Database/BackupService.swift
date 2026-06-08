@@ -12,7 +12,7 @@ public struct BackupService: Sendable {
     public func export(companyId: UUID,
                        companyName: String,
                        to destinationURL: URL) async throws -> BackupManifest {
-        let sourceURL = manager.companiesDirectory.appendingPathComponent("\(companyId.uuidString).sqlite")
+        let sourceURL = try await manager.companyFileURL(id: companyId)
         let fm = FileManager.default
         guard fm.fileExists(atPath: sourceURL.path) else {
             throw AppError.notFound("Source company file missing")
@@ -25,11 +25,24 @@ public struct BackupService: Sendable {
             await manager.closeCompany(id: companyId)
         }
         if fm.fileExists(atPath: destinationURL.path) {
-            try fm.removeItem(at: destinationURL)
+            do {
+                try fm.removeItem(at: destinationURL)
+            } catch {
+                throw AppError.fileSystem("Unable to replace existing backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+            }
         }
-        try fm.copyItem(at: sourceURL, to: destinationURL)
+        do {
+            try fm.copyItem(at: sourceURL, to: destinationURL)
+        } catch {
+            throw AppError.fileSystem("Unable to write backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+        }
 
-        let data = try Data(contentsOf: destinationURL)
+        let data: Data
+        do {
+            data = try Data(contentsOf: destinationURL)
+        } catch {
+            throw AppError.fileSystem("Unable to read written backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+        }
         let digest = SHA256.hash(data: data)
         let hex = digest.map { String(format: "%02x", $0) }.joined()
         let manifest = BackupManifest(
@@ -42,8 +55,17 @@ public struct BackupService: Sendable {
         let manifestURL = destinationURL.appendingPathExtension("manifest.json")
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
-        let json = try enc.encode(manifest)
-        try json.write(to: manifestURL)
+        let json: Data
+        do {
+            json = try enc.encode(manifest)
+        } catch {
+            throw AppError.fileSystem("Unable to encode backup manifest for \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+        }
+        do {
+            try json.write(to: manifestURL)
+        } catch {
+            throw AppError.fileSystem("Unable to write backup manifest at \(manifestURL.lastPathComponent): \(error.localizedDescription)")
+        }
         return manifest
     }
 }

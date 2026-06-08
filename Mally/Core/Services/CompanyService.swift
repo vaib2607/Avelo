@@ -21,14 +21,16 @@ public final class CompanyService: Sendable {
     public func update(_ company: Company) throws {
         var c = company
         c.updatedAt = Date()
-        try repository.update(c)
-        try audit.record(
-            action: .companyUpdated,
-            entityType: "company",
-            entityId: c.id.uuidString,
-            snapshotBefore: company,
-            snapshotAfter: c
-        )
+        try db.write { tx in
+            try CompanyRepository(db: tx).update(c)
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .companyUpdated,
+                entityType: "company",
+                entityId: c.id.uuidString,
+                snapshotBefore: company,
+                snapshotAfter: c
+            )
+        }
     }
 
     public func setInventoryMode(enabled: Bool, linkMode: InventoryLinkMode) throws {
@@ -39,14 +41,16 @@ public final class CompanyService: Sendable {
         company.isInventoryEnabled = enabled
         company.inventoryLinkMode = linkMode
         company.updatedAt = Date()
-        try repository.update(company)
-        try audit.record(
-            action: .inventoryModeChanged,
-            entityType: "company",
-            entityId: company.id.uuidString,
-            snapshotBefore: before,
-            snapshotAfter: company
-        )
+        try db.write { tx in
+            try CompanyRepository(db: tx).update(company)
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .inventoryModeChanged,
+                entityType: "company",
+                entityId: company.id.uuidString,
+                snapshotBefore: before,
+                snapshotAfter: company
+            )
+        }
     }
 
     public static func create(companyInput: CompanyInputValidator.Input,
@@ -81,27 +85,29 @@ public final class CompanyService: Sendable {
                                             .path)
         defer { db.close() }
 
-        let companyRepo = CompanyRepository(db: db)
-        let fyRepo = FinancialYearRepository(db: db)
-        _ = try companyRepo.insert(company)
-        try fyRepo.insert(fy)
-        try SeedLoader().loadDefaults(into: db,
-                                       companyId: company.id,
-                                       financialYearId: fy.id)
+        try db.write { tx in
+            let companyRepo = CompanyRepository(db: tx)
+            let fyRepo = FinancialYearRepository(db: tx)
+            _ = try companyRepo.insert(company)
+            try fyRepo.insert(fy)
+            try SeedLoader().loadDefaults(into: tx,
+                                          companyId: company.id,
+                                          financialYearId: fy.id)
 
-        let audit = AuditService(db: db, companyId: company.id)
-        try audit.record(
-            action: .companyCreated,
-            entityType: "company",
-            entityId: company.id.uuidString,
-            snapshotAfter: company
-        )
-        try audit.record(
-            action: .financialYearCreated,
-            entityType: "financial_year",
-            entityId: fy.id.uuidString,
-            snapshotAfter: fy
-        )
+            let audit = AuditService(db: tx, companyId: company.id)
+            try audit.record(
+                action: .companyCreated,
+                entityType: "company",
+                entityId: company.id.uuidString,
+                snapshotAfter: company
+            )
+            try audit.record(
+                action: .financialYearCreated,
+                entityType: "financial_year",
+                entityId: fy.id.uuidString,
+                snapshotAfter: fy
+            )
+        }
 
         let registry = RegistryRepository(db: try registryDb(manager: manager))
         try registry.register(CompanyRegistryEntry(

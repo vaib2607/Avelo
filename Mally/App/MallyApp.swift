@@ -4,15 +4,15 @@ import AppKit
 @main
 struct MallyApp: App {
 
-    @StateObject private var environment = AppEnvironment()
-    @StateObject private var keyboardBridge = KeyboardBridge()
+    @State private var environment = AppEnvironment()
+    @State private var keyboardBridge = KeyboardBridge()
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(environment)
-                .environmentObject(environment.router)
-                .environmentObject(keyboardBridge)
+                .environment(environment)
+                .environment(environment.router)
+                .environment(keyboardBridge)
                 .frame(minWidth: 1080, minHeight: 720)
                 .onAppear {
                     environment.keyboard.onCommand = { [weak keyboardBridge] cmd in
@@ -53,16 +53,10 @@ struct MallyApp: App {
                     .keyboardShortcut("3", modifiers: .command)
                 Button("Reports")   { environment.router.go(.reports) }
                     .keyboardShortcut("4", modifiers: .command)
-                Button("Inventory") { environment.router.go(.inventory) }
-                    .keyboardShortcut("5", modifiers: .command)
-                Button("Payroll")   { environment.router.go(.payroll) }
-                    .keyboardShortcut("6", modifiers: .command)
-                Button("Banking")   { environment.router.go(.banking) }
-                    .keyboardShortcut("7", modifiers: .command)
                 Button("Audit")     { environment.router.go(.audit) }
-                    .keyboardShortcut("8", modifiers: .command)
+                    .keyboardShortcut("5", modifiers: .command)
                 Button("Settings")  { environment.router.go(.settings) }
-                    .keyboardShortcut("9", modifiers: .command)
+                    .keyboardShortcut("6", modifiers: .command)
             }
             CommandMenu("Voucher") {
                 Button("Contra (F4)")     { environment.router.present(.newContra) }

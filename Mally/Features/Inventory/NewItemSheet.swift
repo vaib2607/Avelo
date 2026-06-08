@@ -2,8 +2,8 @@ import SwiftUI
 
 public struct NewItemSheet: View {
 
-    @EnvironmentObject private var env: AppEnvironment
-    @EnvironmentObject private var router: AppRouter
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
 
     @State private var code: String = ""
     @State private var name: String = ""

@@ -1,15 +1,17 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class AuditViewModel: ObservableObject {
+@Observable
+public final class AuditViewModel {
 
-    @Published public var events: [AuditEvent] = []
-    @Published public var query: String = ""
-    @Published public var entityTypeFilter: String = ""
-    @Published public var fromDate: Date?
-    @Published public var toDate: Date?
-    @Published public var isLoading: Bool = false
-    @Published public var error: AppError?
+    public var events: [AuditEvent] = []
+    public var query: String = ""
+    public var entityTypeFilter: String = ""
+    public var fromDate: Date?
+    public var toDate: Date?
+    public var isLoading: Bool = false
+    public var error: AppError?
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase

@@ -75,7 +75,7 @@ public struct CompanyRepository: Sendable {
     }
 
     static func rowToCompany(_ r: Row) throws -> Company {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
+        let id = try UUIDParsing.required(r.text("id"), field: "mally_companies.id")
         let modeRaw = r.text("inventory_link_mode")
         let mode = InventoryLinkMode(rawValue: modeRaw) ?? .manual
         return Company(
