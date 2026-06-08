@@ -281,4 +281,42 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(byId[activity.gstCollection.id]?.voucherNumber, activity.gstCollection.number)
         XCTAssertEqual(byId[activity.supplierBill.id]?.voucherNumber, activity.supplierBill.number)
     }
+
+    func testDayBookOrdersBackdatedVouchersByVoucherDate() throws {
+        let tc = try makeSeededCompany()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let laterDatedFirst = try svc.post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-04-05")!,
+            narration: "Current entry",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 2000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 2000, side: .credit)
+            ]
+        ), in: tc.fy).voucher
+
+        let backdatedSecond = try svc.post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-04-01")!,
+            narration: "Backdated entry",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 1000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 1000, side: .credit)
+            ]
+        ), in: tc.fy).voucher
+
+        let rows = try ReportService(db: tc.db, companyId: tc.companyId).dayBook(
+            fromDate: DateFormatters.parseDate("2024-04-01")!,
+            toDate: DateFormatters.parseDate("2024-04-30")!
+        )
+
+        XCTAssertEqual(rows.map(\.voucherNumber), [
+            backdatedSecond.number,
+            laterDatedFirst.number
+        ])
+        XCTAssertEqual(rows.map(\.narration), ["Backdated entry", "Current entry"])
+    }
 }

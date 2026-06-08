@@ -158,4 +158,57 @@ final class AppEnvironmentFlowTests: XCTestCase {
         XCTAssertEqual(env.router.selection, .dashboard)
         XCTAssertNil(env.router.presentedSheet)
     }
+
+    func testCompanySwitchSoakMaintainsCorrectContextAcrossRepeatedOpens() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manager = try DatabaseManager(appSupportDirectory: root)
+        let registryDb = try await SQLiteDatabase(path: manager.registryPath)
+        defer { registryDb.close() }
+
+        let env = AppEnvironment(
+            manager: manager,
+            router: AppRouter(),
+            keyboard: KeyboardRouter(),
+            registry: RegistryRepository(db: registryDb),
+            backupService: BackupService(manager: manager)
+        )
+
+        let alpha = try await CompanyService.create(
+            companyInput: .init(name: "Soak Alpha", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: manager
+        )
+        let beta = try await CompanyService.create(
+            companyInput: .init(name: "Soak Beta", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2025-26",
+                startDate: DateFormatters.parseDate("2025-04-01")!,
+                endDate: DateFormatters.parseDate("2026-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2025-04-01")!
+            ),
+            seedDefaults: true,
+            manager: manager
+        )
+
+        for index in 0..<100 {
+            let target = index.isMultiple(of: 2) ? alpha : beta
+            await env.openCompany(target.id)
+
+            let ctx = try XCTUnwrap(env.companyContext)
+            XCTAssertEqual(ctx.companyId, target.id)
+            XCTAssertEqual(env.accountTree?.companyId, target.id)
+            XCTAssertEqual(env.router.selection, .dashboard)
+            XCTAssertNil(env.router.presentedSheet)
+            XCTAssertEqual(env.banner?.message, "Company opened.")
+        }
+    }
 }

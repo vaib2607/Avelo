@@ -93,23 +93,23 @@ Hidden entry-point rule:
 | RB-023 | P0 | Done | D | Verify audit logging for all financially meaningful actions |
 | RB-024 | P0 | Done | D | Verify company isolation |
 | RB-025 | P0 | Done | D | Verify restore integrity |
-| RB-026 | P1 | Open | E | Review company setup and switching shipped flows |
-| RB-027 | P1 | Open | E | Review accounts shipped flow |
-| RB-028 | P1 | Open | E | Review voucher list/create/edit/reverse shipped flows |
-| RB-029 | P1 | Open | E | Review settings/FY-management shipped flow |
-| RB-030 | P1 | Open | E | Review backup/restore shipped flows |
-| RB-031 | P1 | Open | F | Validate trial balance totals against seeded and live SQL totals |
-| RB-032 | P1 | Open | F | Validate P&L totals against seeded and live SQL totals |
-| RB-033 | P1 | Open | F | Validate balance sheet totals against seeded and live SQL totals |
+| RB-026 | P1 | Done | E | Review company setup and switching shipped flows |
+| RB-027 | P1 | Done | E | Review accounts shipped flow |
+| RB-028 | P1 | Done | E | Review voucher list/create/edit/reverse shipped flows |
+| RB-029 | P1 | Done | E | Review settings/FY-management shipped flow |
+| RB-030 | P1 | Done | E | Review backup/restore shipped flows |
+| RB-031 | P1 | Done | F | Validate trial balance totals against seeded and live SQL totals |
+| RB-032 | P1 | Done | F | Validate P&L totals against seeded and live SQL totals |
+| RB-033 | P1 | Done | F | Validate balance sheet totals against seeded and live SQL totals |
 | RB-034 | P1 | Done | F | Validate ledger, day book, GST summary, and outstanding behavior |
 | RB-035 | P1 | Done | F | Verify report drill-down opens the correct source voucher |
-| RB-036 | P1 | Open | G | Add regression tests for schema-sensitive and accounting-sensitive fixes |
-| RB-037 | P1 | Open | I | Run manual accountant-style QA for shipped scope |
+| RB-036 | P1 | Done | G | Add regression tests for schema-sensitive and accounting-sensitive fixes |
+| RB-037 | P1 | Done | I | Run manual accountant-style QA for shipped scope |
 | RB-038 | P2 | Done | H | Inventory audited and hidden from V1 shell entry points; defer decision recorded |
 | RB-039 | P2 | Done | H | Payroll audited and hidden from V1 shell entry points; defer decision recorded |
 | RB-040 | P2 | Done | H | Banking audited and hidden from V1 shell entry points; defer decision recorded |
 | RB-041 | P2 | Done | H | Advanced GST export audited and kept deferred from V1 shell entry points |
-| RB-042 | P2 | Open | J | Run stress, soak, RC, and deployment validation |
+| RB-042 | P2 | Blocked | J | Run stress, soak, RC, and deployment validation |
 
 ## Completed Board Items
 

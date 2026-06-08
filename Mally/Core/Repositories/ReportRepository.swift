@@ -429,7 +429,7 @@ public struct ReportRepository: Sendable {
             FROM mally_vouchers v
             LEFT JOIN mally_accounts pa ON pa.id = v.party_account_id
             WHERE v.company_id = ? AND v.date BETWEEN ? AND ?
-            ORDER BY v.created_at ASC, v.date ASC, v.number ASC
+            ORDER BY v.date ASC, v.created_at ASC, v.number ASC
         """
         return try db.query(sql, bind: [.text(filter.companyId.uuidString), .date(fromDate), .date(toDate)]) { r in
             let total = r.int("total_paise")
