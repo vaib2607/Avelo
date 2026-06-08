@@ -3,13 +3,13 @@ import SwiftUI
 public struct PayrollView: View {
 
     @Environment(AppEnvironment.self) private var env
-    @State private var holder = PayrollViewModelHolder()
+    @State private var vm: PayrollViewModel?
     @State private var postFor: PayrollEmployee.ID?
 
     public init() {}
 
     public var body: some View {
-        PayrollContent(holder: holder, postFor: $postFor)
+        PayrollContent(vm: vm, postFor: $postFor)
             .navigationTitle("Payroll")
             .toolbar {
                 ToolbarItem {
@@ -23,28 +23,27 @@ public struct PayrollView: View {
     }
 
     private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
-            holder.vm = PayrollViewModel(companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id)
-            holder.vm?.reload()
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        if vm == nil || vm?.companyId != ctx.companyId {
+            let model = PayrollViewModel(companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id)
+            model.reload()
+            vm = model
         }
     }
-}
-
-@MainActor
-final class PayrollViewModelHolder: ObservableObject {
-    @Published var vm: PayrollViewModel?
 }
 
 private struct IdWrap: Identifiable { let id: PayrollEmployee.ID }
 
 @MainActor
 private struct PayrollContent: View {
-    @ObservedObject var holder: PayrollViewModelHolder
+    let vm: PayrollViewModel?
     @Binding var postFor: PayrollEmployee.ID?
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             PayrollBody(vm: vm, postFor: $postFor)
         } else {
             ProgressView()
@@ -54,7 +53,7 @@ private struct PayrollContent: View {
 
 @MainActor
 private struct PayrollBody: View {
-    @ObservedObject var vm: PayrollViewModel
+    @Bindable var vm: PayrollViewModel
     @Binding var postFor: PayrollEmployee.ID?
 
     var body: some View {

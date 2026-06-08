@@ -1,13 +1,15 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class InventoryViewModel: ObservableObject {
+@Observable
+public final class InventoryViewModel {
 
-    @Published public var items: [InventoryItem] = []
-    @Published public var query: String = ""
-    @Published public var includeArchived: Bool = false
-    @Published public var isLoading: Bool = false
-    @Published public var error: AppError?
+    public var items: [InventoryItem] = []
+    public var query: String = ""
+    public var includeArchived: Bool = false
+    public var isLoading: Bool = false
+    public var error: AppError?
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase

@@ -27,12 +27,51 @@ cd ~/Developer/Mally
 swift build -c release
 ```
 
-To produce an `.app` bundle, run the helper in `Scripts/bundle.sh` (provided) which assembles `Mally.app` from the build output.
+To produce an `.app` bundle, first build the release binary, then run the helper in `Scripts/bundle.sh`, which assembles `Mally.app` from the build output.
+
+```bash
+swift build -c release
+./Scripts/bundle.sh
+```
+
+The assembled app bundle is written to `dist/Mally.app`.
+
+Validate the bundle structure and signature:
+
+```bash
+./Scripts/validate_bundle.sh
+```
+
+Smoke-launch the bundled app and confirm it stays up long enough to count as a valid local artifact:
+
+```bash
+./Scripts/launch_smoke.sh
+```
+
+Or run the repeatable local RC proof set in one go:
+
+```bash
+make rc-local
+```
+
+This runs the rule audit, full test suite, release build, bundle assembly, and bundle validation. The GUI launch smoke check remains a separate step because it needs a normal local app-launch context.
+
+For a bundled-binary accountant-flow self-check without GUI interaction:
+
+```bash
+./Scripts/bundle_selftest.sh
+```
 
 ## Run
 
 ```bash
 .build/release/Mally
+```
+
+Or launch the bundled app:
+
+```bash
+open dist/Mally.app
 ```
 
 ## Where data lives

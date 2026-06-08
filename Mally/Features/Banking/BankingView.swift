@@ -3,13 +3,13 @@ import SwiftUI
 public struct BankingView: View {
 
     @Environment(AppEnvironment.self) private var env
-    @State private var holder = BankingViewModelHolder()
+    @State private var vm: BankingViewModel?
     @State private var showImport: Bool = false
 
     public init() {}
 
     public var body: some View {
-        BankingContent(holder: holder)
+        BankingContent(vm: vm)
             .navigationTitle("Banking")
             .toolbar {
                 ToolbarItem {
@@ -22,31 +22,30 @@ public struct BankingView: View {
             .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
             .sheet(isPresented: $showImport) {
                 if let ctx = env.companyContext {
-                    ImportStatementSheet(companyId: ctx.companyId, db: ctx.database, accounts: holder.vm?.accounts ?? [])
+                    ImportStatementSheet(companyId: ctx.companyId, db: ctx.database, accounts: vm?.accounts ?? [])
                 }
             }
     }
 
     private func setup() {
-        guard let ctx = env.companyContext else { return }
-        if holder.vm == nil || holder.vm?.companyId != ctx.companyId {
-            holder.vm = BankingViewModel(companyId: ctx.companyId, db: ctx.database)
-            holder.vm?.reload()
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        if vm == nil || vm?.companyId != ctx.companyId {
+            let model = BankingViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            vm = model
         }
     }
 }
 
 @MainActor
-final class BankingViewModelHolder: ObservableObject {
-    @Published var vm: BankingViewModel?
-}
-
-@MainActor
 private struct BankingContent: View {
-    @ObservedObject var holder: BankingViewModelHolder
+    let vm: BankingViewModel?
 
     var body: some View {
-        if let vm = holder.vm {
+        if let vm {
             BankingBody(vm: vm)
         } else { ProgressView() }
     }
@@ -54,7 +53,7 @@ private struct BankingContent: View {
 
 @MainActor
 private struct BankingBody: View {
-    @ObservedObject var vm: BankingViewModel
+    @Bindable var vm: BankingViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

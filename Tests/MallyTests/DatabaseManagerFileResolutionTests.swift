@@ -149,6 +149,49 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         }
     }
 
+    func testBackupExportFailsClearlyWhenExistingDestinationCannotBeReplaced() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let manager = try DatabaseManager(appSupportDirectory: root)
+        let companyId = UUID()
+        let sourceURL = root.appendingPathComponent("Companies", isDirectory: true)
+            .appendingPathComponent("backup-source.sqlite")
+
+        let db = try SQLiteDatabase(path: sourceURL.path)
+        try MigrationRunner().runMigrations(on: db)
+        _ = try TestCompany.seed(into: db, companyId: companyId, companyName: "Backup Replace Failure Co")
+        db.close()
+
+        try await manager.registerCompany(
+            CompanyRegistryEntry(id: companyId, name: "Backup Replace Failure Co", sqliteFileName: sourceURL.lastPathComponent)
+        )
+
+        let lockedDirectory = root.appendingPathComponent("locked", isDirectory: true)
+        try FileManager.default.createDirectory(at: lockedDirectory, withIntermediateDirectories: true)
+        let destinationURL = lockedDirectory.appendingPathComponent("existing-backup.mallybackup")
+        try Data("keep".utf8).write(to: destinationURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: lockedDirectory.path)
+
+        do {
+            _ = try await BackupService(manager: manager).export(
+                companyId: companyId,
+                companyName: "Backup Replace Failure Co",
+                to: destinationURL
+            )
+            XCTFail("Expected backup export to fail when an existing directory blocks replacement")
+        } catch {
+            guard case AppError.fileSystem(let message) = AppError.wrap(error) else {
+                return XCTFail("Expected fileSystem error, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("replace existing backup file"))
+        }
+    }
+
     func testDeleteCompanyFilesRemovesRegisteredAndLegacyFiles() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

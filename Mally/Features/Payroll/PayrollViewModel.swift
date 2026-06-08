@@ -1,14 +1,16 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class PayrollViewModel: ObservableObject {
+@Observable
+public final class PayrollViewModel {
 
-    @Published public var employees: [PayrollEmployee] = []
-    @Published public var entries: [PayrollEntry] = []
-    @Published public var query: String = ""
-    @Published public var monthYear: Int = Calendar.current.component(.year, from: Date()) * 100 + Calendar.current.component(.month, from: Date())
-    @Published public var isLoading: Bool = false
-    @Published public var error: AppError?
+    public var employees: [PayrollEmployee] = []
+    public var entries: [PayrollEntry] = []
+    public var query: String = ""
+    public var monthYear: Int = Calendar.current.component(.year, from: Date()) * 100 + Calendar.current.component(.month, from: Date())
+    public var isLoading: Bool = false
+    public var error: AppError?
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase

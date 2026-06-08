@@ -1,14 +1,16 @@
 import SwiftUI
+import Observation
 
 @MainActor
-public final class BankingViewModel: ObservableObject {
+@Observable
+public final class BankingViewModel {
 
-    @Published public var accounts: [Account] = []
-    @Published public var selectedAccountId: Account.ID?
-    @Published public var asOf: Date = Date()
-    @Published public var result: BankReconciliationService.ReconciliationResult?
-    @Published public var isLoading: Bool = false
-    @Published public var error: AppError?
+    public var accounts: [Account] = []
+    public var selectedAccountId: Account.ID?
+    public var asOf: Date = Date()
+    public var result: BankReconciliationService.ReconciliationResult?
+    public var isLoading: Bool = false
+    public var error: AppError?
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase

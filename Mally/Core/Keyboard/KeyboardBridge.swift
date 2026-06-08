@@ -47,10 +47,11 @@ public final class KeyboardBridge {
         case .openAccounts:      router?.go(.accounts)
         case .openVouchers:      router?.go(.vouchers)
         case .openReports:       router?.go(.reports)
+        case .openInventory:     router?.go(.inventory)
+        case .openPayroll:       router?.go(.payroll)
+        case .openBanking:       router?.go(.banking)
         case .openAudit:         router?.go(.audit)
         case .openSettings:      router?.go(.settings)
-        case .openInventory, .openPayroll, .openBanking:
-            break
 
         case .newVoucher(let type):
             router?.present(sheet(for: type))

@@ -88,9 +88,9 @@ public struct RootView: View {
         case .vouchers:  VouchersView()
         case .accounts:  AccountsView()
         case .reports:   ReportsView()
-        case .inventory: UnavailableModuleView(title: "Inventory")
-        case .payroll:   UnavailableModuleView(title: "Payroll")
-        case .banking:   UnavailableModuleView(title: "Banking")
+        case .inventory: InventoryView()
+        case .payroll:   PayrollView()
+        case .banking:   BankingView()
         case .audit:     AuditView()
         case .settings:  SettingsView()
         }
@@ -120,19 +120,6 @@ public struct RootView: View {
         case .manageInventory:      ManageInventorySheet()
         case .managePayroll:        ManagePayrollSheet()
         }
-    }
-}
-
-private struct UnavailableModuleView: View {
-    let title: String
-
-    var body: some View {
-        ContentUnavailableView(
-            "\(title) is not in V1",
-            systemImage: "lock.fill",
-            description: Text("This module is hidden until it is approved for the V1 release path.")
-        )
-        .navigationTitle(title)
     }
 }
 

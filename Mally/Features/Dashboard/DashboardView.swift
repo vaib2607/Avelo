@@ -43,7 +43,7 @@ public struct DashboardView: View {
                     quickButton("Sales", "F8", .newSales, "cart")
                     quickButton("Purchase", "F9", .newPurchase, "bag")
                     quickButton("Credit Note", "F10", .newCreditNote, "doc.badge.plus")
-                    quickButton("Debit Note", "F11", .newDebitNote, "doc.badge.minus")
+                    quickButton("Debit Note", "F11", .newDebitNote, "document.badge.minus")
                 }
                 .padding(6)
             }

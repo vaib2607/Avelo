@@ -3,13 +3,33 @@
 
 SRC_DIR := .
 
-.PHONY: all build test net-check rule-audit board todo count help
+.PHONY: all build bundle validate-bundle launch-smoke bundle-selftest rc-local test net-check rule-audit board todo count help
 
 all: net-check build test
 
 # Swift Package Manager build
 build:
 	swift build 2>&1
+
+# Assemble a local .app bundle from the release binary
+bundle:
+	./Scripts/bundle.sh
+
+validate-bundle:
+	./Scripts/validate_bundle.sh
+
+launch-smoke:
+	./Scripts/launch_smoke.sh
+
+bundle-selftest:
+	./Scripts/bundle_selftest.sh
+
+rc-local: rule-audit test
+	swift build -c release
+	./Scripts/bundle.sh
+	./Scripts/validate_bundle.sh
+	./Scripts/bundle_selftest.sh
+	@echo "Local RC proof complete. Run './Scripts/launch_smoke.sh' from a normal local GUI session to confirm bundled app launch."
 
 # Run full test suite
 test:
@@ -40,7 +60,10 @@ r16-check:
 	  $(SRC_DIR)/Mally/Core \
 	  $(SRC_DIR)/Mally/Features/Accounts \
 	  $(SRC_DIR)/Mally/Features/Audit \
+	  $(SRC_DIR)/Mally/Features/Banking \
+	  $(SRC_DIR)/Mally/Features/Inventory \
 	  $(SRC_DIR)/Mally/Features/Onboarding \
+	  $(SRC_DIR)/Mally/Features/Payroll \
 	  $(SRC_DIR)/Mally/Features/Reports \
 	  $(SRC_DIR)/Mally/Features/Settings \
 	  $(SRC_DIR)/Mally/Features/Vouchers \
