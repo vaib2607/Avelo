@@ -4,13 +4,13 @@ set -euo pipefail
 CONFIGURATION="${1:-release}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/.build/x86_64-apple-macosx/$CONFIGURATION"
-APP_DIR="$ROOT_DIR/dist/Mally.app"
+APP_DIR="$ROOT_DIR/dist/Avelo.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
-EXECUTABLE_NAME="Mally"
+EXECUTABLE_NAME="Avelo"
 EXECUTABLE_PATH="$BUILD_DIR/$EXECUTABLE_NAME"
-SEED_RESOURCE="$ROOT_DIR/Mally/Resources/Seed/DefaultChartOfAccounts.json"
+SEED_RESOURCE="$ROOT_DIR/Avelo/Resources/Seed/DefaultChartOfAccounts.json"
 
 if [[ ! -x "$EXECUTABLE_PATH" ]]; then
   echo "error: expected built executable at $EXECUTABLE_PATH" >&2
@@ -32,13 +32,13 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>Mally</string>
+  <string>Avelo</string>
   <key>CFBundleIdentifier</key>
-  <string>com.mally.desktop</string>
+  <string>com.avelo.desktop</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Mally</string>
+  <string>Avelo</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>

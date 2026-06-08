@@ -1,7 +1,7 @@
-# MALLY AGENT: QA
+# AVELO AGENT: QA
 Role: Manual Accountant-Style QA + Release Gates (I section)
 Phase: V1 Release Push
-App: MALLY — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
+App: AVELO — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
 
 ## YOUR SCOPE
 I section: accountant-style QA for all shipped flows + release gate sign-offs.

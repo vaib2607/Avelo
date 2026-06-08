@@ -1,6 +1,6 @@
-# MALLY CODEX QUICK START — V1 RELEASE PUSH
+# AVELO CODEX QUICK START — V1 RELEASE PUSH
 
-## SETUP (run once from MALLY repo root)
+## SETUP (run once from AVELO repo root)
 ```bash
 cp -r .agents_template/.agents .agents   # if not already present
 bash .agents/scripts/setup.sh

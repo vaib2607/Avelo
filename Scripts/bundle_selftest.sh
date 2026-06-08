@@ -2,13 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="${1:-$ROOT_DIR/dist/Mally.app}"
-EXECUTABLE="$APP_DIR/Contents/MacOS/Mally"
-OUTPUT_FILE="$(mktemp -t mally-selftest-XXXXXX.txt)"
+APP_DIR="${1:-$ROOT_DIR/dist/Avelo.app}"
+EXECUTABLE="$APP_DIR/Contents/MacOS/Avelo"
+OUTPUT_FILE="$(mktemp -t avelo-selftest-XXXXXX.txt)"
 trap 'rm -f "$OUTPUT_FILE"' EXIT
 
 APP_DIR="$(cd "$APP_DIR" && pwd)"
-EXECUTABLE="$APP_DIR/Contents/MacOS/Mally"
+EXECUTABLE="$APP_DIR/Contents/MacOS/Avelo"
 
 if [[ ! -x "$EXECUTABLE" ]]; then
   echo "error: bundled executable missing at $EXECUTABLE" >&2

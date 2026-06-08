@@ -1,7 +1,7 @@
-# MALLY AGENT: FLOW
+# AVELO AGENT: FLOW
 Role: Core User Flow Reviews (E section)
 Phase: V1 Release Push
-App: MALLY — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
+App: AVELO — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
 
 ## YOUR SCOPE
 E section: 10 user flow reviews (RB-026 to RB-030)

@@ -1,6 +1,6 @@
-# Mally
+# Avelo
 
-Offline accounting for macOS. Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no network calls. All data lives on your Mac under `~/Library/Application Support/Mally/`.
+Offline accounting for macOS. Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no network calls. All data lives on your Mac under `~/Library/Application Support/Avelo/`.
 
 ## Highlights
 
@@ -23,18 +23,18 @@ Offline accounting for macOS. Native Swift 5.9 + SwiftUI, raw `import SQLite3`, 
 ## Build
 
 ```bash
-cd ~/Developer/Mally
+cd ~/Developer/Avelo
 swift build -c release
 ```
 
-To produce an `.app` bundle, first build the release binary, then run the helper in `Scripts/bundle.sh`, which assembles `Mally.app` from the build output.
+To produce an `.app` bundle, first build the release binary, then run the helper in `Scripts/bundle.sh`, which assembles `Avelo.app` from the build output.
 
 ```bash
 swift build -c release
 ./Scripts/bundle.sh
 ```
 
-The assembled app bundle is written to `dist/Mally.app`.
+The assembled app bundle is written to `dist/Avelo.app`.
 
 Validate the bundle structure and signature:
 
@@ -65,20 +65,20 @@ For a bundled-binary accountant-flow self-check without GUI interaction:
 ## Run
 
 ```bash
-.build/release/Mally
+.build/release/Avelo
 ```
 
 Or launch the bundled app:
 
 ```bash
-open dist/Mally.app
+open dist/Avelo.app
 ```
 
 ## Where data lives
 
 ```
-~/Library/Application Support/Mally/
-├── mally_registry.sqlite
+~/Library/Application Support/Avelo/
+├── avelo_registry.sqlite
 ├── Companies/
 │   ├── <uuid-1>.sqlite
 │   ├── <uuid-2>.sqlite
@@ -89,4 +89,4 @@ open dist/Mally.app
 
 ## Docs
 
-See `Docs/Mally_Master_PRD.md` for the product spec, and `Docs/Mally_Architecture.md` for the layer map. `ASSEMBLY.md` lists every file and what it does.
+See `Docs/Avelo_Master_PRD.md` for the product spec, and `Docs/Avelo_Architecture.md` for the layer map. `Docs/Avelo_ASSEMBLY.md` lists every file and what it does.

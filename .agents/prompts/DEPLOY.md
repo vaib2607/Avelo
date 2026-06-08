@@ -1,7 +1,7 @@
-# MALLY AGENT: DEPLOY
+# AVELO AGENT: DEPLOY
 Role: RC Freeze + Deployment Package (J section)
 Phase: V1 Release Push
-App: MALLY — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
+App: AVELO — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
 
 ## YOUR SCOPE
 J section: RC freeze, full RC verification, deployment package validation, go/no-go recording.

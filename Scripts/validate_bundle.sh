@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="${1:-$ROOT_DIR/dist/Mally.app}"
+APP_DIR="${1:-$ROOT_DIR/dist/Avelo.app}"
 CONTENTS_DIR="$APP_DIR/Contents"
-EXECUTABLE="$CONTENTS_DIR/MacOS/Mally"
+EXECUTABLE="$CONTENTS_DIR/MacOS/Avelo"
 PLIST="$CONTENTS_DIR/Info.plist"
 RESOURCE="$CONTENTS_DIR/Resources/DefaultChartOfAccounts.json"
 
