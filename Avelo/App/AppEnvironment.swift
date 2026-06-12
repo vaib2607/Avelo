@@ -122,6 +122,25 @@ public final class AppEnvironment {
         }
     }
 
+    public func switchFinancialYear(_ id: FinancialYear.ID) {
+        guard let ctx = companyContext else { return }
+        do {
+            guard let fy = try FinancialYearRepository(db: ctx.database).findById(id) else {
+                throw AppError.notFound("Financial year")
+            }
+            companyContext = CompanyContext(
+                companyId: ctx.companyId,
+                companyName: ctx.companyName,
+                financialYear: fy,
+                database: ctx.database
+            )
+            notifyDataChanged()
+            banner = BannerPayload(kind: .info("Financial year switched."), message: "Financial year switched.")
+        } catch {
+            globalError = AppError.wrap(error)
+        }
+    }
+
     public func closeCompany() {
         if let ctx = companyContext {
             Task { await manager.closeCompany(id: ctx.companyId) }

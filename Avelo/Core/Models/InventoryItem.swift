@@ -30,6 +30,9 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
     public var openingQuantity: Double
     public var openingRatePaise: Int64
     public var gstRate: Double
+    public var stockGroup: String?
+    public var stockCategory: String?
+    public var godown: String?
     public var barcode: String?
     public var hsnSac: String?
     public var isArchived: Bool
@@ -70,6 +73,9 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
                 openingQuantity: Double = 0,
                 openingRatePaise: Int64 = 0,
                 gstRate: Double = 0,
+                stockGroup: String? = nil,
+                stockCategory: String? = nil,
+                godown: String? = nil,
                 barcode: String? = nil,
                 hsnSac: String? = nil,
                 isArchived: Bool = false,
@@ -86,6 +92,9 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
         self.openingQuantity = openingQuantity
         self.openingRatePaise = openingRatePaise
         self.gstRate = gstRate
+        self.stockGroup = stockGroup
+        self.stockCategory = stockCategory
+        self.godown = godown
         self.barcode = barcode
         self.hsnSac = hsnSac
         self.isArchived = isArchived
@@ -153,6 +162,9 @@ public struct StockMovement: Identifiable, Hashable, Sendable, Codable {
     public var unitCostPaise: Int64
     public var totalValuePaise: Int64
     public var referenceVoucherNumber: String?
+    public var batchNumber: String?
+    public var manufactureDate: Date?
+    public var expiryDate: Date?
     public var reason: String?
     public let createdAt: Date
 
@@ -166,6 +178,9 @@ public struct StockMovement: Identifiable, Hashable, Sendable, Codable {
                 totalValuePaise: Int64,
                 voucherId: Voucher.ID? = nil,
                 referenceVoucherNumber: String? = nil,
+                batchNumber: String? = nil,
+                manufactureDate: Date? = nil,
+                expiryDate: Date? = nil,
                 reason: String? = nil,
                 createdAt: Date = Date()) {
         self.id = id
@@ -178,6 +193,9 @@ public struct StockMovement: Identifiable, Hashable, Sendable, Codable {
         self.unitCostPaise = unitCostPaise
         self.totalValuePaise = totalValuePaise
         self.referenceVoucherNumber = referenceVoucherNumber
+        self.batchNumber = batchNumber
+        self.manufactureDate = manufactureDate
+        self.expiryDate = expiryDate
         self.reason = reason
         self.createdAt = createdAt
     }

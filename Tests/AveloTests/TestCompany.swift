@@ -26,6 +26,17 @@ struct TestCompany {
         return try seed(into: db, companyId: UUID(), companyName: "Test Co")
     }
 
+    static func makeOnDisk(name: String = "Test Co") throws -> (fixture: TestCompany, cleanupURL: URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("avelo-benchmark-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let dbURL = root.appendingPathComponent("company.sqlite")
+        let db = try SQLiteDatabase(path: dbURL.path)
+        try MigrationRunner().runMigrations(on: db)
+        let fixture = try seed(into: db, companyId: UUID(), companyName: name)
+        return (fixture, root)
+    }
+
     static func seed(into db: SQLiteDatabase,
                      companyId: Company.ID,
                      companyName: String = "Test Co") throws -> TestCompany {

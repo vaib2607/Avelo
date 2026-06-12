@@ -8,6 +8,49 @@ public struct ReportRepository: Sendable {
         self.db = db
     }
 
+    private struct MovementTotals: Sendable {
+        let debitPaise: Int64
+        let creditPaise: Int64
+    }
+
+    private func movementTotals(
+        for accountIds: [Account.ID],
+        companyId: Company.ID,
+        fromDate: Date? = nil,
+        toDate: Date? = nil
+    ) throws -> [Account.ID: MovementTotals] {
+        guard !accountIds.isEmpty else { return [:] }
+        let placeholders = Array(repeating: "?", count: accountIds.count).joined(separator: ",")
+        var sql = """
+            SELECT l.account_id AS aid,
+                   COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
+            FROM avelo_ledger_lines l
+            JOIN avelo_vouchers v ON v.id = l.voucher_id
+            WHERE l.company_id = ? AND l.account_id IN (\(placeholders))
+        """
+        var bind: [SQLValue] = [.text(companyId.uuidString)]
+        for id in accountIds {
+            bind.append(.text(id.uuidString))
+        }
+        if let fromDate {
+            sql += " AND v.date >= ?"
+            bind.append(.date(fromDate))
+        }
+        if let toDate {
+            sql += " AND v.date <= ?"
+            bind.append(.date(toDate))
+        }
+        sql += " GROUP BY l.account_id"
+        var out: [Account.ID: MovementTotals] = [:]
+        _ = try db.query(sql, bind: bind) { row in
+            if let idStr = row.optionalText("aid"), let id = UUID(uuidString: idStr) {
+                out[id] = MovementTotals(debitPaise: row.int("dr"), creditPaise: row.int("cr"))
+            }
+        }
+        return out
+    }
+
     // MARK: - Ledger
 
     public func ledgerReport(filter: ReportResult.ReportFilter,
@@ -129,23 +172,19 @@ public struct ReportRepository: Sendable {
         }
         let groups = try AccountGroupRepository(db: db).listForCompany(filter.companyId)
         let groupById: [UUID: AccountGroup] = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        let totalsByAccount = try movementTotals(
+            for: raws.map(\.id),
+            companyId: filter.companyId,
+            toDate: asOfDate
+        )
 
         var rows: [ReportResult.TrialBalanceRow] = []
         var totalDr: Int64 = 0
         var totalCr: Int64 = 0
         for raw in raws {
-            let movement: (Int64, Int64)? = try db.queryOne(
-                """
-                SELECT COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
-                       COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
-                FROM avelo_ledger_lines l
-                JOIN avelo_vouchers v ON v.id = l.voucher_id
-                WHERE l.account_id = ? AND v.date <= ?
-                """,
-                bind: [.text(raw.id.uuidString), .date(asOfDate)]
-            ) { r in (r.int("dr"), r.int("cr")) }
-            let moveDr = movement?.0 ?? 0
-            let moveCr = movement?.1 ?? 0
+            let movement = totalsByAccount[raw.id]
+            let moveDr = movement?.debitPaise ?? 0
+            let moveCr = movement?.creditPaise ?? 0
             let signedOpening: Int64 = raw.obs == "debit" ? raw.ob : -raw.ob
             let netDebit = (signedOpening > 0 ? signedOpening : 0) + moveDr
             let netCredit = (signedOpening < 0 ? -signedOpening : 0) + moveCr
@@ -232,21 +271,18 @@ public struct ReportRepository: Sendable {
                 r.text("gcode")
             )
         }
+        let totalsByAccount = try movementTotals(
+            for: raws.map { $0.0 },
+            companyId: filter.companyId,
+            fromDate: fromDate,
+            toDate: toDate
+        )
         var rows: [ReportResult.TrialBalanceRow] = []
         var sectionTotal: Int64 = 0
         for (id, code, name, ob, obs, gcode) in raws {
-            let move: (Int64, Int64)? = try db.queryOne(
-                """
-                SELECT SUM(CASE WHEN l.side='debit'  THEN l.amount_paise ELSE 0 END) AS dr,
-                       SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END) AS cr
-                FROM avelo_ledger_lines l
-                JOIN avelo_vouchers v ON v.id = l.voucher_id
-                WHERE l.account_id = ? AND v.date BETWEEN ? AND ?
-                """,
-                bind: [.text(id.uuidString), .date(fromDate), .date(toDate)]
-            ) { r in (r.int("dr"), r.int("cr")) }
-            let dr = move?.0 ?? 0
-            let cr = move?.1 ?? 0
+            let move = totalsByAccount[id]
+            let dr = move?.debitPaise ?? 0
+            let cr = move?.creditPaise ?? 0
             let signedOpening: Int64 = obs == "debit" ? ob : -ob
             let absNet: Int64
             switch nature {
@@ -336,21 +372,17 @@ public struct ReportRepository: Sendable {
                 r.text("gname")
             )
         }
+        let totalsByAccount = try movementTotals(
+            for: raws.map { $0.0 },
+            companyId: filter.companyId,
+            toDate: asOfDate
+        )
         var byGname: [String: [ReportResult.TrialBalanceRow]] = [:]
         var totals: [String: Int64] = [:]
         for (id, code, name, ob, obs, gcode, gname) in raws {
-            let move: (Int64, Int64)? = try db.queryOne(
-                """
-                SELECT SUM(CASE WHEN l.side='debit'  THEN l.amount_paise ELSE 0 END) AS dr,
-                       SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END) AS cr
-                FROM avelo_ledger_lines l
-                JOIN avelo_vouchers v ON v.id = l.voucher_id
-                WHERE l.account_id = ? AND v.date <= ?
-                """,
-                bind: [.text(id.uuidString), .date(asOfDate)]
-            ) { r in (r.int("dr"), r.int("cr")) }
-            let dr = move?.0 ?? 0
-            let cr = move?.1 ?? 0
+            let move = totalsByAccount[id]
+            let dr = move?.debitPaise ?? 0
+            let cr = move?.creditPaise ?? 0
             let signedOpening: Int64 = obs == "debit" ? ob : -ob
             let net: Int64
             if nature == .assets {
@@ -385,24 +417,22 @@ public struct ReportRepository: Sendable {
             .init(accountCode: "SGST_INPUT",  sign: -1),
             .init(accountCode: "IGST_INPUT",  sign: -1)
         ]
+        let accountsByCode = try AccountRepository(db: db).findByCodes(codes.map(\.accountCode), companyId: filter.companyId)
+        let totalsByAccount = try movementTotals(
+            for: Array(accountsByCode.values.map(\.id)),
+            companyId: filter.companyId,
+            fromDate: fromDate,
+            toDate: toDate
+        )
         var output: [ReportResult.GstBucket] = []
         var input: [ReportResult.GstBucket] = []
         var net: Int64 = 0
         for c in codes {
-            let acct = try AccountRepository(db: db).findByCode(c.accountCode, companyId: filter.companyId)
+            let acct = accountsByCode[c.accountCode]
             guard let acct else { continue }
-            let totals: (Int64, Int64)? = try db.queryOne(
-                """
-                SELECT SUM(CASE WHEN l.side='debit'  THEN l.amount_paise ELSE 0 END) AS dr,
-                       SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END) AS cr
-                FROM avelo_ledger_lines l
-                JOIN avelo_vouchers v ON v.id = l.voucher_id
-                WHERE l.account_id = ? AND v.date BETWEEN ? AND ?
-                """,
-                bind: [.text(acct.id.uuidString), .date(fromDate), .date(toDate)]
-            ) { r in (r.int("dr"), r.int("cr")) }
-            let dr = totals?.0 ?? 0
-            let cr = totals?.1 ?? 0
+            let totals = totalsByAccount[acct.id]
+            let dr = totals?.debitPaise ?? 0
+            let cr = totals?.creditPaise ?? 0
             let netAmt: Int64
             if acct.openingBalanceSide == .debit {
                 netAmt = (dr + acct.openingBalancePaise) - cr
@@ -468,19 +498,15 @@ public struct ReportRepository: Sendable {
         let accounts: [(Account.ID, String, String)] = try db.query(sql, bind: bind) { r in
             (try UUIDParsing.required(r.text("id"), field: "report.outstanding.account_id"), r.text("name"), r.text("code"))
         }
+        let totalsByAccount = try movementTotals(
+            for: accounts.map { $0.0 },
+            companyId: filter.companyId,
+            toDate: asOfDate
+        )
         var rows: [ReportResult.OutstandingRow] = []
         for (aid, name, _) in accounts {
-            let total: Int64 = (try db.queryOne(
-                """
-                SELECT
-                  COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END),0)
-                - COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END),0) AS net
-                FROM avelo_ledger_lines l
-                JOIN avelo_vouchers v ON v.id = l.voucher_id
-                WHERE l.account_id = ? AND v.date <= ?
-                """,
-                bind: [.text(aid.uuidString), .date(asOfDate)]
-            ) { r in r.int("net") }) ?? 0
+            let totals = totalsByAccount[aid]
+            let total = (totals?.debitPaise ?? 0) - (totals?.creditPaise ?? 0)
             if total == 0 { continue }
             rows.append(ReportResult.OutstandingRow(
                 id: aid,

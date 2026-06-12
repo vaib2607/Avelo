@@ -3,12 +3,16 @@
 ## Summary
 This is the final master list for this thread. It is the only list we use going forward. We will strike items only when the item itself is complete, its proof-of-done check passes, and any dependency re-check required by that item also passes.
 
+Release intent for the current thread:
+- `v1.1` is the performance, accuracy, and reliability release.
+- The release evidence must include repeatable local benchmark runs for core voucher/report paths and a million-voucher stress path, measured on the same machine with visible progress and comparable modes.
+
 Execution rule:
 - Work only from `Active Now`.
 - When an item is done, strike it.
 - When a dependency changes, re-check dependent completed items before moving forward.
 - If scope changes, edit this list only. No side scope.
-- Apply the release split in `Docs/Avelo_Release_Board.md`: `V1` for day-one correctness/open-save reliability, `V2` for post-launch merge/security/scale work, `V3` for later hardening and rare-edge-case resilience.
+- Apply the release split in `Docs/Avelo_Release_Board.md`: `V1` for day-one correctness/open-save reliability, `V2` for post-launch merge/security/scale and benchmark tooling work, `V3` for later hardening and rare-edge-case resilience.
 
 Status keys:
 - `Owner`: `Code`, `Review`, `Test`, `Manual QA`, `Decision`
@@ -633,6 +637,11 @@ Status keys:
   Depends: restore flow reviewed  
   Proof: repeated restore/reopen remains stable
 
+- ~~Run repeatable benchmark harness and 500k stress validation~~  
+  Owner: `Test`  
+  Depends: benchmark suite and cleanup fixes complete  
+  Proof: before/after benchmark JSON captured, 500k stress run passes, and post-cleanup memory growth stays within limit
+
 - ~~Freeze features for release candidate~~  
   Owner: `Decision`  
   Depends: all core functional work complete  
@@ -739,6 +748,7 @@ Status keys:
 - ~~Keep company setup flow green after onboarding migration~~
 - ~~Run `swift build` after completed architecture batches~~
 - ~~Run `swift test` after completed architecture batches~~
+- ~~Run repeatable benchmark harness and 500k stress validation~~
 
 ## Immediate Next Sequence
 1. Finish `B. Observation / Shell Completion`.

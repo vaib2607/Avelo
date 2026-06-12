@@ -4,6 +4,8 @@ public struct SearchBar: View {
     @Binding public var text: String
     public var placeholder: String = "Search"
     public var onSubmit: (() -> Void)? = nil
+    @State private var draftText: String = ""
+    @State private var debounceTask: Task<Void, Never>?
 
     public init(text: Binding<String>, placeholder: String = "Search", onSubmit: (() -> Void)? = nil) {
         self._text = text
@@ -15,12 +17,18 @@ public struct SearchBar: View {
         HStack(spacing: AppMetrics.spacing) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-            TextField(placeholder, text: $text)
+            TextField(placeholder, text: $draftText)
                 .textFieldStyle(.plain)
                 .font(AppTypography.bodyFont)
-                .onSubmit { onSubmit?() }
-            if !text.isEmpty {
+                .onSubmit {
+                    debounceTask?.cancel()
+                    text = draftText
+                    onSubmit?()
+                }
+            if !draftText.isEmpty {
                 Button {
+                    debounceTask?.cancel()
+                    draftText = ""
                     text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -40,5 +48,19 @@ public struct SearchBar: View {
             RoundedRectangle(cornerRadius: AppMetrics.cornerRadius)
                 .stroke(AppColors.divider, lineWidth: 0.5)
         )
+        .onAppear { draftText = text }
+        .onChange(of: text) { _, newValue in
+            if newValue != draftText {
+                draftText = newValue
+            }
+        }
+        .onChange(of: draftText) { _, newValue in
+            debounceTask?.cancel()
+            debounceTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                guard !Task.isCancelled else { return }
+                text = newValue
+            }
+        }
     }
 }

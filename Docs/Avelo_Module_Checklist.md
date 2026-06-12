@@ -2,6 +2,8 @@
 
 The file-by-file gap map and per-slice acceptance criteria. Every Swift file in the project is listed here. When a pass is complete, every file in that pass's slice is checked off in code review.
 
+Out of scope for this checklist: cloud sync, remote login, remote protection, and other network-dependent features.
+
 Legend: `[ ]` pending · `[x]` done · `[-]` deferred (with reason) · `[!]` blocked on something
 
 ---
@@ -214,13 +216,15 @@ Legend: `[ ]` pending · `[x]` done · `[-]` deferred (with reason) · `[!]` blo
 ## Per-slice acceptance criteria
 
 ### Slice 1 — Foundation
-- App launches and shows the company picker.
+- [x] App launches and shows the company picker.
 - "New Company" wizard collects name, address, GSTIN/PAN, base currency, and a financial year (start, end, books-begin date) and a default chart of accounts choice.
 - On confirm, a `.sqlite` file is created at `Application Support/Avelo/Companies/<uuid>.sqlite` and seeded with the full schema + default voucher types + default groups + default ledgers.
 - The registry DB records the company.
 - The dashboard shell renders with the company name, active FY, and a "no data yet" empty state.
-- "Open Backup" works.
-- Switching the FY in the toolbar updates the active FY.
+- [x] "Open Backup" works.
+- [x] Switching the FY in the toolbar updates the active FY.
+- [x] Company Info menu exposes local company actions: select company, create company, backup, restore, and close company.
+- [x] New Company wizard captures every field-level input required by the spec.
 
 ### Slice 2 — Accounts
 - Accounts screen lists groups and ledgers in a tree.
@@ -228,48 +232,61 @@ Legend: `[ ]` pending · `[x]` done · `[-]` deferred (with reason) · `[!]` blo
 - Edit ledger; edits to opening balance are allowed only on the first FY.
 - Disable ledger; disabled ledgers do not appear in pickers but still appear in historical reports.
 - Add group; reorder via sort_order.
+- [x] F11 company-features panel exposes local accounting and inventory toggles in one place.
+- [x] F12 configuration exposes local app settings in one place, including data paths and voucher-entry behavior.
+- [x] Bill-wise Adjustments support `New Ref`, `Agst Ref`, `Advance`, and `On Account`.
+- [x] Batch-wise tracking captures manufacture date and expiry date.
+- [x] Zero-valued entries support free samples and gifts without breaking inventory posting.
 
 ### Slice 3 — Vouchers
-- Voucher list with filters: FY, type, date range, party, narration contains.
-- Voucher entry with all 10 types, live debit/credit/diff footer, Tab/Enter shortcuts, party picker, narration.
-- Save posts the voucher inside a single DB transaction; audit event is written.
-- Edit a posted voucher in an open FY.
-- Reverse a posted voucher; the reversal voucher has opposite lines and a `reversal_of_id` link.
-- Locked FY rejects any write at the trigger level.
+- [x] Voucher list with filters: FY, type, date range, party, narration contains.
+- [x] Voucher entry with all 10 types, live debit/credit/diff footer, Tab/Enter shortcuts, party picker, narration.
+- [x] Save posts the voucher inside a single DB transaction; audit event is written.
+- [x] Edit a posted voucher in an open FY.
+- [x] Reverse a posted voucher; the reversal voucher has opposite lines and a `reversal_of_id` link.
+- [x] Locked FY rejects any write at the trigger level.
+- [x] Accounting voucher variants explicitly cover contra, payment, receipt, journal, sales, purchase, debit note, and credit note entry flows.
+- [x] Inventory vouchers explicitly cover purchase order, sales order, receipt note, delivery note, rejection in, rejection out, stock journal, and physical stock.
 
 ### Slice 4 — Reports
-- Ledger report: account + period; running balance in paise.
-- Trial balance: all accounts, debit total, credit total, diff column.
-- P&L: income minus expense, broken into sections.
-- Balance sheet: assets vs liabilities + equity, group hierarchy respected.
-- GST summary: month picker, input vs output, CGST/SGST/IGST/cess, net payable.
-- Day book: chronological voucher list.
-- Drill-down: any row in any report jumps to the source voucher (open in read-only editor).
+- [x] Ledger report: account + period; running balance in paise.
+- [x] Trial balance: all accounts, debit total, credit total, diff column.
+- [x] P&L: income minus expense, broken into sections.
+- [x] Balance sheet: assets vs liabilities + equity, group hierarchy respected.
+- [x] GST summary: month picker, input vs output, CGST/SGST/IGST/cess, net payable.
+- [x] Day book: chronological voucher list.
+- [x] Drill-down: any row in any report jumps to the source voucher (open in read-only editor).
 
 ### Slice 5 — Inventory
-- Toggle inventory on/off in Settings.
+- [x] Toggle inventory on/off in Settings.
 - CRUD on stock items; choose valuation method.
-- Record stock in (purchase, opening) and stock out (sale, issue) with explicit qty and unit cost.
+- [x] Record stock in (purchase, opening) and stock out (sale, issue) with explicit qty and unit cost.
 - After saving a `sales` or `purchase` voucher, prompt to record stock movement; user confirms and posts.
-- Stock valuation report (FIFO or WA per item) is available.
+- [x] Stock valuation report (FIFO or WA per item) is available.
+- [x] Stock master coverage includes stock groups, stock categories, units of measure, and godowns.
+- [x] Bill of Materials supports assembled stock items with component breakdowns.
+- [x] Physical Stock vouchers support manual inventory counting and reconciliation.
+- [x] Stock Journal vouchers support inter-godown transfers and stock adjustments.
 
 ### Slice 6 — Banking, backup, audit
-- Bank account identified by `is_bank_account = 1`.
-- Reconciliation view shows uncleared bank book entries and accepts statement date + amount matches.
-- Mark cleared; clears with timestamp.
-- Backup export to chosen `.avelobackup` (zip of the SQLite file + sidecar manifest).
-- Restore from `.avelobackup` creates a new company in the picker.
-- Audit log view: filters by entity, action, date range; shows before/after JSON for each event.
+- [x] Bank account identified by `is_bank_account = 1`.
+- [x] Reconciliation view shows uncleared bank book entries and accepts statement date + amount matches.
+- [x] Mark cleared; clears with timestamp.
+- [x] Backup export to chosen `.avelobackup` (zip of the SQLite file + sidecar manifest).
+- [x] Restore from `.avelobackup` creates a new company in the picker.
+- [x] Audit log view: filters by entity, action, date range; shows before/after JSON for each event.
 
 ### Slice 7 — Payroll
-- Employee CRUD; termination via end date.
-- Salary voucher: pick employee + month; pre-fills gross from base salary; user enters deductions; net is auto-computed; saves as a single voucher with Salary Expense Dr / Cash or Bank Cr.
-- Salary register per month per employee.
+- [x] Employee CRUD; termination via end date.
+- [x] Salary voucher: pick employee + month; pre-fills gross from base salary; user enters deductions; net is auto-computed; saves as a single voucher with Salary Expense Dr / Cash or Bank Cr.
+- [x] Salary register per month per employee.
 
 ### Slice 8 — Hardening
-- Voucher templates: save current draft as a template, load template into a new draft.
-- Last-used-account sort in account picker.
-- Multi-line paste (TSV) parses into lines.
-- Dark mode respected.
-- Full keyboard shortcut help dialog.
-- App icon set (placeholder; user replaces later).
+- [x] Voucher templates: save current draft as a template, load template into a new draft.
+- [x] Last-used-account sort in account picker.
+- [x] Multi-line paste (TSV) parses into lines.
+- [x] Dark mode respected.
+- [x] Full keyboard shortcut help dialog.
+- [x] App icon set (placeholder; user replaces later).
+- [x] Keyboard shortcuts cover F1 through F12 and the app-level navigation shortcuts listed in the spec.
+- [x] Full field-level master coverage is reconciled against the spec for company, group, ledger, stock item, voucher, financial-year, inventory, and GST screens.

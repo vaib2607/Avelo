@@ -24,13 +24,25 @@ public final class PayrollViewModel {
 
     public func reload() {
         isLoading = true
-        defer { isLoading = false }
-        do {
-            let svc = PayrollService(db: db, companyId: companyId)
-            employees = try svc.listEmployees()
-            entries = try svc.listEntries(monthYear: monthYear)
-        } catch {
-            self.error = AppError.wrap(error)
+        let db = db
+        let companyId = companyId
+        let monthYear = monthYear
+        Task.detached {
+            do {
+                let svc = PayrollService(db: db, companyId: companyId)
+                let employees = try svc.listEmployees()
+                let entries = try svc.listEntries(monthYear: monthYear)
+                await MainActor.run {
+                    self.employees = employees
+                    self.entries = entries
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.error = AppError.wrap(error)
+                    self.isLoading = false
+                }
+            }
         }
     }
 

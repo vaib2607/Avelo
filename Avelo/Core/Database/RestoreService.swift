@@ -163,27 +163,35 @@ public struct RestoreService: Sendable {
             throw AppError.fileSystem("Unable to copy backup into restored company file at \(destURL.lastPathComponent): \(error.localizedDescription)")
         }
 
-        let db = try SQLiteDatabase(path: destURL.path)
-        defer { db.close() }
-        let current = db.userVersion()
-        if current < SchemaVersion.current.rawValue {
-            try MigrationRunner().runMigrations(on: db)
-        }
-        try Self.prepareRestoredCompanyDatabase(
-            db: db,
-            restoredCompanyId: newId,
-            restoredCompanyName: manifest.companyName
-        )
+        do {
+            let db = try SQLiteDatabase(path: destURL.path)
+            defer { db.close() }
+            try Self.validateIntegrity(db: db)
+            let current = db.userVersion()
+            if current < SchemaVersion.current.rawValue {
+                try MigrationRunner().runMigrations(on: db)
+                try Self.validateIntegrity(db: db)
+            }
+            try Self.prepareRestoredCompanyDatabase(
+                db: db,
+                restoredCompanyId: newId,
+                restoredCompanyName: manifest.companyName
+            )
+            try Self.validateIntegrity(db: db)
 
-        let entry = CompanyRegistryEntry(
-            id: newId,
-            name: manifest.companyName,
-            sqliteFileName: destURL.lastPathComponent,
-            lastOpenedAt: nil,
-            createdAt: Date()
-        )
-        try await manager.registerCompany(entry)
-        return entry
+            let entry = CompanyRegistryEntry(
+                id: newId,
+                name: manifest.companyName,
+                sqliteFileName: destURL.lastPathComponent,
+                lastOpenedAt: nil,
+                createdAt: Date()
+            )
+            try await manager.registerCompany(entry)
+            return entry
+        } catch {
+            try? fm.removeItem(at: destURL)
+            throw error
+        }
     }
 
     static func prepareRestoredCompanyDatabase(
@@ -238,6 +246,13 @@ public struct RestoreService: Sendable {
             throw error
         }
         try db.execute("PRAGMA foreign_keys = ON")
+    }
+
+    private static func validateIntegrity(db: SQLiteDatabase) throws {
+        let rows = try db.query("PRAGMA integrity_check") { $0.text(0) }
+        guard rows.count == 1, rows.first == "ok" else {
+            throw AppError.database(.schemaMismatch("Restore integrity check failed; original company was kept."))
+        }
     }
 
     private static func writeRestoreAuditEvent(db: SQLiteDatabase, companyId: Company.ID) throws {

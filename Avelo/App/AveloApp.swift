@@ -45,20 +45,47 @@ struct AveloApp: App {
         .windowStyle(.titleBar)
         .commands {
             if !selfTestRequested, let environment {
-                SidebarCommands()
-                ToolbarCommands()
-                CommandGroup(replacing: .newItem) {
+                CommandMenu("Company") {
                     Button("New Company…") {
                         NotificationCenter.default.post(name: .aveloRequestNewCompany, object: nil)
                     }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
-                }
-                CommandGroup(after: .pasteboard) {
-                    Divider()
+
+                    Button("Open Company…") {
+                        NotificationCenter.default.post(name: .aveloRequestOpenCompany, object: nil)
+                    }
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
+
                     Button("Backup…") {
                         NotificationCenter.default.post(name: .aveloRequestBackup, object: nil)
                     }
                     .keyboardShortcut("b", modifiers: [.command, .shift])
+
+                    Button("Restore Backup…") {
+                        NotificationCenter.default.post(name: .aveloRequestRestore, object: nil)
+                    }
+                    .keyboardShortcut("r", modifiers: [.command, .shift])
+
+                    Button("Preferences…") {
+                        NotificationCenter.default.post(name: .aveloRequestPreferences, object: nil)
+                    }
+                    .keyboardShortcut(",", modifiers: .command)
+
+                    Divider()
+
+                    Button("Close Company") {
+                        NotificationCenter.default.post(name: .aveloRequestCloseCompany, object: nil)
+                    }
+                    .keyboardShortcut("w", modifiers: [.command, .shift])
+                    .disabled(environment.companyContext == nil)
+                }
+                SidebarCommands()
+                ToolbarCommands()
+                CommandGroup(after: .pasteboard) {
+                    Button("Open Company…") {
+                        NotificationCenter.default.post(name: .aveloRequestOpenCompany, object: nil)
+                    }
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
                 }
                 CommandMenu("Go") {
                     Button("Dashboard") { environment.router.go(.dashboard) }
@@ -97,8 +124,11 @@ struct AveloApp: App {
 
 extension Notification.Name {
     public static let aveloRequestNewCompany = Notification.Name("avelo.request.newCompany")
+    public static let aveloRequestOpenCompany = Notification.Name("avelo.request.openCompany")
     public static let aveloRequestBackup = Notification.Name("avelo.request.backup")
     public static let aveloRequestRestore = Notification.Name("avelo.request.restore")
+    public static let aveloRequestPreferences = Notification.Name("avelo.request.preferences")
+    public static let aveloRequestCloseCompany = Notification.Name("avelo.request.closeCompany")
     public static let aveloRequestCloseFy = Notification.Name("avelo.request.closeFy")
     public static let aveloRequestLockFy = Notification.Name("avelo.request.lockFy")
 }

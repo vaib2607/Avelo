@@ -12,6 +12,8 @@ public final class VoucherEditViewModel {
     public var narration: String = ""
     public var date: Date = Date()
     public var partyAccountId: Account.ID?
+    public var billReferenceType: VoucherDraft.BillReferenceType?
+    public var billReferenceNumber: String = ""
     public var lines: [LineRow] = [LineRow()]
 
     public let mode: VoucherDraft.Mode
@@ -25,13 +27,13 @@ public final class VoucherEditViewModel {
         self.fyId = fyId
         if let eid = existingId {
             self.mode = .edit(originalVoucherId: eid)
-            self.draft = VoucherDraft(
-                mode: .edit(originalVoucherId: eid),
-                voucherTypeCode: initialType,
-                date: Date(),
-                partyAccountId: nil, narration: "",
-                lines: []
-            )
+                self.draft = VoucherDraft(
+                    mode: .edit(originalVoucherId: eid),
+                    voucherTypeCode: initialType,
+                    date: Date(),
+                    partyAccountId: nil, narration: "",
+                    lines: []
+                )
         } else {
             self.mode = .create
             self.draft = VoucherDraft(
@@ -77,6 +79,8 @@ public final class VoucherEditViewModel {
                     self.narration = existing.narration
                     self.date = existing.date
                     self.partyAccountId = existing.partyAccountId
+                    self.billReferenceType = existing.partyAccountId != nil ? .agstRef : nil
+                    self.billReferenceNumber = existing.number
                     let lines = try svc.lines(for: vid)
                     self.lines = lines.enumerated().map { (idx, l) in
                         LineRow(
@@ -100,6 +104,40 @@ public final class VoucherEditViewModel {
         lines.append(LineRow())
     }
 
+    public func pasteTSV(_ text: String) {
+        let parsed = text.split(whereSeparator: \.isNewline).compactMap { row -> LineRow? in
+            let cols = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            guard cols.count >= 3 else { return nil }
+            let side = (cols[safe: 1]?.lowercased() == "cr") ? LedgerSide.credit : .debit
+            return LineRow(
+                accountId: nil,
+                amount: cols[safe: 2] ?? "0.00",
+                side: side,
+                taxCode: cols[safe: 3],
+                costCenter: cols[safe: 4]
+            )
+        }
+        if !parsed.isEmpty {
+            lines = parsed
+        }
+    }
+
+    public func saveTemplate(named name: String) throws {
+        try VoucherTemplateService(db: db, companyId: companyId).save(name: name, draft: buildDraft())
+    }
+
+    public func loadTemplate(named name: String) throws {
+        if let loaded = try VoucherTemplateService(db: db, companyId: companyId).load(name: name) {
+            draft = loaded
+            narration = loaded.narration
+            date = loaded.date
+            partyAccountId = loaded.partyAccountId
+            billReferenceType = loaded.billReferenceType
+            billReferenceNumber = loaded.billReferenceNumber ?? ""
+            lines = loaded.lines.map { LineRow(accountId: $0.accountId, amount: $0.amount, side: $0.side, taxCode: $0.taxCode, costCenter: $0.costCenter) }
+        }
+    }
+
     public func removeLine(_ id: UUID) {
         lines.removeAll(where: { $0.id == id })
     }
@@ -120,6 +158,8 @@ public final class VoucherEditViewModel {
         var d = draft
         d.date = date
         d.partyAccountId = partyAccountId
+        d.billReferenceType = billReferenceType
+        d.billReferenceNumber = billReferenceNumber.isEmpty ? nil : billReferenceNumber
         d.narration = narration
         d.lines = lines.enumerated().map { (idx, row) in
             VoucherDraft.Line(
@@ -150,5 +190,11 @@ public final class VoucherEditViewModel {
     public var canPost: Bool {
         if case .valid = validation { return isBalanced }
         return false
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

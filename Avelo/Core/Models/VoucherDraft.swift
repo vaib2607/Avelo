@@ -1,6 +1,15 @@
 import Foundation
 
 public struct VoucherDraft: Sendable, Hashable {
+    public enum BillReferenceType: String, CaseIterable, Sendable, Hashable, Codable, Identifiable {
+        case newRef = "New Ref"
+        case agstRef = "Agst Ref"
+        case advance = "Advance"
+        case onAccount = "On Account"
+
+        public var id: String { rawValue }
+    }
+
     public enum Mode: Sendable, Hashable {
         case create
         case edit(originalVoucherId: Voucher.ID)
@@ -43,6 +52,8 @@ public struct VoucherDraft: Sendable, Hashable {
     public var voucherTypeCode: VoucherType.Code
     public var date: Date
     public var partyAccountId: Account.ID?
+    public var billReferenceType: BillReferenceType?
+    public var billReferenceNumber: String?
     public var narration: String
     public var lines: [Line]
 
@@ -50,12 +61,16 @@ public struct VoucherDraft: Sendable, Hashable {
                 voucherTypeCode: VoucherType.Code,
                 date: Date,
                 partyAccountId: Account.ID? = nil,
+                billReferenceType: BillReferenceType? = nil,
+                billReferenceNumber: String? = nil,
                 narration: String = "",
                 lines: [Line] = []) {
         self.mode = mode
         self.voucherTypeCode = voucherTypeCode
         self.date = date
         self.partyAccountId = partyAccountId
+        self.billReferenceType = billReferenceType
+        self.billReferenceNumber = billReferenceNumber
         self.narration = narration
         self.lines = lines
     }

@@ -222,9 +222,9 @@ public struct PayrollRepository: Sendable {
     }
 
     static func rowToEmployee(_ r: Row) throws -> PayrollEmployee {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
-        let bank = r.optionalText("bank_account_id").flatMap { UUID(uuidString: $0) }
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_payroll_employees.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_payroll_employees.company_id")
+        let bank = try UUIDParsing.optional(r.optionalText("bank_account_id"), field: "avelo_payroll_employees.bank_account_id")
         return PayrollEmployee(
             id: id,
             companyId: companyId,
@@ -248,11 +248,11 @@ public struct PayrollRepository: Sendable {
     }
 
     static func rowToEntry(_ r: Row) throws -> PayrollEntry {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
-        let employeeId = UUID(uuidString: r.text("employee_id")) ?? UUID()
-        let fyId = UUID(uuidString: r.text("financial_year_id")) ?? UUID()
-        let voucherId = r.optionalText("voucher_id").flatMap { UUID(uuidString: $0) }
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_payroll_entries.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_payroll_entries.company_id")
+        let employeeId = try UUIDParsing.required(r.text("employee_id"), field: "avelo_payroll_entries.employee_id")
+        let fyId = try UUIDParsing.required(r.text("financial_year_id"), field: "avelo_payroll_entries.financial_year_id")
+        let voucherId = try UUIDParsing.optional(r.optionalText("voucher_id"), field: "avelo_payroll_entries.voucher_id")
         return PayrollEntry(
             id: id,
             companyId: companyId,

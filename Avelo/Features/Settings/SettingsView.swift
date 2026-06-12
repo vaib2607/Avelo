@@ -12,6 +12,21 @@ public struct SettingsView: View {
             if let vm = vm { content(vm: vm) } else { ProgressView() }
         }
         .navigationTitle("Settings")
+        .toolbar {
+            if let ctx = env.companyContext, let vm {
+                ToolbarItem {
+                    Picker("FY", selection: Binding(
+                        get: { ctx.financialYear.id },
+                        set: { env.switchFinancialYear($0) }
+                    )) {
+                        ForEach(vm.financialYears) { fy in
+                            Text(fy.label).tag(fy.id)
+                        }
+                    }
+                    .frame(width: 170)
+                }
+            }
+        }
         .task(id: reloadKey) { setup() }
     }
 
@@ -32,6 +47,21 @@ public struct SettingsView: View {
                     Button("Backup now…") { env.router.present(.backup) }
                     Button("Restore from backup…") { env.router.present(.restore) }
                 }
+            }
+            Section("Company Features") {
+                Toggle("Enable inventory", isOn: Binding(
+                    get: { vm.company?.isInventoryEnabled ?? false },
+                    set: { vm.setInventoryEnabled($0) }
+                ))
+                Picker("Inventory link mode", selection: Binding(
+                    get: { vm.company?.inventoryLinkMode ?? .manual },
+                    set: { vm.setInventoryLinkMode($0) }
+                )) {
+                    ForEach(InventoryLinkMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .disabled(!(vm.company?.isInventoryEnabled ?? false))
             }
             Section("Financial years") {
                 Table(vm.financialYears) {

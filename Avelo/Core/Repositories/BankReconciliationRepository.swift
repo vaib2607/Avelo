@@ -78,10 +78,10 @@ public struct BankReconciliationRepository: Sendable {
             bind: [.text(bankAccountId.uuidString)]
         ) { r in
             Entry(
-                id: UUID(uuidString: r.text("id")) ?? UUID(),
-                companyId: UUID(uuidString: r.text("company_id")) ?? UUID(),
-                bankAccountId: UUID(uuidString: r.text("bank_account_id")) ?? UUID(),
-                voucherId: UUID(uuidString: r.text("voucher_id")) ?? UUID(),
+                id: try UUIDParsing.required(r.text("id"), field: "avelo_bank_reconciliations.id"),
+                companyId: try UUIDParsing.required(r.text("company_id"), field: "avelo_bank_reconciliations.company_id"),
+                bankAccountId: try UUIDParsing.required(r.text("bank_account_id"), field: "avelo_bank_reconciliations.bank_account_id"),
+                voucherId: try UUIDParsing.required(r.text("voucher_id"), field: "avelo_bank_reconciliations.voucher_id"),
                 statementDate: r.date("statement_date"),
                 statementAmountPaise: r.int("statement_amount_paise"),
                 isCleared: r.bool("is_cleared"),
@@ -123,8 +123,8 @@ public struct BankReconciliationRepository: Sendable {
             bind: [.text(accountId.uuidString), .date(asOf)]
         ) { r in
             StatementLine(
-                id: UUID(uuidString: r.text("id")) ?? UUID(),
-                accountId: UUID(uuidString: r.text("account_id")) ?? UUID(),
+                id: try UUIDParsing.required(r.text("id"), field: "avelo_bank_statement_lines.id"),
+                accountId: try UUIDParsing.required(r.text("account_id"), field: "avelo_bank_statement_lines.account_id"),
                 date: r.date("date"),
                 amountPaise: r.int("amount_paise"),
                 narration: r.text("narration"),
@@ -146,7 +146,7 @@ public struct BankReconciliationRepository: Sendable {
             bind: [.text(accountId.uuidString), .date(asOf)]
         ) { r in
             VoucherCandidate(
-                id: UUID(uuidString: r.text("id")) ?? UUID(),
+                id: try UUIDParsing.required(r.text("id"), field: "banking.candidate_vouchers.id"),
                 number: r.text("number"),
                 date: r.date("date"),
                 amountPaise: r.int("total_paise")

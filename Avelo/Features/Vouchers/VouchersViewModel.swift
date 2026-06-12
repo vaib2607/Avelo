@@ -28,21 +28,38 @@ public final class VouchersViewModel {
 
     public func reload() {
         isLoading = true
-        defer { isLoading = false }
-        do {
-            let svc = VoucherService(db: db, companyId: companyId)
-            let acct = AccountService(db: db, companyId: companyId)
-            var f = filter
-            f.companyId = companyId
-            f.financialYearId = fyId
-            f.fromDate = fromDate
-            f.toDate = toDate
-            f.voucherTypeCodes = typeFilter
-            f.searchText = query.isEmpty ? nil : query
-            vouchers = try svc.list(filter: f)
-            accounts = try acct.listActiveAccounts()
-        } catch {
-            self.error = AppError.wrap(error)
+        let db = db
+        let companyId = companyId
+        let fyId = fyId
+        let fromDate = fromDate
+        let toDate = toDate
+        let typeFilter = typeFilter
+        let query = query
+        let baseFilter = filter
+        Task.detached {
+            do {
+                let svc = VoucherService(db: db, companyId: companyId)
+                let acct = AccountService(db: db, companyId: companyId)
+                var f = baseFilter
+                f.companyId = companyId
+                f.financialYearId = fyId
+                f.fromDate = fromDate
+                f.toDate = toDate
+                f.voucherTypeCodes = typeFilter
+                f.searchText = query.isEmpty ? nil : query
+                let vouchers = try svc.list(filter: f)
+                let accounts = try acct.listActiveAccounts()
+                await MainActor.run {
+                    self.vouchers = vouchers
+                    self.accounts = accounts
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.error = AppError.wrap(error)
+                    self.isLoading = false
+                }
+            }
         }
     }
 

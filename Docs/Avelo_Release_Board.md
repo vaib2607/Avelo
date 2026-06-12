@@ -2,6 +2,10 @@
 
 This is the repo-tracked `P0/P1/P2` execution board for the release push. Each open issue appears once, carries one severity, and maps back to the master execution checklist.
 
+Current release target:
+- `v1.1` is the performance, accuracy, and reliability hardening release.
+- The current benchmark focus is on repeatable local measurement for cold launch, core voucher/report paths, backup/restore, soak, stress, and million-voucher runs on the same machine and dataset.
+
 Severity rules:
 - `P0`: release-blocking correctness, data integrity, fiscal lock, restore, or core offline-behavior risk
 - `P1`: high-priority shipped-path gap that can cause broken workflow, bad UX trust, or incomplete validation
@@ -14,7 +18,7 @@ Module ship status:
 
 Release split rule:
 - If it affects correctness, data loss, or the app's ability to open and save reliably on day one, it belongs in `V1`.
-- If it improves offline merge, security, or scale but does not block launch, it belongs in `V2`.
+- If it improves offline merge, security, scale, or benchmark tooling but does not block launch, it belongs in `V2`.
 - If it is mainly enterprise hardening, resilience polish, or rare-edge-case protection, it belongs in `V3`.
 
 ## Release Split
@@ -30,7 +34,7 @@ Release split rule:
 ### V2: Should Ship After Launch
 - Migrate from plain UUIDs to UUIDv7 for time-sortable IDs and better offline merge behavior.
 - Add stronger restore hardening and more explicit integrity verification around imported backups.
-- Add basic large-dataset performance work: better pagination, query-plan tuning, and prepared-statement reuse.
+- Add basic large-dataset performance work: better pagination, query-plan tuning, prepared-statement reuse, and benchmark-driven regression checks.
 - Add SQLCipher or equivalent at-rest encryption if product or security requirements demand it.
 - Add clearer recovery for unusual filesystem cases like network volumes or antivirus locks.
 
@@ -105,6 +109,7 @@ Hidden entry-point rule:
 | RB-041 | P2 | Done | H | Advanced GST export audited and kept deferred from V1 shell entry points |
 | RB-043 | P1 | Done | J | Prove promoted inventory, payroll, and banking shell routes behave correctly across sidebar, menu, keyboard, and command palette |
 | RB-042 | P2 | Done | J | Run stress, soak, RC, and deployment validation |
+| RB-048 | P2 | Done | J | Benchmark harness and 500k stress validation completed with before/after JSON and post-cleanup memory gate proof |
 
 ## Completed Board Items
 

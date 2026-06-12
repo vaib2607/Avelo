@@ -66,13 +66,22 @@ private struct InventoryBody: View {
             }
             .padding(12)
             Divider()
-            Table(vm.filtered) {
-                TableColumn("Code", value: \.code)
-                TableColumn("Name", value: \.name)
-                TableColumn("Unit", value: \.unit)
-                TableColumn("Opening Qty") { i in
-                    Text(String(format: "%.3f", i.openingQuantity))
-                }
+                Table(vm.filtered) {
+                    TableColumn("Code", value: \.code)
+                    TableColumn("Name", value: \.name)
+                    TableColumn("Unit", value: \.unit)
+                    TableColumn("Group") { i in
+                        Text(i.stockGroup ?? "—").foregroundStyle(i.stockGroup == nil ? .secondary : .primary)
+                    }
+                    TableColumn("Category") { i in
+                        Text(i.stockCategory ?? "—").foregroundStyle(i.stockCategory == nil ? .secondary : .primary)
+                    }
+                    TableColumn("Godown") { i in
+                        Text(i.godown ?? "—").foregroundStyle(i.godown == nil ? .secondary : .primary)
+                    }
+                    TableColumn("Opening Qty") { i in
+                        Text(String(format: "%.3f", i.openingQuantity))
+                    }
                 TableColumn("Opening Rate (₹)") { i in
                     Text(Currency.formatPaise(i.openingRatePaise)).monospacedDigit()
                 }

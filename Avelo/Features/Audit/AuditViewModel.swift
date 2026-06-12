@@ -23,17 +23,31 @@ public final class AuditViewModel {
 
     public func reload() {
         isLoading = true
-        defer { isLoading = false }
-        do {
-            let repo = AuditRepository(db: db)
-            var f = AuditRepository.Filter(companyId: companyId, limit: 1000)
-            f.searchText = query.isEmpty ? nil : query
-            f.entityType = entityTypeFilter.isEmpty ? nil : entityTypeFilter
-            f.fromDate = fromDate
-            f.toDate = toDate
-            events = try repo.list(filter: f)
-        } catch {
-            self.error = AppError.wrap(error)
+        let db = db
+        let companyId = companyId
+        let query = query
+        let entityTypeFilter = entityTypeFilter
+        let fromDate = fromDate
+        let toDate = toDate
+        Task.detached {
+            do {
+                let repo = AuditRepository(db: db)
+                var f = AuditRepository.Filter(companyId: companyId, limit: 1000)
+                f.searchText = query.isEmpty ? nil : query
+                f.entityType = entityTypeFilter.isEmpty ? nil : entityTypeFilter
+                f.fromDate = fromDate
+                f.toDate = toDate
+                let events = try repo.list(filter: f)
+                await MainActor.run {
+                    self.events = events
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.error = AppError.wrap(error)
+                    self.isLoading = false
+                }
+            }
         }
     }
 

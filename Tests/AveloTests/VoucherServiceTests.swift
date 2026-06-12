@@ -37,6 +37,31 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.0, totals?.1)
     }
 
+    func testPostBatchPersistsAllVouchersInOneBalancedBatch() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let drafts = (0..<25).map { i in
+            tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1000 + Int64(i), .debit),
+                tc.line(tc.salesId, 1000 + Int64(i), .credit)
+            ])
+        }
+
+        let results = try svc.postBatch(drafts, in: tc.fy)
+        XCTAssertEqual(results.count, 25)
+
+        let totals = try tc.db.queryOne(
+            """
+            SELECT COALESCE(SUM(CASE WHEN side='debit' THEN amount_paise ELSE 0 END),0) AS dr,
+                   COALESCE(SUM(CASE WHEN side='credit' THEN amount_paise ELSE 0 END),0) AS cr,
+                   COUNT(DISTINCT voucher_id) AS c
+            FROM avelo_ledger_lines
+            """
+        ) { ($0.int("dr"), $0.int("cr"), $0.int("c")) }
+        XCTAssertEqual(totals?.0, totals?.1)
+        XCTAssertEqual(totals?.2, 25)
+    }
+
     func testUnbalancedPostThrows() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)

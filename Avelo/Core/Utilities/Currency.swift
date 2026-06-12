@@ -7,7 +7,7 @@ public enum Currency {
     public static func rupeesToPaise(_ rupees: Decimal) -> Int64 {
         var value = rupees * Decimal(paisePerRupee)
         var rounded = Decimal()
-        NSDecimalRound(&rounded, &value, 0, .bankers)
+        NSDecimalRound(&rounded, &value, 0, .plain)
         return NSDecimalNumber(decimal: rounded).int64Value
     }
 
