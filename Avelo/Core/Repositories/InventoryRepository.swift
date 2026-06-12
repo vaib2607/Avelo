@@ -10,20 +10,20 @@ public struct InventoryRepository: Sendable {
 
     public func findItemById(_ id: InventoryItem.ID) throws -> InventoryItem? {
         try db.queryOne(
-            "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE id = ?",
+            "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE id = ?",
             bind: [.text(id.uuidString)]
         ) { try Self.rowToItem($0) }
     }
 
     public func findItemByCode(_ code: String, companyId: Company.ID) throws -> InventoryItem? {
         try db.queryOne(
-            "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ? AND code = ?",
+            "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ? AND code = ?",
             bind: [.text(companyId.uuidString), .text(code)]
         ) { try Self.rowToItem($0) }
     }
 
     public func listItemsForCompany(_ companyId: Company.ID, includeInactive: Bool = false) throws -> [InventoryItem] {
-        let sql = "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ?\(includeInactive ? "" : " AND is_active = 1") ORDER BY code COLLATE NOCASE"
+        let sql = "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ?\(includeInactive ? "" : " AND is_active = 1") ORDER BY code COLLATE NOCASE"
         return try db.query(sql, bind: [.text(companyId.uuidString)]) { try Self.rowToItem($0) }
     }
 
@@ -51,8 +51,8 @@ public struct InventoryRepository: Sendable {
             """
             INSERT INTO avelo_inventory_items
             (id, company_id, code, name, unit, valuation_method, is_active,
-             opening_quantity, opening_rate_paise, gst_rate, barcode, hsn_sac, is_archived, linked_account_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, barcode, hsn_sac, is_archived, linked_account_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(item.id.uuidString),
@@ -65,6 +65,9 @@ public struct InventoryRepository: Sendable {
                 .real(item.openingQuantity),
                 .integer(item.openingRatePaise),
                 .real(item.gstRate),
+                .optionalText(item.stockGroup),
+                .optionalText(item.stockCategory),
+                .optionalText(item.godown),
                 .optionalText(item.barcode),
                 .optionalText(item.hsnSac),
                 .bool(item.isArchived),
@@ -80,6 +83,7 @@ public struct InventoryRepository: Sendable {
             UPDATE avelo_inventory_items SET
                 code = ?, name = ?, unit = ?, valuation_method = ?, is_active = ?,
                 opening_quantity = ?, opening_rate_paise = ?, gst_rate = ?,
+                stock_group = ?, stock_category = ?, godown = ?,
                 barcode = ?, hsn_sac = ?, is_archived = ?, linked_account_id = ?
             WHERE id = ?
             """,
@@ -92,6 +96,9 @@ public struct InventoryRepository: Sendable {
                 .real(item.openingQuantity),
                 .integer(item.openingRatePaise),
                 .real(item.gstRate),
+                .optionalText(item.stockGroup),
+                .optionalText(item.stockCategory),
+                .optionalText(item.godown),
                 .optionalText(item.barcode),
                 .optionalText(item.hsnSac),
                 .bool(item.isArchived),
@@ -113,8 +120,9 @@ public struct InventoryRepository: Sendable {
             """
             INSERT INTO avelo_stock_movements
             (id, company_id, item_id, voucher_id, date, movement_type, quantity,
-             unit_cost_paise, total_value_paise, reference_voucher_number, reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             unit_cost_paise, total_value_paise, reference_voucher_number, batch_number,
+             manufacture_date, expiry_date, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(m.id.uuidString),
@@ -127,6 +135,9 @@ public struct InventoryRepository: Sendable {
                 .integer(m.unitCostPaise),
                 .integer(m.totalValuePaise),
                 .optionalText(m.referenceVoucherNumber),
+                .optionalText(m.batchNumber),
+                .optionalDate(m.manufactureDate),
+                .optionalDate(m.expiryDate),
                 .optionalText(m.reason),
                 .timestamp(m.createdAt)
             ]
@@ -162,7 +173,8 @@ public struct InventoryRepository: Sendable {
     public func listMovements(filter: MovementFilter) throws -> [StockMovement] {
         var sql = """
             SELECT id, company_id, item_id, voucher_id, date, movement_type, quantity,
-                   unit_cost_paise, total_value_paise, reference_voucher_number, reason, created_at
+                   unit_cost_paise, total_value_paise, reference_voucher_number, batch_number,
+                   manufacture_date, expiry_date, reason, created_at
             FROM avelo_stock_movements
             WHERE company_id = ?
         """
@@ -248,8 +260,8 @@ public struct InventoryRepository: Sendable {
     }
 
     static func rowToItem(_ r: Row) throws -> InventoryItem {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_inventory_items.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_inventory_items.company_id")
         let vm = ValuationMethod(rawValue: r.text("valuation_method")) ?? .fifo
         return InventoryItem(
             id: id,
@@ -262,19 +274,22 @@ public struct InventoryRepository: Sendable {
             openingQuantity: r.real("opening_quantity"),
             openingRatePaise: r.int("opening_rate_paise"),
             gstRate: r.real("gst_rate"),
+            stockGroup: r.optionalText("stock_group"),
+            stockCategory: r.optionalText("stock_category"),
+            godown: r.optionalText("godown"),
             barcode: r.optionalText("barcode"),
             hsnSac: r.optionalText("hsn_sac"),
             isArchived: r.bool("is_archived"),
-            linkedAccountId: r.optionalText("linked_account_id").flatMap { UUID(uuidString: $0) },
+            linkedAccountId: try UUIDParsing.optional(r.optionalText("linked_account_id"), field: "avelo_inventory_items.linked_account_id"),
             createdAt: r.timestamp("created_at")
         )
     }
 
     static func rowToMovement(_ r: Row) throws -> StockMovement {
-        let id = UUID(uuidString: r.text("id")) ?? UUID()
-        let companyId = UUID(uuidString: r.text("company_id")) ?? UUID()
-        let itemId = UUID(uuidString: r.text("item_id")) ?? UUID()
-        let voucherId = r.optionalText("voucher_id").flatMap { UUID(uuidString: $0) }
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_stock_movements.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_stock_movements.company_id")
+        let itemId = try UUIDParsing.required(r.text("item_id"), field: "avelo_stock_movements.item_id")
+        let voucherId = try UUIDParsing.optional(r.optionalText("voucher_id"), field: "avelo_stock_movements.voucher_id")
         let mt = MovementType(rawValue: r.text("movement_type")) ?? .adjustment
         return StockMovement(
             id: id,
@@ -287,6 +302,9 @@ public struct InventoryRepository: Sendable {
             totalValuePaise: r.int("total_value_paise"),
             voucherId: voucherId,
             referenceVoucherNumber: r.optionalText("reference_voucher_number"),
+            batchNumber: r.optionalText("batch_number"),
+            manufactureDate: r.optionalDate("manufacture_date"),
+            expiryDate: r.optionalDate("expiry_date"),
             reason: r.optionalText("reason"),
             createdAt: r.timestamp("created_at")
         )

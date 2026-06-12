@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import Observation
 
@@ -6,6 +7,7 @@ import Observation
 public final class SettingsViewModel {
 
     public var financialYears: [FinancialYear] = []
+    public var company: Company?
     public var isLoading: Bool = false
     public var error: AppError?
 
@@ -21,7 +23,34 @@ public final class SettingsViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
+            company = try CompanyRepository(db: db).findById(companyId)
             financialYears = try FinancialYearService(db: db, companyId: companyId).list()
+        } catch {
+            self.error = AppError.wrap(error)
+        }
+    }
+
+    public func setInventoryEnabled(_ enabled: Bool) {
+        guard var company else { return }
+        do {
+            company.isInventoryEnabled = enabled
+            if !enabled {
+                company.inventoryLinkMode = .manual
+            }
+            try CompanyRepository(db: db).update(company)
+            reload()
+        } catch {
+            self.error = AppError.wrap(error)
+        }
+    }
+
+    public func setInventoryLinkMode(_ mode: InventoryLinkMode) {
+        guard var company else { return }
+        do {
+            company.isInventoryEnabled = true
+            company.inventoryLinkMode = mode
+            try CompanyRepository(db: db).update(company)
+            reload()
         } catch {
             self.error = AppError.wrap(error)
         }

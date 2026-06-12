@@ -30,6 +30,15 @@ public struct VouchersView: View {
                 Button("New Contra")  { env.router.present(.newContra) }
                 Button("New Purchase"){ env.router.present(.newPurchase) }
                 Button("New Sales")   { env.router.present(.newSales) }
+                Divider()
+                Button("New Purchase Order") { env.router.present(.newPurchaseOrder) }
+                Button("New Sales Order") { env.router.present(.newSalesOrder) }
+                Button("New Receipt Note") { env.router.present(.newReceiptNote) }
+                Button("New Delivery Note") { env.router.present(.newDeliveryNote) }
+                Button("New Physical Stock") { env.router.present(.newPhysicalStock) }
+                Button("New Stock Journal") { env.router.present(.newStockJournal) }
+                Button("New Rejection In") { env.router.present(.newRejectionIn) }
+                Button("New Rejection Out") { env.router.present(.newRejectionOut) }
                 Button("New Credit Note") { env.router.present(.newCreditNote) }
                 Button("New Debit Note")  { env.router.present(.newDebitNote) }
             } label: {

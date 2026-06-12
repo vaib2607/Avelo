@@ -153,6 +153,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
     private var handle: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var inTransactionDepth: Int = 0
+    private var statementCache: [String: OpaquePointer] = [:]
 
     public init(path: String, readonly: Bool = false) throws {
         self.path = path
@@ -171,6 +172,9 @@ public final class SQLiteDatabase: @unchecked Sendable {
                     msg = "sqlite3_open_v2 returned \(rc)"
                 }
                 sqlite3_close(h)
+                if rc == SQLITE_CANTOPEN || msg.localizedCaseInsensitiveContains("permission") {
+                    throw AppError.database(.openFailed("Cannot open \(URL(fileURLWithPath: path).lastPathComponent): permission denied or unavailable. \(msg)"))
+                }
                 throw AppError.database(.openFailed(msg))
             }
             self.handle = h
@@ -179,9 +183,14 @@ public final class SQLiteDatabase: @unchecked Sendable {
     }
 
     deinit {
-        if let h = handle {
-            sqlite3_close(h)
+        close()
+    }
+
+    private func finalizeStatementCacheNoLock() {
+        for stmt in statementCache.values {
+            sqlite3_finalize(stmt)
         }
+        statementCache.removeAll()
     }
 
     private func sync<T>(_ block: () throws -> T) rethrows -> T {
@@ -194,6 +203,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         try execNoLock("PRAGMA foreign_keys = ON")
         try execNoLock("PRAGMA journal_mode = WAL")
         try execNoLock("PRAGMA synchronous = NORMAL")
+        try execNoLock("PRAGMA cache_size = -64000")
         try execNoLock("PRAGMA busy_timeout = 5000")
         try execNoLock("PRAGMA temp_store = MEMORY")
     }
@@ -220,13 +230,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
     }
 
     private func execWithBindingsNoLock(_ sql: String, _ bindings: [SQLValue]) throws {
-        var stmt: OpaquePointer?
-        let prep = sqlite3_prepare_v2(handle, sql, -1, &stmt, nil)
-        guard prep == SQLITE_OK, let stmt = stmt else {
-            let msg = String(cString: sqlite3_errmsg(handle))
-            throw AppError.database(.prepareFailed(msg))
+        let stmt = try preparedStatement(sql)
+        defer {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
         }
-        defer { sqlite3_finalize(stmt) }
         try bindAll(stmt, bindings)
         let step = sqlite3_step(stmt)
         if step != SQLITE_DONE && step != SQLITE_ROW {
@@ -250,13 +258,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
     private func queryNoLock<T>(_ sql: String,
                                 bind: [SQLValue],
                                 row: (Row) throws -> T) throws -> [T] {
-        var stmt: OpaquePointer?
-        let prep = sqlite3_prepare_v2(handle, sql, -1, &stmt, nil)
-        guard prep == SQLITE_OK, let stmt = stmt else {
-            let msg = String(cString: sqlite3_errmsg(handle))
-            throw AppError.database(.prepareFailed(msg))
+        let stmt = try preparedStatement(sql)
+        defer {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
         }
-        defer { sqlite3_finalize(stmt) }
         try bindAll(stmt, bind)
         var results: [T] = []
         while true {
@@ -275,13 +281,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
     private func queryOneNoLock<T>(_ sql: String,
                                    bind: [SQLValue],
                                    row: (Row) throws -> T) throws -> T? {
-        var stmt: OpaquePointer?
-        let prep = sqlite3_prepare_v2(handle, sql, -1, &stmt, nil)
-        guard prep == SQLITE_OK, let stmt = stmt else {
-            let msg = String(cString: sqlite3_errmsg(handle))
-            throw AppError.database(.prepareFailed(msg))
+        let stmt = try preparedStatement(sql)
+        defer {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
         }
-        defer { sqlite3_finalize(stmt) }
         try bindAll(stmt, bind)
         let step = sqlite3_step(stmt)
         if step == SQLITE_DONE { return nil }
@@ -291,6 +295,26 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
         let r = Row(stmt: stmt)
         return try row(r)
+    }
+
+    private func preparedStatement(_ sql: String) throws -> OpaquePointer {
+        if let stmt = statementCache[sql] {
+            let resetRc = sqlite3_reset(stmt)
+            if resetRc == SQLITE_OK {
+                sqlite3_clear_bindings(stmt)
+                return stmt
+            }
+            sqlite3_finalize(stmt)
+            statementCache.removeValue(forKey: sql)
+        }
+        var stmt: OpaquePointer?
+        let prep = sqlite3_prepare_v2(handle, sql, -1, &stmt, nil)
+        guard prep == SQLITE_OK, let stmt = stmt else {
+            let msg = String(cString: sqlite3_errmsg(handle))
+            throw AppError.database(.prepareFailed(msg))
+        }
+        statementCache[sql] = stmt
+        return stmt
     }
 
     private func bindAll(_ stmt: OpaquePointer?, _ values: [SQLValue]) throws {
@@ -385,7 +409,10 @@ public final class SQLiteDatabase: @unchecked Sendable {
         sync {
             if let h = handle {
                 _ = try? execNoLock("PRAGMA wal_checkpoint(TRUNCATE)")
+                finalizeStatementCacheNoLock()
+                sqlite3_db_release_memory(h)
                 sqlite3_close(h)
+                sqlite3_release_memory(Int32.max)
                 handle = nil
             }
         }

@@ -28,6 +28,9 @@ public final class InventoryService: Sendable {
                            openingQuantity: Double,
                            openingRatePaise: Int64,
                            gstRate: Double = 0,
+                           stockGroup: String? = nil,
+                           stockCategory: String? = nil,
+                           godown: String? = nil,
                            barcode: String? = nil,
                            hsnSac: String? = nil) throws -> InventoryItem {
         let item = InventoryItem(
@@ -38,6 +41,9 @@ public final class InventoryService: Sendable {
             openingQuantity: openingQuantity,
             openingRatePaise: openingRatePaise,
             gstRate: gstRate,
+            stockGroup: stockGroup,
+            stockCategory: stockCategory,
+            godown: godown,
             barcode: barcode,
             hsnSac: hsnSac,
             isArchived: false,
@@ -87,6 +93,9 @@ public final class InventoryService: Sendable {
                                quantity: Double,
                                ratePaise: Int64,
                                voucherId: Voucher.ID? = nil,
+                               batchNumber: String? = nil,
+                               manufactureDate: Date? = nil,
+                               expiryDate: Date? = nil,
                                notes: String? = nil) throws {
         let totalValuePaise = Int64((quantity * Double(ratePaise)).rounded())
         let onHand: Double
@@ -117,6 +126,9 @@ public final class InventoryService: Sendable {
             unitCostPaise: ratePaise,
             totalValuePaise: totalValuePaise,
             voucherId: voucherId,
+            batchNumber: batchNumber,
+            manufactureDate: manufactureDate,
+            expiryDate: expiryDate,
             reason: notes
         )
         try db.write { tx in

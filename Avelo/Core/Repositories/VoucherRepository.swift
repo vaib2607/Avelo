@@ -158,11 +158,11 @@ public struct VoucherRepository: Sendable {
     }
 
     public func hasReversal(for originalId: Voucher.ID) throws -> Bool {
-        let count: Int64? = try db.queryOne(
-            "SELECT COUNT(*) FROM avelo_vouchers WHERE reversal_of_id = ? AND is_reversal = 1",
+        let exists: Int64? = try db.queryOne(
+            "SELECT 1 FROM avelo_vouchers WHERE reversal_of_id = ? AND is_reversal = 1 LIMIT 1",
             bind: [.text(originalId.uuidString)]
         ) { $0.int(0) }
-        return (count ?? 0) > 0
+        return exists != nil
     }
 
     static let selectAllSQL: String = """

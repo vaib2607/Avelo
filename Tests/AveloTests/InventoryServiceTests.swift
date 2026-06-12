@@ -9,6 +9,38 @@ final class InventoryServiceTests: XCTestCase {
                         openingQuantity: 0, openingRatePaise: 0)
     }
 
+    func testInventoryMasterFieldsRoundTrip() throws {
+        let tc = try TestCompany.make()
+        let item = try InventoryService(db: tc.db, companyId: tc.companyId)
+            .createItem(code: "ITEM002", name: "Wheat", unit: "KG",
+                        openingQuantity: 1, openingRatePaise: 2500,
+                        stockGroup: "Grains", stockCategory: "Staples", godown: "Main",
+                        hsnSac: "1001")
+        let loaded = try XCTUnwrap(InventoryRepository(db: tc.db).findItemById(item.id))
+        XCTAssertEqual(loaded.stockGroup, "Grains")
+        XCTAssertEqual(loaded.stockCategory, "Staples")
+        XCTAssertEqual(loaded.godown, "Main")
+        XCTAssertEqual(loaded.hsnSac, "1001")
+    }
+
+    func testBatchTrackingFieldsRoundTrip() throws {
+        let tc = try TestCompany.make()
+        let item = try makeItem(tc)
+        let svc = InventoryService(db: tc.db, companyId: tc.companyId)
+        let mfg = DateFormatters.parseDate("2024-01-10")!
+        let exp = DateFormatters.parseDate("2025-01-10")!
+
+        try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
+                               type: .purchase, quantity: 10, ratePaise: 1250,
+                               batchNumber: "B-1001", manufactureDate: mfg, expiryDate: exp)
+
+        let movement = try XCTUnwrap(InventoryRepository(db: tc.db)
+            .listMovements(filter: .init(companyId: tc.companyId, itemId: item.id)).first)
+        XCTAssertEqual(movement.batchNumber, "B-1001")
+        XCTAssertEqual(movement.manufactureDate?.timeIntervalSince1970 ?? 0, mfg.timeIntervalSince1970, accuracy: 0.1)
+        XCTAssertEqual(movement.expiryDate?.timeIntervalSince1970 ?? 0, exp.timeIntervalSince1970, accuracy: 0.1)
+    }
+
     // MARK: - Fractional quantity
 
     func testFractionalQuantityRoundTrips() throws {
@@ -70,6 +102,20 @@ final class InventoryServiceTests: XCTestCase {
             }
             XCTAssertEqual(ve.code, .stockMovementQuantityZero)
         }
+    }
+
+    func testZeroValuedMovementSucceedsForFreeSample() throws {
+        let tc = try TestCompany.make()
+        let item = try makeItem(tc)
+        let svc = InventoryService(db: tc.db, companyId: tc.companyId)
+
+        XCTAssertNoThrow(
+            try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
+                                   type: .purchase, quantity: 1, ratePaise: 0, notes: "Free sample")
+        )
+        let movements = try InventoryRepository(db: tc.db)
+            .listMovements(filter: .init(companyId: tc.companyId, itemId: item.id))
+        XCTAssertEqual(movements.first?.totalValuePaise, 0)
     }
 
     // MARK: - Stock availability guard (E2 — was dead before)

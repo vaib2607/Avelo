@@ -3,6 +3,32 @@ import XCTest
 
 final class RestoreServiceTests: XCTestCase {
 
+    func testCorruptRestoreFailsWithoutRegisteringCompany() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let backupURL = root.appendingPathComponent("corrupt.avelobackup")
+        try Data("not sqlite".utf8).write(to: backupURL)
+
+        let restoreRoot = root.appendingPathComponent("restore", isDirectory: true)
+        let manager = try DatabaseManager(appSupportDirectory: restoreRoot)
+
+        do {
+            _ = try await RestoreService(manager: manager).restore(from: backupURL)
+            XCTFail("Expected corrupt restore to fail")
+        } catch {
+            let entries = try await manager.listCompanies()
+            XCTAssertTrue(entries.isEmpty)
+            let companiesDirectory = await manager.companiesDirectory
+            let restoredFiles = try FileManager.default.contentsOfDirectory(
+                at: companiesDirectory,
+                includingPropertiesForKeys: nil
+            ).filter { $0.pathExtension == "sqlite" }
+            XCTAssertTrue(restoredFiles.isEmpty)
+        }
+    }
+
     func testPrepareRestoredCompanyDatabaseRemapsCompanyAndWritesAudit() throws {
         let tc = try TestCompany.make()
         let targetCompanyId = UUID()

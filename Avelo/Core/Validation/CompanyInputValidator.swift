@@ -4,11 +4,34 @@ public struct CompanyInputValidator: Sendable {
 
     public struct Input: Sendable {
         public var name: String
+        public var addressLine1: String
+        public var addressLine2: String
+        public var city: String
+        public var state: String
+        public var pincode: String
+        public var country: String
+        public var baseCurrency: String
         public var gstin: String?
         public var pan: String?
 
-        public init(name: String, gstin: String?, pan: String?) {
+        public init(name: String,
+                    addressLine1: String = "",
+                    addressLine2: String = "",
+                    city: String = "",
+                    state: String = "",
+                    pincode: String = "",
+                    country: String = "India",
+                    baseCurrency: String = "INR",
+                    gstin: String?,
+                    pan: String?) {
             self.name = name
+            self.addressLine1 = addressLine1
+            self.addressLine2 = addressLine2
+            self.city = city
+            self.state = state
+            self.pincode = pincode
+            self.country = country
+            self.baseCurrency = baseCurrency
             self.gstin = gstin
             self.pan = pan
         }

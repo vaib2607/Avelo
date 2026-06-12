@@ -23,13 +23,24 @@ public final class AccountsViewModel {
 
     public func reload() {
         isLoading = true
-        defer { isLoading = false }
-        do {
-            let svc = AccountService(db: db, companyId: companyId)
-            accounts = try svc.listAccounts()
-            groups = try svc.listGroups()
-        } catch {
-            self.error = AppError.wrap(error)
+        let db = db
+        let companyId = companyId
+        Task.detached {
+            do {
+                let svc = AccountService(db: db, companyId: companyId)
+                let accounts = try svc.listAccounts()
+                let groups = try svc.listGroups()
+                await MainActor.run {
+                    self.accounts = accounts
+                    self.groups = groups
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.error = AppError.wrap(error)
+                    self.isLoading = false
+                }
+            }
         }
     }
 
@@ -46,9 +57,15 @@ public final class AccountsViewModel {
     }
 
     public func disable(_ id: Account.ID) {
-        do {
-            try AccountService(db: db, companyId: companyId).disableAccount(id)
-            reload()
-        } catch { self.error = AppError.wrap(error) }
+        let db = db
+        let companyId = companyId
+        Task.detached {
+            do {
+                try AccountService(db: db, companyId: companyId).disableAccount(id)
+                await self.reload()
+            } catch {
+                await MainActor.run { self.error = AppError.wrap(error) }
+            }
+        }
     }
 }

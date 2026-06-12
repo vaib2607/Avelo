@@ -21,12 +21,23 @@ public final class InventoryViewModel {
 
     public func reload() {
         isLoading = true
-        defer { isLoading = false }
-        do {
-            items = try InventoryService(db: db, companyId: companyId)
-                .listItems(includeArchived: includeArchived)
-        } catch {
-            self.error = AppError.wrap(error)
+        let db = db
+        let companyId = companyId
+        let includeArchived = includeArchived
+        Task.detached {
+            do {
+                let items = try InventoryService(db: db, companyId: companyId)
+                    .listItems(includeArchived: includeArchived)
+                await MainActor.run {
+                    self.items = items
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.error = AppError.wrap(error)
+                    self.isLoading = false
+                }
+            }
         }
     }
 
@@ -39,9 +50,15 @@ public final class InventoryViewModel {
     }
 
     public func archive(_ id: InventoryItem.ID) {
-        do {
-            try InventoryService(db: db, companyId: companyId).archiveItem(id)
-            reload()
-        } catch { self.error = AppError.wrap(error) }
+        let db = db
+        let companyId = companyId
+        Task.detached {
+            do {
+                try InventoryService(db: db, companyId: companyId).archiveItem(id)
+                await self.reload()
+            } catch {
+                await MainActor.run { self.error = AppError.wrap(error) }
+            }
+        }
     }
 }

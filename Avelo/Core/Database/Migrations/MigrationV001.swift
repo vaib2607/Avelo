@@ -118,7 +118,7 @@ public struct MigrationV001: Migration {
     CREATE TABLE avelo_voucher_types (
         id TEXT NOT NULL PRIMARY KEY,
         company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-        code TEXT NOT NULL CHECK(code IN ('journal','sales','purchase','payment','receipt','contra','creditNote','debitNote','opening','payroll')),
+        code TEXT NOT NULL CHECK(code IN ('journal','sales','purchase','purchaseOrder','salesOrder','receiptNote','deliveryNote','physicalStock','stockJournal','rejectionIn','rejectionOut','payment','receipt','contra','creditNote','debitNote','opening','payroll')),
         name TEXT NOT NULL,
         abbreviation TEXT NOT NULL,
         is_system INTEGER NOT NULL DEFAULT 0 CHECK(is_system IN (0,1)),
@@ -244,6 +244,9 @@ public struct MigrationV001: Migration {
         opening_quantity REAL NOT NULL DEFAULT 0,
         opening_rate_paise INTEGER NOT NULL DEFAULT 0,
         gst_rate REAL NOT NULL DEFAULT 0,
+        stock_group TEXT,
+        stock_category TEXT,
+        godown TEXT,
         barcode TEXT,
         hsn_sac TEXT,
         is_archived INTEGER NOT NULL DEFAULT 0 CHECK(is_archived IN (0,1)),
@@ -265,12 +268,35 @@ public struct MigrationV001: Migration {
         unit_cost_paise INTEGER NOT NULL DEFAULT 0,
         total_value_paise INTEGER NOT NULL DEFAULT 0,
         reference_voucher_number TEXT,
+        batch_number TEXT,
+        manufacture_date TEXT,
+        expiry_date TEXT,
         reason TEXT,
         created_at TEXT NOT NULL
     );
     CREATE INDEX idx_avelo_mov_item_date ON avelo_stock_movements(item_id, date);
     CREATE INDEX idx_avelo_mov_company_date ON avelo_stock_movements(company_id, date);
     CREATE INDEX idx_avelo_mov_voucher ON avelo_stock_movements(voucher_id);
+
+    CREATE TABLE avelo_boms (
+        id TEXT NOT NULL PRIMARY KEY,
+        company_id TEXT NOT NULL REFERENCES avelo_companies(id),
+        assembly_item_id TEXT NOT NULL REFERENCES avelo_inventory_items(id),
+        output_quantity REAL NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(company_id, assembly_item_id)
+    );
+
+    CREATE TABLE avelo_bom_components (
+        id TEXT NOT NULL PRIMARY KEY,
+        company_id TEXT NOT NULL REFERENCES avelo_companies(id),
+        bom_id TEXT NOT NULL REFERENCES avelo_boms(id) ON DELETE CASCADE,
+        component_item_id TEXT NOT NULL REFERENCES avelo_inventory_items(id),
+        quantity REAL NOT NULL CHECK(quantity > 0),
+        line_order INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX idx_avelo_bom_components_bom ON avelo_bom_components(bom_id, line_order);
 
     CREATE TABLE avelo_payroll_employees (
         id TEXT NOT NULL PRIMARY KEY,

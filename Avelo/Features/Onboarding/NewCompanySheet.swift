@@ -15,18 +15,26 @@ public struct NewCompanySheet: View {
             header
             Divider()
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 16) {
                     companySection
                     fySection
+                    chartSection
                     inventorySection
                 }
-                .padding(24)
+                .padding(20)
             }
             Divider()
             footer
         }
         .frame(minWidth: 600, minHeight: 540)
         .onChange(of: vm.companyName) { _, _ in vm.refreshValidity() }
+        .onChange(of: vm.addressLine1) { _, _ in vm.refreshValidity() }
+        .onChange(of: vm.addressLine2) { _, _ in vm.refreshValidity() }
+        .onChange(of: vm.city) { _, _ in vm.refreshValidity() }
+        .onChange(of: vm.state) { _, _ in vm.refreshValidity() }
+        .onChange(of: vm.pincode) { _, _ in vm.refreshValidity() }
+        .onChange(of: vm.country) { _, _ in vm.refreshValidity() }
+        .onChange(of: vm.baseCurrency) { _, _ in vm.refreshValidity() }
         .onChange(of: vm.pan) { _, _ in vm.refreshValidity() }
         .onChange(of: vm.gstin) { _, _ in vm.refreshValidity() }
         .onChange(of: vm.fyLabel) { _, _ in vm.refreshValidity() }
@@ -50,44 +58,97 @@ public struct NewCompanySheet: View {
 
     @ViewBuilder
     private var companySection: some View {
-        GroupBox("Company") {
-            Form {
-                TextField("Legal name *", text: $vm.companyName)
-                TextField("PAN (optional)", text: $vm.pan)
-                    .textCase(.uppercase)
-                TextField("GSTIN (optional)", text: $vm.gstin)
-                    .textCase(.uppercase)
-            }
-            .formStyle(.grouped)
+        card(title: "Company") {
+            inputField("Legal name *", text: $vm.companyName)
+            inputField("Address line 1", text: $vm.addressLine1)
+            inputField("Address line 2", text: $vm.addressLine2)
+            inputField("City", text: $vm.city)
+            inputField("State", text: $vm.state)
+            inputField("Pincode", text: $vm.pincode)
+            inputField("Country", text: $vm.country)
+            inputField("Base currency", text: $vm.baseCurrency)
+            inputField("PAN (optional)", text: $vm.pan)
+                .textCase(.uppercase)
+            inputField("GSTIN (optional)", text: $vm.gstin)
+                .textCase(.uppercase)
         }
     }
 
     @ViewBuilder
     private var fySection: some View {
-        GroupBox("Financial Year") {
-            Form {
-                TextField("Label *", text: $vm.fyLabel)
-                DatePicker("Start *", selection: $vm.fyStart, displayedComponents: .date)
-                DatePicker("End *", selection: $vm.fyEnd, displayedComponents: .date)
-                DatePicker("Books begin *", selection: $vm.booksBegin, displayedComponents: .date)
+        card(title: "Financial Year") {
+            inputField("Label *", text: $vm.fyLabel)
+            labeledRow("Start *") {
+                DatePicker("", selection: $vm.fyStart, displayedComponents: .date)
+                    .labelsHidden()
             }
-            .formStyle(.grouped)
+            labeledRow("End *") {
+                DatePicker("", selection: $vm.fyEnd, displayedComponents: .date)
+                    .labelsHidden()
+            }
+            labeledRow("Books begin *") {
+                DatePicker("", selection: $vm.booksBegin, displayedComponents: .date)
+                    .labelsHidden()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var chartSection: some View {
+        card(title: "Chart of Accounts") {
+            Picker("Default chart", selection: $vm.defaultChart) {
+                Text("Default").tag("Default")
+            }
         }
     }
 
     @ViewBuilder
     private var inventorySection: some View {
-        GroupBox("Inventory") {
-            Form {
-                Toggle("Enable inventory", isOn: $vm.enableInventory)
-                if vm.enableInventory {
-                    Picker("Link mode", selection: $vm.inventoryMode) {
-                        Text("Manual").tag(InventoryLinkMode.manual)
-                        Text("Auto-prompt").tag(InventoryLinkMode.autoPrompt)
-                    }
+        card(title: "Inventory") {
+            Toggle("Enable inventory", isOn: $vm.enableInventory)
+            if vm.enableInventory {
+                Picker("Link mode", selection: $vm.inventoryMode) {
+                    Text("Manual").tag(InventoryLinkMode.manual)
+                    Text("Auto-prompt").tag(InventoryLinkMode.autoPrompt)
                 }
             }
-            .formStyle(.grouped)
+        }
+    }
+
+    @ViewBuilder
+    private func card<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 10) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func labeledRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
+                .frame(width: 140, alignment: .leading)
+            content()
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func inputField(_ title: String, text: Binding<String>) -> some View {
+        labeledRow(title) {
+            TextField("", text: text)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 320)
         }
     }
 
@@ -111,7 +172,18 @@ public struct NewCompanySheet: View {
             defer { env.isBusy = false }
             do {
                 let company = try await CompanyService.create(
-                    companyInput: CompanyInputValidator.Input(name: vm.companyName, gstin: vm.gstin, pan: vm.pan),
+                    companyInput: CompanyInputValidator.Input(
+                        name: vm.companyName,
+                        addressLine1: vm.addressLine1,
+                        addressLine2: vm.addressLine2,
+                        city: vm.city,
+                        state: vm.state,
+                        pincode: vm.pincode,
+                        country: vm.country,
+                        baseCurrency: vm.baseCurrency,
+                        gstin: vm.gstin,
+                        pan: vm.pan
+                    ),
                     fyInput: FinancialYearInputValidator.Input(
                         label: vm.fyLabel, startDate: vm.fyStart, endDate: vm.fyEnd, booksBeginDate: vm.booksBegin
                     ),

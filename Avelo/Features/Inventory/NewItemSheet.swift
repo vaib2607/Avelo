@@ -8,6 +8,9 @@ public struct NewItemSheet: View {
     @State private var code: String = ""
     @State private var name: String = ""
     @State private var unit: String = "NOS"
+    @State private var stockGroup: String = ""
+    @State private var stockCategory: String = ""
+    @State private var godown: String = ""
     @State private var openingQty: String = "0.000"
     @State private var openingRate: String = "0.00"
     @State private var gstRate: String = "0"
@@ -30,6 +33,9 @@ public struct NewItemSheet: View {
                 TextField("Code *", text: $code)
                 TextField("Name *", text: $name)
                 TextField("Unit", text: $unit)
+                TextField("Stock group", text: $stockGroup)
+                TextField("Stock category", text: $stockCategory)
+                TextField("Godown", text: $godown)
                 TextField("Opening quantity", text: $openingQty)
                 MoneyTextField(label: "Opening rate (₹)", text: $openingRate)
                 TextField("GST rate (%)", text: $gstRate)
@@ -66,7 +72,11 @@ public struct NewItemSheet: View {
             _ = try InventoryService(db: ctx.database, companyId: ctx.companyId).createItem(
                 code: code, name: name, unit: unit,
                 openingQuantity: qty, openingRatePaise: rate,
-                gstRate: gst, hsnSac: hsn.isEmpty ? nil : hsn
+                gstRate: gst,
+                stockGroup: stockGroup.isEmpty ? nil : stockGroup,
+                stockCategory: stockCategory.isEmpty ? nil : stockCategory,
+                godown: godown.isEmpty ? nil : godown,
+                hsnSac: hsn.isEmpty ? nil : hsn
             )
             env.showSuccess("Item created.")
             router.presentedSheet = nil

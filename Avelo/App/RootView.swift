@@ -65,8 +65,20 @@ public struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .aveloRequestNewCompany)) { _ in
             router.present(.newCompany)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .aveloRequestOpenCompany)) { _ in
+            router.present(.openCompany)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .aveloRequestBackup)) { _ in
             router.present(.backup)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aveloRequestRestore)) { _ in
+            router.present(.restore)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aveloRequestPreferences)) { _ in
+            router.present(.preferences)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aveloRequestCloseCompany)) { _ in
+            env.closeCompany()
         }
         .sheet(item: env.presentedSheetBinding) { sheet in
             sheetView(for: sheet)
@@ -111,7 +123,10 @@ public struct RootView: View {
         case .about:                AboutSheet()
         case .preferences:          PreferencesSheet()
         case .newVoucher, .newJournal, .newPayment, .newReceipt,
-             .newContra, .newPurchase, .newSales, .newCreditNote, .newDebitNote:
+             .newContra, .newPurchase, .newSales,
+             .newPurchaseOrder, .newSalesOrder, .newReceiptNote, .newDeliveryNote,
+             .newPhysicalStock, .newStockJournal, .newRejectionIn, .newRejectionOut,
+             .newCreditNote, .newDebitNote:
             NewVoucherSheet(initialType: sheet.initialVoucherType)
         case .editVoucher(let id):  EditVoucherSheet(voucherId: id)
         case .reverseVoucher(let id): ReverseVoucherSheet(voucherId: id)
@@ -138,6 +153,14 @@ extension RouterSheet {
         case .newContra:       return .contra
         case .newPurchase:     return .purchase
         case .newSales:        return .sales
+        case .newPurchaseOrder:return .purchaseOrder
+        case .newSalesOrder:   return .salesOrder
+        case .newReceiptNote:  return .receiptNote
+        case .newDeliveryNote: return .deliveryNote
+        case .newPhysicalStock:return .physicalStock
+        case .newStockJournal: return .stockJournal
+        case .newRejectionIn:  return .rejectionIn
+        case .newRejectionOut: return .rejectionOut
         case .newCreditNote:   return .creditNote
         case .newDebitNote:    return .debitNote
         default:               return .journal

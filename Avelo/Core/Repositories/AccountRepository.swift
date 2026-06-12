@@ -32,6 +32,27 @@ public struct AccountRepository: Sendable {
         ) { try Self.rowToAccount($0) }
     }
 
+    public func findByCodes(_ codes: [String], companyId: Company.ID) throws -> [String: Account] {
+        guard !codes.isEmpty else { return [:] }
+        let placeholders = Array(repeating: "?", count: codes.count).joined(separator: ",")
+        let sql = """
+            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
+                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            FROM avelo_accounts
+            WHERE company_id = ? AND code IN (\(placeholders))
+            """
+        var bind: [SQLValue] = [.text(companyId.uuidString)]
+        for code in codes {
+            bind.append(.text(code))
+        }
+        var out: [String: Account] = [:]
+        _ = try db.query(sql, bind: bind) { row in
+            let account = try Self.rowToAccount(row)
+            out[account.code] = account
+        }
+        return out
+    }
+
     public func listForCompany(_ companyId: Company.ID) throws -> [Account] {
         try db.query(
             """

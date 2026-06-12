@@ -55,6 +55,14 @@ public enum RouterSheet: Identifiable, Sendable {
     case newContra
     case newPurchase
     case newSales
+    case newPurchaseOrder
+    case newSalesOrder
+    case newReceiptNote
+    case newDeliveryNote
+    case newPhysicalStock
+    case newStockJournal
+    case newRejectionIn
+    case newRejectionOut
     case newCreditNote
     case newDebitNote
     case editVoucher(Voucher.ID)
@@ -84,6 +92,14 @@ public enum RouterSheet: Identifiable, Sendable {
         case .newContra: return "newContra"
         case .newPurchase: return "newPurchase"
         case .newSales: return "newSales"
+        case .newPurchaseOrder: return "newPurchaseOrder"
+        case .newSalesOrder: return "newSalesOrder"
+        case .newReceiptNote: return "newReceiptNote"
+        case .newDeliveryNote: return "newDeliveryNote"
+        case .newPhysicalStock: return "newPhysicalStock"
+        case .newStockJournal: return "newStockJournal"
+        case .newRejectionIn: return "newRejectionIn"
+        case .newRejectionOut: return "newRejectionOut"
         case .newCreditNote: return "newCreditNote"
         case .newDebitNote: return "newDebitNote"
         case .editVoucher(let id): return "editVoucher-\(id.uuidString)"

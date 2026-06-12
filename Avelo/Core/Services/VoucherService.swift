@@ -31,6 +31,31 @@ public final class VoucherService: Sendable {
     }
 
     public func post(draft: VoucherDraft, in fy: FinancialYear) throws -> PostResult {
+        defer { ReportService.invalidateCache(companyId: companyId) }
+        return try postWithoutCacheInvalidation(draft: draft, in: fy)
+    }
+
+    public func postBatch(_ drafts: [VoucherDraft], in fy: FinancialYear) throws -> [PostResult] {
+        var results: [PostResult] = []
+        results.reserveCapacity(drafts.count)
+        let batchSize = 1_000
+        var index = drafts.startIndex
+        while index < drafts.endIndex {
+            let end = drafts.index(index, offsetBy: batchSize, limitedBy: drafts.endIndex) ?? drafts.endIndex
+            try db.write { _ in
+                for draft in drafts[index..<end] {
+                    try autoreleasepool {
+                        results.append(try postWithoutCacheInvalidation(draft: draft, in: fy))
+                    }
+                }
+            }
+            index = end
+        }
+        ReportService.invalidateCache(companyId: companyId)
+        return results
+    }
+
+    private func postWithoutCacheInvalidation(draft: VoucherDraft, in fy: FinancialYear) throws -> PostResult {
         let result = try validate(draft: draft, in: fy)
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
@@ -78,6 +103,7 @@ public final class VoucherService: Sendable {
         try db.write { tx in
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
+            let accountRepo = AccountRepository(db: tx)
             try vRepo.insert(voucher)
             try lRepo.insertBatch(lines)
             try AuditService(db: tx, companyId: companyId).record(
@@ -86,9 +112,7 @@ public final class VoucherService: Sendable {
                 entityId: voucher.id.uuidString,
                 snapshotAfter: VoucherAuditSnapshot(voucher: voucher, lines: lines)
             )
-            for line in lines {
-                try AccountRepository(db: tx).markUsed(line.accountId)
-            }
+            try markAccountsUsed(accountRepo, lines: lines)
         }
 
         let prompt: InventoryPromptContext? = nil
@@ -135,6 +159,7 @@ public final class VoucherService: Sendable {
         try db.write { tx in
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
+            let accountRepo = AccountRepository(db: tx)
             try vRepo.update(updated)
             try lRepo.deleteForVoucher(voucherId)
             try lRepo.insertBatch(newLines)
@@ -145,10 +170,9 @@ public final class VoucherService: Sendable {
                 snapshotBefore: VoucherAuditSnapshot(voucher: existing, lines: existingLines),
                 snapshotAfter: VoucherAuditSnapshot(voucher: updated, lines: newLines)
             )
-            for line in newLines {
-                try AccountRepository(db: tx).markUsed(line.accountId)
-            }
+            try markAccountsUsed(accountRepo, lines: newLines)
         }
+        ReportService.invalidateCache(companyId: companyId)
         return updated
     }
 
@@ -207,6 +231,7 @@ public final class VoucherService: Sendable {
         try db.write { tx in
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
+            let accountRepo = AccountRepository(db: tx)
             try vRepo.insert(reversal)
             try lRepo.insertBatch(flippedLines)
             try AuditService(db: tx, companyId: companyId).record(
@@ -217,10 +242,9 @@ public final class VoucherService: Sendable {
                 snapshotAfter: VoucherAuditSnapshot(voucher: reversal, lines: flippedLines),
                 reason: reason
             )
-            for line in flippedLines {
-                try AccountRepository(db: tx).markUsed(line.accountId)
-            }
+            try markAccountsUsed(accountRepo, lines: flippedLines)
         }
+        ReportService.invalidateCache(companyId: companyId)
         return reversal
     }
 
@@ -279,5 +303,13 @@ public final class VoucherService: Sendable {
             throw AppError.businessRule("Cannot reverse voucher because there is no open financial year available.")
         }
         return target
+    }
+
+    private func markAccountsUsed(_ accountRepo: AccountRepository, lines: [LedgerLine]) throws {
+        var seen: Set<Account.ID> = []
+        seen.reserveCapacity(lines.count)
+        for line in lines where seen.insert(line.accountId).inserted {
+            try accountRepo.markUsed(line.accountId)
+        }
     }
 }

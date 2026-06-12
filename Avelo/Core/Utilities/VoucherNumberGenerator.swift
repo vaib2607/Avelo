@@ -3,6 +3,8 @@ import Foundation
 public struct VoucherNumberGenerator: Sendable {
 
     public let db: SQLiteDatabase
+    private static let fyShortCacheLock = NSLock()
+    private static var fyShortCache: [String: String] = [:]
 
     public init(db: SQLiteDatabase) {
         self.db = db
@@ -13,7 +15,7 @@ public struct VoucherNumberGenerator: Sendable {
                      typeCode: VoucherType.Code) throws -> String {
         let prefix: String
         let padding: Int
-        let fyShort: String
+        let fyShort = try Self.shortFY(of: financialYearId, db: db)
 
         let row = try db.queryOne(
             "SELECT prefix, padding, last_number FROM avelo_voucher_sequences WHERE company_id = ? AND financial_year_id = ? AND voucher_type_code = ?",
@@ -39,7 +41,6 @@ public struct VoucherNumberGenerator: Sendable {
                     .text(typeCode.rawValue)
                 ]
             )
-            fyShort = try shortFY(of: financialYearId)
             return formatNumber(prefix: prefix, fyShort: fyShort, n: nextN, padding: padding)
         } else {
             prefix = typeCode.defaultPrefix
@@ -54,21 +55,33 @@ public struct VoucherNumberGenerator: Sendable {
                     .integer(Int64(padding))
                 ]
             )
-            fyShort = try shortFY(of: financialYearId)
             return formatNumber(prefix: prefix, fyShort: fyShort, n: 1, padding: padding)
         }
     }
 
-    private func shortFY(of fyId: FinancialYear.ID) throws -> String {
+    private static func shortFY(of fyId: FinancialYear.ID, db: SQLiteDatabase) throws -> String {
+        let key = fyId.uuidString
+        Self.fyShortCacheLock.lock()
+        if let cached = fyShortCache[key] {
+            Self.fyShortCacheLock.unlock()
+            return cached
+        }
+        Self.fyShortCacheLock.unlock()
         let label: String? = try db.queryOne(
             "SELECT label FROM avelo_financial_years WHERE id = ?",
             bind: [.text(fyId.uuidString)]
         ) { r in r.text("label") }
         guard let label else { return "0000" }
+        let short: String
         if let y = IndianFinancialYear.startYear(fromLabel: label) {
-            return String(format: "%02d-%02d", y % 100, (y + 1) % 100)
+            short = String(format: "%02d-%02d", y % 100, (y + 1) % 100)
+        } else {
+            short = label
         }
-        return label
+        Self.fyShortCacheLock.lock()
+        fyShortCache[key] = short
+        Self.fyShortCacheLock.unlock()
+        return short
     }
 
     private func formatNumber(prefix: String, fyShort: String, n: Int, padding: Int) -> String {

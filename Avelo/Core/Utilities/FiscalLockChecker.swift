@@ -31,7 +31,7 @@ public struct FiscalLockChecker: Sendable {
             "SELECT id FROM avelo_financial_years WHERE company_id = ? AND ? BETWEEN start_date AND end_date LIMIT 1",
             bind: [.text(companyId.uuidString), .text(dateStr)]
         ) { r in r.text("id") }
-        return id.flatMap { UUID(uuidString: $0) }
+        return try UUIDParsing.optional(id, field: "avelo_financial_years.id")
     }
 
     public func assertOpen(financialYearId: FinancialYear.ID) throws {

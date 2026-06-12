@@ -10,6 +10,9 @@ public struct StockMovementSheet: View {
     @State private var quantity: String = "0.000"
     @State private var rate: String = "0.00"
     @State private var date: Date = Date()
+    @State private var batchNumber: String = ""
+    @State private var manufactureDate: Date = Date()
+    @State private var expiryDate: Date = Date()
     @State private var notes: String = ""
     @State private var canSave: Bool = false
 
@@ -37,6 +40,9 @@ public struct StockMovementSheet: View {
                     }
                 }
                 DatePicker("Date", selection: $date, displayedComponents: .date)
+                TextField("Batch number", text: $batchNumber)
+                DatePicker("Manufacture date", selection: $manufactureDate, displayedComponents: .date)
+                DatePicker("Expiry date", selection: $expiryDate, displayedComponents: .date)
                 TextField("Quantity", text: $quantity)
                 MoneyTextField(label: "Rate (₹)", text: $rate)
                 TextField("Notes (optional)", text: $notes, axis: .vertical)
@@ -72,6 +78,9 @@ public struct StockMovementSheet: View {
                 itemId: itemId, date: date, type: type,
                 quantity: Double(quantity) ?? 0,
                 ratePaise: Currency.parseRupeeInput(rate) ?? 0,
+                batchNumber: batchNumber.isEmpty ? nil : batchNumber,
+                manufactureDate: batchNumber.isEmpty ? nil : manufactureDate,
+                expiryDate: batchNumber.isEmpty ? nil : expiryDate,
                 notes: notes.isEmpty ? nil : notes
             )
             env.showSuccess("Movement recorded.")

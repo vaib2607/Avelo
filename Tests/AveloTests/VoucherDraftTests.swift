@@ -41,4 +41,28 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertEqual(editDraft.mode.originalVoucherId, id)
         XCTAssertNil(VoucherDraft.Mode.create.originalVoucherId)
     }
+
+    func testBillReferenceFieldsRoundTrip() {
+        let draft = VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .sales,
+            date: Date(),
+            partyAccountId: UUID(),
+            billReferenceType: .agstRef,
+            billReferenceNumber: "REF-123",
+            narration: "Bill-wise"
+        )
+        XCTAssertEqual(draft.billReferenceType, .agstRef)
+        XCTAssertEqual(draft.billReferenceNumber, "REF-123")
+    }
+
+    @MainActor
+    func testPasteTsvParsesVoucherLines() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.pasteTSV("Cash\tDr\t100.00\nSales\tCr\t100.00")
+        XCTAssertEqual(vm.lines.count, 2)
+        XCTAssertEqual(vm.lines[0].amount, "100.00")
+        XCTAssertEqual(vm.lines[1].side, .credit)
+    }
 }

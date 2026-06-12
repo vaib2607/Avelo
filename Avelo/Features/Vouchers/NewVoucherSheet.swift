@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 public struct NewVoucherSheet: View {
 
@@ -82,6 +85,8 @@ private struct NewVoucherBody: View {
             ScrollView { mainContent }
                 .onChange(of: vm.lines) { _, _ in vm.revalidate() }
                 .onChange(of: vm.partyAccountId) { _, _ in vm.revalidate() }
+                .onChange(of: vm.billReferenceType) { _, _ in vm.revalidate() }
+                .onChange(of: vm.billReferenceNumber) { _, _ in vm.revalidate() }
                 .onChange(of: vm.narration) { _, _ in vm.revalidate() }
                 .onChange(of: vm.date) { _, _ in vm.revalidate() }
             Divider()
@@ -93,6 +98,9 @@ private struct NewVoucherBody: View {
         HStack {
             Text("New \(initialType.rawValue) Voucher").font(.title2.bold())
             Spacer()
+            Button("Paste TSV") { pasteTSV() }
+            Button("Save Template") { try? vm.saveTemplate(named: initialType.rawValue) }
+            Button("Load Template") { try? vm.loadTemplate(named: initialType.rawValue) }
             Button { router.presentedSheet = nil } label: {
                 Image(systemName: "xmark.circle.fill")
             }
@@ -118,6 +126,13 @@ private struct NewVoucherBody: View {
                 AccountPicker(selection: $vm.partyAccountId,
                               accounts: vm.accounts,
                               placeholder: "Party (optional)")
+                Picker("Bill reference type", selection: $vm.billReferenceType) {
+                    Text("None").tag(VoucherDraft.BillReferenceType?.none)
+                    ForEach(VoucherDraft.BillReferenceType.allCases) { type in
+                        Text(type.rawValue).tag(Optional(type))
+                    }
+                }
+                TextField("Bill reference number", text: $vm.billReferenceNumber)
                 TextField("Narration", text: $vm.narration, axis: .vertical)
                     .lineLimit(2...4)
             }
@@ -204,5 +219,13 @@ private struct NewVoucherBody: View {
                 .disabled(!vm.canPost)
         }
         .padding(16)
+    }
+
+    private func pasteTSV() {
+        #if canImport(AppKit)
+        if let text = NSPasteboard.general.string(forType: .string) {
+            vm.pasteTSV(text)
+        }
+        #endif
     }
 }

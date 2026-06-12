@@ -68,8 +68,15 @@ public final class CompanyService: Sendable {
 
         let company = Company(
             name: companyInput.name.trimmingCharacters(in: .whitespacesAndNewlines),
+            addressLine1: companyInput.addressLine1.isEmpty ? nil : companyInput.addressLine1,
+            addressLine2: companyInput.addressLine2.isEmpty ? nil : companyInput.addressLine2,
+            city: companyInput.city.isEmpty ? nil : companyInput.city,
+            state: companyInput.state.isEmpty ? nil : companyInput.state,
+            pincode: companyInput.pincode.isEmpty ? nil : companyInput.pincode,
+            country: companyInput.country.isEmpty ? "India" : companyInput.country,
             gstin: companyInput.gstin?.isEmpty == true ? nil : companyInput.gstin,
-            pan:   companyInput.pan?.isEmpty   == true ? nil : companyInput.pan
+            pan:   companyInput.pan?.isEmpty   == true ? nil : companyInput.pan,
+            baseCurrency: companyInput.baseCurrency.isEmpty ? "INR" : companyInput.baseCurrency
         )
         let fy = FinancialYear(
             companyId: company.id,

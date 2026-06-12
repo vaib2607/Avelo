@@ -35,6 +35,7 @@ final class CurrencyTests: XCTestCase {
     func testRupeesToPaiseRoundsToPaise() {
         // 1 paise = 0.01 rupee; sub-paise input must round to nearest paise.
         XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.014")!), 1001)
+        XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.015")!), 1002)
         XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.016")!), 1002)
     }
 

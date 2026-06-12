@@ -3,7 +3,7 @@
 
 SRC_DIR := .
 
-.PHONY: all build bundle validate-bundle launch-smoke bundle-selftest rc-local test net-check rule-audit board todo count help
+.PHONY: all build bundle validate-bundle launch-smoke bundle-selftest benchmark benchmark-million rc-local test net-check rule-audit board todo count help
 
 all: net-check build test
 
@@ -23,6 +23,12 @@ launch-smoke:
 
 bundle-selftest:
 	./Scripts/bundle_selftest.sh
+
+benchmark:
+	./Scripts/benchmark.sh
+
+benchmark-million:
+	./Scripts/benchmark.sh million
 
 rc-local: rule-audit test
 	swift build -c release

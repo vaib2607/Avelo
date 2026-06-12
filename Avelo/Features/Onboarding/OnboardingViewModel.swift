@@ -7,6 +7,13 @@ import Observation
 public final class OnboardingViewModel {
 
     public var companyName: String = ""
+    public var addressLine1: String = ""
+    public var addressLine2: String = ""
+    public var city: String = ""
+    public var state: String = ""
+    public var pincode: String = ""
+    public var country: String = "India"
+    public var baseCurrency: String = "INR"
     public var pan: String = ""
     public var gstin: String = ""
     public var fyLabel: String = ""
@@ -15,6 +22,7 @@ public final class OnboardingViewModel {
     public var booksBegin: Date = IndianFinancialYear.start(for: Date())
     public var enableInventory: Bool = false
     public var inventoryMode: InventoryLinkMode = .autoPrompt
+    public var defaultChart: String = "Default"
     public var canCreate: Bool = false
 
     public init() {
@@ -26,7 +34,18 @@ public final class OnboardingViewModel {
     }
 
     public func refreshValidity() {
-        let company = CompanyInputValidator.Input(name: companyName, gstin: gstin, pan: pan)
+        let company = CompanyInputValidator.Input(
+            name: companyName,
+            addressLine1: addressLine1,
+            addressLine2: addressLine2,
+            city: city,
+            state: state,
+            pincode: pincode,
+            country: country,
+            baseCurrency: baseCurrency,
+            gstin: gstin,
+            pan: pan
+        )
         let fy = FinancialYearInputValidator.Input(
             label: fyLabel, startDate: fyStart, endDate: fyEnd, booksBeginDate: booksBegin
         )
