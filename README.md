@@ -16,7 +16,6 @@ Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no ne
 ## Release Focus
 
 - `v1.1` hardens the core engine for speed, accuracy, and reliability.
-- Release ID: `019ebdbd-6540-7fb3-ac41-9f4fcd59c0f2`
 - Benchmark validation now covers cold launch, company switching, voucher posting, reports, backup/restore, and 500k-voucher stress runs on the same machine and dataset.
 - Paise-exact accounting remains the priority: no drift, deterministic rounding, and reconciliation checks on the core report paths.
 
@@ -46,7 +45,6 @@ Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no ne
 
 ### Why It Is Better
 
-- The README now matches the actual product surface, so contributors can scan the current scope without hunting through docs.
 - The app covers more of the offline accounting workflow without needing network features.
 - Data entry is faster and more Tally-like for recurring vouchers and stock operations.
 - The current benchmark proof shows the 500k stress path improving throughput and report latency while staying inside the cleanup target.
