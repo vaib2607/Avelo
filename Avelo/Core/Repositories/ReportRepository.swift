@@ -199,6 +199,8 @@ public struct ReportRepository: Sendable {
             ))
             totalDr += netDebit
             totalCr += netCredit
+            assert(totalDr <= Int64.max / 2)
+            assert(totalCr <= Int64.max / 2)
         }
         return ReportResult.TrialBalance(
             asOfDate: asOfDate,
@@ -226,6 +228,8 @@ public struct ReportRepository: Sendable {
 
         let ti = directIncome.totalPaise + indirectIncome.totalPaise
         let te = directExpense.totalPaise + indirectExpense.totalPaise
+        assert(ti <= Int64.max / 2)
+        assert(te <= Int64.max / 2)
         return ReportResult.ProfitLoss(
             fromDate: fromDate, toDate: toDate,
             directIncome: directIncome,
@@ -294,6 +298,7 @@ public struct ReportRepository: Sendable {
                 absNet = 0
             }
             sectionTotal += absNet
+            assert(sectionTotal <= Int64.max / 2)
             rows.append(ReportResult.TrialBalanceRow(
                 id: id, accountCode: code, accountName: name, groupPath: gcode,
                 debitPaise: 0, creditPaise: 0
@@ -329,6 +334,8 @@ public struct ReportRepository: Sendable {
         let liabSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .liabilities, rootCodes: liabilityCodes, groupById: groupById)
         let totalAssets = assetSections.reduce(0) { $0 + $1.totalPaise }
         let totalLiab = liabSections.reduce(0) { $0 + $1.totalPaise }
+        assert(totalAssets <= Int64.max / 2)
+        assert(totalLiab <= Int64.max / 2)
         let equity = totalAssets - totalLiab
         return ReportResult.BalanceSheet(
             asOfDate: asOfDate,
@@ -398,6 +405,7 @@ public struct ReportRepository: Sendable {
             )
             byGname[gname, default: []].append(row)
             totals[gname, default: 0] += net
+            assert(totals[gname, default: 0] <= Int64.max / 2)
         }
         return byGname.keys.sorted().map { gname in
             ReportResult.BalanceSheetSection(id: gname, title: gname, rows: byGname[gname] ?? [], totalPaise: totals[gname] ?? 0)
@@ -439,10 +447,12 @@ public struct ReportRepository: Sendable {
             } else {
                 netAmt = (cr + acct.openingBalancePaise) - dr
             }
+            assert(netAmt <= Int64.max / 2)
             let label = "\(c.accountCode.replacingOccurrences(of: "_", with: " "))"
             let bucket = ReportResult.GstBucket(id: label, label: label, amountPaise: netAmt)
             if c.sign > 0 { output.append(bucket) } else { input.append(bucket) }
             net += netAmt * Int64(c.sign)
+            assert(net <= Int64.max / 2)
         }
         return ReportResult.GstSummary(
             fromDate: fromDate, toDate: toDate,
@@ -466,7 +476,7 @@ public struct ReportRepository: Sendable {
             let half = total / 2
             return ReportResult.DayBookRow(
                 id: try UUIDParsing.required(r.text("id"), field: "report.day_book.voucher_id"),
-                timestamp: r.timestamp("created_at"),
+                timestamp: try r.timestamp("created_at"),
                 voucherNumber: r.text("number"),
                 voucherTypeCode: VoucherType.Code(rawValue: r.text("voucher_type_code")) ?? .journal,
                 partyName: r.optionalText("party_name") ?? "",
@@ -614,7 +624,9 @@ public struct ReportRepository: Sendable {
                 ageInDays: maxAge
             ))
         }
-        return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: rows, direction: direction, totalPaise: rows.reduce(0) { $0 + $1.amountPaise })
+        let total = rows.reduce(0) { $0 + $1.amountPaise }
+        assert(total <= Int64.max / 2)
+        return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: rows, direction: direction, totalPaise: total)
     }
 
     // MARK: - Stock Valuation

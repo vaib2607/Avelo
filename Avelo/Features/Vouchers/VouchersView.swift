@@ -20,6 +20,10 @@ public struct VouchersView: View {
         return "\(company)-\(env.dataRevision)"
     }
 
+    static func filterDateFallback(_ date: Date?) -> Date {
+        date ?? Date()
+    }
+
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem {
@@ -127,7 +131,7 @@ private struct VouchersBody: View {
                 TableColumn("Type", value: \.voucherTypeCode.rawValue)
                 TableColumn("Party") { v in
                     if let pid = v.partyAccountId {
-                        Text(vm.accountName(pid))
+                        Text(vm.accountName(pid).capitalized)
                     } else { Text("—").foregroundStyle(.secondary) }
                 }
                 TableColumn("Narration") { v in
@@ -178,11 +182,11 @@ private struct VouchersBody: View {
                         }
                         Divider()
                         DatePicker("From", selection: Binding(
-                            get: { vm.fromDate ?? Date.distantPast },
+                            get: { VouchersView.filterDateFallback(vm.fromDate) },
                             set: { vm.fromDate = $0 }
                         ), displayedComponents: .date)
                         DatePicker("To", selection: Binding(
-                            get: { vm.toDate ?? Date.distantFuture },
+                            get: { VouchersView.filterDateFallback(vm.toDate) },
                             set: { vm.toDate = $0 }
                         ), displayedComponents: .date)
                         Button("Clear dates") {

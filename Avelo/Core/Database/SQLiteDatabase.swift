@@ -25,9 +25,12 @@ public enum SQLValue: Sendable {
 final class PreparedStatementBox: @unchecked Sendable {
     let stmt: OpaquePointer
     var columnIndexCache: [String: Int32] = [:]
+    var lastUsedAt: Int = 0
+    let isTransient: Bool
 
-    init(stmt: OpaquePointer) {
+    init(stmt: OpaquePointer, isTransient: Bool = false) {
         self.stmt = stmt
+        self.isTransient = isTransient
     }
 }
 
@@ -100,28 +103,36 @@ public struct Row {
         return DateFormatters.parseDate(s) ?? Date(timeIntervalSince1970: 0)
     }
 
-    public func timestamp(_ name: String) -> Date {
+    public func timestamp(_ name: String) throws -> Date {
         let s = text(name)
-        return DateFormatters.parseTimestamp(s) ?? Date(timeIntervalSince1970: 0)
+        guard let date = DateFormatters.parseTimestamp(s) else {
+            throw AppError.database(.rowReadFailed("invalid timestamp value for column \(name)"))
+        }
+        return date
     }
 
-    public func timestamp(_ i: Int32) -> Date {
+    public func timestamp(_ i: Int32) throws -> Date {
         let s = text(i)
-        return DateFormatters.parseTimestamp(s) ?? Date(timeIntervalSince1970: 0)
+        guard let date = DateFormatters.parseTimestamp(s) else {
+            throw AppError.database(.rowReadFailed("invalid timestamp value at column \(i)"))
+        }
+        return date
     }
 
     public func optionalDate(_ name: String) -> Date? {
         let i = index(of: name)
         guard i >= 0, let box else { return nil }
         if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
-        let s = String(cString: sqlite3_column_text(box.stmt, i))
+        guard let cStr = sqlite3_column_text(box.stmt, i) else { return nil }
+        let s = String(cString: cStr)
         return DateFormatters.parseDate(s)
     }
 
     public func optionalDate(_ i: Int32) -> Date? {
         guard i >= 0, let box else { return nil }
         if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
-        let s = String(cString: sqlite3_column_text(box.stmt, i))
+        guard let cStr = sqlite3_column_text(box.stmt, i) else { return nil }
+        let s = String(cString: cStr)
         return DateFormatters.parseDate(s)
     }
 
@@ -169,7 +180,10 @@ public final class SQLiteDatabase: @unchecked Sendable {
     private var handle: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var inTransactionDepth: Int = 0
+    private var inReadTransactionDepth: Int = 0
     private var statementCache: [String: PreparedStatementBox] = [:]
+    private var statementUseCounter: Int = 0
+    private let maxCachedStatements = 256
 
     public init(path: String, readonly: Bool = false) throws {
         self.path = path
@@ -232,6 +246,34 @@ public final class SQLiteDatabase: @unchecked Sendable {
         try sync { try execWithBindingsNoLock(sql, bindings) }
     }
 
+    public func read<T>(_ block: (SQLiteDatabase) throws -> T) throws -> T {
+        try sync {
+            if inReadTransactionDepth == 0 {
+                try execNoLock("BEGIN DEFERRED")
+            }
+            inReadTransactionDepth += 1
+            do {
+                let result = try block(self)
+                inReadTransactionDepth -= 1
+                if inReadTransactionDepth == 0 {
+                    try execNoLock("COMMIT")
+                }
+                return result
+            } catch {
+                inReadTransactionDepth -= 1
+                if inReadTransactionDepth == 0 {
+                    do {
+                        try execNoLock("ROLLBACK")
+                    } catch {
+                        AveloDBLogger.error("rollback failed after read transaction error")
+                    }
+                    inReadTransactionDepth = 0
+                }
+                throw error
+            }
+        }
+    }
+
     private func execNoLock(_ sql: String) throws {
         guard let handle = handle else {
             throw AppError.database(.openFailed("null handle"))
@@ -247,10 +289,14 @@ public final class SQLiteDatabase: @unchecked Sendable {
     }
 
     private func execWithBindingsNoLock(_ sql: String, _ bindings: [SQLValue]) throws {
-        let stmt = try preparedStatement(sql)
+        let box = try preparedStatement(sql)
+        let stmt = box.stmt
         defer {
             sqlite3_reset(stmt)
             sqlite3_clear_bindings(stmt)
+            if box.isTransient {
+                sqlite3_finalize(stmt)
+            }
         }
         try bindAll(stmt, bindings)
         let step = sqlite3_step(stmt)
@@ -276,10 +322,14 @@ public final class SQLiteDatabase: @unchecked Sendable {
     private func queryNoLock<T>(_ sql: String,
                                 bind: [SQLValue],
                                 row: (Row) throws -> T) throws -> [T] {
-        let stmt = try preparedStatement(sql)
+        let box = try preparedStatement(sql)
+        let stmt = box.stmt
         defer {
             sqlite3_reset(stmt)
             sqlite3_clear_bindings(stmt)
+            if box.isTransient {
+                sqlite3_finalize(stmt)
+            }
         }
         try bindAll(stmt, bind)
         var results: [T] = []
@@ -290,7 +340,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
                 let msg = String(cString: sqlite3_errmsg(handle))
                 throw AppError.database(.stepFailed(msg))
             }
-            let r = Row(box: statementCache[sql])
+            let r = Row(box: box)
             results.append(try row(r))
         }
         return results
@@ -299,10 +349,14 @@ public final class SQLiteDatabase: @unchecked Sendable {
     private func queryOneNoLock<T>(_ sql: String,
                                    bind: [SQLValue],
                                    row: (Row) throws -> T) throws -> T? {
-        let stmt = try preparedStatement(sql)
+        let box = try preparedStatement(sql)
+        let stmt = box.stmt
         defer {
             sqlite3_reset(stmt)
             sqlite3_clear_bindings(stmt)
+            if box.isTransient {
+                sqlite3_finalize(stmt)
+            }
         }
         try bindAll(stmt, bind)
         let step = sqlite3_step(stmt)
@@ -311,20 +365,37 @@ public final class SQLiteDatabase: @unchecked Sendable {
             let msg = String(cString: sqlite3_errmsg(handle))
             throw AppError.database(.stepFailed(msg))
         }
-        let r = Row(box: statementCache[sql])
+        let r = Row(box: box)
         return try row(r)
     }
 
-    private func preparedStatement(_ sql: String) throws -> OpaquePointer {
+    private func preparedStatement(_ sql: String) throws -> PreparedStatementBox {
         if let box = statementCache[sql] {
-            let resetRc = sqlite3_reset(box.stmt)
-            if resetRc == SQLITE_OK {
+            if sqlite3_stmt_busy(box.stmt) == 0 {
                 sqlite3_clear_bindings(box.stmt)
-                return box.stmt
+                touchCachedStatement(sql, box: box)
+                return box
             }
-            sqlite3_finalize(box.stmt)
-            statementCache.removeValue(forKey: sql)
+            // The cached statement is still active in a recursive read path.
+            // Prepare a one-off statement so the outer cursor is not disturbed.
+            return try prepareTransientStatement(sql)
         }
+        return try prepareAndCacheStatement(sql)
+    }
+
+    private func prepareAndCacheStatement(_ sql: String) throws -> PreparedStatementBox {
+        let box = try prepareStatementBox(sql)
+        touchCachedStatement(sql, box: box)
+        statementCache[sql] = box
+        evictIfNeededNoLock()
+        return box
+    }
+
+    private func prepareTransientStatement(_ sql: String) throws -> PreparedStatementBox {
+        try prepareStatementBox(sql, transient: true)
+    }
+
+    private func prepareStatementBox(_ sql: String, transient: Bool = false) throws -> PreparedStatementBox {
         var stmt: OpaquePointer?
         let prep = sqlite3_prepare_v2(handle, sql, -1, &stmt, nil)
         guard prep == SQLITE_OK, let stmt = stmt else {
@@ -332,8 +403,24 @@ public final class SQLiteDatabase: @unchecked Sendable {
             AveloDBLogger.error("prepare failed: \(msg, privacy: .public)")
             throw AppError.database(.prepareFailed(msg))
         }
-        statementCache[sql] = PreparedStatementBox(stmt: stmt)
-        return stmt
+        return PreparedStatementBox(stmt: stmt, isTransient: transient)
+    }
+
+    private func touchCachedStatement(_ sql: String, box: PreparedStatementBox) {
+        statementUseCounter &+= 1
+        box.lastUsedAt = statementUseCounter
+    }
+
+    private func evictIfNeededNoLock() {
+        guard statementCache.count > maxCachedStatements else { return }
+        if let victim = statementCache.min(by: { $0.value.lastUsedAt < $1.value.lastUsedAt }) {
+            sqlite3_finalize(victim.value.stmt)
+            statementCache.removeValue(forKey: victim.key)
+        }
+    }
+
+    internal var debugStatementCacheCount: Int {
+        sync { statementCache.count }
     }
 
     private func bindAll(_ stmt: OpaquePointer?, _ values: [SQLValue]) throws {
@@ -386,6 +473,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
                     } catch {
                         AveloDBLogger.error("rollback failed after transaction error")
                     }
+                    inTransactionDepth = 0
                 }
                 throw error
             }

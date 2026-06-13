@@ -62,6 +62,28 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.2, 25)
     }
 
+    func testPostBatchRollsBackAllBatchesOnLaterFailure() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let drafts: [VoucherDraft] = [
+            tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1000, .debit),
+                tc.line(tc.salesId, 1000, .credit)
+            ]),
+            tc.draft(on: "2024-06-02", lines: [
+                tc.line(tc.cashId, 1000, .debit),
+                tc.line(tc.salesId, 900, .credit)
+            ])
+        ]
+
+        XCTAssertThrowsError(try svc.postBatch(drafts, in: tc.fy))
+
+        let voucherCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_vouchers") { $0.int(0) } ?? 0
+        let lineCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_ledger_lines") { $0.int(0) } ?? 0
+        XCTAssertEqual(voucherCount, 0)
+        XCTAssertEqual(lineCount, 0)
+    }
+
     func testUnbalancedPostThrows() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -151,7 +173,7 @@ final class VoucherServiceTests: XCTestCase {
             bind: [.text(posted.id.uuidString)]
         ) { ($0.text("cheque_number"), $0.text("status")) }
         XCTAssertEqual(cheque?.0, "CHQ-123")
-        XCTAssertEqual(cheque?.1, ChequeStatus.deposited.rawValue)
+        XCTAssertEqual(cheque?.1, ChequeStatus.issued.rawValue)
 
         let tds = try tc.db.queryOne(
             "SELECT section_code, tax_paise FROM avelo_tds_records WHERE voucher_id = ?",
@@ -166,6 +188,52 @@ final class VoucherServiceTests: XCTestCase {
         ) { ($0.text("section_code"), $0.int("tax_paise")) }
         XCTAssertEqual(tcs?.0, "206C")
         XCTAssertEqual(tcs?.1, 3000)
+    }
+
+    func testPostWithWorkflowRollsBackVoucherWhenWorkflowInsertFails() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        try tc.db.execute(
+            """
+            CREATE TRIGGER trg_bill_allocations_fail
+            BEFORE INSERT ON avelo_bill_allocations
+            BEGIN
+                SELECT RAISE(ABORT, 'forced workflow failure');
+            END;
+            """
+        )
+
+        XCTAssertThrowsError(try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.salesId,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-77",
+                narration: "Workflow rollback test",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 118000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 100000, side: .credit),
+                    .init(accountId: tc.rentId, amountPaise: 18000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                billAllocationKind: .newRef,
+                billAllocationNumber: "INV-77",
+                chequeNumber: "CHQ-123",
+                chequeDueDate: DateFormatters.parseDate("2024-06-15")!,
+                tdsSectionCode: "194C",
+                tdsTaxPaise: 5000
+            )
+        ))
+
+        let voucherCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_vouchers") { $0.int(0) } ?? 0
+        let allocationCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_bill_allocations") { $0.int(0) } ?? 0
+        XCTAssertEqual(voucherCount, 0)
+        XCTAssertEqual(allocationCount, 0)
     }
 
     func testEditInLockedFinancialYearThrows() throws {
@@ -187,6 +255,46 @@ final class VoucherServiceTests: XCTestCase {
             }
             XCTAssertEqual(validation.code, .voucherFYLocked)
         }
+    }
+
+    func testValidateAccumulatesAllInactiveAccountErrors() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let accountService = AccountService(db: tc.db, companyId: tc.companyId)
+        let extraGroup = try accountService.createGroup(code: "EXT", name: "Extra", nature: .assets)
+        let a1 = try accountService.createAccount(.init(code: "X1", name: "X1", groupId: extraGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
+        let a2 = try accountService.createAccount(.init(code: "X2", name: "X2", groupId: extraGroup.id, openingBalancePaise: 0, openingBalanceSide: .credit, gstin: nil, existingAccountId: nil))
+        try accountService.disableAccount(a1.id)
+        try accountService.disableAccount(a2.id)
+
+        let draft = tc.draft(on: "2024-06-01", lines: [
+            tc.line(a1.id, 1000, .debit),
+            tc.line(a2.id, 1000, .credit)
+        ])
+        let result = try svc.validate(draft: draft, in: tc.fy)
+        guard case .invalid(let errors) = result else {
+            return XCTFail("Expected invalid result")
+        }
+        XCTAssertEqual(errors.filter { $0.code == .voucherAccountInactive }.count, 2)
+    }
+
+    func testHistoricalEditAllowsNewlyDeactivatedAccountsWhenLinesUnchanged() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let accountService = AccountService(db: tc.db, companyId: tc.companyId)
+        let posted = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy)
+
+        try accountService.disableAccount(tc.cashId)
+        try accountService.disableAccount(tc.salesId)
+
+        let edited = tc.draft(on: "2024-06-01", narration: "Narration tweak", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ])
+        XCTAssertNoThrow(try svc.edit(posted.voucher.id, with: edited, in: tc.fy))
     }
 
     func testPostInLockedFinancialYearThrows() throws {
@@ -227,6 +335,24 @@ final class VoucherServiceTests: XCTestCase {
         let reversal = try svc.reverse(posted.voucher.id, reason: "lock correction")
         XCTAssertEqual(reversal.financialYearId, nextFY.id)
         XCTAssertEqual(reversal.reversalOfId, posted.voucher.id)
+    }
+
+    func testReverseRejectsDisabledAccountsThroughValidation() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy)
+
+        try AccountService(db: tc.db, companyId: tc.companyId).disableAccount(tc.salesId)
+
+        XCTAssertThrowsError(try svc.reverse(posted.voucher.id, reason: "disabled account")) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected validation error, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .voucherAccountInactive)
+        }
     }
 
     func testVoucherCannotBeReversedTwice() throws {
@@ -381,6 +507,73 @@ final class VoucherServiceTests: XCTestCase {
             filter: .init(companyId: tc.companyId, action: .voucherEdited)
         ).count
         XCTAssertEqual(editAuditCount, 0)
+    }
+
+    func testVoucherEditRecomputesWorkflowRowsWhenTotalsChange() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.salesId,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-77",
+                narration: "Workflow edit test",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 118000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 100000, side: .credit),
+                    .init(accountId: tc.rentId, amountPaise: 18000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                billAllocationKind: .newRef,
+                billAllocationNumber: "INV-77",
+                chequeNumber: "CHQ-123",
+                chequeDueDate: DateFormatters.parseDate("2024-06-15")!,
+                tdsSectionCode: "194C",
+                tdsTaxPaise: 5000,
+                tcsSectionCode: "206C",
+                tcsTaxPaise: 3000
+            )
+        ).voucher
+
+        let edited = VoucherDraft(
+            mode: .edit(originalVoucherId: posted.id),
+            voucherTypeCode: .sales,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: tc.salesId,
+            billReferenceType: .newRef,
+            billReferenceNumber: "INV-77",
+            narration: "Workflow edit test",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 128000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 110000, side: .credit),
+                .init(accountId: tc.rentId, amountPaise: 18000, side: .credit)
+            ]
+        )
+
+        _ = try svc.edit(posted.id, with: edited, in: tc.fy)
+
+        let allocation = try tc.db.queryOne(
+            "SELECT allocated_paise FROM avelo_bill_allocations WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { $0.int(0) }
+        XCTAssertEqual(allocation, 128000)
+
+        let tds = try tc.db.queryOne(
+            "SELECT base_paise FROM avelo_tds_records WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { $0.int(0) }
+        XCTAssertEqual(tds, 128000)
+
+        let tcs = try tc.db.queryOne(
+            "SELECT base_paise FROM avelo_tcs_records WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { $0.int(0) }
+        XCTAssertEqual(tcs, 128000)
     }
 
     func testVoucherReverseRollsBackIfAccountUsageUpdateFails() throws {

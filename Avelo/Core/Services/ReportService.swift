@@ -35,9 +35,10 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId, fromDate: fromDate, toDate: toDate, accountId: accountId)
         let key = ReportCache.Key(companyId: companyId, reportType: "ledger", financialYearId: financialYearId, fromDate: fromDate, toDate: toDate, accountId: accountId)
         if let cached: ReportResult.LedgerReport = try Self.cache.value(for: key, db: db) { return cached }
+        let voucherCount = try Self.cache.voucherCount(db: db, companyId: companyId)
         let report = try repository.ledgerReport(filter: f, accountId: accountId)
         try ReconciliationCheck.verifyLedger(report, db: db, companyId: companyId, accountId: accountId, fromDate: fromDate, toDate: toDate)
-        try Self.cache.store(report, for: key, db: db)
+        try Self.cache.store(report, for: key, voucherCount: voucherCount)
         return report
     }
 
@@ -45,10 +46,13 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "trial_balance", financialYearId: financialYearId, toDate: asOfDate)
         if let cached: ReportResult.TrialBalance = try Self.cache.value(for: key, db: db) { return cached }
+        let voucherCount = try Self.cache.voucherCount(db: db, companyId: companyId)
         let report = try repository.trialBalance(asOfDate: asOfDate, filter: f)
         try ReconciliationCheck.verifyTrialBalance(report)
-        try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, toDate: asOfDate)
-        try Self.cache.store(report, for: key, db: db)
+        let startDate = try financialYearId.flatMap { try FinancialYearRepository(db: db).findById($0)?.startDate }
+            ?? (try FinancialYearRepository(db: db).findMostRecent(companyId)?.startDate)
+        try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, fromDate: startDate, toDate: asOfDate)
+        try Self.cache.store(report, for: key, voucherCount: voucherCount)
         return report
     }
 
@@ -56,9 +60,10 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "profit_loss", financialYearId: financialYearId, fromDate: fromDate, toDate: toDate)
         if let cached: ReportResult.ProfitLoss = try Self.cache.value(for: key, db: db) { return cached }
+        let voucherCount = try Self.cache.voucherCount(db: db, companyId: companyId)
         let report = try repository.profitAndLoss(fromDate: fromDate, toDate: toDate, filter: f)
         try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, fromDate: fromDate, toDate: toDate)
-        try Self.cache.store(report, for: key, db: db)
+        try Self.cache.store(report, for: key, voucherCount: voucherCount)
         return report
     }
 
@@ -66,9 +71,10 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "balance_sheet", financialYearId: financialYearId, toDate: asOfDate)
         if let cached: ReportResult.BalanceSheet = try Self.cache.value(for: key, db: db) { return cached }
+        let voucherCount = try Self.cache.voucherCount(db: db, companyId: companyId)
         let report = try repository.balanceSheet(asOfDate: asOfDate, filter: f)
         try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, toDate: asOfDate)
-        try Self.cache.store(report, for: key, db: db)
+        try Self.cache.store(report, for: key, voucherCount: voucherCount)
         return report
     }
 
@@ -110,10 +116,13 @@ private final class ReportCache: @unchecked Sendable {
     private struct Entry {
         let voucherCount: Int64
         let value: Any
+        var lastUsedAt: Int
     }
 
     private let lock = NSLock()
     private var entries: [Key: Entry] = [:]
+    private var useCounter: Int = 0
+    private let maxEntries = 128
 
     func value<T>(for key: Key, db: SQLiteDatabase) throws -> T? {
         let count = try voucherCount(db: db, companyId: key.companyId)
@@ -123,13 +132,16 @@ private final class ReportCache: @unchecked Sendable {
             entries.removeValue(forKey: key)
             return nil
         }
+        useCounter &+= 1
+        entries[key]?.lastUsedAt = useCounter
         return entry.value as? T
     }
 
-    func store<T>(_ value: T, for key: Key, db: SQLiteDatabase) throws {
-        let count = try voucherCount(db: db, companyId: key.companyId)
+    func store<T>(_ value: T, for key: Key, voucherCount count: Int64) throws {
         lock.lock()
-        entries[key] = Entry(voucherCount: count, value: value)
+        useCounter &+= 1
+        entries[key] = Entry(voucherCount: count, value: value, lastUsedAt: useCounter)
+        evictIfNeeded()
         lock.unlock()
     }
 
@@ -139,11 +151,16 @@ private final class ReportCache: @unchecked Sendable {
         lock.unlock()
     }
 
-    private func voucherCount(db: SQLiteDatabase, companyId: Company.ID) throws -> Int64 {
+    func voucherCount(db: SQLiteDatabase, companyId: Company.ID) throws -> Int64 {
         try db.queryOne(
             "SELECT COUNT(*) AS c FROM avelo_vouchers WHERE company_id = ? AND is_posted = 1",
             bind: [.text(companyId.uuidString)]
         ) { $0.int("c") } ?? 0
+    }
+
+    private func evictIfNeeded() {
+        guard entries.count > maxEntries, let victim = entries.min(by: { $0.value.lastUsedAt < $1.value.lastUsedAt }) else { return }
+        entries.removeValue(forKey: victim.key)
     }
 }
 
@@ -193,6 +210,10 @@ public enum ReconciliationCheck {
             bind.append(.date(toDate))
         }
         let row = try db.queryOne(sql, bind: bind) { ($0.int("dr"), $0.int("cr")) }
+        if let row {
+            assert(row.0 <= Int64.max / 2)
+            assert(row.1 <= Int64.max / 2)
+        }
         guard row?.0 == row?.1 else {
             throw AppError.database(.schemaMismatch("Posted vouchers do not reconcile to paise."))
         }

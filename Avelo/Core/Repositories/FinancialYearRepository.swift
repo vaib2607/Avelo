@@ -24,7 +24,7 @@ public struct FinancialYearRepository: Sendable {
 
     public func findOpenForCompany(_ companyId: Company.ID) throws -> [FinancialYear] {
         try db.query(
-            "SELECT id, company_id, label, start_date, end_date, books_begin_date, is_locked, is_closed, created_at FROM avelo_financial_years WHERE company_id = ? AND is_locked = 0 ORDER BY start_date ASC",
+            "SELECT id, company_id, label, start_date, end_date, books_begin_date, is_locked, is_closed, created_at FROM avelo_financial_years WHERE company_id = ? AND is_locked = 0 AND COALESCE(is_closed, 0) = 0 ORDER BY start_date ASC",
             bind: [.text(companyId.uuidString)]
         ) { try Self.rowToFinancialYear($0) }
     }
@@ -86,7 +86,7 @@ public struct FinancialYearRepository: Sendable {
             booksBeginDate: r.date("books_begin_date"),
             isLocked: r.bool("is_locked"),
             isClosed: r.bool("is_closed"),
-            createdAt: r.timestamp("created_at")
+            createdAt: try r.timestamp("created_at")
         )
     }
 }

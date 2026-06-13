@@ -163,7 +163,7 @@ private struct ReportsBody: View {
                 Picker("Account", selection: $vm.ledgerAccountId) {
                     Text("Select…").tag(Account.ID?.none)
                     ForEach(vm.accounts) { a in
-                        Text("\(a.code) — \(a.name)").tag(Optional(a.id))
+                        Text("\(a.code) — \(a.name.capitalized)").tag(Optional(a.id))
                     }
                 }
                 .frame(minWidth: 280)
@@ -171,7 +171,7 @@ private struct ReportsBody: View {
                 Picker("Account", selection: $vm.cashBankAccountId) {
                     Text("Select…").tag(Account.ID?.none)
                     ForEach(vm.accounts.filter { $0.code.uppercased().contains("CASH") || $0.code.uppercased().contains("BANK") }) { a in
-                        Text("\(a.code) — \(a.name)").tag(Optional(a.id))
+                        Text("\(a.code) — \(a.name.capitalized)").tag(Optional(a.id))
                     }
                 }
                 .frame(minWidth: 280)
@@ -441,7 +441,7 @@ private struct ReportsBody: View {
     private var ledgerSection: some View {
         if let l = vm.ledger {
             VStack(alignment: .leading, spacing: 8) {
-                Text(l.accountName).font(.headline)
+                        Text(l.accountName.capitalized).font(.headline)
                 Table(l.entries) {
                     TableColumn("Date") { e in
                         Text(DateFormatters.userDate.string(from: e.date))
@@ -572,7 +572,7 @@ private struct ReportsBody: View {
                 Text(title).font(.headline)
                 Table(o.rows) {
                     TableColumn("Account") { r in
-                        Button(r.partyName) { openLedger(r.id) }
+                        Button(r.partyName.capitalized) { openLedger(r.id) }
                             .buttonStyle(.plain)
                     }
                     TableColumn("Amount (₹)") { r in

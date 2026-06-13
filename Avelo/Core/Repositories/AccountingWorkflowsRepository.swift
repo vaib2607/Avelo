@@ -4,6 +4,58 @@ public struct AccountingWorkflowsRepository: Sendable {
     public let db: SQLiteDatabase
     public init(db: SQLiteDatabase) { self.db = db }
 
+    public func deleteForVoucher(_ voucherId: Voucher.ID) throws {
+        try db.execute(
+            "DELETE FROM avelo_bill_allocations WHERE voucher_id = ?",
+            [.text(voucherId.uuidString)]
+        )
+        try db.execute(
+            "DELETE FROM avelo_cheques WHERE voucher_id = ?",
+            [.text(voucherId.uuidString)]
+        )
+        try db.execute(
+            "DELETE FROM avelo_tds_records WHERE voucher_id = ?",
+            [.text(voucherId.uuidString)]
+        )
+        try db.execute(
+            "DELETE FROM avelo_tcs_records WHERE voucher_id = ?",
+            [.text(voucherId.uuidString)]
+        )
+    }
+
+    public func workflowInputs(for voucherId: Voucher.ID) throws -> VoucherService.WorkflowInputs {
+        let billAllocation = try db.queryOne(
+            "SELECT kind, reference_number FROM avelo_bill_allocations WHERE voucher_id = ? LIMIT 1",
+            bind: [.text(voucherId.uuidString)]
+        ) { ($0.text("kind"), $0.optionalText("reference_number")) }
+
+        let cheque = try db.queryOne(
+            "SELECT cheque_number, due_date FROM avelo_cheques WHERE voucher_id = ? LIMIT 1",
+            bind: [.text(voucherId.uuidString)]
+        ) { ($0.optionalText("cheque_number"), $0.optionalDate("due_date")) }
+
+        let tds = try db.queryOne(
+            "SELECT section_code, tax_paise FROM avelo_tds_records WHERE voucher_id = ? LIMIT 1",
+            bind: [.text(voucherId.uuidString)]
+        ) { ($0.optionalText("section_code"), $0.int("tax_paise")) }
+
+        let tcs = try db.queryOne(
+            "SELECT section_code, tax_paise FROM avelo_tcs_records WHERE voucher_id = ? LIMIT 1",
+            bind: [.text(voucherId.uuidString)]
+        ) { ($0.optionalText("section_code"), $0.int("tax_paise")) }
+
+        return VoucherService.WorkflowInputs(
+            billAllocationKind: billAllocation.flatMap { BillAllocationKind(rawValue: $0.0) },
+            billAllocationNumber: billAllocation?.1,
+            chequeNumber: cheque?.0,
+            chequeDueDate: cheque?.1,
+            tdsSectionCode: tds?.0,
+            tdsTaxPaise: tds?.1 == 0 ? nil : tds?.1,
+            tcsSectionCode: tcs?.0,
+            tcsTaxPaise: tcs?.1 == 0 ? nil : tcs?.1
+        )
+    }
+
     public func insert(_ a: BillAllocation) throws {
         try db.execute("INSERT INTO avelo_bill_allocations (id, company_id, voucher_id, party_account_id, kind, reference_number, allocated_paise, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                        [.text(a.id.uuidString), .text(a.companyId.uuidString), .text(a.voucherId.uuidString), .text(a.partyAccountId.uuidString), .text(a.kind.rawValue), .optionalText(a.referenceNumber), .integer(a.allocatedPaise), .timestamp(a.createdAt)])

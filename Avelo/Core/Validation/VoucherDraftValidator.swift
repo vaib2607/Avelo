@@ -157,24 +157,24 @@ public struct VoucherDraftValidator: Sendable {
             ))
         }
 
-        for line in filled {
-            if let acc = line.accountId {
-                do {
-                    if try isAccountActive(acc, companyId: companyId) == false {
+        if existingVoucherId == nil {
+            for line in filled {
+                if let acc = line.accountId {
+                    do {
+                        if try isAccountActive(acc, companyId: companyId) == false {
+                            errors.append(ValidationError(
+                                code: .voucherAccountInactive,
+                                field: "lines",
+                                message: "Account is inactive."
+                            ))
+                        }
+                    } catch {
                         errors.append(ValidationError(
-                            code: .voucherAccountInactive,
+                            code: .internal,
                             field: "lines",
-                            message: "Account is inactive."
+                            message: "Unable to validate account activity."
                         ))
-                        break
                     }
-                } catch {
-                    errors.append(ValidationError(
-                        code: .internal,
-                        field: "lines",
-                        message: "Unable to validate account activity."
-                    ))
-                    break
                 }
             }
         }

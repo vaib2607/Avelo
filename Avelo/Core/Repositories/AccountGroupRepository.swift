@@ -96,7 +96,7 @@ public struct AccountGroupRepository: Sendable {
             nature: nature,
             isActive: r.bool("is_active"),
             sortOrder: Int(r.int("sort_order")),
-            createdAt: r.timestamp("created_at")
+            createdAt: try r.timestamp("created_at")
         )
     }
 }

@@ -243,7 +243,7 @@ public struct PayrollRepository: Sendable {
             isActive: r.bool("is_active"),
             joinedOn: r.date("joined_on"),
             endDate: r.optionalDate("end_date"),
-            createdAt: r.timestamp("created_at")
+            createdAt: try r.timestamp("created_at")
         )
     }
 
@@ -272,7 +272,7 @@ public struct PayrollRepository: Sendable {
             overtimePaise: r.int("overtime_paise"),
             pfApplicable: r.bool("pf_applicable"),
             esiApplicable: r.bool("esi_applicable"),
-            postedAt: r.timestamp("posted_at")
+            postedAt: try r.timestamp("posted_at")
         )
     }
 }

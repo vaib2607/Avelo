@@ -110,7 +110,7 @@ private struct AccountsBody: View {
                 Section("Groups") {
                     ForEach(vm.groups) { g in
                         HStack {
-                            Text(g.name)
+                            Text(g.name.capitalized)
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -141,10 +141,10 @@ private struct AccountsBody: View {
                 Spacer()
             }
             .padding(12)
-            List(vm.filtered) { account in
+                List(vm.filtered) { account in
                 HStack {
                     VStack(alignment: .leading) {
-                        Text(account.name).font(.headline)
+                        Text(account.name.capitalized).font(.headline)
                         Text(account.code).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()

@@ -87,10 +87,7 @@ public struct DashboardView: View {
                 .init(title: "Dashboard", key: "1"),
                 .init(title: "Reports", key: "4"),
                 .init(title: "New voucher", key: "⌘N")
-            ],
-            primaryActionTitle: "New Voucher",
-            primaryActionSystemImage: "plus",
-            primaryAction: { env.router.present(.newVoucher) }
+            ]
         )
     }
 
@@ -247,7 +244,7 @@ private struct AccountTreeStrip: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Rebuild") { cache.reload() }
+                Button("Rebuild") { Task { await cache.reload() } }
                     .controlSize(.small)
             }
             .padding(6)

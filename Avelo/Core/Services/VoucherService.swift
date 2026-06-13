@@ -67,26 +67,24 @@ public final class VoucherService: Sendable {
     }
 
     public func post(draft: VoucherDraft, in fy: FinancialYear, workflow: WorkflowInputs) throws -> PostResult {
-        let result = try post(draft: draft, in: fy)
-        try recordWorkflow(result.voucher, draft: draft, workflow: workflow)
+        var result: PostResult!
+        try db.write { _ in
+            result = try postWithoutCacheInvalidation(draft: draft, in: fy)
+            try recordWorkflow(result.voucher, draft: draft, workflow: workflow)
+        }
+        ReportService.invalidateCache(companyId: companyId)
         return result
     }
 
     public func postBatch(_ drafts: [VoucherDraft], in fy: FinancialYear) throws -> [PostResult] {
         var results: [PostResult] = []
         results.reserveCapacity(drafts.count)
-        let batchSize = 1_000
-        var index = drafts.startIndex
-        while index < drafts.endIndex {
-            let end = drafts.index(index, offsetBy: batchSize, limitedBy: drafts.endIndex) ?? drafts.endIndex
-            try db.write { _ in
-                for draft in drafts[index..<end] {
-                    try autoreleasepool {
-                        results.append(try postWithoutCacheInvalidation(draft: draft, in: fy))
-                    }
+        try db.write { _ in
+            for draft in drafts {
+                try autoreleasepool {
+                    results.append(try postWithoutCacheInvalidation(draft: draft, in: fy))
                 }
             }
-            index = end
         }
         ReportService.invalidateCache(companyId: companyId)
         return results
@@ -165,7 +163,7 @@ public final class VoucherService: Sendable {
             try repo.insert(BillAllocation(companyId: companyId, voucherId: voucher.id, partyAccountId: party, kind: kind, referenceNumber: workflow.billAllocationNumber, allocatedPaise: voucher.totalPaise))
         }
         if let chequeNumber = workflow.chequeNumber {
-            try repo.insert(Cheque(companyId: companyId, voucherId: voucher.id, chequeNumber: chequeNumber, issueDate: voucher.date, dueDate: workflow.chequeDueDate, status: workflow.chequeDueDate == nil ? .issued : .deposited))
+            try repo.insert(Cheque(companyId: companyId, voucherId: voucher.id, chequeNumber: chequeNumber, issueDate: voucher.date, dueDate: workflow.chequeDueDate, status: workflow.chequeDueDate != nil ? .issued : .deposited))
         }
         if let tdsSectionCode = workflow.tdsSectionCode, let tdsTaxPaise = workflow.tdsTaxPaise {
             try repo.insert(TDSRecord(companyId: companyId, voucherId: voucher.id, sectionCode: tdsSectionCode, basePaise: voucher.totalPaise, taxPaise: tdsTaxPaise))
@@ -194,6 +192,7 @@ public final class VoucherService: Sendable {
             throw AppError.businessRule("This voucher has already been reversed and cannot be edited in place.")
         }
         let existingLines = try linesRepository.findForVoucher(voucherId)
+        let existingWorkflow = try AccountingWorkflowsRepository(db: db).workflowInputs(for: voucherId)
         let result = try validate(draft: newDraft, in: existingFY, existingVoucherId: voucherId)
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
@@ -224,9 +223,12 @@ public final class VoucherService: Sendable {
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
             let accountRepo = AccountRepository(db: tx)
+            let workflowRepo = AccountingWorkflowsRepository(db: tx)
             try vRepo.update(updated)
             try lRepo.deleteForVoucher(voucherId)
             try lRepo.insertBatch(newLines)
+            try workflowRepo.deleteForVoucher(voucherId)
+            try recordWorkflow(updated, draft: newDraft, workflow: existingWorkflow)
             try AuditService(db: tx, companyId: companyId).record(
                 action: .voucherEdited,
                 entityType: "voucher",
@@ -262,7 +264,6 @@ public final class VoucherService: Sendable {
         )
         let reversalId = UUID()
         let now = Date()
-        let reversalDate: Date = targetFY.contains(date: now) ? now : targetFY.endDate
         let flippedLines: [LedgerLine] = originalLines.enumerated().map { (idx, line) in
             LedgerLine(
                 id: UUID(),
@@ -276,13 +277,39 @@ public final class VoucherService: Sendable {
                 lineOrder: idx
             )
         }
+        let reversalDate: Date = {
+            if now < targetFY.startDate { return targetFY.startDate }
+            if now > targetFY.endDate { return targetFY.endDate }
+            return now
+        }()
+        let reversalDraft = VoucherDraft(
+            mode: .create,
+            voucherTypeCode: original.voucherTypeCode,
+            date: reversalDate,
+            partyAccountId: original.partyAccountId,
+            narration: "Reversal of \(original.number)" + (reason.map { ": \($0)" } ?? ""),
+            lines: flippedLines.map { line in
+                VoucherDraft.Line(
+                    accountId: line.accountId,
+                    amountPaise: line.amountPaise,
+                    side: line.side,
+                    taxCode: line.taxCode,
+                    costCenter: line.costCenter,
+                    lineOrder: line.lineOrder
+                )
+            }
+        )
+        let validation = try validate(draft: reversalDraft, in: targetFY)
+        if case .invalid(let errs) = validation, let first = errs.first {
+            throw AppError.validation(first)
+        }
         let reversal = Voucher(
             id: reversalId,
             companyId: companyId,
             financialYearId: targetFY.id,
             voucherTypeCode: original.voucherTypeCode,
             number: number,
-            date: reversalDate,
+            date: reversalDraft.date,
             partyAccountId: original.partyAccountId,
             narration: "Reversal of \(original.number)" + (reason.map { ": \($0)" } ?? ""),
             isReversal: true,

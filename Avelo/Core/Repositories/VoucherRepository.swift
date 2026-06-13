@@ -193,8 +193,8 @@ public struct VoucherRepository: Sendable {
             reversalOfId: reversalOf,
             isPosted: r.bool("is_posted"),
             totalPaise: r.int("total_paise"),
-            createdAt: r.timestamp("created_at"),
-            updatedAt: r.timestamp("updated_at")
+            createdAt: try r.timestamp("created_at"),
+            updatedAt: try r.timestamp("updated_at")
         )
     }
 }

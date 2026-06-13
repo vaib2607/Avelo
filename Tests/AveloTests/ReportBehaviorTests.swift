@@ -290,6 +290,44 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(gstBeforeCollection.netPayablePaise, 0)
     }
 
+    func testTrialBalanceUsesActiveFinancialYearStartForMultiYearValidation() throws {
+        let tc = try makeSeededCompany()
+        let activity = try seedActivity(tc)
+
+        let secondFYStart = DateFormatters.parseDate("2025-04-01")!
+        let secondFYEnd = DateFormatters.parseDate("2026-03-31")!
+        let secondFYId = UUID()
+        let now = DateFormatters.formatIsoTimestamp(Date())
+        try tc.db.execute(
+            """
+            INSERT INTO avelo_financial_years
+            (id, company_id, label, start_date, end_date, books_begin_date, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                .text(secondFYId.uuidString),
+                .text(tc.companyId.uuidString),
+                .text("2025-26"),
+                .date(secondFYStart),
+                .date(secondFYEnd),
+                .date(secondFYStart),
+                .text(now)
+            ]
+        )
+
+        // Sanity check that the prior year still has activity the verifier must ignore.
+        XCTAssertNotEqual(activity.openingDaySale.financialYearId, secondFYId)
+
+        let report = ReportService(db: tc.db, companyId: tc.companyId)
+        let trialBalance = try report.trialBalance(
+            asOfDate: secondFYEnd,
+            financialYearId: secondFYId
+        )
+
+        XCTAssertEqual(trialBalance.totalDebitPaise, trialBalance.totalCreditPaise)
+        XCTAssertFalse(trialBalance.rows.isEmpty, "The later FY should still produce a valid report snapshot")
+    }
+
     func testLedgerReportShowsRunningBalanceAndSourceVoucherLinkage() throws {
         let tc = try makeSeededCompany()
         let activity = try seedActivity(tc)

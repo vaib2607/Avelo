@@ -21,12 +21,13 @@ final class AccountTreeReconciliationTests: XCTestCase {
         ]), in: tc.fy)
     }
 
-    func testTreeBalancesMatchSqlTrialBalance() throws {
+    func testTreeBalancesMatchSqlTrialBalance() async throws {
         let tc = try TestCompany.make()
         try seedActivity(tc)
 
         let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db)
-        guard let tree = cache.ensureLoaded() else {
+        await cache.reload()
+        guard let tree = cache.tree else {
             return XCTFail("Tree failed to load: \(String(describing: cache.lastError))")
         }
 
@@ -72,12 +73,13 @@ final class AccountTreeReconciliationTests: XCTestCase {
         XCTAssertEqual(rowsById[tc.capitalId]?.creditPaise, 10000)
     }
 
-    func testBooksAreBalancedAcrossAllLedgers() throws {
+    func testBooksAreBalancedAcrossAllLedgers() async throws {
         let tc = try TestCompany.make()
         try seedActivity(tc)
 
         let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db)
-        guard let tree = cache.ensureLoaded() else {
+        await cache.reload()
+        guard let tree = cache.tree else {
             return XCTFail("Tree failed to load")
         }
         // Balanced opening + balanced vouchers => sum of all signed leaf balances is zero.
@@ -85,12 +87,13 @@ final class AccountTreeReconciliationTests: XCTestCase {
         XCTAssertEqual(sum, 0)
     }
 
-    func testLiveNetTrialBalanceTotalsTieOutWithSql() throws {
+    func testLiveNetTrialBalanceTotalsTieOutWithSql() async throws {
         let tc = try TestCompany.make()
         try seedActivity(tc)
 
         let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db)
-        guard let tree = cache.ensureLoaded() else { return XCTFail("Tree failed to load") }
+        await cache.reload()
+        guard let tree = cache.tree else { return XCTFail("Tree failed to load") }
 
         // Same net presentation the Dashboard's live trial-balance card uses.
         var dr: Int64 = 0
@@ -152,12 +155,13 @@ final class AccountTreeReconciliationTests: XCTestCase {
         XCTAssertEqual(tb.totalCreditPaise, expectedCredit)
     }
 
-    func testGroupBalanceEqualsSumOfChildren() throws {
+    func testGroupBalanceEqualsSumOfChildren() async throws {
         let tc = try TestCompany.make()
         try seedActivity(tc)
 
         let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db)
-        guard let tree = cache.ensureLoaded() else {
+        await cache.reload()
+        guard let tree = cache.tree else {
             return XCTFail("Tree failed to load")
         }
         for root in tree.roots {
@@ -165,5 +169,23 @@ final class AccountTreeReconciliationTests: XCTestCase {
                 + root.childLedgers.map { $0.balancePaise }.reduce(0, +)
             XCTAssertEqual(root.balancePaise, childSum, "Group \(root.name) balance != children")
         }
+    }
+
+    func testReloadRunsOnBackgroundWorkerAndPublishesTree() async throws {
+        let tc = try TestCompany.make()
+        try seedActivity(tc)
+
+        let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db)
+        let backgroundExpectation = expectation(description: "background load")
+        cache.onBackgroundLoad = { isMainThread in
+            XCTAssertFalse(isMainThread, "AccountTreeCache.reload() should run its heavy load off the main thread")
+            backgroundExpectation.fulfill()
+        }
+
+        await cache.reload()
+        await fulfillment(of: [backgroundExpectation], timeout: 5)
+
+        XCTAssertNotNil(cache.tree)
+        XCTAssertEqual(cache.tree?.findLedger(tc.cashId)?.balancePaise, 40000)
     }
 }

@@ -190,8 +190,8 @@ public struct AccountRepository: Sendable {
             isBankAccount: r.bool("is_bank_account"),
             gstin: r.optionalText("gstin"),
             lastUsedAt: r.optionalText("last_used_at").flatMap { DateFormatters.parseTimestamp($0) },
-            createdAt: r.timestamp("created_at"),
-            updatedAt: r.timestamp("updated_at")
+            createdAt: try r.timestamp("created_at"),
+            updatedAt: try r.timestamp("updated_at")
         )
     }
 }

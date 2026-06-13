@@ -28,13 +28,16 @@ public struct MoneyTextField: View {
             .focused($isFocused)
             .onAppear { text = format(paise) }
             .onChange(of: paise) { _, newValue in
-                if !isFocused { text = format(newValue) }
+                let formatted = format(newValue)
+                if !isFocused, text != formatted { text = formatted }
             }
             .onChange(of: isFocused) { _, focused in
                 if focused {
-                    text = paise == 0 ? "" : Currency.formatPaise(paise, style: .plain)
+                    let focusedText = paise == 0 ? "" : Currency.formatPaise(paise, style: .plain)
+                    if text != focusedText { text = focusedText }
                 } else {
-                    text = format(paise)
+                    let formatted = format(paise)
+                    if text != formatted { text = formatted }
                 }
             }
             .onSubmit {
@@ -49,10 +52,12 @@ public struct MoneyTextField: View {
 
     private func commitFromText() {
         if let parsed = Currency.parseRupeeInput(text) {
-            paise = parsed
-            text = format(paise)
+            let formatted = format(parsed)
+            if paise != parsed { paise = parsed }
+            if text != formatted { text = formatted }
         } else {
-            text = format(paise)
+            let formatted = format(paise)
+            if text != formatted { text = formatted }
         }
     }
 }
@@ -63,9 +68,10 @@ extension MoneyTextField {
             get: { Currency.parseRupeeInput(text.wrappedValue) ?? 0 },
             set: { newValue in
                 if newValue == 0 {
-                    text.wrappedValue = ""
+                    if text.wrappedValue != "" { text.wrappedValue = "" }
                 } else {
-                    text.wrappedValue = Currency.formatAmountInput(paise: newValue)
+                    let formatted = Currency.formatAmountInput(paise: newValue)
+                    if text.wrappedValue != formatted { text.wrappedValue = formatted }
                 }
             }
         )

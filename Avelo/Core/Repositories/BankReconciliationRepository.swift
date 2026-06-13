@@ -166,7 +166,9 @@ public struct BankReconciliationRepository: Sendable {
             """,
             bind: [.text(accountId.uuidString), .date(asOf)]
         ) { r in r.int(0) }
-        return row ?? 0
+        let balance = row ?? 0
+        assert(balance <= Int64.max / 2)
+        return balance
     }
 
     public func clearStatementLine(id: UUID) throws {

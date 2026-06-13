@@ -137,7 +137,7 @@ public struct AuditRepository: Sendable {
         return AuditEvent(
             id: id,
             companyId: companyId,
-            timestamp: r.timestamp("timestamp"),
+            timestamp: try r.timestamp("timestamp"),
             actor: r.text("actor"),
             action: action,
             entityType: r.text("entity_type"),

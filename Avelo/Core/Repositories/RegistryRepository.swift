@@ -18,7 +18,7 @@ public struct RegistryRepository: Sendable {
                 name: r.text("name"),
                 sqliteFileName: r.text("sqlite_file_name"),
                 lastOpenedAt: last,
-                createdAt: r.timestamp("created_at")
+                createdAt: try r.timestamp("created_at")
             )
         }
     }

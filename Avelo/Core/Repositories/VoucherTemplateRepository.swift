@@ -42,7 +42,7 @@ public struct VoucherTemplateRepository: Sendable {
                 description: r.optionalText("description"),
                 templateLinesJSON: r.text("template_lines_json"),
                 isActive: r.bool("is_active"),
-                createdAt: r.timestamp("created_at")
+                createdAt: try r.timestamp("created_at")
             )
         }
     }

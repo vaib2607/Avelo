@@ -92,8 +92,8 @@ public struct CompanyRepository: Sendable {
             baseCurrency: r.text("base_currency"),
             isInventoryEnabled: r.bool("is_inventory_enabled"),
             inventoryLinkMode: mode,
-            createdAt: r.timestamp("created_at"),
-            updatedAt: r.timestamp("updated_at")
+            createdAt: try r.timestamp("created_at"),
+            updatedAt: try r.timestamp("updated_at")
         )
     }
 }

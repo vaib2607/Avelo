@@ -58,8 +58,8 @@ public struct BOMRepository: Sendable {
                 companyId: try UUIDParsing.required(r.text("company_id"), field: "avelo_boms.company_id"),
                 assemblyItemId: try UUIDParsing.required(r.text("assembly_item_id"), field: "avelo_boms.assembly_item_id"),
                 outputQuantity: r.real("output_quantity"),
-                createdAt: r.timestamp("created_at"),
-                updatedAt: r.timestamp("updated_at")
+                createdAt: try r.timestamp("created_at"),
+                updatedAt: try r.timestamp("updated_at")
             )
             }
         ) else { return nil }

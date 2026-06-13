@@ -45,6 +45,21 @@ public struct CompanyPickerView: View {
                     Label("Restore Backup", systemImage: "tray.and.arrow.down")
                 }
                 .controlSize(.large)
+
+                Button {
+                    Task {
+                        do {
+                            let entry = try await DemoCompanySeeder.ensureDemoCompany(manager: env.manager)
+                            await env.openCompany(entry.id)
+                        } catch {
+                            env.showError(AppError.wrap(error))
+                        }
+                    }
+                } label: {
+                    Label("Demo Company", systemImage: "sparkles")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
         }
         .padding(24)

@@ -18,6 +18,10 @@ public struct RestoreService: Sendable {
         "avelo_stock_movements",
         "avelo_payroll_employees",
         "avelo_payroll_entries",
+        "avelo_bill_allocations",
+        "avelo_cheques",
+        "avelo_tds_records",
+        "avelo_tcs_records",
         "avelo_audit_events",
         "avelo_voucher_sequences",
         "avelo_voucher_templates",
@@ -197,7 +201,7 @@ public struct RestoreService: Sendable {
             return entry
         } catch {
             AveloRestoreLogger.error("restore failed, cleaning up \(destURL.path, privacy: .public)")
-            try? fm.removeItem(at: destURL)
+            try fm.removeItem(at: destURL)
             throw error
         }
     }
@@ -240,17 +244,18 @@ public struct RestoreService: Sendable {
                 }
 
                 try writeRestoreAuditEvent(db: tx, companyId: restoredCompanyId)
+
+                try recreateLockedFinancialYearTriggers(db: tx)
+                try recreateAuditImmutabilityTriggers(db: tx)
             }
-            try recreateLockedFinancialYearTriggers(db: db)
-            try recreateAuditImmutabilityTriggers(db: db)
 
             let foreignKeyIssues = try db.query("PRAGMA foreign_key_check") { _ in true }
             guard foreignKeyIssues.isEmpty else {
                 throw AppError.database(.schemaMismatch("Restore left foreign-key violations in the restored company database."))
             }
         } catch {
-            try? recreateLockedFinancialYearTriggers(db: db)
-            try? recreateAuditImmutabilityTriggers(db: db)
+            try recreateLockedFinancialYearTriggers(db: db)
+            try recreateAuditImmutabilityTriggers(db: db)
             try? db.execute("PRAGMA foreign_keys = ON")
             throw error
         }

@@ -69,7 +69,7 @@ public final actor DatabaseManager {
                 name: row.text("name"),
                 sqliteFileName: row.text("sqlite_file_name"),
                 lastOpenedAt: lastOpened,
-                createdAt: row.timestamp("created_at")
+                createdAt: try row.timestamp("created_at")
             )
         }
     }

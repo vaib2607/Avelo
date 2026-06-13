@@ -256,6 +256,9 @@ public struct InventoryRepository: Sendable {
         let outVal  = row?.4 ?? 0
         let onHand  = row?.5 ?? 0
         let onHandVal = inVal - outVal
+        assert(inVal <= Int64.max / 2)
+        assert(outVal <= Int64.max / 2)
+        assert(onHandVal <= Int64.max / 2)
         return ItemBalance(
             itemId: itemId,
             inQty: inQty,
@@ -294,7 +297,7 @@ public struct InventoryRepository: Sendable {
             hsnSac: r.optionalText("hsn_sac"),
             isArchived: r.bool("is_archived"),
             linkedAccountId: try UUIDParsing.optional(r.optionalText("linked_account_id"), field: "avelo_inventory_items.linked_account_id"),
-            createdAt: r.timestamp("created_at")
+            createdAt: try r.timestamp("created_at")
         )
     }
 
@@ -319,7 +322,7 @@ public struct InventoryRepository: Sendable {
             manufactureDate: r.optionalDate("manufacture_date"),
             expiryDate: r.optionalDate("expiry_date"),
             reason: r.optionalText("reason"),
-            createdAt: r.timestamp("created_at")
+            createdAt: try r.timestamp("created_at")
         )
     }
 }
