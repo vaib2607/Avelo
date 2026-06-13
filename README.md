@@ -161,3 +161,4 @@ open dist/Avelo.app
 ## Docs
 
 See `Docs/Avelo_Master_PRD.md` for the product spec, and `Docs/Avelo_Architecture.md` for the layer map. `Docs/Avelo_ASSEMBLY.md` lists every file and what it does.
+For the Tally study and gap-analysis map, see `Docs/Tally_Master_Study_Guide.md`.

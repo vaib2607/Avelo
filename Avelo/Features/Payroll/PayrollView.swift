@@ -53,12 +53,25 @@ private struct PayrollContent: View {
 
 @MainActor
 private struct PayrollBody: View {
+    @Environment(AppEnvironment.self) private var env
     @Bindable var vm: PayrollViewModel
     @Binding var postFor: PayrollEmployee.ID?
 
     var body: some View {
         VSplitView {
             VStack(spacing: 0) {
+                ModuleChrome(
+                    title: "Payroll",
+                    subtitle: "Employee masters and salary postings with a clear month-by-month register.",
+                    hints: [
+                        .init(title: "Employees", key: "⌘1"),
+                        .init(title: "Post salary", key: "⌘P"),
+                        .init(title: "New employee", key: "⇧⌘N")
+                    ],
+                    primaryActionTitle: "New Employee",
+                    primaryActionSystemImage: "plus",
+                    primaryAction: { env.router.present(.newEmployee) }
+                )
                 HStack {
                     SearchBar(text: $vm.query, placeholder: "Search employees…")
                 }
@@ -110,6 +123,11 @@ private struct PayrollBody: View {
                     }
                 }
             }
+            ModuleFooterBar(items: [
+                .init(title: "Next", detail: "Choose an employee and post salary for the current month."),
+                .init(title: "Shortcut", detail: "⇧⌘N creates an employee; ⌘P posts salary."),
+                .init(title: "Scope", detail: "The right pane shows the posting register for the selected month.")
+            ])
         }
         .sheet(item: Binding(
             get: { postFor.map { IdWrap(id: $0) } },

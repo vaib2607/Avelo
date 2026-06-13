@@ -125,13 +125,24 @@ private struct EditVoucherBody: View {
     }
 
     private var topBar: some View {
-        HStack {
-            Text("Edit Voucher \(voucherNumber)").font(.title2.bold())
-            Spacer()
-            Button { router.presentedSheet = nil } label: { Image(systemName: "xmark.circle.fill") }
-                .buttonStyle(.plain)
+        VStack(spacing: 0) {
+            ModuleChrome(
+                title: "Edit Voucher \(voucherNumber)",
+                subtitle: "Adjust lines, narration, or voucher metadata before saving changes back to the books.",
+                hints: [
+                    .init(title: "Save", key: "⌘↩"),
+                    .init(title: "Cancel", key: "Esc"),
+                    .init(title: "Add line", key: "⌘+")
+                ]
+            )
+            HStack {
+                Spacer()
+                Button { router.presentedSheet = nil } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
-        .padding(16)
     }
 
     private var mainContent: some View {
@@ -200,12 +211,13 @@ private struct EditVoucherBody: View {
     }
 
     private var totalsSection: some View {
-        HStack {
+        let difference = vm.totalDebitPaise - vm.totalCreditPaise
+        return HStack {
             Spacer()
             Text("Debit: \(Currency.formatPaise(vm.totalDebitPaise))").monospacedDigit()
             Text("Credit: \(Currency.formatPaise(vm.totalCreditPaise))").monospacedDigit()
-            Text(vm.isBalanced ? "Balanced" : "Not balanced")
-                .foregroundStyle(vm.isBalanced ? .green : .red)
+            Text(difference == 0 ? "Balanced" : "Difference: \(Currency.formatPaise(abs(difference)))")
+                .foregroundStyle(difference == 0 ? .green : .red)
         }
     }
 

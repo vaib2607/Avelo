@@ -7,6 +7,7 @@ public enum SidebarDestination: String, CaseIterable, Identifiable, Hashable, Se
     case accounts
     case reports
     case inventory
+    case gst
     case payroll
     case banking
     case audit
@@ -21,6 +22,7 @@ public enum SidebarDestination: String, CaseIterable, Identifiable, Hashable, Se
         case .accounts:  return "Accounts"
         case .reports:   return "Reports"
         case .inventory: return "Inventory"
+        case .gst:       return "GST"
         case .payroll:   return "Payroll"
         case .banking:   return "Banking"
         case .audit:     return "Audit"
@@ -35,6 +37,7 @@ public enum SidebarDestination: String, CaseIterable, Identifiable, Hashable, Se
         case .accounts:  return "book"
         case .reports:   return "chart.bar"
         case .inventory: return "shippingbox"
+        case .gst:       return "doc.text.magnifyingglass"
         case .payroll:   return "person.3"
         case .banking:   return "building.columns"
         case .audit:     return "lock.shield"
@@ -49,10 +52,11 @@ public enum SidebarDestination: String, CaseIterable, Identifiable, Hashable, Se
         case .accounts:  return "3"
         case .reports:   return "4"
         case .inventory: return "5"
-        case .payroll:   return "6"
-        case .banking:   return "7"
-        case .audit:     return "8"
-        case .settings:  return "9"
+        case .gst:       return "6"
+        case .payroll:   return "7"
+        case .banking:   return "8"
+        case .audit:     return "9"
+        case .settings:  return "0"
         }
     }
 

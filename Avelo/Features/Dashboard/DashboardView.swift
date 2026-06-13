@@ -19,6 +19,11 @@ public struct DashboardView: View {
                 cashPosition
                 monthlyPLSection
                 recentVouchersSection
+                ModuleFooterBar(items: [
+                    .init(title: "Next", detail: "Press ⌘N for a new voucher or switch to Reports for drill-down."),
+                    .init(title: "Shortcut", detail: "F4-F11 map to the main voucher families."),
+                    .init(title: "Context", detail: "Company, FY, and module are always shown above.")
+                ])
             }
             .padding(20)
         }
@@ -75,23 +80,18 @@ public struct DashboardView: View {
 
     @ViewBuilder
     private var header: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Welcome back").font(.title2.bold())
-                if let fy = env.companyContext?.financialYear {
-                    Text("Financial year: \(fy.label)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            Button {
-                env.router.present(.newVoucher)
-            } label: {
-                Label("New Voucher", systemImage: "plus")
-            }
-            .buttonStyle(.borderedProminent)
-            .keyboardShortcut("n", modifiers: [.command])
-        }
+        ModuleChrome(
+            title: "Dashboard",
+            subtitle: "Your offline Tally-style control center for company context, quick entry, and live totals.",
+            hints: [
+                .init(title: "Dashboard", key: "1"),
+                .init(title: "Reports", key: "4"),
+                .init(title: "New voucher", key: "⌘N")
+            ],
+            primaryActionTitle: "New Voucher",
+            primaryActionSystemImage: "plus",
+            primaryAction: { env.router.present(.newVoucher) }
+        )
     }
 
     @ViewBuilder

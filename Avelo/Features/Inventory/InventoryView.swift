@@ -53,11 +53,24 @@ private struct InventoryContent: View {
 
 @MainActor
 private struct InventoryBody: View {
+    @Environment(AppEnvironment.self) private var env
     @Bindable var vm: InventoryViewModel
     @Binding var showMovement: InventoryItem.ID?
 
     var body: some View {
         VStack(spacing: 0) {
+            ModuleChrome(
+                title: "Inventory",
+                subtitle: "Stock masters, movement, and valuation in a Tally-style offline inventory workspace.",
+                hints: [
+                    .init(title: "Stock items", key: "⌘1"),
+                    .init(title: "Movements", key: "⌘M"),
+                    .init(title: "New item", key: "⇧⌘N")
+                ],
+                primaryActionTitle: "New Item",
+                primaryActionSystemImage: "plus",
+                primaryAction: { env.router.present(.newItem) }
+            )
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search items…")
                 Toggle("Archived", isOn: $vm.includeArchived)
@@ -97,6 +110,11 @@ private struct InventoryBody: View {
                     }
                 }
             }
+            ModuleFooterBar(items: [
+                .init(title: "Next", detail: "Open Movement… to inspect item-level stock flow."),
+                .init(title: "Shortcut", detail: "⌘1 switches to stock items; ⇧⌘N creates a new item."),
+                .init(title: "Scope", detail: "Archived items stay visible when the toggle is on.")
+            ])
         }
         .sheet(item: Binding(
             get: { showMovement.map { IdWrap(id: $0) } },

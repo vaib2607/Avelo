@@ -95,18 +95,30 @@ private struct NewVoucherBody: View {
     }
 
     private var topBar: some View {
-        HStack {
-            Text("New \(initialType.rawValue) Voucher").font(.title2.bold())
-            Spacer()
-            Button("Paste TSV") { pasteTSV() }
-            Button("Save Template") { try? vm.saveTemplate(named: initialType.rawValue) }
-            Button("Load Template") { try? vm.loadTemplate(named: initialType.rawValue) }
-            Button { router.presentedSheet = nil } label: {
-                Image(systemName: "xmark.circle.fill")
+        VStack(spacing: 0) {
+            ModuleChrome(
+                title: "New \(initialType.rawValue) Voucher",
+                subtitle: "Enter lines with keyboard-first debit/credit balance feedback, then post or cancel.",
+                hints: [
+                    .init(title: "Save", key: "⌘↩"),
+                    .init(title: "Cancel", key: "Esc"),
+                    .init(title: "Add line", key: "⌘+"),
+                    .init(title: "Paste TSV", key: "⌘V")
+                ]
+            )
+            HStack {
+                Spacer()
+                Button("Paste TSV") { pasteTSV() }
+                Button("Save Template") { try? vm.saveTemplate(named: initialType.rawValue) }
+                Button("Load Template") { try? vm.loadTemplate(named: initialType.rawValue) }
+                Button { router.presentedSheet = nil } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
-        .padding(16)
     }
 
     private var mainContent: some View {
@@ -214,13 +226,14 @@ private struct NewVoucherBody: View {
     }
 
     private var totalsSection: some View {
-        HStack {
+        let difference = vm.totalDebitPaise - vm.totalCreditPaise
+        return HStack {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text("Debit total: \(Currency.formatPaise(vm.totalDebitPaise))")
                 Text("Credit total: \(Currency.formatPaise(vm.totalCreditPaise))")
-                Text(vm.isBalanced ? "Balanced" : "Not balanced")
-                    .foregroundStyle(vm.isBalanced ? .green : .red)
+                Text(difference == 0 ? "Balanced" : "Difference: \(Currency.formatPaise(abs(difference)))")
+                    .foregroundStyle(difference == 0 ? .green : .red)
             }
             .monospacedDigit()
         }

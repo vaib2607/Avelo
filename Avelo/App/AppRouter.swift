@@ -12,6 +12,7 @@ public final class AppRouter {
     /// Set when another screen requests the Reports view open a specific
     /// account's ledger. Consumed (and cleared) by `ReportsView`.
     public var pendingLedgerAccountId: Account.ID?
+    public var pendingReportSelection: ReportSelection?
 
     public init() {}
 
@@ -20,6 +21,7 @@ public final class AppRouter {
         presentedSheet = nil
         presentedAlert = nil
         pendingLedgerAccountId = nil
+        pendingReportSelection = nil
     }
 
     public func go(_ destination: SidebarDestination) {
@@ -29,6 +31,11 @@ public final class AppRouter {
     /// Deep-links to the Reports view showing the given account's ledger.
     public func openLedger(_ accountId: Account.ID) {
         pendingLedgerAccountId = accountId
+        selection = .reports
+    }
+
+    public func openReport(_ report: ReportSelection) {
+        pendingReportSelection = report
         selection = .reports
     }
 
@@ -48,6 +55,7 @@ public enum RouterSheet: Identifiable, Sendable {
     case restore
     case about
     case preferences
+    case companyInfo
     case newVoucher
     case newJournal
     case newPayment
@@ -85,6 +93,7 @@ public enum RouterSheet: Identifiable, Sendable {
         case .restore: return "restore"
         case .about: return "about"
         case .preferences: return "preferences"
+        case .companyInfo: return "companyInfo"
         case .newVoucher: return "newVoucher"
         case .newJournal: return "newJournal"
         case .newPayment: return "newPayment"
