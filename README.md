@@ -6,11 +6,11 @@ Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no ne
 
 ## Screenshots
 
-![Dashboard](appscreenshotformarketing/Generated image 1.png)
+![Dashboard](appscreenshotformarketing/Generated%20image%201.png)
 
-![Vouchers](appscreenshotformarketing/Generated image 2.png)
+![Vouchers](appscreenshotformarketing/Generated%20image%202.png)
 
-![Reports](appscreenshotformarketing/Generated image 3.png)
+![Reports](appscreenshotformarketing/Generated%20image%203.png)
 
 ## At A Glance
 
