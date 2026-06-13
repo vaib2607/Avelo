@@ -30,9 +30,28 @@ public final class VoucherService: Sendable {
         let lines: [LedgerLine]
     }
 
+    public struct WorkflowInputs: Sendable {
+        public var billAllocationKind: BillAllocationKind?
+        public var billAllocationNumber: String?
+        public var chequeNumber: String?
+        public var chequeDueDate: Date?
+        public var postDatedDate: Date?
+        public var tdsSectionCode: String?
+        public var tdsTaxPaise: Int64?
+        public var tcsSectionCode: String?
+        public var tcsTaxPaise: Int64?
+        public init() {}
+    }
+
     public func post(draft: VoucherDraft, in fy: FinancialYear) throws -> PostResult {
         defer { ReportService.invalidateCache(companyId: companyId) }
         return try postWithoutCacheInvalidation(draft: draft, in: fy)
+    }
+
+    public func post(draft: VoucherDraft, in fy: FinancialYear, workflow: WorkflowInputs) throws -> PostResult {
+        let result = try post(draft: draft, in: fy)
+        try recordWorkflow(result.voucher, draft: draft, workflow: workflow)
+        return result
     }
 
     public func postBatch(_ drafts: [VoucherDraft], in fy: FinancialYear) throws -> [PostResult] {
@@ -117,6 +136,27 @@ public final class VoucherService: Sendable {
 
         let prompt: InventoryPromptContext? = nil
         return PostResult(voucher: voucher, inventoryPrompt: prompt)
+    }
+
+    private func recordWorkflow(_ voucher: Voucher, draft: VoucherDraft, workflow: WorkflowInputs) throws {
+        let repo = AccountingWorkflowsRepository(db: db)
+        if let kind = workflow.billAllocationKind, let party = voucher.partyAccountId {
+            try repo.insert(BillAllocation(companyId: companyId, voucherId: voucher.id, partyAccountId: party, kind: kind, referenceNumber: workflow.billAllocationNumber, allocatedPaise: voucher.totalPaise))
+        }
+        if let chequeNumber = workflow.chequeNumber {
+            try repo.insert(Cheque(companyId: companyId, voucherId: voucher.id, chequeNumber: chequeNumber, issueDate: voucher.date, dueDate: workflow.chequeDueDate, status: workflow.chequeDueDate == nil ? .issued : .deposited))
+        }
+        if let tdsSectionCode = workflow.tdsSectionCode, let tdsTaxPaise = workflow.tdsTaxPaise {
+            try repo.insert(TDSRecord(companyId: companyId, voucherId: voucher.id, sectionCode: tdsSectionCode, basePaise: voucher.totalPaise, taxPaise: tdsTaxPaise))
+        }
+        if let tcsSectionCode = workflow.tcsSectionCode, let tcsTaxPaise = workflow.tcsTaxPaise {
+            try repo.insert(TCSRecord(companyId: companyId, voucherId: voucher.id, sectionCode: tcsSectionCode, basePaise: voucher.totalPaise, taxPaise: tcsTaxPaise))
+        }
+        if let postDatedDate = workflow.postDatedDate {
+            var updated = voucher
+            updated.date = postDatedDate
+            try VoucherRepository(db: db).update(updated)
+        }
     }
 
     public func edit(_ voucherId: Voucher.ID, with newDraft: VoucherDraft, in fy: FinancialYear) throws -> Voucher {

@@ -22,6 +22,7 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
     public var code: String
     public var name: String
     public var unit: String
+    public var alternateUnit: String?
     public var valuationMethod: ValuationMethod
     public var isActive: Bool
     public let createdAt: Date
@@ -33,6 +34,9 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
     public var stockGroup: String?
     public var stockCategory: String?
     public var godown: String?
+    public var reorderLevel: Double?
+    public var priceLevel1Paise: Int64?
+    public var priceLevel2Paise: Int64?
     public var barcode: String?
     public var hsnSac: String?
     public var isArchived: Bool
@@ -43,6 +47,7 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
                 code: String,
                 name: String,
                 unit: String,
+                alternateUnit: String? = nil,
                 valuationMethod: ValuationMethod = .fifo,
                 isActive: Bool = true,
                 createdAt: Date = Date()) {
@@ -51,6 +56,7 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
         self.code = code
         self.name = name
         self.unit = unit
+        self.alternateUnit = alternateUnit
         self.valuationMethod = valuationMethod
         self.isActive = isActive
         self.createdAt = createdAt
@@ -68,6 +74,7 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
                 code: String,
                 name: String,
                 unit: String,
+                alternateUnit: String? = nil,
                 valuationMethod: ValuationMethod = .fifo,
                 isActive: Bool = true,
                 openingQuantity: Double = 0,
@@ -76,6 +83,9 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
                 stockGroup: String? = nil,
                 stockCategory: String? = nil,
                 godown: String? = nil,
+                reorderLevel: Double? = nil,
+                priceLevel1Paise: Int64? = nil,
+                priceLevel2Paise: Int64? = nil,
                 barcode: String? = nil,
                 hsnSac: String? = nil,
                 isArchived: Bool = false,
@@ -86,6 +96,7 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
         self.code = code
         self.name = name
         self.unit = unit
+        self.alternateUnit = alternateUnit
         self.valuationMethod = valuationMethod
         self.isActive = isActive
         self.createdAt = createdAt
@@ -95,6 +106,9 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
         self.stockGroup = stockGroup
         self.stockCategory = stockCategory
         self.godown = godown
+        self.reorderLevel = reorderLevel
+        self.priceLevel1Paise = priceLevel1Paise
+        self.priceLevel2Paise = priceLevel2Paise
         self.barcode = barcode
         self.hsnSac = hsnSac
         self.isArchived = isArchived

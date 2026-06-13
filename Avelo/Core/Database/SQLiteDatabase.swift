@@ -13,6 +13,8 @@ public enum SQLValue: Sendable {
     public static func date(_ d: Date) -> SQLValue { .text(DateFormatters.formatIsoDate(d)) }
     public static func timestamp(_ d: Date) -> SQLValue { .text(DateFormatters.formatIsoTimestamp(d)) }
     public static func optionalText(_ s: String?) -> SQLValue { s.map { .text($0) } ?? .null }
+    public static func optionalInteger(_ i: Int64?) -> SQLValue { i.map { .integer($0) } ?? .null }
+    public static func optionalReal(_ d: Double?) -> SQLValue { d.map { .real($0) } ?? .null }
     public static func optionalDate(_ d: Date?) -> SQLValue { d.map { .text(DateFormatters.formatIsoDate($0)) } ?? .null }
     public static func optionalTimestamp(_ d: Date?) -> SQLValue { d.map { .text(DateFormatters.formatIsoTimestamp($0)) } ?? .null }
     public static func bool(_ b: Bool) -> SQLValue { .integer(b ? 1 : 0) }

@@ -57,7 +57,7 @@ Status keys:
 - `FLOW`  
   What it is supposed to do: verify end-to-end shipped journeys on the built RC artifact.  
   Proof of done: built-artifact flow matrix for company setup, company switching, accounts, vouchers, FY lock, reports, backup, and restore.  
-  Current blocker: proof-only gap; the packaging path exists, but `RB-042` is still open because the built-artifact pass is not fully recorded.  
+  Current blocker: none proven; built-artifact QA now has direct RC-flow and bundle/self-test evidence.  
   Current task: re-run accountant-style QA on `dist/Avelo.app`, using self-test coverage as baseline and manually confirming any journey not already proven.
 
 - `QA`  

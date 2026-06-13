@@ -10,20 +10,20 @@ public struct InventoryRepository: Sendable {
 
     public func findItemById(_ id: InventoryItem.ID) throws -> InventoryItem? {
         try db.queryOne(
-            "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE id = ?",
+            "SELECT id, company_id, code, name, unit, alternate_unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, reorder_level, price_level1_paise, price_level2_paise, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE id = ?",
             bind: [.text(id.uuidString)]
         ) { try Self.rowToItem($0) }
     }
 
     public func findItemByCode(_ code: String, companyId: Company.ID) throws -> InventoryItem? {
         try db.queryOne(
-            "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ? AND code = ?",
+            "SELECT id, company_id, code, name, unit, alternate_unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, reorder_level, price_level1_paise, price_level2_paise, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ? AND code = ?",
             bind: [.text(companyId.uuidString), .text(code)]
         ) { try Self.rowToItem($0) }
     }
 
     public func listItemsForCompany(_ companyId: Company.ID, includeInactive: Bool = false) throws -> [InventoryItem] {
-        let sql = "SELECT id, company_id, code, name, unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ?\(includeInactive ? "" : " AND is_active = 1") ORDER BY code COLLATE NOCASE"
+        let sql = "SELECT id, company_id, code, name, unit, alternate_unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, reorder_level, price_level1_paise, price_level2_paise, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ?\(includeInactive ? "" : " AND is_active = 1") ORDER BY code COLLATE NOCASE"
         return try db.query(sql, bind: [.text(companyId.uuidString)]) { try Self.rowToItem($0) }
     }
 
@@ -50,9 +50,10 @@ public struct InventoryRepository: Sendable {
         try db.execute(
             """
             INSERT INTO avelo_inventory_items
-            (id, company_id, code, name, unit, valuation_method, is_active,
-             opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, barcode, hsn_sac, is_archived, linked_account_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, company_id, code, name, unit, alternate_unit, valuation_method, is_active,
+             opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown,
+             reorder_level, price_level1_paise, price_level2_paise, barcode, hsn_sac, is_archived, linked_account_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(item.id.uuidString),
@@ -60,6 +61,7 @@ public struct InventoryRepository: Sendable {
                 .text(item.code),
                 .text(item.name),
                 .text(item.unit),
+                .optionalText(item.alternateUnit),
                 .text(item.valuationMethod.rawValue),
                 .bool(item.isActive),
                 .real(item.openingQuantity),
@@ -68,6 +70,9 @@ public struct InventoryRepository: Sendable {
                 .optionalText(item.stockGroup),
                 .optionalText(item.stockCategory),
                 .optionalText(item.godown),
+                .optionalReal(item.reorderLevel),
+                .optionalInteger(item.priceLevel1Paise),
+                .optionalInteger(item.priceLevel2Paise),
                 .optionalText(item.barcode),
                 .optionalText(item.hsnSac),
                 .bool(item.isArchived),
@@ -81,16 +86,17 @@ public struct InventoryRepository: Sendable {
         try db.execute(
             """
             UPDATE avelo_inventory_items SET
-                code = ?, name = ?, unit = ?, valuation_method = ?, is_active = ?,
+                code = ?, name = ?, unit = ?, alternate_unit = ?, valuation_method = ?, is_active = ?,
                 opening_quantity = ?, opening_rate_paise = ?, gst_rate = ?,
-                stock_group = ?, stock_category = ?, godown = ?,
-                barcode = ?, hsn_sac = ?, is_archived = ?, linked_account_id = ?
+                stock_group = ?, stock_category = ?, godown = ?, reorder_level = ?,
+                price_level1_paise = ?, price_level2_paise = ?, barcode = ?, hsn_sac = ?, is_archived = ?, linked_account_id = ?
             WHERE id = ?
             """,
             [
                 .text(item.code),
                 .text(item.name),
                 .text(item.unit),
+                .optionalText(item.alternateUnit),
                 .text(item.valuationMethod.rawValue),
                 .bool(item.isActive),
                 .real(item.openingQuantity),
@@ -99,6 +105,9 @@ public struct InventoryRepository: Sendable {
                 .optionalText(item.stockGroup),
                 .optionalText(item.stockCategory),
                 .optionalText(item.godown),
+                .optionalReal(item.reorderLevel),
+                .optionalInteger(item.priceLevel1Paise),
+                .optionalInteger(item.priceLevel2Paise),
                 .optionalText(item.barcode),
                 .optionalText(item.hsnSac),
                 .bool(item.isArchived),
@@ -269,6 +278,7 @@ public struct InventoryRepository: Sendable {
             code: r.text("code"),
             name: r.text("name"),
             unit: r.text("unit"),
+            alternateUnit: r.optionalText("alternate_unit"),
             valuationMethod: vm,
             isActive: r.bool("is_active"),
             openingQuantity: r.real("opening_quantity"),
@@ -277,6 +287,9 @@ public struct InventoryRepository: Sendable {
             stockGroup: r.optionalText("stock_group"),
             stockCategory: r.optionalText("stock_category"),
             godown: r.optionalText("godown"),
+            reorderLevel: r.optionalReal("reorder_level"),
+            priceLevel1Paise: r.optionalReal("price_level1_paise").map(Int64.init),
+            priceLevel2Paise: r.optionalReal("price_level2_paise").map(Int64.init),
             barcode: r.optionalText("barcode"),
             hsnSac: r.optionalText("hsn_sac"),
             isArchived: r.bool("is_archived"),
