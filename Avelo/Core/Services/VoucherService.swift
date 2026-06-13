@@ -107,12 +107,15 @@ public final class VoucherService: Sendable {
         let now = Date()
         let total = draft.totalDebitPaise
 
-        let lines: [LedgerLine] = draft.filledLines.enumerated().map { (idx, line) in
-            LedgerLine(
+        let lines: [LedgerLine] = try draft.filledLines.enumerated().map { (idx, line) in
+            guard let accountId = line.accountId else {
+                throw AppError.validation(.init(code: .internal, message: "Voucher line account is required"))
+            }
+            return LedgerLine(
                 id: UUID(),
                 companyId: companyId,
                 voucherId: voucherId,
-                accountId: line.accountId!,
+                accountId: accountId,
                 amountPaise: line.amountPaise,
                 side: line.side,
                 taxCode: line.taxCode,
@@ -201,12 +204,15 @@ public final class VoucherService: Sendable {
         updated.narration = newDraft.narration
         updated.totalPaise = newDraft.totalDebitPaise
         updated.updatedAt = Date()
-        let newLines: [LedgerLine] = newDraft.filledLines.enumerated().map { (idx, line) in
-            LedgerLine(
+        let newLines: [LedgerLine] = try newDraft.filledLines.enumerated().map { (idx, line) in
+            guard let accountId = line.accountId else {
+                throw AppError.validation(.init(code: .internal, message: "Voucher line account is required"))
+            }
+            return LedgerLine(
                 id: UUID(),
                 companyId: companyId,
                 voucherId: voucherId,
-                accountId: line.accountId!,
+                accountId: accountId,
                 amountPaise: line.amountPaise,
                 side: line.side,
                 taxCode: line.taxCode,

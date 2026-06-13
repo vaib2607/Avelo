@@ -23,13 +23,20 @@ enum LocalRCFlowRunner {
         let manager = try DatabaseManager(appSupportDirectory: root)
         let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot)
 
+        func requireDate(_ string: String) throws -> Date {
+            guard let date = DateFormatters.parseDate(string) else {
+                throw AppError.validation(.init(code: .internal, message: "Invalid date literal \(string)"))
+            }
+            return date
+        }
+
         let company = try await CompanyService.create(
             companyInput: .init(name: "RC Accountant Co", gstin: nil, pan: nil),
             fyInput: .init(
                 label: "2024-25",
-                startDate: DateFormatters.parseDate("2024-04-01")!,
-                endDate: DateFormatters.parseDate("2025-03-31")!,
-                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+                startDate: try requireDate("2024-04-01"),
+                endDate: try requireDate("2025-03-31"),
+                booksBeginDate: try requireDate("2024-04-01")
             ),
             seedDefaults: true,
             manager: manager
@@ -92,7 +99,7 @@ enum LocalRCFlowRunner {
         let salesDraft = VoucherDraft(
             mode: .create,
             voucherTypeCode: .sales,
-            date: DateFormatters.parseDate("2024-06-15")!,
+            date: try requireDate("2024-06-15"),
             partyAccountId: partyAccount.id,
             narration: "RC sales invoice",
             lines: [
@@ -105,7 +112,7 @@ enum LocalRCFlowRunner {
         let editedSales = VoucherDraft(
             mode: .edit(originalVoucherId: postedSales.voucher.id),
             voucherTypeCode: .sales,
-            date: DateFormatters.parseDate("2024-06-15")!,
+            date: try requireDate("2024-06-15"),
             partyAccountId: partyAccount.id,
             narration: "RC sales invoice revised",
             lines: [
@@ -118,7 +125,7 @@ enum LocalRCFlowRunner {
         let purchaseDraft = VoucherDraft(
             mode: .create,
             voucherTypeCode: .purchase,
-            date: DateFormatters.parseDate("2024-06-16")!,
+            date: try requireDate("2024-06-16"),
             narration: "RC purchase voucher",
             lines: [
                 .init(accountId: purchase.id, amountPaise: 40_000, side: .debit),
@@ -144,7 +151,7 @@ enum LocalRCFlowRunner {
                 draft: VoucherDraft(
                     mode: .create,
                     voucherTypeCode: .receipt,
-                    date: DateFormatters.parseDate("2024-06-20")!,
+                    date: try requireDate("2024-06-20"),
                     narration: "Blocked by lock",
                     lines: [
                         .init(accountId: cash.id, amountPaise: 10_000, side: .debit),
@@ -160,9 +167,9 @@ enum LocalRCFlowRunner {
 
         let nextFY = try fyService.create(
             label: "2025-26",
-            startDate: DateFormatters.parseDate("2025-04-01")!,
-            endDate: DateFormatters.parseDate("2026-03-31")!,
-            booksBeginDate: DateFormatters.parseDate("2025-04-01")!
+            startDate: try requireDate("2025-04-01"),
+            endDate: try requireDate("2026-03-31"),
+            booksBeginDate: try requireDate("2025-04-01")
         )
         let reversal = try voucherService.reverse(postedSales.voucher.id, reason: "RC reversal")
         guard reversal.financialYearId == nextFY.id else {

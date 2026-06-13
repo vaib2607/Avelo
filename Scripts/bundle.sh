@@ -11,6 +11,7 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 EXECUTABLE_NAME="Avelo"
 EXECUTABLE_PATH="$BUILD_DIR/$EXECUTABLE_NAME"
 SEED_RESOURCE="$ROOT_DIR/Avelo/Resources/Seed/DefaultChartOfAccounts.json"
+ENTITLEMENTS_FILE="$ROOT_DIR/Avelo/Avelo.entitlements"
 
 if [[ ! -x "$EXECUTABLE_PATH" ]]; then
   echo "error: expected built executable at $EXECUTABLE_PATH" >&2
@@ -56,6 +57,6 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-codesign --force --deep --sign - "$APP_DIR"
+codesign --force --deep --sign - --entitlements "$ENTITLEMENTS_FILE" "$APP_DIR"
 
 echo "Created $APP_DIR"

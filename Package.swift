@@ -14,6 +14,7 @@ let package = Package(
             name: "Avelo",
             path: "Avelo",
             exclude: [
+                "Avelo.entitlements",
                 "Resources/SQL/schema_v1.sql",
                 "Resources/Seed/DefaultChartOfAccounts.json"
             ],
