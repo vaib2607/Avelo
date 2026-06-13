@@ -27,3 +27,11 @@ EVIDENCE:
 
 NOTE:
 - Deferred modules inventory, payroll, and banking remain hidden from V1 shipped scope; their `ObservableObject` / `@Published` usage is intentionally excluded from the shipped-surface R-16 audit.
+- Invoice/PDF printing remains deferred and is not part of the current RC bundle.
+- Bill-wise ageing with interest remains deferred and is not part of the current RC bundle.
+- TDS/TCS/cheque/bill-allocation voucher UI remains deferred and is not part of the current RC bundle.
+- PO/SO order-tracking remains deferred and is not part of the current RC bundle.
+- Cash flow / funds flow statement remains deferred and is not part of the current RC bundle.
+- Stock ageing / reorder-level reports remain deferred and are not part of the current RC bundle.
+- Group-company consolidation remains deferred and is not part of the current RC bundle.
+- Search consistency remains intentionally asymmetrical in this RC; Reports and Settings do not add extra search surfaces.

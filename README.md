@@ -107,6 +107,8 @@ swift build -c release
 
 The assembled app bundle is written to `dist/Avelo.app`.
 
+The local RC bundle is ad-hoc signed, so on a fresh Mac you may need to right-click the app and choose Open the first time to clear the Gatekeeper warning.
+
 Validate the bundle structure and signature:
 
 ```bash

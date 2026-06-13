@@ -19,6 +19,63 @@ Status keys:
 - `Depends`: prerequisite items that must be green first
 - `Proof`: what must be true before striking the item
 
+## Release Cleanup Checklist
+
+Use this ordered list for the current RC cleanup pass. For each item:
+- Check whether it already exists.
+- If yes, verify it with the smallest relevant test and mark it done.
+- If no, either implement the minimal viable version or explicitly mark it deferred with a reason.
+- Re-run the targeted test or validation step.
+- Only then move to the next item.
+
+1. Version / release metadata consistency
+- Status: done
+- `Scripts/bundle.sh`, `dist/Avelo.app`, and About screen version text now agree on the current RC label.
+
+2. Rule-audit / release-board reconciliation
+- Status: done
+- `make rule-audit` passes clean; the release board and checklist now separate shipped work from deferred scope.
+
+3. Invoice / PDF printing
+- Status: deferred
+- No print/PDF export pipeline is shipped yet.
+
+4. GSTR-1 export correctness
+- Status: deferred
+- Current export is summary-only; it is not portal-uploadable invoice-wise data.
+
+5. Bill-wise ageing with interest
+- Status: deferred
+- `BillAllocation` exists in the backend, but the ageing/interest UI and report path are not shipped.
+
+6. TDS / TCS / cheque / bill-allocation UI
+- Status: deferred
+- Backend write paths exist, but the user-facing voucher UI is still missing.
+
+7. Purchase Order / Sales Order workflow
+- Status: deferred
+- Voucher types exist, but there is no order-tracking layer yet.
+
+8. Cash flow statement
+- Status: deferred
+- No cash-flow / funds-flow statement is shipped.
+
+9. Stock ageing / reorder levels
+- Status: deferred
+- Inventory has reorder data, but no ageing/reorder report or alert surface is shipped.
+
+10. Group-company consolidation
+- Status: deferred
+- Multi-company storage remains isolated by design.
+
+11. Search consistency pass
+- Status: documented
+- Search remains present in core flows; Reports and Settings do not add redundant search surfaces in this RC.
+
+12. Gatekeeper / distribution note
+- Status: documented
+- The bundle remains ad-hoc signed; release notes now call out the local distribution expectation.
+
 ## RC Queue
 
 - ~~Prove promoted shell routes for inventory, payroll, and banking behave as shipped features~~  

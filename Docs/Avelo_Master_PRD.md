@@ -513,10 +513,17 @@ These are listed in `Avelo_Module_Checklist.md` as deferred. They will not appea
 
 - Multi-user / roles.
 - Cloud sync, online backup.
-- GST portal integration.
+- Invoice / PDF printing for customer-facing vouchers.
+- GST portal integration, including invoice-wise GSTR-1 export.
 - E-invoicing.
 - Multi-currency.
 - Cost centres with budgets.
+- Bill-wise ageing with interest-on-overdue tracking.
+- Purchase order / sales order workflow tracking.
+- Cash flow / funds flow statement.
+- Stock ageing / reorder-level reports and alerts.
+- Group-company consolidation across multiple company files.
+- TDS / TCS / cheque / bill-allocation UI surfaces.
 - Godowns / multiple stock locations.
 - Batches and expiry.
 - Recurring vouchers (templates handle simple cases).
