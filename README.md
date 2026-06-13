@@ -4,6 +4,14 @@ Offline accounting for macOS.
 
 Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no network calls. All data lives on your Mac under `~/Library/Application Support/Avelo/`.
 
+## Screenshots
+
+![Dashboard](docs/assets/generated-image-1.png)
+
+![Vouchers](docs/assets/generated-image-2.png)
+
+![Reports](docs/assets/generated-image-3.png)
+
 ## At A Glance
 
 | Area | Status |
