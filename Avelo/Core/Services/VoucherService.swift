@@ -86,10 +86,18 @@ public final class VoucherService: Sendable {
     public func postBatch(_ drafts: [VoucherDraft], in fy: FinancialYear) throws -> [PostResult] {
         var results: [PostResult] = []
         results.reserveCapacity(drafts.count)
-        for draft in drafts {
-            try autoreleasepool {
-                results.append(try postWithoutCacheInvalidation(draft: draft, in: fy))
+        let chunkSize = 500
+        var index = drafts.startIndex
+        while index < drafts.endIndex {
+            let end = drafts.index(index, offsetBy: chunkSize, limitedBy: drafts.endIndex) ?? drafts.endIndex
+            try db.write { _ in
+                for draft in drafts[index..<end] {
+                    try autoreleasepool {
+                        results.append(try postWithoutCacheInvalidation(draft: draft, in: fy))
+                    }
+                }
             }
+            index = end
         }
         ReportService.invalidateCache(companyId: companyId)
         return results

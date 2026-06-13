@@ -145,7 +145,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
             guard case AppError.fileSystem(let message) = AppError.wrap(error) else {
                 return XCTFail("Expected fileSystem error, got \(error)")
             }
-            XCTAssertTrue(message.localizedCaseInsensitiveContains("write backup file"))
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("copy backup file"))
         }
     }
 
@@ -237,25 +237,20 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         let registeredURL = companiesURL.appendingPathComponent("gone-primary.sqlite")
         let legacyURL = companiesURL.appendingPathComponent("\(companyId.uuidString).sqlite")
 
-        let legacyDB = try SQLiteDatabase(path: legacyURL.path)
-        try MigrationRunner().runMigrations(on: legacyDB)
-        _ = try TestCompany.seed(into: legacyDB, companyId: companyId, companyName: "Missing Primary Co")
-        legacyDB.close()
-
         try await manager.registerCompany(
             CompanyRegistryEntry(id: companyId, name: "Missing Primary Co", sqliteFileName: registeredURL.lastPathComponent)
         )
 
-        let legacyWal = URL(fileURLWithPath: legacyURL.path + "-wal")
-        let legacyShm = URL(fileURLWithPath: legacyURL.path + "-shm")
-        try Data("wal".utf8).write(to: legacyWal)
-        try Data("shm".utf8).write(to: legacyShm)
+        let registeredWal = URL(fileURLWithPath: registeredURL.path + "-wal")
+        let registeredShm = URL(fileURLWithPath: registeredURL.path + "-shm")
+        try Data("wal".utf8).write(to: registeredWal)
+        try Data("shm".utf8).write(to: registeredShm)
 
         try await manager.deleteCompanyFiles(id: companyId)
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: registeredURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyWal.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyShm.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: registeredWal.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: registeredShm.path))
     }
 }

@@ -62,26 +62,32 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.2, 25)
     }
 
-    func testPostBatchCommitsEarlierVouchersBeforeLaterFailure() throws {
+    func testPostBatchRollsBackOnlyCurrentChunkOnFailure() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
-        let drafts: [VoucherDraft] = [
+        var drafts = (0..<500).map { i in
             tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1000 + Int64(i), .debit),
+                tc.line(tc.salesId, 1000 + Int64(i), .credit)
+            ])
+        }
+        drafts.append(contentsOf: [
+            tc.draft(on: "2024-06-02", lines: [
                 tc.line(tc.cashId, 1000, .debit),
                 tc.line(tc.salesId, 1000, .credit)
             ]),
-            tc.draft(on: "2024-06-02", lines: [
+            tc.draft(on: "2024-06-03", lines: [
                 tc.line(tc.cashId, 1000, .debit),
                 tc.line(tc.salesId, 900, .credit)
             ])
-        ]
+        ])
 
         XCTAssertThrowsError(try svc.postBatch(drafts, in: tc.fy))
 
         let voucherCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_vouchers") { $0.int(0) } ?? 0
         let lineCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_ledger_lines") { $0.int(0) } ?? 0
-        XCTAssertEqual(voucherCount, 1)
-        XCTAssertEqual(lineCount, 2)
+        XCTAssertEqual(voucherCount, 500)
+        XCTAssertEqual(lineCount, 1000)
     }
 
     func testUnbalancedPostThrows() throws {

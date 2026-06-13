@@ -254,8 +254,8 @@ public struct RestoreService: Sendable {
                 throw AppError.database(.schemaMismatch("Restore left foreign-key violations in the restored company database."))
             }
         } catch {
-            try recreateLockedFinancialYearTriggers(db: db)
-            try recreateAuditImmutabilityTriggers(db: db)
+            try? recreateLockedFinancialYearTriggers(db: db)
+            try? recreateAuditImmutabilityTriggers(db: db)
             try? db.execute("PRAGMA foreign_keys = ON")
             throw error
         }

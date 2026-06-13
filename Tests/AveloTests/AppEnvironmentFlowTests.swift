@@ -295,39 +295,21 @@ final class AppEnvironmentFlowTests: XCTestCase {
             backupService: BackupService(manager: manager)
         )
 
-        let company = try await CompanyService.create(
-            companyInput: .init(name: "Demo Co", gstin: nil, pan: nil),
-            fyInput: .init(
-                label: "2024-25",
-                startDate: DateFormatters.parseDate("2024-04-01")!,
-                endDate: DateFormatters.parseDate("2025-03-31")!,
-                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
-            ),
-            seedDefaults: true,
-            manager: manager
-        )
-
-        let dbURL = try await manager.companyFileURL(id: company.id)
-        let db = try SQLiteDatabase(path: dbURL.path)
-        defer { db.close() }
-        try tcLikeDeleteAccountCodeIfExists(db: db, code: "PURCHASE")
+        env.onDemoCompanyCreatedForTesting = { companyId in
+            let dbURL = try await manager.companyFileURL(id: companyId)
+            let db = try SQLiteDatabase(path: dbURL.path)
+            defer { db.close() }
+            try tcLikeDeleteAccountCodeIfExists(db: db, code: "PURCHASE")
+        }
 
         do {
-            let handle = try await manager.openCompany(id: company.id)
-            let fyRepo = FinancialYearRepository(db: handle.db)
-            guard let fy = try fyRepo.findMostRecent(handle.companyId) else {
-                return XCTFail("Expected financial year")
-            }
-            let activeAccounts = try AccountService(db: handle.db, companyId: handle.companyId).listActiveAccounts()
-            let lookup = { (code: String) -> Account? in activeAccounts.first(where: { $0.code == code }) }
-            XCTAssertNil(lookup("PURCHASE"))
-            XCTAssertNotNil(lookup("CASH_IN_HAND"))
-            XCTAssertNotNil(lookup("BANK_HDFC"))
-            XCTAssertNotNil(lookup("SALES"))
-            XCTAssertNotNil(lookup("SALARY_EXPENSE"))
-            XCTAssertEqual(fy.label, "2024-25")
+            try await env.ensureDemoCompanyOpenForTesting()
+            XCTFail("Expected missing seed account to be reported as a notFound error")
         } catch {
-            XCTFail("Expected demo bootstrap lookups to be handled without crashing, got \(error)")
+            guard case AppError.notFound(let message) = AppError.wrap(error) else {
+                return XCTFail("Expected notFound error, got \(error)")
+            }
+            XCTAssertEqual(message, "Seed account PURCHASE")
         }
     }
 }

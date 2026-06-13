@@ -23,6 +23,7 @@ public final class AppEnvironment {
     public let registry: RegistryRepository
     public let backupService: BackupService
     public let shouldAutoOpenDemoCompany: Bool
+    internal var onDemoCompanyCreatedForTesting: ((Company.ID) async throws -> Void)?
 
     @MainActor
     public init() {
@@ -109,6 +110,10 @@ public final class AppEnvironment {
         }
     }
 
+    internal func ensureDemoCompanyOpenForTesting() async throws {
+        try await ensureDemoCompanyOpen()
+    }
+
     private func ensureDemoCompanyOpen() async throws {
         if let entry = try registry.listAll().first(where: { $0.name == "Demo Co" }) {
             await openCompany(entry.id)
@@ -136,6 +141,7 @@ public final class AppEnvironment {
             seedDefaults: true,
             manager: manager
         )
+        try await onDemoCompanyCreatedForTesting?(company.id)
 
         let dbURL = try await manager.companyFileURL(id: company.id)
         let db = try SQLiteDatabase(path: dbURL.path)

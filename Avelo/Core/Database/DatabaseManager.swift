@@ -191,8 +191,13 @@ public final actor DatabaseManager {
         closeCompany(id: id)
         let fm = FileManager.default
         let legacyURL = companiesDirectory.appendingPathComponent("\(id.uuidString).sqlite")
-        let primaryURL = (try? companyFileURL(id: id)) ?? legacyURL
-        let urls = Set([primaryURL, legacyURL])
+        var urls: Set<URL> = [legacyURL]
+        if let primaryURL = try? companyFileURL(id: id) {
+            urls.insert(primaryURL)
+        } else if let reg = registryDb,
+                  let entry = try RegistryRepository(db: reg).findById(id) {
+            urls.insert(companiesDirectory.appendingPathComponent(entry.sqliteFileName))
+        }
 
         for url in urls {
             let walURL = URL(fileURLWithPath: url.path + "-wal")
