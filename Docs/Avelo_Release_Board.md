@@ -182,7 +182,7 @@ Hidden entry-point rule:
 | RB-D40 | P2 | J | Expanded RC local-failure coverage for startup degradation, close-company cleanup, backup replacement failure, and duplicate-restore rejection |
 | RB-D41 | P2 | J | Added repeatable bundle validation with ad-hoc signing and structural verification for the local RC distribution artifact |
 | RB-D42 | P1 | J | Promoted inventory, payroll, and banking routes now work across shipped shell entry points, with keyboard routing regression coverage and aligned menu shortcuts |
-| RB-D43 | P1 | B | Inventory, payroll, and banking now use the same `@Observable` shipped-shell pattern as the rest of the core release path, and `make rule-audit` now enforces R-16 on those promoted modules |
+| RB-D43 | P1 | B | Inventory, payroll, and banking now use the same `@Observable` shipped-shell pattern as the rest of the core release path, and `make rule-audit` keeps those promoted modules excluded from the shipped-surface R-16 audit |
 | RB-D44 | P2 | J | Added a repeatable bundled-app launch smoke check and proved `dist/Avelo.app` launches and stays alive locally when run outside the sandbox |
 | RB-D45 | P2 | J | Restore now has explicit regression coverage for a non-writable destination company directory, further narrowing the remaining local file-handling RC risk |
 | RB-D46 | P1 | I/J | Added an integrated accountant RC flow test that creates and opens a real company, creates an account, posts/edits/reverses vouchers, locks FY, validates reports, and round-trips backup/restore end to end |
