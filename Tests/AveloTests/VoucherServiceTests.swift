@@ -129,6 +129,22 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertNotNil(try repo.findById(tc.salesId)?.lastUsedAt)
     }
 
+    func testVoucherNumbersAreUniqueAcrossSequentialPosts() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let first = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy).voucher.number
+        let second = try svc.post(draft: tc.draft(on: "2024-06-02", lines: [
+            tc.line(tc.cashId, 60000, .debit),
+            tc.line(tc.salesId, 60000, .credit)
+        ]), in: tc.fy).voucher.number
+
+        XCTAssertNotEqual(first, second)
+    }
+
     func testWorkflowInputsPersistBillChequeAndTaxRecords() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)

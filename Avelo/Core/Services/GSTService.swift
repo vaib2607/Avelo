@@ -55,13 +55,13 @@ public final class GSTService: Sendable {
             ["Period", "Outward Taxable (Rs)", "Outward Tax (Rs)", "Inward Taxable (Rs)", "Inward Tax (Rs)", "IGST (Rs)", "CGST (Rs)", "SGST (Rs)"],
             [
                 DateFormatters.gstReturn.string(from: fromDate) + " - " + DateFormatters.gstReturn.string(from: toDate),
-                String(format: "%.2f", Double(s.outputTaxablePaise) / 100.0),
-                String(format: "%.2f", Double(s.outputTaxPaise) / 100.0),
-                String(format: "%.2f", Double(s.inputTaxablePaise) / 100.0),
-                String(format: "%.2f", Double(s.inputTaxPaise) / 100.0),
-                String(format: "%.2f", Double(s.igstPaise) / 100.0),
-                String(format: "%.2f", Double(s.cgstPaise) / 100.0),
-                String(format: "%.2f", Double(s.sgstPaise) / 100.0)
+                Currency.formatPaise(s.outputTaxablePaise, style: .plain),
+                Currency.formatPaise(s.outputTaxPaise, style: .plain),
+                Currency.formatPaise(s.inputTaxablePaise, style: .plain),
+                Currency.formatPaise(s.inputTaxPaise, style: .plain),
+                Currency.formatPaise(s.igstPaise, style: .plain),
+                Currency.formatPaise(s.cgstPaise, style: .plain),
+                Currency.formatPaise(s.sgstPaise, style: .plain)
             ]
         ]
         var csv = rows.map { $0.joined(separator: ",") }.joined(separator: "\n")

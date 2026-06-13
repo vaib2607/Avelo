@@ -81,6 +81,13 @@ public struct AccountGroupRepository: Sendable {
         )
     }
 
+    public func delete(_ id: AccountGroup.ID) throws {
+        try db.execute(
+            "DELETE FROM avelo_account_groups WHERE id = ?",
+            [.text(id.uuidString)]
+        )
+    }
+
     static func rowToGroup(_ r: Row) throws -> AccountGroup {
         let id = try UUIDParsing.required(r.text("id"), field: "avelo_account_groups.id")
         let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_account_groups.company_id")

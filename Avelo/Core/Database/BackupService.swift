@@ -17,6 +17,9 @@ public struct BackupService: Sendable {
                        to destinationURL: URL) async throws -> BackupManifest {
         let sourceURL = try await manager.companyFileURL(id: companyId)
         let fm = FileManager.default
+        let tempURL = fm.temporaryDirectory
+            .appendingPathComponent("avelo-backup-\(UUID().uuidString)-\(destinationURL.lastPathComponent)")
+        defer { try? fm.removeItem(at: tempURL) }
         guard fm.fileExists(atPath: sourceURL.path) else {
             AveloBackupLogger.error("backup source missing: \(sourceURL.path, privacy: .public)")
             throw AppError.notFound("Source company file missing")
@@ -28,27 +31,19 @@ public struct BackupService: Sendable {
             try tempHandle.db.checkpoint()
             await manager.closeCompany(id: companyId)
         }
-        if fm.fileExists(atPath: destinationURL.path) {
-            do {
-                try fm.removeItem(at: destinationURL)
-            } catch {
-                AveloBackupLogger.error("backup replace failed: \(destinationURL.path, privacy: .public)")
-                throw AppError.fileSystem("Unable to replace existing backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
-            }
-        }
         do {
-            try fm.copyItem(at: sourceURL, to: destinationURL)
+            try fm.copyItem(at: sourceURL, to: tempURL)
         } catch {
-            AveloBackupLogger.error("backup copy failed: \(destinationURL.path, privacy: .public)")
-            throw AppError.fileSystem("Unable to write backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+            AveloBackupLogger.error("backup temp copy failed: \(tempURL.path, privacy: .public)")
+            throw AppError.fileSystem("Unable to stage backup file at \(tempURL.lastPathComponent): \(error.localizedDescription)")
         }
 
         let data: Data
         do {
-            data = try Data(contentsOf: destinationURL)
+            data = try Data(contentsOf: tempURL)
         } catch {
-            AveloBackupLogger.error("backup readback failed: \(destinationURL.path, privacy: .public)")
-            throw AppError.fileSystem("Unable to read written backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+            AveloBackupLogger.error("backup readback failed: \(tempURL.path, privacy: .public)")
+            throw AppError.fileSystem("Unable to read staged backup file at \(tempURL.lastPathComponent): \(error.localizedDescription)")
         }
         let digest = SHA256.hash(data: data)
         let hex = digest.map { String(format: "%02x", $0) }.joined()
@@ -66,13 +61,23 @@ public struct BackupService: Sendable {
         do {
             json = try enc.encode(manifest)
         } catch {
-            AveloBackupLogger.error("backup manifest encode failed: \(destinationURL.path, privacy: .public)")
-            throw AppError.fileSystem("Unable to encode backup manifest for \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+            AveloBackupLogger.error("backup manifest encode failed: \(tempURL.path, privacy: .public)")
+            throw AppError.fileSystem("Unable to encode backup manifest for \(tempURL.lastPathComponent): \(error.localizedDescription)")
+        }
+        if fm.fileExists(atPath: destinationURL.path) {
+            do {
+                try fm.removeItem(at: destinationURL)
+            } catch {
+                AveloBackupLogger.error("backup replace failed: \(destinationURL.path, privacy: .public)")
+                throw AppError.fileSystem("Unable to replace existing backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+            }
         }
         do {
+            try fm.copyItem(at: tempURL, to: destinationURL)
             try json.write(to: manifestURL)
         } catch {
             AveloBackupLogger.error("backup manifest write failed: \(manifestURL.path, privacy: .public)")
+            try? fm.removeItem(at: manifestURL)
             throw AppError.fileSystem("Unable to write backup manifest at \(manifestURL.lastPathComponent): \(error.localizedDescription)")
         }
         return manifest

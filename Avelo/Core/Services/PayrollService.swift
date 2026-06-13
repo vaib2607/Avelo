@@ -114,6 +114,19 @@ public final class PayrollService: Sendable {
         let net = gross - deductionsPaise
         let year = monthYear / 100
         let month = monthYear % 100
+        let result = PayrollDraftValidator().validate(PayrollDraftValidator.Input(
+            employeeId: employeeId,
+            month: month,
+            year: year,
+            grossPaise: gross,
+            deductionsPaise: deductionsPaise,
+            netPaise: net,
+            employeeActive: employee.isActive,
+            employeeHasEndDate: employee.endDate != nil
+        ))
+        if case .invalid(let errs) = result {
+            throw AppError.validation(errs[0])
+        }
         let entry = PayrollEntry(
             id: UUID(),
             companyId: companyId,
@@ -134,21 +147,12 @@ public final class PayrollService: Sendable {
             esiApplicable: employee.esiApplicable,
             postedAt: Date()
         )
-        let result = PayrollDraftValidator().validate(PayrollDraftValidator.Input(
-            employeeId: employeeId,
-            month: month,
-            year: year,
-            grossPaise: gross,
-            deductionsPaise: deductionsPaise,
-            netPaise: net,
-            employeeActive: employee.isActive,
-            employeeHasEndDate: employee.endDate != nil
-        ))
-        if case .invalid(let errs) = result {
-            throw AppError.validation(errs[0])
-        }
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
+            let existing = try repo.listEntries(filter: .init(companyId: companyId, employeeId: employeeId, financialYearId: financialYearId, monthYear: (year, month), limit: 1))
+            if !existing.isEmpty {
+                throw AppError.duplicateSalary("Payroll already posted for this employee and month.")
+            }
             try repo.insertEntry(entry)
             try AuditService(db: tx, companyId: companyId).record(
                 action: .payrollEntryPosted,

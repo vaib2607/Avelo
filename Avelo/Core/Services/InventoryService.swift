@@ -114,7 +114,14 @@ public final class InventoryService: Sendable {
             currentOnHandQty: onHand
         ))
         if case .invalid(let errs) = v {
+            if errs.contains(where: { $0.code == .quantityExceedsStock }) {
+                throw AppError.negativeStock(errs.first?.message ?? "Out quantity exceeds current stock.")
+            }
             throw AppError.validation(errs[0])
+        }
+        let outTypes: Set<InventoryItem.MovementType> = [.stockOut, .sale, .purchaseReturn, .adjustmentOut]
+        if outTypes.contains(type) && quantity > onHand {
+            throw AppError.negativeStock("Out quantity exceeds current stock.")
         }
         let movement = StockMovement(
             id: UUID(),

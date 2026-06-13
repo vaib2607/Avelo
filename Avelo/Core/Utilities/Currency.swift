@@ -70,6 +70,15 @@ public enum Currency {
         return rupeesToPaise(decimal)
     }
 
+    public static func percentagePaise(_ amountPaise: Int64, ratePercent: Int64) -> Int64 {
+        let scaled = amountPaise * ratePercent
+        if scaled >= 0 {
+            return (scaled + 50) / 100
+        } else {
+            return (scaled - 50) / 100
+        }
+    }
+
     public static func formatAmountInput(paise: Int64) -> String {
         if paise == 0 { return "0.00" }
         return formatPaise(paise, style: .plain)

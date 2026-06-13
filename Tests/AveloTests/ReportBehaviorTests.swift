@@ -264,6 +264,20 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(gst.netPayablePaise, 1800)
     }
 
+    func testGstSummaryCsvUsesSharedPaiseFormatter() throws {
+        let tc = try makeSeededCompany()
+        try seedActivity(tc)
+
+        let csv = try GSTService(db: tc.db, companyId: tc.companyId).exportGSTSummaryCSV(
+            fromDate: DateFormatters.parseDate("2024-08-01")!,
+            toDate: DateFormatters.parseDate("2024-08-31")!
+        )
+        let text = String(decoding: csv, as: UTF8.self)
+
+        XCTAssertTrue(text.contains("Period"))
+        XCTAssertFalse(text.contains("/ 100.0"))
+    }
+
     func testReportDateBoundariesExcludeLaterActivity() throws {
         let tc = try makeSeededCompany()
         try seedActivity(tc)

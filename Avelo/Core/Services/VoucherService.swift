@@ -96,11 +96,6 @@ public final class VoucherService: Sendable {
             throw AppError.validation(errs[0])
         }
 
-        let number = try sequenceRepository.nextNumber(
-            companyId: companyId,
-            financialYearId: fy.id,
-            typeCode: draft.voucherTypeCode
-        )
         let voucherId = UUID()
         let now = Date()
         let total = draft.totalDebitPaise
@@ -121,24 +116,29 @@ public final class VoucherService: Sendable {
                 lineOrder: idx
             )
         }
-        let voucher = Voucher(
-            id: voucherId,
-            companyId: companyId,
-            financialYearId: fy.id,
-            voucherTypeCode: draft.voucherTypeCode,
-            number: number,
-            date: draft.date,
-            partyAccountId: draft.partyAccountId,
-            narration: draft.narration,
-            isReversal: false,
-            reversalOfId: nil,
-            isPosted: true,
-            totalPaise: total,
-            createdAt: now,
-            updatedAt: now
-        )
-
+        var voucher: Voucher!
         try db.write { tx in
+            let number = try VoucherSequenceRepository(db: tx).nextNumber(
+                companyId: companyId,
+                financialYearId: fy.id,
+                typeCode: draft.voucherTypeCode
+            )
+            voucher = Voucher(
+                id: voucherId,
+                companyId: companyId,
+                financialYearId: fy.id,
+                voucherTypeCode: draft.voucherTypeCode,
+                number: number,
+                date: draft.date,
+                partyAccountId: draft.partyAccountId,
+                narration: draft.narration,
+                isReversal: false,
+                reversalOfId: nil,
+                isPosted: true,
+                totalPaise: total,
+                createdAt: now,
+                updatedAt: now
+            )
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
             let accountRepo = AccountRepository(db: tx)

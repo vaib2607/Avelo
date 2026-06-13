@@ -7,6 +7,9 @@ public enum AppError: Error, Sendable, Equatable, Identifiable {
     case fileSystem(String)
     case unexpected(String)
     case businessRule(String)
+    case duplicateSalary(String)
+    case groupHasChildren(String)
+    case negativeStock(String)
     case notFound(String)
 
     public var localizedMessage: String {
@@ -22,6 +25,12 @@ public enum AppError: Error, Sendable, Equatable, Identifiable {
         case .unexpected(let s):
             return "Unexpected error: \(s)"
         case .businessRule(let s):
+            return s
+        case .duplicateSalary(let s):
+            return s
+        case .groupHasChildren(let s):
+            return s
+        case .negativeStock(let s):
             return s
         case .notFound(let s):
             return "Not found: \(s)"
@@ -46,6 +55,9 @@ public enum AppError: Error, Sendable, Equatable, Identifiable {
         case .fileSystem(let s):   return "fs-\(s.hashValue)"
         case .unexpected(let s):   return "unexpected-\(s.hashValue)"
         case .businessRule(let s): return "biz-\(s.hashValue)"
+        case .duplicateSalary(let s): return "salary-dup-\(s.hashValue)"
+        case .groupHasChildren(let s): return "group-children-\(s.hashValue)"
+        case .negativeStock(let s): return "negative-\(s.hashValue)"
         case .notFound(let s):     return "404-\(s.hashValue)"
         }
     }

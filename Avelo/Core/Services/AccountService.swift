@@ -117,4 +117,27 @@ public final class AccountService: Sendable {
         try groupRepository.insert(group)
         return group
     }
+
+    public func deleteGroup(_ id: AccountGroup.ID) throws {
+        guard let group = try groupRepository.findById(id) else {
+            throw AppError.notFound("Account group")
+        }
+        let children = try groupRepository.listChildren(of: id)
+        if !children.isEmpty {
+            throw AppError.groupHasChildren("Cannot delete an account group that still has child groups.")
+        }
+        let ledgers = try repository.listLedgersForGroup(id)
+        if !ledgers.isEmpty {
+            throw AppError.groupHasChildren("Cannot delete an account group that still has ledger accounts.")
+        }
+        try db.write { tx in
+            try AccountGroupRepository(db: tx).delete(group.id)
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .accountUpdated,
+                entityType: "account_group",
+                entityId: group.id.uuidString,
+                snapshotBefore: group
+            )
+        }
+    }
 }
