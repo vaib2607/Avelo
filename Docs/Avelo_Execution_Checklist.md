@@ -829,3 +829,7 @@ Strike an item only when:
 ## Future Split Candidates
 - `Core/Repositories/ReportRepository.swift`
 - `Features/Reports/ReportsView.swift`
+
+## Benchmark Note
+- At 500k vouchers, `million_report_pass` has been observed in the ~14.4s to ~16.6s band on this machine, and `million_voucher_post_batched` has ranged roughly ~516s to ~606s depending on background load.
+- Treat single-sample benchmark deltas as suggestive only; compare multiple runs and the load average at the start of each run before drawing conclusions.
