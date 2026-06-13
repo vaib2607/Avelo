@@ -193,6 +193,62 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(payablesAfterBill.totalPaise, -7000)
     }
 
+    func testOutstandingUsesBillWiseAllocationsAndAgeBuckets() throws {
+        let tc = try makeSeededCompany()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        _ = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-04-01")!,
+                partyAccountId: tc.debtorsId,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-001",
+                narration: "Bill one",
+                lines: [
+                    .init(accountId: tc.debtorsId, amountPaise: 50000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .newRef, billAllocationNumber: "INV-001")
+        )
+
+        _ = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .receipt,
+                date: DateFormatters.parseDate("2024-04-15")!,
+                partyAccountId: tc.debtorsId,
+                billReferenceType: .agstRef,
+                billReferenceNumber: "INV-001",
+                narration: "Partial settlement",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 20000, side: .debit),
+                    .init(accountId: tc.debtorsId, amountPaise: 20000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .agstRef, billAllocationNumber: "INV-001")
+        )
+
+        let outstanding = try ReportService(db: tc.db, companyId: tc.companyId).outstanding(
+            asOfDate: DateFormatters.parseDate("2024-05-20")!,
+            direction: .receivable
+        )
+
+        XCTAssertEqual(outstanding.rows.count, 1)
+        XCTAssertEqual(outstanding.totalPaise, 30000)
+        let row = try XCTUnwrap(outstanding.rows.first)
+        XCTAssertEqual(row.amountPaise, 30000)
+        XCTAssertEqual(row.age31to60Paise, 30000)
+        XCTAssertEqual(row.age0to30Paise, 0)
+        XCTAssertEqual(row.age61to90Paise, 0)
+        XCTAssertEqual(row.age90PlusPaise, 0)
+        XCTAssertEqual(row.ageInDays, 49)
+    }
+
     func testGstSummaryRespectsDateRangeAndBucketTotals() throws {
         let tc = try makeSeededCompany()
         try seedActivity(tc)

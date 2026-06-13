@@ -40,7 +40,25 @@ public final class VoucherService: Sendable {
         public var tdsTaxPaise: Int64?
         public var tcsSectionCode: String?
         public var tcsTaxPaise: Int64?
-        public init() {}
+        public init(billAllocationKind: BillAllocationKind? = nil,
+                    billAllocationNumber: String? = nil,
+                    chequeNumber: String? = nil,
+                    chequeDueDate: Date? = nil,
+                    postDatedDate: Date? = nil,
+                    tdsSectionCode: String? = nil,
+                    tdsTaxPaise: Int64? = nil,
+                    tcsSectionCode: String? = nil,
+                    tcsTaxPaise: Int64? = nil) {
+            self.billAllocationKind = billAllocationKind
+            self.billAllocationNumber = billAllocationNumber
+            self.chequeNumber = chequeNumber
+            self.chequeDueDate = chequeDueDate
+            self.postDatedDate = postDatedDate
+            self.tdsSectionCode = tdsSectionCode
+            self.tdsTaxPaise = tdsTaxPaise
+            self.tcsSectionCode = tcsSectionCode
+            self.tcsTaxPaise = tcsTaxPaise
+        }
     }
 
     public func post(draft: VoucherDraft, in fy: FinancialYear) throws -> PostResult {

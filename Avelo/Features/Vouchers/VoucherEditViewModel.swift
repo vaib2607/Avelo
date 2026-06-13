@@ -14,6 +14,12 @@ public final class VoucherEditViewModel {
     public var partyAccountId: Account.ID?
     public var billReferenceType: VoucherDraft.BillReferenceType?
     public var billReferenceNumber: String = ""
+    public var chequeNumber: String = ""
+    public var chequeDueDate: Date?
+    public var tdsSectionCode: String = ""
+    public var tdsTaxAmount: String = ""
+    public var tcsSectionCode: String = ""
+    public var tcsTaxAmount: String = ""
     public var lines: [LineRow] = [LineRow()]
 
     public let mode: VoucherDraft.Mode
@@ -172,6 +178,26 @@ public final class VoucherEditViewModel {
             )
         }
         return d
+    }
+
+    public func buildWorkflowInputs() -> VoucherService.WorkflowInputs {
+        var workflow = VoucherService.WorkflowInputs()
+        workflow.billAllocationKind = billReferenceType.map {
+            switch $0 {
+            case .newRef: return .newRef
+            case .agstRef: return .agstRef
+            case .advance: return .advance
+            case .onAccount: return .onAccount
+            }
+        }
+        workflow.billAllocationNumber = billReferenceNumber.isEmpty ? nil : billReferenceNumber
+        workflow.chequeNumber = chequeNumber.isEmpty ? nil : chequeNumber
+        workflow.chequeDueDate = chequeDueDate
+        workflow.tdsSectionCode = tdsSectionCode.isEmpty ? nil : tdsSectionCode
+        workflow.tdsTaxPaise = Currency.parseRupeeInput(tdsTaxAmount)
+        workflow.tcsSectionCode = tcsSectionCode.isEmpty ? nil : tcsSectionCode
+        workflow.tcsTaxPaise = Currency.parseRupeeInput(tcsTaxAmount)
+        return workflow
     }
 
     public func revalidate() {

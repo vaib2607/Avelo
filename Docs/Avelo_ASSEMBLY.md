@@ -94,6 +94,7 @@ Use cases. Compose repositories + validators + audit. Write paths open one `db.w
 - `InventoryService.swift` — items, archive, movements, link to ledger account.
 - `PayrollService.swift` — employees, monthly salary posting.
 - `GSTService.swift` — summary, return builder, GSTR-1 CSV.
+- `InvoicePDFService.swift` — PDF tax invoice export for Sales/Purchase vouchers.
 - `BankReconciliationService.swift` — import, reconcile, clear.
 - `ValidationService.swift` — façade over all validators + static PAN / GSTIN helpers.
 - `AuditService.swift` — `record(action:entityType:entityId:snapshotBefore:snapshotAfter:reason:)`; takes `Encodable?` so any model encodes directly.

@@ -498,21 +498,120 @@ public struct ReportRepository: Sendable {
         let accounts: [(Account.ID, String, String)] = try db.query(sql, bind: bind) { r in
             (try UUIDParsing.required(r.text("id"), field: "report.outstanding.account_id"), r.text("name"), r.text("code"))
         }
-        let totalsByAccount = try movementTotals(
-            for: accounts.map { $0.0 },
+        let accountIds = accounts.map { $0.0 }
+        guard !accountIds.isEmpty else {
+            return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: [], direction: direction, totalPaise: 0)
+        }
+        let placeholder = Array(repeating: "?", count: accountIds.count).joined(separator: ",")
+        let billSql = """
+            SELECT ba.party_account_id AS aid,
+                   ba.kind AS kind,
+                   COALESCE(ba.reference_number, v.number) AS ref,
+                   ba.allocated_paise AS allocated,
+                   v.date AS vdate
+            FROM avelo_bill_allocations ba
+            JOIN avelo_vouchers v ON v.id = ba.voucher_id AND v.company_id = ba.company_id
+            WHERE ba.company_id = ? AND ba.party_account_id IN (\(placeholder)) AND v.date <= ?
+            ORDER BY v.date ASC, v.created_at ASC
+        """
+        struct BillRow: Sendable {
+            let partyId: Account.ID
+            let kind: BillAllocationKind
+            let reference: String
+            let allocatedPaise: Int64
+            let voucherDate: Date
+        }
+        let billRows: [BillRow] = try db.query(billSql, bind: [.text(filter.companyId.uuidString)] + accountIds.map { .text($0.uuidString) } + [.date(asOfDate)]) { r in
+            BillRow(
+                partyId: try UUIDParsing.required(r.text("aid"), field: "report.outstanding.party_account_id"),
+                kind: BillAllocationKind(rawValue: r.text("kind")) ?? .newRef,
+                reference: r.text("ref"),
+                allocatedPaise: r.int("allocated"),
+                voucherDate: r.date("vdate")
+            )
+        }
+        let legacyTotals = try movementTotals(
+            for: accountIds,
             companyId: filter.companyId,
             toDate: asOfDate
         )
+
+        struct BillSummary {
+            var accountName: String
+            var totalPaise: Int64 = 0
+            var age0to30Paise: Int64 = 0
+            var age31to60Paise: Int64 = 0
+            var age61to90Paise: Int64 = 0
+            var age90PlusPaise: Int64 = 0
+            var ageInDays: Int = 0
+            var invoices: [String: (date: Date, amount: Int64)] = [:]
+            var settlements: [String: Int64] = [:]
+        }
+
+        var summaries: [Account.ID: BillSummary] = Dictionary(uniqueKeysWithValues: accounts.map { ($0.0, BillSummary(accountName: $0.1)) })
+        for bill in billRows {
+            guard var summary = summaries[bill.partyId] else { continue }
+            switch bill.kind {
+            case .newRef:
+                let entry = summary.invoices[bill.reference] ?? (date: bill.voucherDate, amount: 0)
+                summary.invoices[bill.reference] = (date: min(entry.date, bill.voucherDate), amount: entry.amount + bill.allocatedPaise)
+            case .agstRef:
+                summary.settlements[bill.reference, default: 0] += bill.allocatedPaise
+            case .advance, .onAccount:
+                break
+            }
+            summaries[bill.partyId] = summary
+        }
+
         var rows: [ReportResult.OutstandingRow] = []
-        for (aid, name, _) in accounts {
-            let totals = totalsByAccount[aid]
-            let total = (totals?.debitPaise ?? 0) - (totals?.creditPaise ?? 0)
-            if total == 0 { continue }
+        for (aid, summary) in summaries {
+            if summary.invoices.isEmpty && summary.settlements.isEmpty {
+                let totals = legacyTotals[aid]
+                let total = (totals?.debitPaise ?? 0) - (totals?.creditPaise ?? 0)
+                if total == 0 { continue }
+                if let account = accounts.first(where: { $0.0 == aid }) {
+                    rows.append(ReportResult.OutstandingRow(
+                        id: aid,
+                        partyName: account.1,
+                        asOf: asOfDate,
+                        amountPaise: total,
+                        age0to30Paise: total,
+                        ageInDays: 0
+                    ))
+                }
+                continue
+            }
+            var total: Int64 = 0
+            var bucket0: Int64 = 0
+            var bucket31: Int64 = 0
+            var bucket61: Int64 = 0
+            var bucket90: Int64 = 0
+            var maxAge = 0
+            for (ref, invoice) in summary.invoices {
+                let settled = summary.settlements[ref, default: 0]
+                let outstanding = invoice.amount - settled
+                guard outstanding > 0 else { continue }
+                total += outstanding
+                let days = max(0, Int(asOfDate.timeIntervalSince(invoice.date) / 86_400))
+                maxAge = max(maxAge, days)
+                switch days {
+                case 0...30: bucket0 += outstanding
+                case 31...60: bucket31 += outstanding
+                case 61...90: bucket61 += outstanding
+                default: bucket90 += outstanding
+                }
+            }
+            guard total > 0 else { continue }
             rows.append(ReportResult.OutstandingRow(
                 id: aid,
-                partyName: name,
+                partyName: summary.accountName,
                 asOf: asOfDate,
-                amountPaise: total
+                amountPaise: total,
+                age0to30Paise: bucket0,
+                age31to60Paise: bucket31,
+                age61to90Paise: bucket61,
+                age90PlusPaise: bucket90,
+                ageInDays: maxAge
             ))
         }
         return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: rows, direction: direction, totalPaise: rows.reduce(0) { $0 + $1.amountPaise })

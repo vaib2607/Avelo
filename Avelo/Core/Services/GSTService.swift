@@ -49,7 +49,7 @@ public final class GSTService: Sendable {
         )
     }
 
-    public func exportGSTR1(fromDate: Date, toDate: Date) throws -> Data {
+    public func exportGSTSummaryCSV(fromDate: Date, toDate: Date) throws -> Data {
         let s = try summary(fromDate: fromDate, toDate: toDate)
         let rows: [[String]] = [
             ["Period", "Outward Taxable (Rs)", "Outward Tax (Rs)", "Inward Taxable (Rs)", "Inward Tax (Rs)", "IGST (Rs)", "CGST (Rs)", "SGST (Rs)"],
@@ -67,5 +67,10 @@ public final class GSTService: Sendable {
         var csv = rows.map { $0.joined(separator: ",") }.joined(separator: "\n")
         csv += "\n"
         return Data(csv.utf8)
+    }
+
+    @available(*, deprecated, message: "This export is summary-only; use exportGSTSummaryCSV(fromDate:toDate:) for the honest label.")
+    public func exportGSTR1(fromDate: Date, toDate: Date) throws -> Data {
+        try exportGSTSummaryCSV(fromDate: fromDate, toDate: toDate)
     }
 }

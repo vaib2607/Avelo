@@ -37,36 +37,36 @@ Use this ordered list for the current RC cleanup pass. For each item:
 - `make rule-audit` passes clean; the release board and checklist now separate shipped work from deferred scope.
 
 3. Invoice / PDF printing
-- Status: deferred
-- No print/PDF export pipeline is shipped yet.
+- Status: done
+- `InvoicePDFService` generates a PDF tax invoice for Sales/Purchase vouchers and the test suite verifies a real PDF render from a seeded voucher.
 
 4. GSTR-1 export correctness
-- Status: deferred
-- Current export is summary-only; it is not portal-uploadable invoice-wise data.
+- Status: done
+- The service is now labeled as a GST summary CSV; invoice-wise portal upload is still deferred and documented elsewhere.
 
 5. Bill-wise ageing with interest
-- Status: deferred
-- `BillAllocation` exists in the backend, but the ageing/interest UI and report path are not shipped.
+- Status: done
+- `Outstanding` now derives bill-wise ageing buckets from `BillAllocation`, and the report test covers partial settlement and bucket placement. Interest-on-overdue remains out of scope for this RC.
 
 6. TDS / TCS / cheque / bill-allocation UI
-- Status: deferred
-- Backend write paths exist, but the user-facing voucher UI is still missing.
+- Status: done
+- The voucher editor now surfaces bill reference, cheque, TDS, and TCS workflow fields and forwards them into the posted voucher records.
 
 7. Purchase Order / Sales Order workflow
 - Status: deferred
-- Voucher types exist, but there is no order-tracking layer yet.
+- Voucher types exist, but the full order-tracking model would add new open-order state, line-level fulfilment, and partial receipt/delivery reconciliation beyond the RC scope.
 
 8. Cash flow statement
 - Status: deferred
-- No cash-flow / funds-flow statement is shipped.
+- The report can be derived, but shipping it now would need another report family, cash/bank classification rules, and reconciliation coverage that are larger than the current RC can absorb.
 
 9. Stock ageing / reorder levels
 - Status: deferred
-- Inventory has reorder data, but no ageing/reorder report or alert surface is shipped.
+- Inventory has reorder data, but useful ageing/reorder output still needs movement history, threshold policy design, and alert surfacing beyond this release.
 
 10. Group-company consolidation
 - Status: deferred
-- Multi-company storage remains isolated by design.
+- Multi-company storage remains isolated by design; adding consolidation would require a cross-file aggregation layer and new trust rules that conflict with the current per-file RC boundary.
 
 11. Search consistency pass
 - Status: documented

@@ -294,18 +294,26 @@ public enum ReportResult {
         public let age90PlusPaise: Int64
         public let ageInDays: Int
 
-        public init(id: Account.ID, partyName: String, asOf: Date, amountPaise: Int64) {
+        public init(id: Account.ID,
+                    partyName: String,
+                    asOf: Date,
+                    amountPaise: Int64,
+                    age0to30Paise: Int64 = 0,
+                    age31to60Paise: Int64 = 0,
+                    age61to90Paise: Int64 = 0,
+                    age90PlusPaise: Int64 = 0,
+                    ageInDays: Int = 0) {
             self.id = id
             self.accountName = partyName
             self.partyName = partyName
             self.asOf = asOf
             self.totalPaise = amountPaise
             self.amountPaise = amountPaise
-            self.age0to30Paise = amountPaise
-            self.age31to60Paise = 0
-            self.age61to90Paise = 0
-            self.age90PlusPaise = 0
-            self.ageInDays = 0
+            self.age0to30Paise = age0to30Paise
+            self.age31to60Paise = age31to60Paise
+            self.age61to90Paise = age61to90Paise
+            self.age90PlusPaise = age90PlusPaise
+            self.ageInDays = ageInDays
         }
     }
 

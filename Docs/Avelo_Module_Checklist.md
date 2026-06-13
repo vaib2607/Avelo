@@ -97,6 +97,7 @@ Legend: `[ ]` pending · `[x]` done · `[-]` deferred (with reason) · `[!]` blo
 - [x] `Core/Services/InventoryService.swift`
 - [x] `Core/Services/PayrollService.swift`
 - [x] `Core/Services/GSTService.swift`
+- [x] `Core/Services/InvoicePDFService.swift`
 - [x] `Core/Services/BankReconciliationService.swift`
 - [x] `Core/Services/AuditService.swift`
 - [x] `Core/Services/ValidationService.swift`

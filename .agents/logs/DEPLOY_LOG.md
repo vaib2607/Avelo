@@ -15,6 +15,10 @@ VERIFICATION:
 - `Scripts/launch_smoke.sh dist/Avelo.app`: pass
 - `RC stress tests`: pass
 
+NOTES:
+- GST export remains summary CSV only; invoice-wise GSTR-1 upload data is still deferred.
+- Purchase order / sales order workflow, cash flow statement, stock ageing/reorder, and group-company consolidation remain deferred for this RC.
+
 BLOCKERS:
 - none proven
 
@@ -27,9 +31,8 @@ EVIDENCE:
 
 NOTE:
 - Deferred modules inventory, payroll, and banking remain hidden from V1 shipped scope; their `ObservableObject` / `@Published` usage is intentionally excluded from the shipped-surface R-16 audit.
-- Invoice/PDF printing remains deferred and is not part of the current RC bundle.
-- Bill-wise ageing with interest remains deferred and is not part of the current RC bundle.
-- TDS/TCS/cheque/bill-allocation voucher UI remains deferred and is not part of the current RC bundle.
+- Bill-wise ageing buckets are shipped; interest-on-overdue remains deferred and is not part of the current RC bundle.
+- TDS/TCS/cheque/bill-allocation voucher fields are shipped; only deeper workflow expansion remains deferred.
 - PO/SO order-tracking remains deferred and is not part of the current RC bundle.
 - Cash flow / funds flow statement remains deferred and is not part of the current RC bundle.
 - Stock ageing / reorder-level reports remain deferred and are not part of the current RC bundle.

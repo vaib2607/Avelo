@@ -14,7 +14,7 @@ Severity rules:
 Module ship status:
 - `Core ship`: company setup, company switching, FYs, accounts, vouchers, reports, inventory, payroll, banking, audit, backup/restore, offline shell
 - `Conditional`: none in the current local RC shell
-- `Deferred`: invoice/PDF printing, bill-wise ageing/interest, TDS/TCS/cheque/bill-allocation UI, PO/SO order-tracking, cash flow statement, stock ageing/reorder alerts, group-company consolidation, and GST export flows beyond current summary/report preparation, including invoice-wise GSTR-1 portal upload data
+- `Deferred`: PO/SO order-tracking, cash flow statement, stock ageing/reorder alerts, group-company consolidation, and invoice-wise GSTR-1 portal upload data beyond the current summary CSV/report preparation; each requires either a new report family or a cross-file/stateful workflow layer that exceeds the RC scope
 
 Release split rule:
 - If it affects correctness, data loss, or the app's ability to open and save reliably on day one, it belongs in `V1`.

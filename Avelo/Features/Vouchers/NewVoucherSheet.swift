@@ -44,7 +44,7 @@ public struct NewVoucherSheet: View {
         guard let ctx = env.companyContext else { return }
         do {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
-            _ = try svc.post(draft: vm.buildDraft(), in: ctx.financialYear)
+            _ = try svc.post(draft: vm.buildDraft(), in: ctx.financialYear, workflow: vm.buildWorkflowInputs())
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher posted.")
@@ -112,6 +112,7 @@ private struct NewVoucherBody: View {
     private var mainContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             headerSection
+            workflowSection
             linesSection
             if !vm.validationErrors.isEmpty { validationSection }
             totalsSection
@@ -135,6 +136,23 @@ private struct NewVoucherBody: View {
                 TextField("Bill reference number", text: $vm.billReferenceNumber)
                 TextField("Narration", text: $vm.narration, axis: .vertical)
                     .lineLimit(2...4)
+            }
+            .formStyle(.grouped)
+        }
+    }
+
+    private var workflowSection: some View {
+        GroupBox("Workflow") {
+            Form {
+                TextField("Cheque number", text: $vm.chequeNumber)
+                DatePicker("Cheque due date", selection: Binding(
+                    get: { vm.chequeDueDate ?? vm.date },
+                    set: { vm.chequeDueDate = $0 }
+                ), displayedComponents: .date)
+                TextField("TDS section code", text: $vm.tdsSectionCode)
+                TextField("TDS tax amount", text: $vm.tdsTaxAmount)
+                TextField("TCS section code", text: $vm.tcsSectionCode)
+                TextField("TCS tax amount", text: $vm.tcsTaxAmount)
             }
             .formStyle(.grouped)
         }

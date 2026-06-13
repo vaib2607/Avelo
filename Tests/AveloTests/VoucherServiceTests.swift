@@ -107,6 +107,67 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertNotNil(try repo.findById(tc.salesId)?.lastUsedAt)
     }
 
+    func testWorkflowInputsPersistBillChequeAndTaxRecords() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.salesId,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-77",
+                narration: "Workflow test",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 118000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 100000, side: .credit),
+                    .init(accountId: tc.rentId, amountPaise: 18000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                billAllocationKind: .newRef,
+                billAllocationNumber: "INV-77",
+                chequeNumber: "CHQ-123",
+                chequeDueDate: DateFormatters.parseDate("2024-06-15")!,
+                tdsSectionCode: "194C",
+                tdsTaxPaise: 5000,
+                tcsSectionCode: "206C",
+                tcsTaxPaise: 3000
+            )
+        ).voucher
+
+        let allocations = try tc.db.queryOne(
+            "SELECT kind, reference_number, allocated_paise FROM avelo_bill_allocations WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { ($0.text("kind"), $0.optionalText("reference_number"), $0.int("allocated_paise")) }
+        XCTAssertEqual(allocations?.0, BillAllocationKind.newRef.rawValue)
+        XCTAssertEqual(allocations?.1, "INV-77")
+        XCTAssertEqual(allocations?.2, 118000)
+
+        let cheque = try tc.db.queryOne(
+            "SELECT cheque_number, status FROM avelo_cheques WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { ($0.text("cheque_number"), $0.text("status")) }
+        XCTAssertEqual(cheque?.0, "CHQ-123")
+        XCTAssertEqual(cheque?.1, ChequeStatus.deposited.rawValue)
+
+        let tds = try tc.db.queryOne(
+            "SELECT section_code, tax_paise FROM avelo_tds_records WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { ($0.text("section_code"), $0.int("tax_paise")) }
+        XCTAssertEqual(tds?.0, "194C")
+        XCTAssertEqual(tds?.1, 5000)
+
+        let tcs = try tc.db.queryOne(
+            "SELECT section_code, tax_paise FROM avelo_tcs_records WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { ($0.text("section_code"), $0.int("tax_paise")) }
+        XCTAssertEqual(tcs?.0, "206C")
+        XCTAssertEqual(tcs?.1, 3000)
+    }
+
     func testEditInLockedFinancialYearThrows() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
