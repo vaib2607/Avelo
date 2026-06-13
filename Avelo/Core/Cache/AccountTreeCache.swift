@@ -62,7 +62,11 @@ public final class AccountTreeCache {
     }
 
     public func ensureLoaded() -> AccountTree? {
+        if isLoading {
+            return tree
+        }
         if isDirty || tree == nil {
+            isLoading = true
             Task { await reload() }
         }
         return tree
@@ -86,12 +90,12 @@ public final class AccountTreeCache {
         guard !ledgers.isEmpty else { return [:] }
         var out: [Account.ID: LedgerBalance] = [:]
         let batchSize = 500
-        let windows: (from: Date?, to: Date?) = {
+        let fyEnd: Date? = {
             guard let financialYearId,
                   let fy = try? FinancialYearRepository(db: db).findById(financialYearId) else {
-                return (nil, nil)
+                return (nil)
             }
-            return (fy.startDate, fy.endDate)
+            return fy.endDate
         }()
         var index = ledgers.startIndex
         while index < ledgers.endIndex {
@@ -107,11 +111,7 @@ public final class AccountTreeCache {
                 WHERE l.account_id IN (\(placeholders))
             """
             var binds: [SQLValue] = batch.map { .text($0.id.uuidString) }
-            if let from = windows.from {
-                sql += " AND v.date >= ?"
-                binds.append(.date(from))
-            }
-            if let to = windows.to {
+            if let to = fyEnd {
                 sql += " AND v.date <= ?"
                 binds.append(.date(to))
             }

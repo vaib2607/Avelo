@@ -446,7 +446,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
                 rc = sqlite3_bind_null(stmt, idx)
             }
             if rc != SQLITE_OK {
-                let msg = String(cString: sqlite3_errmsg(stmt))
+                let msg = String(cString: sqlite3_errmsg(handle))
                 AveloDBLogger.error("bind failed: \(msg, privacy: .public)")
                 throw AppError.database(.bindFailed("index \(idx): \(msg)"))
             }

@@ -35,6 +35,7 @@ public final class VoucherService: Sendable {
         public var billAllocationNumber: String?
         public var chequeNumber: String?
         public var chequeDueDate: Date?
+        public var chequeStatus: ChequeStatus?
         public var postDatedDate: Date?
         public var tdsSectionCode: String?
         public var tdsTaxPaise: Int64?
@@ -44,6 +45,7 @@ public final class VoucherService: Sendable {
                     billAllocationNumber: String? = nil,
                     chequeNumber: String? = nil,
                     chequeDueDate: Date? = nil,
+                    chequeStatus: ChequeStatus? = nil,
                     postDatedDate: Date? = nil,
                     tdsSectionCode: String? = nil,
                     tdsTaxPaise: Int64? = nil,
@@ -53,6 +55,7 @@ public final class VoucherService: Sendable {
             self.billAllocationNumber = billAllocationNumber
             self.chequeNumber = chequeNumber
             self.chequeDueDate = chequeDueDate
+            self.chequeStatus = chequeStatus
             self.postDatedDate = postDatedDate
             self.tdsSectionCode = tdsSectionCode
             self.tdsTaxPaise = tdsTaxPaise
@@ -67,23 +70,25 @@ public final class VoucherService: Sendable {
     }
 
     public func post(draft: VoucherDraft, in fy: FinancialYear, workflow: WorkflowInputs) throws -> PostResult {
-        var result: PostResult!
-        try db.write { _ in
-            result = try postWithoutCacheInvalidation(draft: draft, in: fy)
-            try recordWorkflow(result.voucher, draft: draft, workflow: workflow)
+        var result: PostResult?
+        try db.write { tx in
+            let posted = try postWithoutCacheInvalidation(draft: draft, in: fy)
+            try recordWorkflow(posted.voucher, draft: draft, workflow: workflow, in: tx)
+            result = posted
         }
         ReportService.invalidateCache(companyId: companyId)
+        guard let result else {
+            throw AppError.unexpected("workflow post did not produce a result")
+        }
         return result
     }
 
     public func postBatch(_ drafts: [VoucherDraft], in fy: FinancialYear) throws -> [PostResult] {
         var results: [PostResult] = []
         results.reserveCapacity(drafts.count)
-        try db.write { _ in
-            for draft in drafts {
-                try autoreleasepool {
-                    results.append(try postWithoutCacheInvalidation(draft: draft, in: fy))
-                }
+        for draft in drafts {
+            try autoreleasepool {
+                results.append(try postWithoutCacheInvalidation(draft: draft, in: fy))
             }
         }
         ReportService.invalidateCache(companyId: companyId)
@@ -157,13 +162,13 @@ public final class VoucherService: Sendable {
         return PostResult(voucher: voucher, inventoryPrompt: prompt)
     }
 
-    private func recordWorkflow(_ voucher: Voucher, draft: VoucherDraft, workflow: WorkflowInputs) throws {
+    private func recordWorkflow(_ voucher: Voucher, draft: VoucherDraft, workflow: WorkflowInputs, in db: SQLiteDatabase) throws {
         let repo = AccountingWorkflowsRepository(db: db)
         if let kind = workflow.billAllocationKind, let party = voucher.partyAccountId {
             try repo.insert(BillAllocation(companyId: companyId, voucherId: voucher.id, partyAccountId: party, kind: kind, referenceNumber: workflow.billAllocationNumber, allocatedPaise: voucher.totalPaise))
         }
         if let chequeNumber = workflow.chequeNumber {
-            try repo.insert(Cheque(companyId: companyId, voucherId: voucher.id, chequeNumber: chequeNumber, issueDate: voucher.date, dueDate: workflow.chequeDueDate, status: workflow.chequeDueDate != nil ? .issued : .deposited))
+            try repo.insert(Cheque(companyId: companyId, voucherId: voucher.id, chequeNumber: chequeNumber, issueDate: voucher.date, dueDate: workflow.chequeDueDate, status: workflow.chequeStatus ?? (workflow.chequeDueDate != nil ? .issued : .deposited)))
         }
         if let tdsSectionCode = workflow.tdsSectionCode, let tdsTaxPaise = workflow.tdsTaxPaise {
             try repo.insert(TDSRecord(companyId: companyId, voucherId: voucher.id, sectionCode: tdsSectionCode, basePaise: voucher.totalPaise, taxPaise: tdsTaxPaise))
@@ -228,7 +233,7 @@ public final class VoucherService: Sendable {
             try lRepo.deleteForVoucher(voucherId)
             try lRepo.insertBatch(newLines)
             try workflowRepo.deleteForVoucher(voucherId)
-            try recordWorkflow(updated, draft: newDraft, workflow: existingWorkflow)
+            try recordWorkflow(updated, draft: newDraft, workflow: existingWorkflow, in: tx)
             try AuditService(db: tx, companyId: companyId).record(
                 action: .voucherEdited,
                 entityType: "voucher",

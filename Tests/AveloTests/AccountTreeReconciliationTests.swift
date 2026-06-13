@@ -73,6 +73,37 @@ final class AccountTreeReconciliationTests: XCTestCase {
         XCTAssertEqual(rowsById[tc.capitalId]?.creditPaise, 10000)
     }
 
+    func testTreeCarriesForwardBalancesIntoLaterFinancialYear() async throws {
+        let tc = try TestCompany.make()
+        try seedActivity(tc)
+
+        let secondFYStart = DateFormatters.parseDate("2025-04-01")!
+        let secondFYEnd = DateFormatters.parseDate("2026-03-31")!
+        let secondFYId = UUID()
+        let now = DateFormatters.formatIsoTimestamp(Date())
+        try tc.db.execute(
+            """
+            INSERT INTO avelo_financial_years
+            (id, company_id, label, start_date, end_date, books_begin_date, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                .text(secondFYId.uuidString),
+                .text(tc.companyId.uuidString),
+                .text("2025-26"),
+                .date(secondFYStart),
+                .date(secondFYEnd),
+                .date(secondFYStart),
+                .text(now)
+            ]
+        )
+
+        let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db, financialYearId: secondFYId)
+        await cache.reload()
+        XCTAssertEqual(cache.tree?.findLedger(tc.cashId)?.balancePaise, 40000)
+        XCTAssertEqual(cache.tree?.findLedger(tc.salesId)?.balancePaise, -50000)
+    }
+
     func testBooksAreBalancedAcrossAllLedgers() async throws {
         let tc = try TestCompany.make()
         try seedActivity(tc)
@@ -187,5 +218,38 @@ final class AccountTreeReconciliationTests: XCTestCase {
 
         XCTAssertNotNil(cache.tree)
         XCTAssertEqual(cache.tree?.findLedger(tc.cashId)?.balancePaise, 40000)
+    }
+
+    func testEnsureLoadedDoesNotSpawnConcurrentReloads() async throws {
+        let tc = try TestCompany.make()
+        try seedActivity(tc)
+
+        let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db)
+        let started = expectation(description: "reload started")
+        let secondStart = expectation(description: "second reload started")
+        secondStart.isInverted = true
+        let lock = NSLock()
+        var startCount = 0
+        cache.onBackgroundLoad = { _ in
+            lock.lock()
+            startCount += 1
+            let current = startCount
+            lock.unlock()
+            if current == 1 {
+                started.fulfill()
+            } else {
+                secondStart.fulfill()
+            }
+            Thread.sleep(forTimeInterval: 0.15)
+        }
+
+        _ = cache.ensureLoaded()
+        await fulfillment(of: [started], timeout: 5)
+        _ = cache.ensureLoaded()
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        await fulfillment(of: [secondStart], timeout: 0.2)
+        XCTAssertNil(cache.lastError)
+        XCTAssertFalse(cache.isLoading)
     }
 }

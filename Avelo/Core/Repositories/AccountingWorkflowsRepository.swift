@@ -30,9 +30,9 @@ public struct AccountingWorkflowsRepository: Sendable {
         ) { ($0.text("kind"), $0.optionalText("reference_number")) }
 
         let cheque = try db.queryOne(
-            "SELECT cheque_number, due_date FROM avelo_cheques WHERE voucher_id = ? LIMIT 1",
+            "SELECT cheque_number, due_date, status FROM avelo_cheques WHERE voucher_id = ? LIMIT 1",
             bind: [.text(voucherId.uuidString)]
-        ) { ($0.optionalText("cheque_number"), $0.optionalDate("due_date")) }
+        ) { ($0.optionalText("cheque_number"), $0.optionalDate("due_date"), $0.optionalText("status")) }
 
         let tds = try db.queryOne(
             "SELECT section_code, tax_paise FROM avelo_tds_records WHERE voucher_id = ? LIMIT 1",
@@ -49,10 +49,11 @@ public struct AccountingWorkflowsRepository: Sendable {
             billAllocationNumber: billAllocation?.1,
             chequeNumber: cheque?.0,
             chequeDueDate: cheque?.1,
+            chequeStatus: cheque?.2.flatMap { ChequeStatus(rawValue: $0) },
             tdsSectionCode: tds?.0,
-            tdsTaxPaise: tds?.1 == 0 ? nil : tds?.1,
+            tdsTaxPaise: tds?.1,
             tcsSectionCode: tcs?.0,
-            tcsTaxPaise: tcs?.1 == 0 ? nil : tcs?.1
+            tcsTaxPaise: tcs?.1
         )
     }
 

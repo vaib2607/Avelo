@@ -225,4 +225,37 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path + "-wal"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path + "-shm"))
     }
+
+    func testDeleteCompanyFilesStillCleansSidecarsWhenPrimaryFileIsMissing() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manager = try DatabaseManager(appSupportDirectory: root)
+        let companyId = UUID()
+        let companiesURL = root.appendingPathComponent("Companies", isDirectory: true)
+        let registeredURL = companiesURL.appendingPathComponent("gone-primary.sqlite")
+        let legacyURL = companiesURL.appendingPathComponent("\(companyId.uuidString).sqlite")
+
+        let legacyDB = try SQLiteDatabase(path: legacyURL.path)
+        try MigrationRunner().runMigrations(on: legacyDB)
+        _ = try TestCompany.seed(into: legacyDB, companyId: companyId, companyName: "Missing Primary Co")
+        legacyDB.close()
+
+        try await manager.registerCompany(
+            CompanyRegistryEntry(id: companyId, name: "Missing Primary Co", sqliteFileName: registeredURL.lastPathComponent)
+        )
+
+        let legacyWal = URL(fileURLWithPath: legacyURL.path + "-wal")
+        let legacyShm = URL(fileURLWithPath: legacyURL.path + "-shm")
+        try Data("wal".utf8).write(to: legacyWal)
+        try Data("shm".utf8).write(to: legacyShm)
+
+        try await manager.deleteCompanyFiles(id: companyId)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: registeredURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyWal.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyShm.path))
+    }
 }

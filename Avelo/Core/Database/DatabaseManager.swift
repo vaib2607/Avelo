@@ -190,9 +190,8 @@ public final actor DatabaseManager {
     public func deleteCompanyFiles(id: UUID) throws {
         closeCompany(id: id)
         let fm = FileManager.default
-
-        let primaryURL = try companyFileURL(id: id)
         let legacyURL = companiesDirectory.appendingPathComponent("\(id.uuidString).sqlite")
+        let primaryURL = (try? companyFileURL(id: id)) ?? legacyURL
         let urls = Set([primaryURL, legacyURL])
 
         for url in urls {

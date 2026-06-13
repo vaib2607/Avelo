@@ -3,6 +3,12 @@ import XCTest
 
 final class RestoreServiceTests: XCTestCase {
 
+    private final class ThrowingFileManager: FileManager {
+        override func removeItem(at URL: URL) throws {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+    }
+
     func testCorruptRestoreFailsWithoutRegisteringCompany() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -27,6 +33,15 @@ final class RestoreServiceTests: XCTestCase {
             ).filter { $0.pathExtension == "sqlite" }
             XCTAssertTrue(restoredFiles.isEmpty)
         }
+    }
+
+    func testRestoreCleanupSwallowsSecondaryDeleteFailures() throws {
+        let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("x".utf8).write(to: temp)
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        let fm = ThrowingFileManager()
+        XCTAssertNoThrow(RestoreService.cleanupRestoredCompanyFile(at: temp, fileManager: fm))
     }
 
     func testPrepareRestoredCompanyDatabaseRemapsCompanyAndWritesAudit() throws {

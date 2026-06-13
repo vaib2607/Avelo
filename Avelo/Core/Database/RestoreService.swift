@@ -201,7 +201,7 @@ public struct RestoreService: Sendable {
             return entry
         } catch {
             AveloRestoreLogger.error("restore failed, cleaning up \(destURL.path, privacy: .public)")
-            try fm.removeItem(at: destURL)
+            Self.cleanupRestoredCompanyFile(at: destURL, fileManager: fm)
             throw error
         }
     }
@@ -298,6 +298,16 @@ public struct RestoreService: Sendable {
     private static func recreateLockedFinancialYearTriggers(db: SQLiteDatabase) throws {
         for sql in lockedFinancialYearTriggerSQL {
             try db.execute(sql)
+        }
+    }
+
+    static func cleanupRestoredCompanyFile(at destURL: URL, fileManager: FileManager = .default) {
+        do {
+            if fileManager.fileExists(atPath: destURL.path) {
+                try fileManager.removeItem(at: destURL)
+            }
+        } catch {
+            AveloRestoreLogger.error("restore cleanup failed for \(destURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
 }

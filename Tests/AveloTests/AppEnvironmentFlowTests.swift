@@ -277,4 +277,64 @@ final class AppEnvironmentFlowTests: XCTestCase {
         XCTAssertEqual(env.router.selection, .dashboard)
         XCTAssertNil(env.router.presentedSheet)
     }
+
+    func testDemoBootstrapDoesNotForceCrashWhenExpectedSeedAccountsAreMissing() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manager = try DatabaseManager(appSupportDirectory: root)
+        let registryDb = try await SQLiteDatabase(path: manager.registryPath)
+        defer { registryDb.close() }
+
+        let env = AppEnvironment(
+            manager: manager,
+            router: AppRouter(),
+            keyboard: KeyboardRouter(),
+            registry: RegistryRepository(db: registryDb),
+            backupService: BackupService(manager: manager)
+        )
+
+        let company = try await CompanyService.create(
+            companyInput: .init(name: "Demo Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: manager
+        )
+
+        let dbURL = try await manager.companyFileURL(id: company.id)
+        let db = try SQLiteDatabase(path: dbURL.path)
+        defer { db.close() }
+        try tcLikeDeleteAccountCodeIfExists(db: db, code: "PURCHASE")
+
+        do {
+            let handle = try await manager.openCompany(id: company.id)
+            let fyRepo = FinancialYearRepository(db: handle.db)
+            guard let fy = try fyRepo.findMostRecent(handle.companyId) else {
+                return XCTFail("Expected financial year")
+            }
+            let activeAccounts = try AccountService(db: handle.db, companyId: handle.companyId).listActiveAccounts()
+            let lookup = { (code: String) -> Account? in activeAccounts.first(where: { $0.code == code }) }
+            XCTAssertNil(lookup("PURCHASE"))
+            XCTAssertNotNil(lookup("CASH_IN_HAND"))
+            XCTAssertNotNil(lookup("BANK_HDFC"))
+            XCTAssertNotNil(lookup("SALES"))
+            XCTAssertNotNil(lookup("SALARY_EXPENSE"))
+            XCTAssertEqual(fy.label, "2024-25")
+        } catch {
+            XCTFail("Expected demo bootstrap lookups to be handled without crashing, got \(error)")
+        }
+    }
+}
+
+private func tcLikeDeleteAccountCodeIfExists(db: SQLiteDatabase, code: String) throws {
+    _ = try db.execute(
+        "DELETE FROM avelo_accounts WHERE code = ?",
+        [.text(code)]
+    )
 }

@@ -74,10 +74,17 @@ public struct BackupService: Sendable {
         }
         do {
             try fm.copyItem(at: tempURL, to: destinationURL)
+        } catch {
+            AveloBackupLogger.error("backup copy failed: \(destinationURL.path, privacy: .public)")
+            try? fm.removeItem(at: destinationURL)
+            throw AppError.fileSystem("Unable to copy backup file to \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+        }
+        do {
             try json.write(to: manifestURL)
         } catch {
             AveloBackupLogger.error("backup manifest write failed: \(manifestURL.path, privacy: .public)")
             try? fm.removeItem(at: manifestURL)
+            try? fm.removeItem(at: destinationURL)
             throw AppError.fileSystem("Unable to write backup manifest at \(manifestURL.lastPathComponent): \(error.localizedDescription)")
         }
         return manifest

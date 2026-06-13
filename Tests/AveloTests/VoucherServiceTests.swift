@@ -62,7 +62,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.2, 25)
     }
 
-    func testPostBatchRollsBackAllBatchesOnLaterFailure() throws {
+    func testPostBatchCommitsEarlierVouchersBeforeLaterFailure() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
         let drafts: [VoucherDraft] = [
@@ -80,8 +80,8 @@ final class VoucherServiceTests: XCTestCase {
 
         let voucherCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_vouchers") { $0.int(0) } ?? 0
         let lineCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_ledger_lines") { $0.int(0) } ?? 0
-        XCTAssertEqual(voucherCount, 0)
-        XCTAssertEqual(lineCount, 0)
+        XCTAssertEqual(voucherCount, 1)
+        XCTAssertEqual(lineCount, 2)
     }
 
     func testUnbalancedPostThrows() throws {
@@ -590,6 +590,66 @@ final class VoucherServiceTests: XCTestCase {
             bind: [.text(posted.id.uuidString)]
         ) { $0.int(0) }
         XCTAssertEqual(tcs, 128000)
+    }
+
+    func testVoucherEditPreservesChequeStatusAndZeroTaxWorkflowRows() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.salesId,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-88",
+                narration: "Workflow status test",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 100000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 100000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                chequeNumber: "CHQ-888",
+                chequeDueDate: DateFormatters.parseDate("2024-06-15")!,
+                tdsSectionCode: "194C",
+                tdsTaxPaise: 0
+            )
+        ).voucher
+
+        try tc.db.execute(
+            "UPDATE avelo_cheques SET status = ? WHERE voucher_id = ?",
+            [.text(ChequeStatus.cleared.rawValue), .text(posted.id.uuidString)]
+        )
+
+        let edited = VoucherDraft(
+            mode: .edit(originalVoucherId: posted.id),
+            voucherTypeCode: .sales,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: tc.salesId,
+            billReferenceType: .newRef,
+            billReferenceNumber: "INV-88",
+            narration: "Workflow status test edited",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 100000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 100000, side: .credit)
+            ]
+        )
+
+        _ = try svc.edit(posted.id, with: edited, in: tc.fy)
+
+        let cheque = try tc.db.queryOne(
+            "SELECT status FROM avelo_cheques WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { $0.text(0) }
+        XCTAssertEqual(cheque, ChequeStatus.cleared.rawValue)
+
+        let tds = try tc.db.queryOne(
+            "SELECT tax_paise FROM avelo_tds_records WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { $0.int(0) }
+        XCTAssertEqual(tds, 0)
     }
 
     func testVoucherReverseRollsBackIfAccountUsageUpdateFails() throws {

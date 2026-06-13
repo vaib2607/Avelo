@@ -84,4 +84,22 @@ final class SQLiteDatabaseTests: XCTestCase {
 
         XCTAssertLessThanOrEqual(db.debugStatementCacheCount, 256)
     }
+
+    func testBindFailuresReportDatabaseHandleMessage() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        defer { db.close() }
+
+        try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, value TEXT)")
+
+        do {
+            try db.execute("INSERT INTO t (id, value) VALUES (?, ?)", [.integer(1), .text("one"), .text("extra")])
+            XCTFail("Expected bind failure for the extra placeholder binding")
+        } catch {
+            guard case AppError.database(.bindFailed(let message)) = error else {
+                return XCTFail("Expected bindFailed, got \(error)")
+            }
+            XCTAssertTrue(message.contains("index 3"))
+            XCTAssertFalse(message.isEmpty)
+        }
+    }
 }

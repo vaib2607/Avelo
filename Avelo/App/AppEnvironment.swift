@@ -165,11 +165,18 @@ public final class AppEnvironment {
         let currentLiabilities = try group("CURRENT_LIAB")
         let directIncome = try group("DIRECT_INCOME")
         let indirectExpense = try group("INDIRECT_EXPENSE")
-        let cash = try accounts.listActiveAccounts().first(where: { $0.code == "CASH_IN_HAND" })!
-        let bank = try accounts.listActiveAccounts().first(where: { $0.code == "BANK_HDFC" })!
-        let sales = try accounts.listActiveAccounts().first(where: { $0.code == "SALES" })!
-        let purchase = try accounts.listActiveAccounts().first(where: { $0.code == "PURCHASE" })!
-        let salaryExpense = try accounts.listActiveAccounts().first(where: { $0.code == "SALARY_EXPENSE" })!
+        let activeAccounts = try accounts.listActiveAccounts()
+        func account(_ code: String) throws -> Account {
+            guard let account = activeAccounts.first(where: { $0.code == code }) else {
+                throw AppError.notFound("Seed account \(code)")
+            }
+            return account
+        }
+        let cash = try account("CASH_IN_HAND")
+        let bank = try account("BANK_HDFC")
+        let sales = try account("SALES")
+        _ = try account("PURCHASE")
+        let salaryExpense = try account("SALARY_EXPENSE")
 
         let customer = try accounts.createAccount(.init(code: "CUST_DEMO", name: "Demo Customer", groupId: currentAssets.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
         let vendor = try accounts.createAccount(.init(code: "VEND_DEMO", name: "Demo Vendor", groupId: currentLiabilities.id, openingBalancePaise: 0, openingBalanceSide: .credit, gstin: nil, existingAccountId: nil))
