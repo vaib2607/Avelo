@@ -31,7 +31,7 @@ Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no ne
 
 ### New or Expanded
 
-- Reconciled the pinned `Docs/Avelo_Module_Checklist.md` end-to-end and checked off the remaining items.
+- Reconciled the pinned `Docs/Avelo_Module_Checklist.md` for the current shipped shell and separated deferred accounting work from shipped scope.
 - Expanded New Company onboarding to capture address fields, base currency, FY dates, and default chart selection.
 - Added FY switching from the toolbar.
 - Confirmed and documented voucher list filters, voucher entry flow, save/edit/reverse behavior, and locked FY protections.
@@ -44,6 +44,17 @@ Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no ne
 - Added voucher template save/load support.
 - Added TSV paste support for voucher lines.
 - Confirmed keyboard shortcut help and F1 through F12 plus navigation shortcut coverage.
+
+### Deferred / Not Yet Shipped
+
+- Bill-wise ageing with interest-on-overdue calculations.
+- Purchase order and sales order workflow visibility across pending receipts and deliveries.
+- Cash flow or funds flow statement.
+- Full invoice printing and PDF export.
+- Portal-uploadable GSTR-1 export with invoice-wise breakdown.
+- TDS, TCS, cheque, and bill-allocation UI surfaces.
+- Cross-company consolidation and group-company reporting.
+- Stock ageing and reorder-level reporting.
 
 ### Already There
 

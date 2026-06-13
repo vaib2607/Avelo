@@ -6,6 +6,12 @@ public struct AboutSheet: View {
 
     public init() {}
 
+    private var bundleVersionText: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "Version \(shortVersion) (build \(build))"
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -18,7 +24,7 @@ public struct AboutSheet: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Text("Version 1.0 (build 1)")
+            Text(bundleVersionText)
                 .font(.callout)
             Text("Made locally. No network. No third-party packages. All data stays on this Mac.")
                 .font(.callout)
