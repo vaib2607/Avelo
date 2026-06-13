@@ -1,5 +1,8 @@
 import Foundation
 import CryptoKit
+import os
+
+private let AveloBackupLogger = Logger(subsystem: "com.avelo.desktop", category: "backup")
 
 public struct BackupService: Sendable {
 
@@ -15,6 +18,7 @@ public struct BackupService: Sendable {
         let sourceURL = try await manager.companyFileURL(id: companyId)
         let fm = FileManager.default
         guard fm.fileExists(atPath: sourceURL.path) else {
+            AveloBackupLogger.error("backup source missing: \(sourceURL.path, privacy: .public)")
             throw AppError.notFound("Source company file missing")
         }
         if let handle = await manager.openHandle(id: companyId) {
@@ -28,12 +32,14 @@ public struct BackupService: Sendable {
             do {
                 try fm.removeItem(at: destinationURL)
             } catch {
+                AveloBackupLogger.error("backup replace failed: \(destinationURL.path, privacy: .public)")
                 throw AppError.fileSystem("Unable to replace existing backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
             }
         }
         do {
             try fm.copyItem(at: sourceURL, to: destinationURL)
         } catch {
+            AveloBackupLogger.error("backup copy failed: \(destinationURL.path, privacy: .public)")
             throw AppError.fileSystem("Unable to write backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
         }
 
@@ -41,6 +47,7 @@ public struct BackupService: Sendable {
         do {
             data = try Data(contentsOf: destinationURL)
         } catch {
+            AveloBackupLogger.error("backup readback failed: \(destinationURL.path, privacy: .public)")
             throw AppError.fileSystem("Unable to read written backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
         }
         let digest = SHA256.hash(data: data)
@@ -59,11 +66,13 @@ public struct BackupService: Sendable {
         do {
             json = try enc.encode(manifest)
         } catch {
+            AveloBackupLogger.error("backup manifest encode failed: \(destinationURL.path, privacy: .public)")
             throw AppError.fileSystem("Unable to encode backup manifest for \(destinationURL.lastPathComponent): \(error.localizedDescription)")
         }
         do {
             try json.write(to: manifestURL)
         } catch {
+            AveloBackupLogger.error("backup manifest write failed: \(manifestURL.path, privacy: .public)")
             throw AppError.fileSystem("Unable to write backup manifest at \(manifestURL.lastPathComponent): \(error.localizedDescription)")
         }
         return manifest

@@ -15,7 +15,8 @@ public struct MigrationRunner: Sendable {
     }
 
     public static let defaultMigrations: [Migration] = [
-        MigrationV001()
+        MigrationV001(),
+        MigrationV002()
     ]
 
     public func runMigrations(on db: SQLiteDatabase) throws {

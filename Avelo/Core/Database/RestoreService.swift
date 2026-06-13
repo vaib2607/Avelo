@@ -1,5 +1,8 @@
 import Foundation
 import CryptoKit
+import os
+
+private let AveloRestoreLogger = Logger(subsystem: "com.avelo.desktop", category: "restore")
 
 public struct RestoreService: Sendable {
 
@@ -107,6 +110,7 @@ public struct RestoreService: Sendable {
     public func restore(from sourceURL: URL) async throws -> CompanyRegistryEntry {
         let fm = FileManager.default
         guard fm.fileExists(atPath: sourceURL.path) else {
+            AveloRestoreLogger.error("restore source missing: \(sourceURL.path, privacy: .public)")
             throw AppError.notFound("Backup file not found")
         }
 
@@ -139,12 +143,14 @@ public struct RestoreService: Sendable {
             let digest = SHA256.hash(data: data)
             let hex = digest.map { String(format: "%02x", $0) }.joined()
             if hex != manifest.checksumSHA256 {
+                AveloRestoreLogger.error("restore checksum mismatch for \(sourceURL.lastPathComponent, privacy: .public)")
                 throw AppError.database(.checksumMismatch)
             }
         }
 
         let registryEntries = try await manager.listCompanies()
         if registryEntries.contains(where: { $0.name.caseInsensitiveCompare(manifest.companyName) == .orderedSame }) {
+            AveloRestoreLogger.error("duplicate restore name rejected: \(manifest.companyName, privacy: .public)")
             throw AppError.businessRule("A company named \"\(manifest.companyName)\" already exists. Rename or remove the existing company before restoring this backup.")
         }
 
@@ -160,6 +166,7 @@ public struct RestoreService: Sendable {
         do {
             try fm.copyItem(at: tempFile, to: destURL)
         } catch {
+            AveloRestoreLogger.error("restore copy failed to \(destURL.path, privacy: .public)")
             throw AppError.fileSystem("Unable to copy backup into restored company file at \(destURL.lastPathComponent): \(error.localizedDescription)")
         }
 
@@ -189,6 +196,7 @@ public struct RestoreService: Sendable {
             try await manager.registerCompany(entry)
             return entry
         } catch {
+            AveloRestoreLogger.error("restore failed, cleaning up \(destURL.path, privacy: .public)")
             try? fm.removeItem(at: destURL)
             throw error
         }
@@ -201,6 +209,7 @@ public struct RestoreService: Sendable {
     ) throws {
         let sourceCompanies = try CompanyRepository(db: db).listForRegistry()
         guard sourceCompanies.count == 1, let sourceCompany = sourceCompanies.first else {
+            AveloRestoreLogger.error("restore schema mismatch: unexpected company count \(sourceCompanies.count, privacy: .public)")
             throw AppError.database(.schemaMismatch("Restore expects exactly one company per backup file."))
         }
         if sourceCompany.id == restoredCompanyId {

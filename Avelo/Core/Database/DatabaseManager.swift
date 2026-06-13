@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let AveloOpsLogger = Logger(subsystem: "com.avelo.desktop", category: "ops")
 
 public final class CompanyHandle: @unchecked Sendable {
     public let companyId: Company.ID
@@ -33,7 +36,12 @@ public final actor DatabaseManager {
         try fm.createDirectory(at: companiesURL, withIntermediateDirectories: true)
 
         let reg = try SQLiteDatabase(path: registryURL.path)
-        try reg.execute(Self.registrySchemaSQL)
+        do {
+            try reg.execute(Self.registrySchemaSQL)
+        } catch {
+            AveloOpsLogger.error("registry schema init failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
         self.registryDb = reg
     }
 
@@ -115,7 +123,12 @@ public final actor DatabaseManager {
         let db = try SQLiteDatabase(path: url.path)
         let current = db.userVersion()
         if current < SchemaVersion.current.rawValue {
-            try MigrationRunner().runMigrations(on: db)
+            do {
+                try MigrationRunner().runMigrations(on: db)
+            } catch {
+                AveloOpsLogger.error("migration failed for company \(id.uuidString, privacy: .public)")
+                throw error
+            }
         }
         guard let reg = registryDb else {
             throw AppError.database(.openFailed("registry not open"))

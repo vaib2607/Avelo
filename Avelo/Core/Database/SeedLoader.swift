@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let AveloSeedLogger = Logger(subsystem: "com.avelo.desktop", category: "seed")
 
 public struct SeedLoader: Sendable {
 
@@ -17,6 +20,7 @@ public struct SeedLoader: Sendable {
             let dec = JSONDecoder()
             payload = try dec.decode(DefaultChartOfAccountsPayload.self, from: data)
         } else {
+            AveloSeedLogger.info("seed resource missing, using built-in defaults")
             payload = DefaultChartOfDefaults.builtIn
         }
 

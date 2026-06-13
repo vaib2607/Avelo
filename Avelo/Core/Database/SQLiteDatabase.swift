@@ -1,7 +1,9 @@
 import Foundation
 import SQLite3
+import os
 
 let SQLITE_TRANSIENT_DESTRUCTOR = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+let AveloDBLogger = Logger(subsystem: "com.avelo.desktop", category: "database")
 
 public enum SQLValue: Sendable {
     case integer(Int64)
@@ -20,21 +22,33 @@ public enum SQLValue: Sendable {
     public static func bool(_ b: Bool) -> SQLValue { .integer(b ? 1 : 0) }
 }
 
-public struct Row {
-    let stmt: OpaquePointer?
+final class PreparedStatementBox: @unchecked Sendable {
+    let stmt: OpaquePointer
+    var columnIndexCache: [String: Int32] = [:]
 
-    public init(stmt: OpaquePointer?) {
+    init(stmt: OpaquePointer) {
         self.stmt = stmt
+    }
+}
+
+public struct Row {
+    fileprivate let box: PreparedStatementBox?
+
+    fileprivate init(box: PreparedStatementBox?) {
+        self.box = box
     }
 
     private func index(of name: String) -> Int32 {
-        guard let stmt = stmt else { return -1 }
-        let n = sqlite3_column_count(stmt)
+        guard let box else { return -1 }
+        if let cached = box.columnIndexCache[name] { return cached }
+        let n = sqlite3_column_count(box.stmt)
         for i in 0..<n {
-            if let cName = sqlite3_column_name(stmt, i) {
-                if String(cString: cName) == name { return i }
+            if let cName = sqlite3_column_name(box.stmt, i), String(cString: cName) == name {
+                box.columnIndexCache[name] = i
+                return i
             }
         }
+        box.columnIndexCache[name] = -1
         return -1
     }
 
@@ -42,37 +56,37 @@ public struct Row {
 
     public func int(_ name: String) -> Int64 {
         let i = index(of: name)
-        guard i >= 0, let stmt = stmt else { return 0 }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return 0 }
-        return sqlite3_column_int64(stmt, i)
+        guard i >= 0, let box else { return 0 }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return 0 }
+        return sqlite3_column_int64(box.stmt, i)
     }
 
     public func int(_ i: Int32) -> Int64 {
-        guard let stmt = stmt else { return 0 }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return 0 }
-        return sqlite3_column_int64(stmt, i)
+        guard let box else { return 0 }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return 0 }
+        return sqlite3_column_int64(box.stmt, i)
     }
 
     public func text(_ name: String) -> String {
         let i = index(of: name)
-        guard i >= 0, let stmt = stmt else { return "" }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return "" }
-        guard let cStr = sqlite3_column_text(stmt, i) else { return "" }
+        guard i >= 0, let box else { return "" }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return "" }
+        guard let cStr = sqlite3_column_text(box.stmt, i) else { return "" }
         return String(cString: cStr)
     }
 
     public func text(_ i: Int32) -> String {
-        guard let stmt = stmt else { return "" }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return "" }
-        guard let cStr = sqlite3_column_text(stmt, i) else { return "" }
+        guard let box else { return "" }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return "" }
+        guard let cStr = sqlite3_column_text(box.stmt, i) else { return "" }
         return String(cString: cStr)
     }
 
     public func optionalText(_ name: String) -> String? {
         let i = index(of: name)
-        guard i >= 0, let stmt = stmt else { return nil }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return nil }
-        guard let cStr = sqlite3_column_text(stmt, i) else { return nil }
+        guard i >= 0, let box else { return nil }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
+        guard let cStr = sqlite3_column_text(box.stmt, i) else { return nil }
         return String(cString: cStr)
     }
 
@@ -98,16 +112,16 @@ public struct Row {
 
     public func optionalDate(_ name: String) -> Date? {
         let i = index(of: name)
-        guard i >= 0, let stmt = stmt else { return nil }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return nil }
-        let s = String(cString: sqlite3_column_text(stmt, i))
+        guard i >= 0, let box else { return nil }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
+        let s = String(cString: sqlite3_column_text(box.stmt, i))
         return DateFormatters.parseDate(s)
     }
 
     public func optionalDate(_ i: Int32) -> Date? {
-        guard i >= 0, let stmt = stmt else { return nil }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return nil }
-        let s = String(cString: sqlite3_column_text(stmt, i))
+        guard i >= 0, let box else { return nil }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
+        let s = String(cString: sqlite3_column_text(box.stmt, i))
         return DateFormatters.parseDate(s)
     }
 
@@ -121,30 +135,30 @@ public struct Row {
 
     public func real(_ name: String) -> Double {
         let i = index(of: name)
-        guard i >= 0, let stmt = stmt else { return 0 }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return 0 }
-        return sqlite3_column_double(stmt, i)
+        guard i >= 0, let box else { return 0 }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return 0 }
+        return sqlite3_column_double(box.stmt, i)
     }
 
     public func real(_ i: Int32) -> Double {
-        guard i >= 0, let stmt = stmt else { return 0 }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return 0 }
-        return sqlite3_column_double(stmt, i)
+        guard i >= 0, let box else { return 0 }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return 0 }
+        return sqlite3_column_double(box.stmt, i)
     }
 
     public func optionalReal(_ name: String) -> Double? {
         let i = index(of: name)
-        guard i >= 0, let stmt = stmt else { return nil }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return nil }
-        return sqlite3_column_double(stmt, i)
+        guard i >= 0, let box else { return nil }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
+        return sqlite3_column_double(box.stmt, i)
     }
 
     public func data(_ name: String) -> Data {
         let i = index(of: name)
-        guard i >= 0, let stmt = stmt else { return Data() }
-        if sqlite3_column_type(stmt, i) == SQLITE_NULL { return Data() }
-        guard let bytes = sqlite3_column_blob(stmt, i) else { return Data() }
-        let count = Int(sqlite3_column_bytes(stmt, i))
+        guard i >= 0, let box else { return Data() }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return Data() }
+        guard let bytes = sqlite3_column_blob(box.stmt, i) else { return Data() }
+        let count = Int(sqlite3_column_bytes(box.stmt, i))
         return Data(bytes: bytes, count: count)
     }
 }
@@ -155,7 +169,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
     private var handle: OpaquePointer?
     private let lock = NSRecursiveLock()
     private var inTransactionDepth: Int = 0
-    private var statementCache: [String: OpaquePointer] = [:]
+    private var statementCache: [String: PreparedStatementBox] = [:]
 
     public init(path: String, readonly: Bool = false) throws {
         self.path = path
@@ -189,8 +203,8 @@ public final class SQLiteDatabase: @unchecked Sendable {
     }
 
     private func finalizeStatementCacheNoLock() {
-        for stmt in statementCache.values {
-            sqlite3_finalize(stmt)
+        for box in statementCache.values {
+            sqlite3_finalize(box.stmt)
         }
         statementCache.removeAll()
     }
@@ -227,6 +241,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         if rc != SQLITE_OK {
             let msg = errPtr.map { String(cString: $0) } ?? "unknown"
             sqlite3_free(errPtr)
+            AveloDBLogger.error("exec failed: \(msg, privacy: .public)")
             throw AppError.database(.execFailed(msg))
         }
     }
@@ -241,6 +256,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         let step = sqlite3_step(stmt)
         if step != SQLITE_DONE && step != SQLITE_ROW {
             let msg = String(cString: sqlite3_errmsg(handle))
+            AveloDBLogger.error("step failed: \(msg, privacy: .public)")
             throw AppError.database(.stepFailed(msg))
         }
     }
@@ -274,7 +290,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
                 let msg = String(cString: sqlite3_errmsg(handle))
                 throw AppError.database(.stepFailed(msg))
             }
-            let r = Row(stmt: stmt)
+            let r = Row(box: statementCache[sql])
             results.append(try row(r))
         }
         return results
@@ -295,27 +311,28 @@ public final class SQLiteDatabase: @unchecked Sendable {
             let msg = String(cString: sqlite3_errmsg(handle))
             throw AppError.database(.stepFailed(msg))
         }
-        let r = Row(stmt: stmt)
+        let r = Row(box: statementCache[sql])
         return try row(r)
     }
 
     private func preparedStatement(_ sql: String) throws -> OpaquePointer {
-        if let stmt = statementCache[sql] {
-            let resetRc = sqlite3_reset(stmt)
+        if let box = statementCache[sql] {
+            let resetRc = sqlite3_reset(box.stmt)
             if resetRc == SQLITE_OK {
-                sqlite3_clear_bindings(stmt)
-                return stmt
+                sqlite3_clear_bindings(box.stmt)
+                return box.stmt
             }
-            sqlite3_finalize(stmt)
+            sqlite3_finalize(box.stmt)
             statementCache.removeValue(forKey: sql)
         }
         var stmt: OpaquePointer?
         let prep = sqlite3_prepare_v2(handle, sql, -1, &stmt, nil)
         guard prep == SQLITE_OK, let stmt = stmt else {
             let msg = String(cString: sqlite3_errmsg(handle))
+            AveloDBLogger.error("prepare failed: \(msg, privacy: .public)")
             throw AppError.database(.prepareFailed(msg))
         }
-        statementCache[sql] = stmt
+        statementCache[sql] = PreparedStatementBox(stmt: stmt)
         return stmt
     }
 
@@ -343,6 +360,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
             }
             if rc != SQLITE_OK {
                 let msg = String(cString: sqlite3_errmsg(stmt))
+                AveloDBLogger.error("bind failed: \(msg, privacy: .public)")
                 throw AppError.database(.bindFailed("index \(idx): \(msg)"))
             }
         }
@@ -363,7 +381,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
             } catch {
                 inTransactionDepth -= 1
                 if inTransactionDepth == 0 {
-                    _ = try? execNoLock("ROLLBACK")
+                    do {
+                        try execNoLock("ROLLBACK")
+                    } catch {
+                        AveloDBLogger.error("rollback failed after transaction error")
+                    }
                 }
                 throw error
             }
@@ -410,7 +432,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
     public func close() {
         sync {
             if let h = handle {
-                _ = try? execNoLock("PRAGMA wal_checkpoint(TRUNCATE)")
+                do {
+                    try execNoLock("PRAGMA wal_checkpoint(TRUNCATE)")
+                } catch {
+                    AveloDBLogger.error("checkpoint on close failed")
+                }
                 finalizeStatementCacheNoLock()
                 sqlite3_db_release_memory(h)
                 sqlite3_close(h)

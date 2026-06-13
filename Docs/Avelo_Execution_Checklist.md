@@ -825,3 +825,7 @@ Strike an item only when:
 - `swift build` and `swift test` are green for code-changing work
 - required dependency re-checks are green
 - no known blocker remains for that item
+
+## Future Split Candidates
+- `Core/Repositories/ReportRepository.swift`
+- `Features/Reports/ReportsView.swift`
