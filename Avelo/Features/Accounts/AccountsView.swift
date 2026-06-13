@@ -68,11 +68,30 @@ private struct AccountsBody: View {
             accountsList
                 .frame(minWidth: 520)
         }
+        .safeAreaInset(edge: .bottom) {
+            ModuleFooterBar(items: [
+                .init(title: "Next", detail: "Open a ledger or create a new account from the toolbar."),
+                .init(title: "Shortcut", detail: "⌘1 shows groups and ⌘2 focuses ledgers."),
+                .init(title: "Context", detail: "Group selection narrows the visible accounts.")
+            ])
+        }
     }
 
     @ViewBuilder
     private var groupsList: some View {
         VStack(alignment: .leading, spacing: 0) {
+            ModuleChrome(
+                title: "Accounts",
+                subtitle: "Groups, ledgers, and account drill-downs with Tally-style master navigation.",
+                hints: [
+                    .init(title: "Groups", key: "⌘1"),
+                    .init(title: "Ledgers", key: "⌘2"),
+                    .init(title: "New account", key: "⇧⌘N")
+                ],
+                primaryActionTitle: "New Account",
+                primaryActionSystemImage: "plus",
+                primaryAction: { env.router.present(.newAccount) }
+            )
             Text("Groups")
                 .font(.headline)
                 .padding(12)
@@ -105,6 +124,16 @@ private struct AccountsBody: View {
     @ViewBuilder
     private var accountsList: some View {
         VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Accounts in scope")
+                    .font(.headline)
+                Spacer()
+                Text("Edit, open ledger, or disable")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search accounts")
                 Toggle("Show disabled", isOn: $vm.showDisabled)

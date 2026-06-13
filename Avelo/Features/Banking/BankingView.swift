@@ -57,6 +57,14 @@ private struct BankingBody: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            ModuleChrome(
+                title: "Banking",
+                subtitle: "Reconciliation-focused bank workspace with offline statement import and matched entries.",
+                hints: [
+                    .init(title: "Reconcile", key: "⌘R"),
+                    .init(title: "Import", key: "⌘I")
+                ]
+            )
             HStack {
                 Picker("Account", selection: $vm.selectedAccountId) {
                     Text("Select…").tag(Account.ID?.none)
@@ -120,6 +128,11 @@ private struct BankingBody: View {
                         .padding(20)
                 }
             }
+            ModuleFooterBar(items: [
+                .init(title: "Next", detail: "Select a bank account, then reconcile or import a statement."),
+                .init(title: "Shortcut", detail: "⌘I opens import, ⌘R reruns reconciliation."),
+                .init(title: "Workflow", detail: "Matched rows map statement entries back to vouchers.")
+            ])
         }
     }
 }

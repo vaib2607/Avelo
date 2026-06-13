@@ -82,6 +82,19 @@ private struct VouchersBody: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            ModuleChrome(
+                title: "Vouchers",
+                subtitle: "Keyboard-first transaction entry with voucher types, filters, and drill-down-friendly history.",
+                hints: [
+                    .init(title: "Contra", key: "F4"),
+                    .init(title: "Payment", key: "F5"),
+                    .init(title: "Receipt", key: "F6"),
+                    .init(title: "Journal", key: "F7")
+                ],
+                primaryActionTitle: "New Sales",
+                primaryActionSystemImage: "plus",
+                primaryAction: { env.router.present(.newSales) }
+            )
             filterBar
             Divider()
             if vm.vouchers.isEmpty {
@@ -95,6 +108,11 @@ private struct VouchersBody: View {
             } else {
                 voucherTable
             }
+            ModuleFooterBar(items: [
+                .init(title: "Next", detail: "Use Edit or Reverse on any row to continue the workflow."),
+                .init(title: "Shortcut", detail: "F4-F11 open the common voucher entry screens."),
+                .init(title: "Filter", detail: "Use the Type button to narrow by voucher family.")
+            ])
         }
     }
 

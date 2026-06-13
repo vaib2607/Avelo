@@ -26,6 +26,13 @@ public enum ReportSelection: String, CaseIterable, Identifiable, Sendable {
     case gstSummary
     case dayBook
     case ledger
+    case cashBook
+    case bankBook
+    case receivables
+    case payables
+    case stockMovement
+    case stockRegister
+    case gstFiling
     case outstanding
     case stockValuation
 
@@ -39,8 +46,15 @@ public enum ReportSelection: String, CaseIterable, Identifiable, Sendable {
         case .gstSummary:    return "GST Summary"
         case .dayBook:       return "Day Book"
         case .ledger:        return "Ledger"
+        case .cashBook:      return "Cash Book"
+        case .bankBook:      return "Bank Book"
+        case .receivables:   return "Receivables"
+        case .payables:      return "Payables"
+        case .stockMovement: return "Stock Movement"
+        case .stockRegister: return "Stock Register"
+        case .gstFiling:     return "GST Filing Views"
         case .outstanding:   return "Outstanding"
-        case .stockValuation:return "Stock Valuation"
+        case .stockValuation:return "Stock Summary"
         }
     }
 }

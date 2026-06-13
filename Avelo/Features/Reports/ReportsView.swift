@@ -29,6 +29,7 @@ public struct ReportsView: View {
             model.reload()
             vm = model
         }
+        consumePendingReportSelection()
     }
 
     /// Applies a deep-link request from elsewhere (e.g. AccountsView) to show a
@@ -39,6 +40,19 @@ public struct ReportsView: View {
         vm.ledgerAccountId = accountId
         vm.reload()
         env.router.pendingLedgerAccountId = nil
+    }
+
+    private func consumePendingReportSelection() {
+        guard let selection = env.router.pendingReportSelection, let vm else { return }
+        vm.selection = selection
+        if selection == .ledger, vm.ledgerAccountId == nil, let first = vm.accounts.first?.id {
+            vm.ledgerAccountId = first
+        }
+        if (selection == .cashBook || selection == .bankBook), vm.cashBankAccountId == nil {
+            vm.cashBankAccountId = vm.accounts.first(where: { $0.code.uppercased().contains("CASH") || $0.code.uppercased().contains("BANK") })?.id
+        }
+        vm.reload()
+        env.router.pendingReportSelection = nil
     }
 }
 
@@ -67,12 +81,37 @@ private struct ReportsBody: View {
             main
                 .frame(minWidth: 540)
         }
+        .safeAreaInset(edge: .bottom) {
+            ModuleFooterBar(items: [
+                .init(title: "Next", detail: "Select a report on the left, then drill into account or voucher rows."),
+                .init(title: "Shortcut", detail: "⌘1 opens Trial Balance; ⌘6 opens Ledger."),
+                .init(title: "Drill-down", detail: "Clickable rows open the related ledger or voucher.")
+            ])
+        }
+        .overlay(alignment: .top) {
+            VStack(alignment: .leading, spacing: 8) {
+                ModuleChrome(
+                    title: "Reports",
+                    subtitle: "Trial balance, ledgers, statements, and drill-down views built for quick review.",
+                    hints: [
+                        .init(title: "Trial balance", key: "⌘1"),
+                        .init(title: "Ledger", key: "⌘6"),
+                        .init(title: "Refresh", key: "⌘R")
+                    ]
+                )
+                Text("Reports > \(vm.selection.title)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 4)
+            }
+        }
     }
 
     @ViewBuilder
     private var sidebar: some View {
         VStack(alignment: .leading) {
-            Text("Report").font(.headline).padding(12)
+            Text("Reports").font(.headline).padding(12)
             List(selection: $vm.selection) {
                 ForEach(ReportSelection.allCases) { r in
                     Text(r.title).tag(r)
@@ -93,10 +132,16 @@ private struct ReportsBody: View {
                     case .profitLoss:    profitLossSection
                     case .balanceSheet:  balanceSheetSection
                     case .gstSummary:    gstSummarySection
+                    case .gstFiling:     gstFilingSection
                     case .dayBook:       dayBookSection
                     case .ledger:        ledgerSection
+                    case .cashBook, .bankBook: ledgerSection
+                    case .receivables:   receivablesSection
+                    case .payables:      payablesSection
+                    case .stockMovement: stockMovementSection
+                    case .stockRegister: stockRegisterSection
                     case .outstanding:   outstandingSection
-                    case .stockValuation: stockValuationSection
+                    case .stockValuation: stockSummarySection
                     }
                 }
                 .padding(16)
@@ -110,7 +155,7 @@ private struct ReportsBody: View {
             switch vm.selection {
             case .trialBalance, .balanceSheet, .outstanding, .stockValuation:
                 DatePicker("As of", selection: $vm.asOf, displayedComponents: .date)
-            case .profitLoss, .gstSummary, .dayBook, .ledger:
+            case .profitLoss, .gstSummary, .gstFiling, .dayBook, .ledger, .cashBook, .bankBook, .receivables, .payables, .stockMovement, .stockRegister:
                 DatePicker("From", selection: $vm.fromDate, displayedComponents: .date)
                 DatePicker("To", selection: $vm.toDate, displayedComponents: .date)
             }
@@ -118,6 +163,14 @@ private struct ReportsBody: View {
                 Picker("Account", selection: $vm.ledgerAccountId) {
                     Text("Select…").tag(Account.ID?.none)
                     ForEach(vm.accounts) { a in
+                        Text("\(a.code) — \(a.name)").tag(Optional(a.id))
+                    }
+                }
+                .frame(minWidth: 280)
+            } else if vm.selection == .cashBook || vm.selection == .bankBook {
+                Picker("Account", selection: $vm.cashBankAccountId) {
+                    Text("Select…").tag(Account.ID?.none)
+                    ForEach(vm.accounts.filter { $0.code.uppercased().contains("CASH") || $0.code.uppercased().contains("BANK") }) { a in
                         Text("\(a.code) — \(a.name)").tag(Optional(a.id))
                     }
                 }
@@ -137,7 +190,13 @@ private struct ReportsBody: View {
         let difference = debitTotal - creditTotal
         return Group {
             if rows.isEmpty {
-                Text("No data.").foregroundStyle(.secondary)
+                EmptyStateView(
+                    title: "No trial balance yet",
+                    message: "There are no posted vouchers in this financial year yet.",
+                    systemImage: "sum",
+                    actionTitle: "Refresh",
+                    action: { vm.reload() }
+                )
             } else {
                 if difference != 0 {
                     Label(
@@ -209,7 +268,15 @@ private struct ReportsBody: View {
                     .monospacedDigit()
                     .foregroundStyle(pl.netProfitPaise >= 0 ? .green : .red)
             }
-        } else { Text("No data.").foregroundStyle(.secondary) }
+        } else {
+            EmptyStateView(
+                title: "No profit and loss data",
+                message: "Profit and loss appears after income and expense vouchers are posted for the selected period.",
+                systemImage: "chart.line.uptrend.xyaxis",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        }
     }
 
     @ViewBuilder
@@ -255,7 +322,15 @@ private struct ReportsBody: View {
                     Text("Total equity: \(Currency.formatPaise(bs.totalEquityPaise))").monospacedDigit().bold()
                 }
             }
-        } else { Text("No data.").foregroundStyle(.secondary) }
+        } else {
+            EmptyStateView(
+                title: "No balance sheet data",
+                message: "Balance sheet rows appear once assets, liabilities, or equity accounts have posted activity.",
+                systemImage: "scale.3d",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        }
     }
 
     @ViewBuilder
@@ -271,7 +346,52 @@ private struct ReportsBody: View {
                 row("SGST", g.sgstPaise)
                 row("Net payable", g.netPayablePaise, bold: true)
             }
-        } else { Text("No data.").foregroundStyle(.secondary) }
+        } else {
+            EmptyStateView(
+                title: "No GST summary yet",
+                message: "GST summary needs taxable sales or purchase activity in the selected date range.",
+                systemImage: "doc.text.magnifyingglass",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var gstFilingSection: some View {
+        if let g = vm.gstSummary {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("GST Filing Views").font(.headline)
+                Text("Offline filing prep only; use the summary totals below to cross-check return figures.")
+                    .foregroundStyle(.secondary)
+                if let filingPeriod = gstFilingPeriod {
+                    Text("Period: \(filingPeriod)").font(.callout)
+                }
+                Divider()
+                row("Output taxable", g.outputTaxablePaise)
+                row("Output tax", g.outputTaxPaise)
+                row("Input taxable", g.inputTaxablePaise)
+                row("Input tax", g.inputTaxPaise)
+                Divider()
+                row("IGST", g.igstPaise)
+                row("CGST", g.cgstPaise)
+                row("SGST", g.sgstPaise)
+                row("Net payable", g.netPayablePaise, bold: true)
+            }
+        } else {
+            EmptyStateView(
+                title: "No GST filing view yet",
+                message: "The filing view mirrors the GST summary for the chosen period, so it appears when GST activity exists.",
+                systemImage: "doc.text.magnifyingglass",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        }
+    }
+
+    private var gstFilingPeriod: String? {
+        guard env.companyContext != nil else { return nil }
+        return "\(DateFormatters.gstReturn.string(from: vm.fromDate)) - \(DateFormatters.gstReturn.string(from: vm.toDate))"
     }
 
     @ViewBuilder
@@ -288,7 +408,13 @@ private struct ReportsBody: View {
     private var dayBookSection: some View {
         let rows = vm.dayBook
         if rows.isEmpty {
-            Text("No vouchers in the period.").foregroundStyle(.secondary)
+            EmptyStateView(
+                title: "No day book entries",
+                message: "No vouchers were posted in the selected date range.",
+                systemImage: "calendar.badge.clock",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
         } else {
             Table(rows) {
                 TableColumn("Date") { r in
@@ -341,53 +467,170 @@ private struct ReportsBody: View {
                     .monospacedDigit()
                     .bold()
             }
-        } else { Text("Select an account.").foregroundStyle(.secondary) }
+        } else {
+            EmptyStateView(
+                title: "No ledger selected",
+                message: "Choose an account to view its ledger entries for the selected period.",
+                systemImage: "book.closed",
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var receivablesSection: some View {
+        outstandingList(title: "Receivables")
+    }
+
+    @ViewBuilder
+    private var payablesSection: some View {
+        outstandingList(title: "Payables")
+    }
+
+    @ViewBuilder
+    private var stockMovementSection: some View {
+        if vm.stockMovements.isEmpty {
+            EmptyStateView(
+                title: "No stock movements",
+                message: "There were no stock movements posted in the selected period.",
+                systemImage: "arrow.left.arrow.right",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Stock Movement").font(.headline)
+                Table(vm.stockMovements) {
+                    TableColumn("Date") { row in
+                        Text(DateFormatters.userDate.string(from: row.date))
+                    }
+                    TableColumn("Item") { row in
+                        Text(row.itemId.uuidString.prefix(8).description)
+                    }
+                    TableColumn("Type", value: \.movementType.rawValue)
+                    TableColumn("Qty") { row in
+                        Text(String(format: "%.3f", row.quantity))
+                    }
+                    TableColumn("Voucher") { row in
+                        if let voucherId = row.voucherId {
+                            Button(row.referenceVoucherNumber ?? "Open") { openVoucher(voucherId) }
+                                .buttonStyle(.plain)
+                        } else {
+                            Text(row.referenceVoucherNumber ?? "—")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var stockRegisterSection: some View {
+        if vm.stockRegisterRows.isEmpty {
+            EmptyStateView(
+                title: "No stock register rows",
+                message: "The selected period has no item-level stock activity to list in the register.",
+                systemImage: "list.bullet.rectangle",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Stock Register").font(.headline)
+                Table(vm.stockRegisterRows) {
+                    TableColumn("Item") { row in
+                        Text(row.itemName)
+                    }
+                    TableColumn("Date") { row in
+                        Text(DateFormatters.userDate.string(from: row.movement.date))
+                    }
+                    TableColumn("Type", value: \.movement.movementType.rawValue)
+                    TableColumn("Qty") { row in
+                        Text(String(format: "%.3f", row.movement.quantity))
+                    }
+                    TableColumn("Voucher") { row in
+                        if let voucherId = row.movement.voucherId {
+                            Button(row.movement.referenceVoucherNumber ?? "Open") { openVoucher(voucherId) }
+                                .buttonStyle(.plain)
+                        } else {
+                            Text(row.movement.referenceVoucherNumber ?? "—")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
     private var outstandingSection: some View {
-        if let o = vm.outstanding {
-            Table(o.rows) {
-                TableColumn("Account") { r in
-                    Button(r.partyName) { openLedger(r.id) }
-                        .buttonStyle(.plain)
-                }
-                TableColumn("Amount (₹)") { r in
-                    Text(Currency.formatPaise(r.amountPaise)).monospacedDigit()
-                }
-            }
-            Text("Total: \(Currency.formatPaise(o.totalPaise))").monospacedDigit().bold()
-        } else { Text("No data.").foregroundStyle(.secondary) }
+        outstandingList(title: "Outstanding")
     }
 
     @ViewBuilder
-    private var stockValuationSection: some View {
-        if let s = vm.stockValuation {
-            Table(s.rows) {
-                TableColumn("Item", value: \.itemName)
-                TableColumn("Qty", value: \.itemCode)
-                TableColumn("Quantity") { r in
-                    Text(String(format: "%.3f", r.quantity))
+    private func outstandingList(title: String) -> some View {
+        if let o = vm.outstanding {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title).font(.headline)
+                Table(o.rows) {
+                    TableColumn("Account") { r in
+                        Button(r.partyName) { openLedger(r.id) }
+                            .buttonStyle(.plain)
+                    }
+                    TableColumn("Amount (₹)") { r in
+                        Text(Currency.formatPaise(r.amountPaise)).monospacedDigit()
+                    }
                 }
-                TableColumn("Rate (₹)") { r in
-                    Text(Currency.formatPaise(r.ratePaise)).monospacedDigit()
-                }
-                TableColumn("Value (₹)") { r in
-                    Text(Currency.formatPaise(r.valuePaise)).monospacedDigit()
-                }
+                Text("Total: \(Currency.formatPaise(o.totalPaise))").monospacedDigit().bold()
             }
-            Text("Total: \(Currency.formatPaise(s.totalPaise))").monospacedDigit().bold()
-        } else { Text("No data.").foregroundStyle(.secondary) }
+        } else {
+            EmptyStateView(
+                title: "No outstanding items",
+                message: "Outstanding balances appear when receivables or payables have unpaid bill allocations.",
+                systemImage: "clock.arrow.circlepath",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        }
     }
 
-    private func openVoucher(_ id: Voucher.ID) {
-        ReportsNavigation.openVoucher(id, router: env.router)
+    @ViewBuilder
+    private var stockSummarySection: some View {
+        if let s = vm.stockValuation {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Stock Summary").font(.headline)
+                Table(s.rows) {
+                    TableColumn("Item", value: \.itemName)
+                    TableColumn("Code", value: \.itemCode)
+                    TableColumn("Quantity") { r in
+                        Text(String(format: "%.3f", r.quantity))
+                    }
+                    TableColumn("Rate (₹)") { r in
+                        Text(Currency.formatPaise(r.ratePaise)).monospacedDigit()
+                    }
+                    TableColumn("Value (₹)") { r in
+                        Text(Currency.formatPaise(r.valuePaise)).monospacedDigit()
+                    }
+                }
+                Text("Total: \(Currency.formatPaise(s.totalPaise))").monospacedDigit().bold()
+            }
+        } else {
+            EmptyStateView(
+                title: "No stock summary",
+                message: "Select a different date range or stock movement mode to see stock valuation rows.",
+                systemImage: "shippingbox",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        }
     }
 
     private func openLedger(_ accountId: Account.ID) {
         vm.selection = .ledger
         vm.ledgerAccountId = accountId
         vm.reload()
+    }
+
+    private func openVoucher(_ id: Voucher.ID) {
+        ReportsNavigation.openVoucher(id, router: env.router)
     }
 }
 

@@ -24,13 +24,21 @@ public struct RootView: View {
             if env.companyContext == nil {
                 CompanyPickerView()
             } else {
-                NavigationSplitView(columnVisibility: $windowState.columnVisibility) {
-                    SidebarView()
-                        .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 300)
-                } detail: {
-                    detailView
+                VStack(spacing: 0) {
+                    ShellContextBar(
+                        companyName: env.companyContext?.companyName,
+                        financialYearLabel: env.companyContext?.financialYear.label,
+                        moduleTitle: router.selection.title,
+                        moduleHint: moduleHint(for: router.selection)
+                    )
+                    NavigationSplitView(columnVisibility: $windowState.columnVisibility) {
+                        SidebarView()
+                            .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 300)
+                    } detail: {
+                        detailView
+                    }
+                    .navigationSplitViewStyle(.balanced)
                 }
-                .navigationSplitViewStyle(.balanced)
             }
         }
         .environment(windowState)
@@ -98,6 +106,21 @@ public struct RootView: View {
         }
     }
 
+    private func moduleHint(for destination: SidebarDestination) -> String {
+        switch destination {
+        case .dashboard: return "Company overview, live totals, and quick entry."
+        case .vouchers:  return "Post, edit, and reverse transactions."
+        case .accounts:  return "Groups, ledgers, and master drill-down."
+        case .reports:   return "Statements, ledgers, and voucher drill-down."
+        case .inventory: return "Stock masters and movement."
+        case .gst:       return "GST summary, return prep, and filing views."
+        case .payroll:   return "Employees and salary posting."
+        case .banking:   return "Statement import and reconciliation."
+        case .audit:     return "Append-only history of changes."
+        case .settings:  return "Company, FY, backup, restore, and preferences."
+        }
+    }
+
     @ViewBuilder
     private var detailView: some View {
         switch router.selection {
@@ -106,6 +129,7 @@ public struct RootView: View {
         case .accounts:  AccountsView()
         case .reports:   ReportsView()
         case .inventory: InventoryView()
+        case .gst:       GSTView()
         case .payroll:   PayrollView()
         case .banking:   BankingView()
         case .audit:     AuditView()
@@ -122,6 +146,11 @@ public struct RootView: View {
         case .restore:              RestoreSheet()
         case .about:                AboutSheet()
         case .preferences:          PreferencesSheet()
+        case .companyInfo:
+            if let ctx = env.companyContext,
+               let company = try? CompanyRepository(db: ctx.database).findById(ctx.companyId) {
+                CompanyInfoSheet(company: company)
+            }
         case .newVoucher, .newJournal, .newPayment, .newReceipt,
              .newContra, .newPurchase, .newSales,
              .newPurchaseOrder, .newSalesOrder, .newReceiptNote, .newDeliveryNote,

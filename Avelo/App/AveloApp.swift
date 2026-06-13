@@ -51,6 +51,10 @@ struct AveloApp: App {
                     }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
 
+                    Button("Company Info…") {
+                        environment.router.present(.companyInfo)
+                    }
+
                     Button("Open Company…") {
                         NotificationCenter.default.post(name: .aveloRequestOpenCompany, object: nil)
                     }
@@ -65,6 +69,22 @@ struct AveloApp: App {
                         NotificationCenter.default.post(name: .aveloRequestRestore, object: nil)
                     }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
+
+                    Button("Inventory Settings…") {
+                        environment.router.present(.manageInventory)
+                    }
+
+                    Button("Payroll Settings…") {
+                        environment.router.present(.managePayroll)
+                    }
+
+                    Button("Lock Financial Year…") {
+                        NotificationCenter.default.post(name: .aveloRequestLockFy, object: nil)
+                    }
+
+                    Button("Close Financial Year…") {
+                        NotificationCenter.default.post(name: .aveloRequestCloseFy, object: nil)
+                    }
 
                     Button("Preferences…") {
                         NotificationCenter.default.post(name: .aveloRequestPreferences, object: nil)
@@ -107,15 +127,75 @@ struct AveloApp: App {
                     Button("Settings")  { environment.router.go(.settings) }
                         .keyboardShortcut("9", modifiers: .command)
                 }
+                CommandMenu("Modules") {
+                    Button("Inventory") { environment.router.go(.inventory) }
+                        .keyboardShortcut("5", modifiers: [.command, .shift])
+                    Button("GST") { environment.router.go(.gst) }
+                        .keyboardShortcut("6", modifiers: [.command, .shift])
+                    Button("Payroll") { environment.router.go(.payroll) }
+                        .keyboardShortcut("7", modifiers: [.command, .shift])
+                    Button("Banking") { environment.router.go(.banking) }
+                        .keyboardShortcut("8", modifiers: [.command, .shift])
+                    Button("Audit") { environment.router.go(.audit) }
+                        .keyboardShortcut("9", modifiers: [.command, .shift])
+                    Button("Settings") { environment.router.go(.settings) }
+                        .keyboardShortcut("0", modifiers: [.command, .shift])
+                }
+                CommandMenu("Masters") {
+                    Button("New Account…") { environment.router.present(.newAccount) }
+                        .keyboardShortcut("a", modifiers: [.command, .shift])
+                    Button("New Item…") { environment.router.present(.newItem) }
+                        .keyboardShortcut("i", modifiers: [.command, .shift])
+                    Button("New Employee…") { environment.router.present(.newEmployee) }
+                        .keyboardShortcut("e", modifiers: [.command, .shift])
+                    Button("New Financial Year…") { environment.router.present(.newFinancialYear) }
+                        .keyboardShortcut("y", modifiers: [.command, .shift])
+                }
                 CommandMenu("Voucher") {
                     Button("Contra (F4)")     { environment.router.present(.newContra) }
                     Button("Payment (F5)")    { environment.router.present(.newPayment) }
                     Button("Receipt (F6)")    { environment.router.present(.newReceipt) }
                     Button("Journal (F7)")    { environment.router.present(.newJournal) }
+                    Button("Memo")            { environment.router.present(.newJournal) }
                     Button("Sales (F8)")      { environment.router.present(.newSales) }
                     Button("Purchase (F9)")   { environment.router.present(.newPurchase) }
-                    Button("Credit Note (F10)") { environment.router.present(.newCreditNote) }
-                    Button("Debit Note (F11)")  { environment.router.present(.newDebitNote) }
+                    Button("Credit Note") { environment.router.present(.newCreditNote) }
+                    Button("Debit Note")  { environment.router.present(.newDebitNote) }
+                    Button("Purchase Order") { environment.router.present(.newPurchaseOrder) }
+                    Button("Sales Order") { environment.router.present(.newSalesOrder) }
+                    Button("Receipt Note") { environment.router.present(.newReceiptNote) }
+                    Button("Delivery Note") { environment.router.present(.newDeliveryNote) }
+                    Button("Physical Stock") { environment.router.present(.newPhysicalStock) }
+                    Button("Stock Journal") { environment.router.present(.newStockJournal) }
+                    Button("Rejection In") { environment.router.present(.newRejectionIn) }
+                    Button("Rejection Out") { environment.router.present(.newRejectionOut) }
+                }
+                CommandMenu("Reports") {
+                    Button("Trial Balance") { environment.router.openReport(.trialBalance) }
+                        .keyboardShortcut("1", modifiers: [.command, .option])
+                    Button("Profit & Loss") { environment.router.openReport(.profitLoss) }
+                        .keyboardShortcut("2", modifiers: [.command, .option])
+                    Button("Balance Sheet") { environment.router.openReport(.balanceSheet) }
+                        .keyboardShortcut("3", modifiers: [.command, .option])
+                    Button("GST Summary") { environment.router.openReport(.gstSummary) }
+                        .keyboardShortcut("4", modifiers: [.command, .option])
+                    Button("Day Book") { environment.router.openReport(.dayBook) }
+                        .keyboardShortcut("5", modifiers: [.command, .option])
+                    Button("Ledger") { environment.router.openReport(.ledger) }
+                        .keyboardShortcut("6", modifiers: [.command, .option])
+                    Button("Cash Book") { environment.router.openReport(.cashBook) }
+                        .keyboardShortcut("7", modifiers: [.command, .option])
+                    Button("Bank Book") { environment.router.openReport(.bankBook) }
+                        .keyboardShortcut("8", modifiers: [.command, .option])
+                    Button("Receivables") { environment.router.openReport(.receivables) }
+                        .keyboardShortcut("9", modifiers: [.command, .option])
+                    Button("Payables") { environment.router.openReport(.payables) }
+                        .keyboardShortcut("0", modifiers: [.command, .option])
+                    Button("Outstanding") { environment.router.openReport(.outstanding) }
+                    Button("Stock Summary") { environment.router.openReport(.stockValuation) }
+                    Button("Stock Movement") { environment.router.openReport(.stockMovement) }
+                    Button("Stock Register") { environment.router.openReport(.stockRegister) }
+                    Button("GST Filing Views") { environment.router.openReport(.gstFiling) }
                 }
             }
         }
