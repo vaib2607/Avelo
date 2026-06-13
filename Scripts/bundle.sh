@@ -46,7 +46,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0-rc1</string>
+  <string>1.0</string>
   <key>CFBundleVersion</key>
   <string>2</string>
   <key>LSMinimumSystemVersion</key>
