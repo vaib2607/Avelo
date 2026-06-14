@@ -91,11 +91,14 @@ public final class AccountTreeCache {
         var out: [Account.ID: LedgerBalance] = [:]
         let batchSize = 500
         let fyEnd: Date? = {
-            guard let financialYearId,
-                  let fy = try? FinancialYearRepository(db: db).findById(financialYearId) else {
-                return (nil)
+            guard let financialYearId else {
+                return nil
             }
-            return fy.endDate
+            do {
+                return try FinancialYearRepository(db: db).findById(financialYearId)?.endDate
+            } catch {
+                return nil
+            }
         }()
         var index = ledgers.startIndex
         while index < ledgers.endIndex {

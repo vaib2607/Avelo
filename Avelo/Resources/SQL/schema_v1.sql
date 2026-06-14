@@ -71,88 +71,6 @@ CREATE TABLE avelo_account_groups (
 CREATE INDEX idx_avelo_groups_company ON avelo_account_groups(company_id);
 CREATE INDEX idx_avelo_groups_parent ON avelo_account_groups(parent_group_id);
 
-CREATE TABLE avelo_cost_centres (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    code TEXT NOT NULL,
-    name TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
-    created_at TEXT NOT NULL,
-    CHECK(length(trim(code)) > 0),
-    CHECK(length(trim(name)) > 0),
-    UNIQUE(company_id, code)
-);
-
-CREATE TABLE avelo_cost_categories (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    code TEXT NOT NULL,
-    name TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
-    created_at TEXT NOT NULL,
-    CHECK(length(trim(code)) > 0),
-    CHECK(length(trim(name)) > 0),
-    UNIQUE(company_id, code)
-);
-
-CREATE TABLE avelo_budgets (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    financial_year_id TEXT NOT NULL REFERENCES avelo_financial_years(id),
-    cost_centre_id TEXT REFERENCES avelo_cost_centres(id),
-    code TEXT NOT NULL,
-    name TEXT NOT NULL,
-    planned_paise INTEGER NOT NULL DEFAULT 0,
-    actual_paise INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL,
-    CHECK(length(trim(code)) > 0),
-    CHECK(length(trim(name)) > 0),
-    UNIQUE(company_id, financial_year_id, code)
-);
-
-CREATE TABLE avelo_bill_allocations (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    voucher_id TEXT NOT NULL REFERENCES avelo_vouchers(id),
-    party_account_id TEXT NOT NULL REFERENCES avelo_accounts(id),
-    kind TEXT NOT NULL CHECK(kind IN ('New Ref','Agst Ref','Advance','On Account')),
-    reference_number TEXT,
-    allocated_paise INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
-);
-
-CREATE TABLE avelo_cheques (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    voucher_id TEXT NOT NULL REFERENCES avelo_vouchers(id),
-    cheque_number TEXT NOT NULL,
-    bank_account_id TEXT REFERENCES avelo_accounts(id),
-    issue_date TEXT NOT NULL,
-    due_date TEXT,
-    status TEXT NOT NULL CHECK(status IN ('issued','deposited','cleared','bounced','cancelled')),
-    created_at TEXT NOT NULL
-);
-
-CREATE TABLE avelo_tds_records (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    voucher_id TEXT NOT NULL REFERENCES avelo_vouchers(id),
-    section_code TEXT NOT NULL,
-    base_paise INTEGER NOT NULL,
-    tax_paise INTEGER NOT NULL,
-    created_at TEXT NOT NULL
-);
-
-CREATE TABLE avelo_tcs_records (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    voucher_id TEXT NOT NULL REFERENCES avelo_vouchers(id),
-    section_code TEXT NOT NULL,
-    base_paise INTEGER NOT NULL,
-    tax_paise INTEGER NOT NULL,
-    created_at TEXT NOT NULL
-);
-
 CREATE TABLE avelo_accounts (
     id TEXT NOT NULL PRIMARY KEY,
     company_id TEXT NOT NULL REFERENCES avelo_companies(id),
@@ -308,22 +226,8 @@ CREATE TABLE avelo_inventory_items (
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     unit TEXT NOT NULL,
-    alternate_unit TEXT,
     valuation_method TEXT NOT NULL DEFAULT 'fifo' CHECK(valuation_method IN ('fifo','weightedAverage')),
     is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
-    opening_quantity REAL NOT NULL DEFAULT 0,
-    opening_rate_paise INTEGER NOT NULL DEFAULT 0,
-    gst_rate REAL NOT NULL DEFAULT 0,
-    stock_group TEXT,
-    stock_category TEXT,
-    godown TEXT,
-    reorder_level REAL,
-    price_level1_paise INTEGER,
-    price_level2_paise INTEGER,
-    barcode TEXT,
-    hsn_sac TEXT,
-    is_archived INTEGER NOT NULL DEFAULT 0 CHECK(is_archived IN (0,1)),
-    linked_account_id TEXT REFERENCES avelo_accounts(id),
     created_at TEXT NOT NULL,
     CHECK(length(trim(code)) > 0),
     CHECK(length(trim(name)) > 0),
@@ -336,40 +240,17 @@ CREATE TABLE avelo_stock_movements (
     item_id TEXT NOT NULL REFERENCES avelo_inventory_items(id),
     voucher_id TEXT REFERENCES avelo_vouchers(id),
     date TEXT NOT NULL,
-    movement_type TEXT NOT NULL CHECK(movement_type IN ('in','out','adjustment','opening','purchase','purchaseReturn','sale','saleReturn','adjustmentIn','adjustmentOut')),
-    quantity REAL NOT NULL DEFAULT 0,
+    movement_type TEXT NOT NULL CHECK(movement_type IN ('in','out','adjustment')),
+    quantity INTEGER NOT NULL CHECK(quantity > 0),
     unit_cost_paise INTEGER NOT NULL DEFAULT 0,
     total_value_paise INTEGER NOT NULL DEFAULT 0,
     reference_voucher_number TEXT,
-    batch_number TEXT,
-    manufacture_date TEXT,
-    expiry_date TEXT,
     reason TEXT,
     created_at TEXT NOT NULL
 );
 CREATE INDEX idx_avelo_mov_item_date ON avelo_stock_movements(item_id, date);
 CREATE INDEX idx_avelo_mov_company_date ON avelo_stock_movements(company_id, date);
 CREATE INDEX idx_avelo_mov_voucher ON avelo_stock_movements(voucher_id);
-
-CREATE TABLE avelo_boms (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    assembly_item_id TEXT NOT NULL REFERENCES avelo_inventory_items(id),
-    output_quantity REAL NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE(company_id, assembly_item_id)
-);
-
-CREATE TABLE avelo_bom_components (
-    id TEXT NOT NULL PRIMARY KEY,
-    company_id TEXT NOT NULL REFERENCES avelo_companies(id),
-    bom_id TEXT NOT NULL REFERENCES avelo_boms(id) ON DELETE CASCADE,
-    component_item_id TEXT NOT NULL REFERENCES avelo_inventory_items(id),
-    quantity REAL NOT NULL CHECK(quantity > 0),
-    line_order INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX idx_avelo_bom_components_bom ON avelo_bom_components(bom_id, line_order);
 
 CREATE TABLE avelo_payroll_employees (
     id TEXT NOT NULL PRIMARY KEY,
@@ -421,12 +302,7 @@ CREATE TABLE avelo_audit_events (
         'payrollEmployeeCreated','payrollEmployeeUpdated','payrollEmployeeTerminated',
         'salaryPosted',
         'backupExported','backupImported',
-        'companySwitched','financialYearSwitched',
-        'inventoryModeChanged','fyUnlocked','inventoryEnabled',
-        'itemCreated','itemUpdated','itemArchived','itemAccountLinked','stockMoved',
-        'employeeCreated','employeeUpdated','employeeDeactivated',
-        'payrollEntryPosted',
-        'bankStatementImported','bankStatementLineCleared','bankReconciled'
+        'companySwitched','financialYearSwitched'
     )),
     entity_type TEXT NOT NULL,
     entity_id TEXT NOT NULL,

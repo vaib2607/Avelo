@@ -83,14 +83,8 @@ private struct PayrollBody: View {
                     TableColumn("Designation") { e in
                         Text(e.designation ?? "—")
                     }
-                    TableColumn("Basic (₹)") { e in
-                        Text(Currency.formatPaise(e.basicPaise)).monospacedDigit()
-                    }
-                    TableColumn("HRA (₹)") { e in
-                        Text(Currency.formatPaise(e.hraPaise)).monospacedDigit()
-                    }
-                    TableColumn("Other (₹)") { e in
-                        Text(Currency.formatPaise(e.otherAllowancesPaise)).monospacedDigit()
+                    TableColumn("Base Salary (₹)") { e in
+                        Text(Currency.formatPaise(e.baseSalaryPaise)).monospacedDigit()
                     }
                     TableColumn("Status") { e in
                         StatusBadge(kind: e.isActive ? .success : .neutral,

@@ -5,22 +5,20 @@ final class InventoryServiceTests: XCTestCase {
 
     private func makeItem(_ tc: TestCompany) throws -> InventoryItem {
         try InventoryService(db: tc.db, companyId: tc.companyId)
-            .createItem(code: "ITEM001", name: "Rice", unit: "KG",
-                        openingQuantity: 0, openingRatePaise: 0)
+            .createItem(code: "ITEM001", name: "Rice", unit: "KG")
     }
 
-    func testInventoryMasterFieldsRoundTrip() throws {
+    func testInventoryMasterFieldsRoundTripFrozenSchema() throws {
         let tc = try TestCompany.make()
         let item = try InventoryService(db: tc.db, companyId: tc.companyId)
-            .createItem(code: "ITEM002", name: "Wheat", unit: "KG",
-                        openingQuantity: 1, openingRatePaise: 2500,
-                        stockGroup: "Grains", stockCategory: "Staples", godown: "Main",
-                        hsnSac: "1001")
+            .createItem(code: "ITEM002", name: "Wheat", unit: "KG", valuationMethod: .weightedAverage)
+
         let loaded = try XCTUnwrap(InventoryRepository(db: tc.db).findItemById(item.id))
-        XCTAssertEqual(loaded.stockGroup, "Grains")
-        XCTAssertEqual(loaded.stockCategory, "Staples")
-        XCTAssertEqual(loaded.godown, "Main")
-        XCTAssertEqual(loaded.hsnSac, "1001")
+        XCTAssertEqual(loaded.code, "ITEM002")
+        XCTAssertEqual(loaded.name, "Wheat")
+        XCTAssertEqual(loaded.unit, "KG")
+        XCTAssertEqual(loaded.valuationMethod, .weightedAverage)
+        XCTAssertTrue(loaded.isActive)
     }
 
     func testInventoryDisabledCompanyRejectsPublicOperations() throws {
@@ -38,7 +36,7 @@ final class InventoryServiceTests: XCTestCase {
             XCTAssertTrue(message.localizedCaseInsensitiveContains("inventory is disabled"))
         }
         XCTAssertThrowsError(
-            try svc.createItem(code: "DISABLED", name: "Disabled", unit: "NOS", openingQuantity: 0, openingRatePaise: 0)
+            try svc.createItem(code: "DISABLED", name: "Disabled", unit: "NOS")
         ) { error in
             guard case AppError.featureUnavailable = error else {
                 return XCTFail("Expected featureUnavailable, got \(error)")
@@ -46,70 +44,45 @@ final class InventoryServiceTests: XCTestCase {
         }
     }
 
-    func testBatchTrackingFieldsRoundTrip() throws {
+    func testInventoryItemAccountLinkingIsDeferredByFrozenSchema() throws {
         let tc = try TestCompany.make()
         let item = try makeItem(tc)
-        let svc = InventoryService(db: tc.db, companyId: tc.companyId)
-        let mfg = DateFormatters.parseDate("2024-01-10")!
-        let exp = DateFormatters.parseDate("2025-01-10")!
 
-        try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
-                               type: .purchase, quantity: 10, ratePaise: 1250,
-                               batchNumber: "B-1001", manufactureDate: mfg, expiryDate: exp)
-
-        let movement = try XCTUnwrap(InventoryRepository(db: tc.db)
-            .listMovements(filter: .init(companyId: tc.companyId, itemId: item.id)).first)
-        XCTAssertEqual(movement.batchNumber, "B-1001")
-        XCTAssertEqual(movement.manufactureDate?.timeIntervalSince1970 ?? 0, mfg.timeIntervalSince1970, accuracy: 0.1)
-        XCTAssertEqual(movement.expiryDate?.timeIntervalSince1970 ?? 0, exp.timeIntervalSince1970, accuracy: 0.1)
+        XCTAssertThrowsError(
+            try InventoryService(db: tc.db, companyId: tc.companyId).linkItemToAccount(itemId: item.id, accountId: tc.salesId)
+        ) { error in
+            guard case AppError.featureUnavailable(let message) = error else {
+                return XCTFail("Expected featureUnavailable, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("deferred"))
+        }
     }
 
-    // MARK: - Fractional quantity
-
-    func testFractionalQuantityRoundTrips() throws {
+    func testIntegerQuantityRoundTrips() throws {
         let tc = try TestCompany.make()
         let item = try makeItem(tc)
         let svc = InventoryService(db: tc.db, companyId: tc.companyId)
 
         try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
-                               type: .purchase, quantity: 2.75, ratePaise: 10000)
+                               type: .stockIn, quantity: 3, ratePaise: 10000)
 
         let bal = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id,
                                                                     asOf: DateFormatters.parseDate("2024-06-01")!)
-        XCTAssertEqual(bal.onHandQty, 2.75, accuracy: 0.001)
+        XCTAssertEqual(bal.onHandQty, 3)
     }
 
-    func testFractionalQuantityIsNotTruncatedToInteger() throws {
+    func testTotalValuePaiseUsesIntegerQuantity() throws {
         let tc = try TestCompany.make()
         let item = try makeItem(tc)
         let svc = InventoryService(db: tc.db, companyId: tc.companyId)
 
-        // The old bug truncated 0.75 → 0, recording a zero-quantity movement
-        // (which the validator would now reject). A successful insert with the
-        // correct on-hand proves no truncation occurred.
         try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
-                               type: .purchase, quantity: 0.75, ratePaise: 10000)
-
-        let bal = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id,
-                                                                    asOf: DateFormatters.parseDate("2024-06-01")!)
-        XCTAssertGreaterThan(bal.onHandQty, 0.5)
-    }
-
-    func testTotalValuePaiseIsRoundedNotTruncated() throws {
-        let tc = try TestCompany.make()
-        let item = try makeItem(tc)
-        let svc = InventoryService(db: tc.db, companyId: tc.companyId)
-
-        // 1.5 kg × ₹33.33/kg = ₹49.995 → should round to ₹50.00 (5000 paise)
-        try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
-                               type: .purchase, quantity: 1.5, ratePaise: 3333)
+                               type: .stockIn, quantity: 2, ratePaise: 3333)
 
         let movements = try InventoryRepository(db: tc.db)
             .listMovements(filter: .init(companyId: tc.companyId, itemId: item.id))
-        XCTAssertEqual(movements.first?.totalValuePaise, 5000) // 1.5 × 3333 = 4999.5 → rounds to 5000 paise
+        XCTAssertEqual(movements.first?.totalValuePaise, 6666)
     }
-
-    // MARK: - Zero-quantity rejection
 
     func testZeroQuantityThrows() throws {
         let tc = try TestCompany.make()
@@ -118,7 +91,7 @@ final class InventoryServiceTests: XCTestCase {
 
         XCTAssertThrowsError(
             try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
-                                   type: .purchase, quantity: 0, ratePaise: 10000)
+                                   type: .stockIn, quantity: 0, ratePaise: 10000)
         ) { error in
             guard case AppError.validation(let ve) = error else {
                 return XCTFail("Expected AppError.validation, got \(error)")
@@ -134,28 +107,24 @@ final class InventoryServiceTests: XCTestCase {
 
         XCTAssertNoThrow(
             try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
-                                   type: .purchase, quantity: 1, ratePaise: 0, notes: "Free sample")
+                                   type: .stockIn, quantity: 1, ratePaise: 0, notes: "Free sample")
         )
         let movements = try InventoryRepository(db: tc.db)
             .listMovements(filter: .init(companyId: tc.companyId, itemId: item.id))
         XCTAssertEqual(movements.first?.totalValuePaise, 0)
     }
 
-    // MARK: - Stock availability guard (E2 — was dead before)
-
     func testOutMovementBeyondStockThrows() throws {
         let tc = try TestCompany.make()
         let item = try makeItem(tc)
         let svc = InventoryService(db: tc.db, companyId: tc.companyId)
 
-        // Record 5 kg in.
         try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
-                               type: .purchase, quantity: 5, ratePaise: 10000)
+                               type: .stockIn, quantity: 5, ratePaise: 10000)
 
-        // Try to sell 6 kg — must throw quantityExceedsStock.
         XCTAssertThrowsError(
             try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-15")!,
-                                   type: .sale, quantity: 6, ratePaise: 10000)
+                                   type: .stockOut, quantity: 6, ratePaise: 10000)
         ) { error in
             guard case AppError.validation(let ve) = error else {
                 return XCTFail("Expected AppError.validation, got \(error)")
@@ -170,45 +139,39 @@ final class InventoryServiceTests: XCTestCase {
         let svc = InventoryService(db: tc.db, companyId: tc.companyId)
 
         try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!,
-                               type: .purchase, quantity: 5, ratePaise: 10000)
+                               type: .stockIn, quantity: 5, ratePaise: 10000)
         XCTAssertNoThrow(
             try svc.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-15")!,
-                                   type: .sale, quantity: 3.5, ratePaise: 10000)
+                                   type: .stockOut, quantity: 3, ratePaise: 10000)
         )
         let bal = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id,
                                                                     asOf: DateFormatters.parseDate("2024-06-15")!)
-        XCTAssertEqual(bal.onHandQty, 1.5, accuracy: 0.001)
+        XCTAssertEqual(bal.onHandQty, 2)
     }
-
-    // MARK: - Validator purity tests (no DB)
 
     func testValidatorAcceptsValidInput() {
         let v = StockMovementValidator().validate(.init(
-            itemId: UUID(), date: Date(), movementType: .purchase,
-            quantity: 2.5, unitCostPaise: 10000, totalValuePaise: 25000, currentOnHandQty: 0
+            itemId: UUID(), date: Date(), movementType: .stockIn,
+            quantity: 2, unitCostPaise: 10000, totalValuePaise: 20000, currentOnHandQty: 0
         ))
         XCTAssertTrue(v.isValid)
     }
 
     func testValidatorRejectsNegativeCost() {
         let v = StockMovementValidator().validate(.init(
-            itemId: UUID(), date: Date(), movementType: .purchase,
-            quantity: 1.0, unitCostPaise: -100, totalValuePaise: -100, currentOnHandQty: 0
+            itemId: UUID(), date: Date(), movementType: .stockIn,
+            quantity: 1, unitCostPaise: -100, totalValuePaise: -100, currentOnHandQty: 0
         ))
         XCTAssertFalse(v.isValid)
-        XCTAssertEqual(v.errors.first?.code, .stockMovementCostMismatch)
+        XCTAssertEqual(v.errors.first?.code, ValidationErrorCode.stockMovementCostMismatch)
     }
 
-    func testValidatorRejectsExceedingStockForAllOutTypes() {
-        let outTypes: [MovementType] = [.stockOut, .sale, .purchaseReturn, .adjustmentOut]
-        for type in outTypes {
-            let v = StockMovementValidator().validate(.init(
-                itemId: UUID(), date: Date(), movementType: type,
-                quantity: 10.0, unitCostPaise: 1000, totalValuePaise: 10000, currentOnHandQty: 5.0
-            ))
-            XCTAssertFalse(v.isValid, "\(type.rawValue) should fail when qty > onHand")
-            XCTAssertTrue(v.errors.contains(where: { $0.code == .quantityExceedsStock }),
-                          "\(type.rawValue) missing quantityExceedsStock error")
-        }
+    func testValidatorRejectsExceedingStockForOutType() {
+        let v = StockMovementValidator().validate(.init(
+            itemId: UUID(), date: Date(), movementType: .stockOut,
+            quantity: 10, unitCostPaise: 1000, totalValuePaise: 10000, currentOnHandQty: 5
+        ))
+        XCTAssertFalse(v.isValid)
+        XCTAssertTrue(v.errors.contains(where: { $0.code == ValidationErrorCode.quantityExceedsStock }))
     }
 }

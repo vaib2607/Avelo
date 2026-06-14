@@ -14,25 +14,12 @@ public final class BOMService: Sendable {
     public func saveBOM(assemblyItemId: InventoryItem.ID,
                         outputQuantity: Double,
                         components: [BOMComponent]) throws {
-        let bom = BillOfMaterials(companyId: companyId,
-                                  assemblyItemId: assemblyItemId,
-                                  outputQuantity: outputQuantity)
-        let normalized = components.enumerated().map { idx, c in
-            BOMComponent(id: c.id,
-                         companyId: companyId,
-                         bomId: bom.id,
-                         componentItemId: c.componentItemId,
-                         quantity: c.quantity,
-                         lineOrder: idx)
-        }
-        try db.write { tx in
-            let repo = BOMRepository(db: tx)
-            try repo.upsertBOM(bom)
-            try repo.upsertComponents(normalized)
-        }
+        _ = (assemblyItemId, outputQuantity, components)
+        throw AppError.featureUnavailable("Bills of materials are deferred outside the frozen schema.")
     }
 
     public func loadBOM(for assemblyItemId: InventoryItem.ID) throws -> (BillOfMaterials, [BOMComponent])? {
-        try repository.loadBOM(companyId: companyId, assemblyItemId: assemblyItemId)
+        _ = assemblyItemId
+        throw AppError.featureUnavailable("Bills of materials are deferred outside the frozen schema.")
     }
 }

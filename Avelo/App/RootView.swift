@@ -148,13 +148,11 @@ public struct RootView: View {
         case .preferences:          PreferencesSheet()
         case .companyInfo:
             if let ctx = env.companyContext,
-               let company = try? CompanyRepository(db: ctx.database).findById(ctx.companyId) {
+               let company = loadCompanyInfo(ctx) {
                 CompanyInfoSheet(company: company)
             }
         case .newVoucher, .newJournal, .newPayment, .newReceipt,
              .newContra, .newPurchase, .newSales,
-             .newPurchaseOrder, .newSalesOrder, .newReceiptNote, .newDeliveryNote,
-             .newPhysicalStock, .newStockJournal, .newRejectionIn, .newRejectionOut,
              .newCreditNote, .newDebitNote:
             NewVoucherSheet(initialType: sheet.initialVoucherType)
         case .editVoucher(let id):  EditVoucherSheet(voucherId: id)
@@ -170,6 +168,15 @@ public struct RootView: View {
         case .managePayroll:        ManagePayrollSheet()
         }
     }
+
+    private func loadCompanyInfo(_ ctx: CompanyContext) -> Company? {
+        do {
+            return try CompanyRepository(db: ctx.database).findById(ctx.companyId)
+        } catch {
+            env.showError(AppError.wrap(error))
+            return nil
+        }
+    }
 }
 
 extension RouterSheet {
@@ -182,14 +189,6 @@ extension RouterSheet {
         case .newContra:       return .contra
         case .newPurchase:     return .purchase
         case .newSales:        return .sales
-        case .newPurchaseOrder:return .purchaseOrder
-        case .newSalesOrder:   return .salesOrder
-        case .newReceiptNote:  return .receiptNote
-        case .newDeliveryNote: return .deliveryNote
-        case .newPhysicalStock:return .physicalStock
-        case .newStockJournal: return .stockJournal
-        case .newRejectionIn:  return .rejectionIn
-        case .newRejectionOut: return .rejectionOut
         case .newCreditNote:   return .creditNote
         case .newDebitNote:    return .debitNote
         default:               return .journal

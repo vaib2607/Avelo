@@ -161,14 +161,6 @@ struct AveloApp: App {
                     Button("Purchase (F9)")   { environment.router.present(.newPurchase) }
                     Button("Credit Note") { environment.router.present(.newCreditNote) }
                     Button("Debit Note")  { environment.router.present(.newDebitNote) }
-                    Button("Purchase Order") { environment.router.present(.newPurchaseOrder) }
-                    Button("Sales Order") { environment.router.present(.newSalesOrder) }
-                    Button("Receipt Note") { environment.router.present(.newReceiptNote) }
-                    Button("Delivery Note") { environment.router.present(.newDeliveryNote) }
-                    Button("Physical Stock") { environment.router.present(.newPhysicalStock) }
-                    Button("Stock Journal") { environment.router.present(.newStockJournal) }
-                    Button("Rejection In") { environment.router.present(.newRejectionIn) }
-                    Button("Rejection Out") { environment.router.present(.newRejectionOut) }
                 }
                 CommandMenu("Reports") {
                     Button("Trial Balance") { environment.router.openReport(.trialBalance) }

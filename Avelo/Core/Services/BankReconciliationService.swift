@@ -59,11 +59,6 @@ public final class BankReconciliationService: Sendable {
                     narration: e.narration
                 )
             }
-            try AuditService(db: tx, companyId: companyId).record(
-                action: .bankStatementImported,
-                entityType: "bank_account",
-                entityId: accountId.uuidString
-            )
         }
     }
 
@@ -119,11 +114,6 @@ public final class BankReconciliationService: Sendable {
         try db.write { tx in
             let repo = BankReconciliationRepository(db: tx)
             try repo.clearStatementLine(id: id)
-            try AuditService(db: tx, companyId: companyId).record(
-                action: .bankStatementLineCleared,
-                entityType: "bank_statement_line",
-                entityId: id.uuidString
-            )
         }
     }
 }

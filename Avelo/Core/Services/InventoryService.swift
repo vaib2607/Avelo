@@ -27,36 +27,20 @@ public final class InventoryService: Sendable {
     public func createItem(code: String,
                            name: String,
                            unit: String,
-                           openingQuantity: Double,
-                           openingRatePaise: Int64,
-                           gstRate: Double = 0,
-                           stockGroup: String? = nil,
-                           stockCategory: String? = nil,
-                           godown: String? = nil,
-                           barcode: String? = nil,
-                           hsnSac: String? = nil) throws -> InventoryItem {
+                           valuationMethod: ValuationMethod = .fifo) throws -> InventoryItem {
         try ensureInventoryEnabled()
         let item = InventoryItem(
             companyId: companyId,
             code: code,
             name: name,
             unit: unit,
-            openingQuantity: openingQuantity,
-            openingRatePaise: openingRatePaise,
-            gstRate: gstRate,
-            stockGroup: stockGroup,
-            stockCategory: stockCategory,
-            godown: godown,
-            barcode: barcode,
-            hsnSac: hsnSac,
-            isArchived: false,
-            linkedAccountId: nil
+            valuationMethod: valuationMethod
         )
         try db.write { tx in
             let repo = InventoryRepository(db: tx)
             try repo.insertItem(item)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .itemCreated,
+                action: .stockItemCreated,
                 entityType: "inventory_item",
                 entityId: item.id.uuidString,
                 snapshotAfter: item
@@ -71,7 +55,7 @@ public final class InventoryService: Sendable {
             let repo = InventoryRepository(db: tx)
             try repo.updateItem(item)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .itemUpdated,
+                action: .stockItemUpdated,
                 entityType: "inventory_item",
                 entityId: item.id.uuidString,
                 snapshotAfter: item
@@ -85,7 +69,7 @@ public final class InventoryService: Sendable {
             let repo = InventoryRepository(db: tx)
             try repo.archiveItem(id)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .itemArchived,
+                action: .stockItemDisabled,
                 entityType: "inventory_item",
                 entityId: id.uuidString
             )
@@ -95,15 +79,12 @@ public final class InventoryService: Sendable {
     public func recordMovement(itemId: InventoryItem.ID,
                                date: Date,
                                type: InventoryItem.MovementType,
-                               quantity: Double,
+                               quantity: Int64,
                                ratePaise: Int64,
                                voucherId: Voucher.ID? = nil,
-                               batchNumber: String? = nil,
-                               manufactureDate: Date? = nil,
-                               expiryDate: Date? = nil,
                                notes: String? = nil) throws {
         try ensureInventoryEnabled()
-        let totalValuePaise = Int64((quantity * Double(ratePaise)).rounded())
+        let totalValuePaise = quantity * ratePaise
         let movement = StockMovement(
             id: UUID(),
             companyId: companyId,
@@ -114,9 +95,6 @@ public final class InventoryService: Sendable {
             unitCostPaise: ratePaise,
             totalValuePaise: totalValuePaise,
             voucherId: voucherId,
-            batchNumber: batchNumber,
-            manufactureDate: manufactureDate,
-            expiryDate: expiryDate,
             reason: notes
         )
         try db.write { tx in
@@ -136,7 +114,7 @@ public final class InventoryService: Sendable {
             }
             try repo.insertMovement(movement)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .stockMoved,
+                action: .stockMovementPosted,
                 entityType: "stock_movement",
                 entityId: movement.id.uuidString,
                 snapshotAfter: movement
@@ -155,7 +133,7 @@ public final class InventoryService: Sendable {
             let repo = InventoryRepository(db: tx)
             try repo.setItemAccount(itemId: itemId, accountId: accountId)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .itemAccountLinked,
+                action: .stockItemUpdated,
                 entityType: "inventory_item",
                 entityId: itemId.uuidString
             )

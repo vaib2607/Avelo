@@ -9,13 +9,7 @@ public struct NewEmployeeSheet: View {
     @State private var name: String = ""
     @State private var designation: String = ""
     @State private var pan: String = ""
-    @State private var bankAccount: String = ""
-    @State private var ifsc: String = ""
-    @State private var basic: String = "0.00"
-    @State private var hra: String = "0.00"
-    @State private var other: String = "0.00"
-    @State private var pfApplicable: Bool = true
-    @State private var esiApplicable: Bool = false
+    @State private var baseSalary: String = "0.00"
     @State private var canSave: Bool = false
 
     public init() {}
@@ -38,16 +32,8 @@ public struct NewEmployeeSheet: View {
                         TextField("Designation", text: $designation)
                         TextField("PAN", text: $pan).textCase(.uppercase)
                     }
-                    Section("Bank") {
-                        TextField("Account no.", text: $bankAccount)
-                        TextField("IFSC", text: $ifsc).textCase(.uppercase)
-                    }
-                    Section("Salary components (₹)") {
-                        MoneyTextField(label: "Basic", text: $basic)
-                        MoneyTextField(label: "HRA", text: $hra)
-                        MoneyTextField(label: "Other allowances", text: $other)
-                        Toggle("PF applicable", isOn: $pfApplicable)
-                        Toggle("ESI applicable", isOn: $esiApplicable)
+                    Section("Salary") {
+                        MoneyTextField(label: "Base salary", text: $baseSalary)
                     }
                 }
                 .formStyle(.grouped)
@@ -65,7 +51,7 @@ public struct NewEmployeeSheet: View {
             }
             .padding(16)
         }
-        .frame(minWidth: 560, minHeight: 600)
+        .frame(minWidth: 560, minHeight: 420)
     }
 
     private func refresh() {
@@ -79,12 +65,7 @@ public struct NewEmployeeSheet: View {
             _ = try PayrollService(db: ctx.database, companyId: ctx.companyId).createEmployee(
                 name: name, employeeCode: code, designation: designation.isEmpty ? nil : designation,
                 pan: pan.isEmpty ? nil : pan,
-                bankAccount: bankAccount.isEmpty ? nil : bankAccount,
-                ifsc: ifsc.isEmpty ? nil : ifsc,
-                basicPaise: Currency.parseRupeeInput(basic) ?? 0,
-                hraPaise: Currency.parseRupeeInput(hra) ?? 0,
-                otherAllowancesPaise: Currency.parseRupeeInput(other) ?? 0,
-                pfApplicable: pfApplicable, esiApplicable: esiApplicable
+                baseSalaryPaise: Currency.parseRupeeInput(baseSalary) ?? 0
             )
             env.showSuccess("Employee created.")
             router.presentedSheet = nil

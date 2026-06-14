@@ -57,7 +57,6 @@ public enum DemoCompanySeeder {
         let vouchers = VoucherService(db: db, companyId: companyId)
         let inventory = InventoryService(db: db, companyId: companyId)
         let payroll = PayrollService(db: db, companyId: companyId)
-        let banking = BankReconciliationService(db: db, companyId: companyId)
         let report = ReportService(db: db, companyId: companyId)
 
         guard let fy = try fyService.mostRecent() else { return }
@@ -85,7 +84,7 @@ public enum DemoCompanySeeder {
 
         let cash = try account("CASH_IN_HAND")
         let bank = try account("BANK_HDFC")
-        let sales = try account("SALES")
+        _ = try account("SALES")
         let salaryExpense = try account("SALARY_EXPENSE")
 
         let customer = try accounts.createAccount(.init(code: "CUST_DEMO", name: "\(companyName) Customer", groupId: currentAssets.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
@@ -103,28 +102,20 @@ public enum DemoCompanySeeder {
         _ = try vouchers.post(draft: VoucherDraft(mode: .create, voucherTypeCode: .journal, date: DateFormatters.parseDate("2024-05-15")!, narration: "Office supplies", lines: [.init(accountId: officeExpense.id, amountPaise: 6_250, side: .debit), .init(accountId: cash.id, amountPaise: 6_250, side: .credit)]), in: fy)
         _ = try vouchers.post(draft: VoucherDraft(mode: .create, voucherTypeCode: .contra, date: DateFormatters.parseDate("2024-05-18")!, narration: "Cash deposit to bank", lines: [.init(accountId: bank.id, amountPaise: 20_000, side: .debit), .init(accountId: cash.id, amountPaise: 20_000, side: .credit)]), in: fy)
 
-        let item = try inventory.createItem(code: "ITEM-001", name: "Demo Widget", unit: "Nos", openingQuantity: 60, openingRatePaise: 1_250, gstRate: 18, stockGroup: "Finished Goods", stockCategory: "Widgets", godown: "Main Store", barcode: "999000111222", hsnSac: "8471")
-        let serviceItem = try inventory.createItem(code: "ITEM-002", name: "Demo Service Pack", unit: "Pack", openingQuantity: 12, openingRatePaise: 4_500, gstRate: 18, stockGroup: "Services", stockCategory: "Support", godown: "Main Store", barcode: "999000111223", hsnSac: "9983")
-        try inventory.linkItemToAccount(itemId: item.id, accountId: sales.id)
-        try inventory.linkItemToAccount(itemId: serviceItem.id, accountId: consultingIncome.id)
-        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-04-12")!, type: .opening, quantity: 20, ratePaise: 1_200, voucherId: serviceInvoice.voucher.id, notes: "Opening demo stock")
-        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-05-02")!, type: .sale, quantity: 8, ratePaise: 1_300, voucherId: serviceInvoice.voucher.id, notes: "Demo issue")
-        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-05-18")!, type: .adjustmentIn, quantity: 5, ratePaise: 1_250, notes: "Cycle count adjustment")
-        try inventory.recordMovement(itemId: serviceItem.id, date: DateFormatters.parseDate("2024-05-20")!, type: .purchase, quantity: 4, ratePaise: 4_500, notes: "Service pack stock-in")
-        try inventory.recordMovement(itemId: serviceItem.id, date: DateFormatters.parseDate("2024-05-22")!, type: .saleReturn, quantity: 1, ratePaise: 4_500, notes: "Returned demo pack")
+        let item = try inventory.createItem(code: "ITEM-001", name: "Demo Widget", unit: "Nos")
+        let serviceItem = try inventory.createItem(code: "ITEM-002", name: "Demo Service Pack", unit: "Pack")
+        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-04-12")!, type: .stockIn, quantity: 20, ratePaise: 1_200, voucherId: serviceInvoice.voucher.id, notes: "Opening demo stock")
+        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-05-02")!, type: .stockOut, quantity: 8, ratePaise: 1_300, voucherId: serviceInvoice.voucher.id, notes: "Demo issue")
+        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-05-18")!, type: .adjustment, quantity: 5, ratePaise: 1_250, notes: "Cycle count adjustment")
+        try inventory.recordMovement(itemId: serviceItem.id, date: DateFormatters.parseDate("2024-05-20")!, type: .stockIn, quantity: 4, ratePaise: 4_500, notes: "Service pack stock-in")
+        try inventory.recordMovement(itemId: serviceItem.id, date: DateFormatters.parseDate("2024-05-22")!, type: .stockIn, quantity: 1, ratePaise: 4_500, notes: "Returned demo pack")
 
-        let employeeA = try payroll.createEmployee(name: "Priya Shah", employeeCode: "EMP-001", designation: "Accounts Executive", pan: "ABCDE1234F", bankAccount: "123456789012", ifsc: "HDFC0001234", basicPaise: 28_000, hraPaise: 8_000, otherAllowancesPaise: 4_000, pfApplicable: true, esiApplicable: false)
-        let employeeB = try payroll.createEmployee(name: "Arjun Mehta", employeeCode: "EMP-002", designation: "Sales Lead", pan: "AAAPM4321Q", bankAccount: "123456789013", ifsc: "SBIN0001234", basicPaise: 32_000, hraPaise: 10_000, otherAllowancesPaise: 6_000, pfApplicable: true, esiApplicable: true)
-        _ = try payroll.postEntry(employeeId: employeeA.id, monthYear: 202404, workingDays: 26, paidDays: 26, overtimePaise: 2_000, deductionsPaise: 1_500, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
-        _ = try payroll.postEntry(employeeId: employeeA.id, monthYear: 202405, workingDays: 25, paidDays: 24, overtimePaise: 1_000, deductionsPaise: 2_000, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
-        _ = try payroll.postEntry(employeeId: employeeB.id, monthYear: 202404, workingDays: 26, paidDays: 25, overtimePaise: 3_000, deductionsPaise: 2_500, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
+        let employeeA = try payroll.createEmployee(name: "Priya Shah", employeeCode: "EMP-001", designation: "Accounts Executive", pan: "ABCDE1234F", baseSalaryPaise: 40_000)
+        let employeeB = try payroll.createEmployee(name: "Arjun Mehta", employeeCode: "EMP-002", designation: "Sales Lead", pan: "AAAPM4321Q", baseSalaryPaise: 48_000)
+        _ = try payroll.postEntry(employeeId: employeeA.id, monthYear: 202404, deductionsPaise: 1_500, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
+        _ = try payroll.postEntry(employeeId: employeeA.id, monthYear: 202405, deductionsPaise: 2_000, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
+        _ = try payroll.postEntry(employeeId: employeeB.id, monthYear: 202404, deductionsPaise: 2_500, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
 
-        try banking.importStatement(accountId: bank.id, entries: [
-            .init(id: UUID(), accountId: bank.id, date: DateFormatters.parseDate("2024-04-14")!, amountPaise: 125_000, narration: "Customer receipt", isCleared: false),
-            .init(id: UUID(), accountId: bank.id, date: DateFormatters.parseDate("2024-05-06")!, amountPaise: -58_000, narration: "Vendor payment", isCleared: false),
-            .init(id: UUID(), accountId: bank.id, date: DateFormatters.parseDate("2024-05-18")!, amountPaise: 20_000, narration: "Cash deposit", isCleared: false)
-        ])
-        _ = try banking.reconcile(accountId: bank.id, asOf: DateFormatters.parseDate("2024-05-31")!)
         try BankReconciliationRepository(db: db).upsert(.init(id: UUID(), companyId: companyId, bankAccountId: bank.id, voucherId: serviceInvoice.voucher.id, statementDate: DateFormatters.parseDate("2024-04-14")!, statementAmountPaise: 125_000, isCleared: true, clearedAt: Date(), note: "Auto-matched demo receipt"))
         try BankReconciliationRepository(db: db).upsert(.init(id: UUID(), companyId: companyId, bankAccountId: bank.id, voucherId: paymentVoucher.voucher.id, statementDate: DateFormatters.parseDate("2024-05-06")!, statementAmountPaise: -58_000, isCleared: true, clearedAt: Date(), note: "Demo payment clearing"))
 

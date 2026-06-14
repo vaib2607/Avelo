@@ -62,6 +62,19 @@ public final class VoucherService: Sendable {
             self.tcsSectionCode = tcsSectionCode
             self.tcsTaxPaise = tcsTaxPaise
         }
+
+        public var isEmpty: Bool {
+            billAllocationKind == nil
+                && billAllocationNumber == nil
+                && chequeNumber == nil
+                && chequeDueDate == nil
+                && chequeStatus == nil
+                && postDatedDate == nil
+                && tdsSectionCode == nil
+                && tdsTaxPaise == nil
+                && tcsSectionCode == nil
+                && tcsTaxPaise == nil
+        }
     }
 
     public func post(draft: VoucherDraft, in fy: FinancialYear) throws -> PostResult {
@@ -70,17 +83,10 @@ public final class VoucherService: Sendable {
     }
 
     public func post(draft: VoucherDraft, in fy: FinancialYear, workflow: WorkflowInputs) throws -> PostResult {
-        var result: PostResult?
-        try db.write { tx in
-            let posted = try postWithoutCacheInvalidation(draft: draft, in: fy)
-            try recordWorkflow(posted.voucher, draft: draft, workflow: workflow, in: tx)
-            result = posted
+        guard workflow.isEmpty else {
+            throw AppError.featureUnavailable("Bill, cheque, TDS, TCS, and post-dated voucher workflows are deferred outside the frozen schema.")
         }
-        ReportService.invalidateCache(companyId: companyId)
-        guard let result else {
-            throw AppError.unexpected("workflow post did not produce a result")
-        }
-        return result
+        return try post(draft: draft, in: fy)
     }
 
     public func postBatch(_ drafts: [VoucherDraft], in fy: FinancialYear) throws -> [PostResult] {
@@ -182,27 +188,6 @@ public final class VoucherService: Sendable {
         return InventoryPromptContext(voucherId: voucher.id, voucherNumber: voucher.number, lines: [])
     }
 
-    private func recordWorkflow(_ voucher: Voucher, draft: VoucherDraft, workflow: WorkflowInputs, in db: SQLiteDatabase) throws {
-        let repo = AccountingWorkflowsRepository(db: db)
-        if let kind = workflow.billAllocationKind, let party = voucher.partyAccountId {
-            try repo.insert(BillAllocation(companyId: companyId, voucherId: voucher.id, partyAccountId: party, kind: kind, referenceNumber: workflow.billAllocationNumber, allocatedPaise: voucher.totalPaise))
-        }
-        if let chequeNumber = workflow.chequeNumber {
-            try repo.insert(Cheque(companyId: companyId, voucherId: voucher.id, chequeNumber: chequeNumber, issueDate: voucher.date, dueDate: workflow.chequeDueDate, status: workflow.chequeStatus ?? (workflow.chequeDueDate != nil ? .issued : .deposited)))
-        }
-        if let tdsSectionCode = workflow.tdsSectionCode, let tdsTaxPaise = workflow.tdsTaxPaise {
-            try repo.insert(TDSRecord(companyId: companyId, voucherId: voucher.id, sectionCode: tdsSectionCode, basePaise: voucher.totalPaise, taxPaise: tdsTaxPaise))
-        }
-        if let tcsSectionCode = workflow.tcsSectionCode, let tcsTaxPaise = workflow.tcsTaxPaise {
-            try repo.insert(TCSRecord(companyId: companyId, voucherId: voucher.id, sectionCode: tcsSectionCode, basePaise: voucher.totalPaise, taxPaise: tcsTaxPaise))
-        }
-        if let postDatedDate = workflow.postDatedDate {
-            var updated = voucher
-            updated.date = postDatedDate
-            try VoucherRepository(db: db).update(updated)
-        }
-    }
-
     public func edit(_ voucherId: Voucher.ID, with newDraft: VoucherDraft, in fy: FinancialYear) throws -> Voucher {
         guard let existing = try repository.findById(voucherId) else {
             throw AppError.notFound("Voucher")
@@ -217,7 +202,6 @@ public final class VoucherService: Sendable {
             throw AppError.businessRule("This voucher has already been reversed and cannot be edited in place.")
         }
         let existingLines = try linesRepository.findForVoucher(voucherId)
-        let existingWorkflow = try AccountingWorkflowsRepository(db: db).workflowInputs(for: voucherId)
         let result = try validate(draft: newDraft, in: existingFY, existingVoucherId: voucherId)
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
@@ -248,12 +232,9 @@ public final class VoucherService: Sendable {
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
             let accountRepo = AccountRepository(db: tx)
-            let workflowRepo = AccountingWorkflowsRepository(db: tx)
             try vRepo.update(updated)
             try lRepo.deleteForVoucher(voucherId)
             try lRepo.insertBatch(newLines)
-            try workflowRepo.deleteForVoucher(voucherId)
-            try recordWorkflow(updated, draft: newDraft, workflow: existingWorkflow, in: tx)
             try AuditService(db: tx, companyId: companyId).record(
                 action: .voucherEdited,
                 entityType: "voucher",

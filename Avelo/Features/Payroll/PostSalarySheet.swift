@@ -8,9 +8,6 @@ public struct PostSalarySheet: View {
 
     @State private var monthYear: Int = Calendar.current.component(.year, from: Date()) * 100
         + Calendar.current.component(.month, from: Date())
-    @State private var workingDays: String = "26"
-    @State private var paidDays: String = "26"
-    @State private var overtime: String = "0.00"
     @State private var deductions: String = "0.00"
     @State private var canSave: Bool = false
     @State private var accounts: [Account] = []
@@ -55,14 +52,10 @@ public struct PostSalarySheet: View {
                     .labelsHidden()
                     .frame(width: 180)
                 }
-                TextField("Working days", text: $workingDays)
-                TextField("Paid days", text: $paidDays)
-                MoneyTextField(label: "Overtime", text: $overtime)
                 MoneyTextField(label: "Deductions", text: $deductions)
             }
             .formStyle(.grouped)
             .task { loadAccounts() }
-            .onChange(of: paidDays) { _, _ in refresh() }
             .onChange(of: salaryExpenseAccountId) { _, _ in refresh() }
             .onChange(of: paymentAccountId) { _, _ in refresh() }
             Divider()
@@ -80,9 +73,7 @@ public struct PostSalarySheet: View {
     }
 
     private func refresh() {
-        let wd = Int(workingDays) ?? 0
-        let pd = Int(paidDays) ?? 0
-        canSave = wd > 0 && pd > 0 && pd <= wd && salaryExpenseAccountId != nil && paymentAccountId != nil
+        canSave = salaryExpenseAccountId != nil && paymentAccountId != nil
     }
 
     private func generateMonthOptions() -> [Int] {
@@ -107,8 +98,6 @@ public struct PostSalarySheet: View {
         do {
             _ = try PayrollService(db: ctx.database, companyId: ctx.companyId).postEntry(
                 employeeId: employeeId, monthYear: monthYear,
-                workingDays: Int(workingDays) ?? 0, paidDays: Int(paidDays) ?? 0,
-                overtimePaise: Currency.parseRupeeInput(overtime) ?? 0,
                 deductionsPaise: Currency.parseRupeeInput(deductions) ?? 0,
                 financialYearId: ctx.financialYear.id,
                 salaryExpenseAccountId: salaryExpenseAccountId,

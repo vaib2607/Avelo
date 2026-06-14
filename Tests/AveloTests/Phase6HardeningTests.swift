@@ -11,21 +11,12 @@ final class Phase6HardeningTests: XCTestCase {
             employeeCode: "EMP-001",
             designation: "Operator",
             pan: nil,
-            bankAccount: nil,
-            ifsc: nil,
-            basicPaise: 50_000,
-            hraPaise: 10_000,
-            otherAllowancesPaise: 5_000,
-            pfApplicable: true,
-            esiApplicable: false
+            baseSalaryPaise: 65_000
         )
 
         let entry = try payroll.postEntry(
             employeeId: employee.id,
             monthYear: 202406,
-            workingDays: 30,
-            paidDays: 30,
-            overtimePaise: 0,
             deductionsPaise: 0,
             financialYearId: tc.fy.id,
             salaryExpenseAccountId: tc.rentId,
@@ -43,9 +34,6 @@ final class Phase6HardeningTests: XCTestCase {
             try payroll.postEntry(
                 employeeId: employee.id,
                 monthYear: 202406,
-                workingDays: 30,
-                paidDays: 30,
-                overtimePaise: 0,
                 deductionsPaise: 0,
                 financialYearId: tc.fy.id,
                 salaryExpenseAccountId: tc.rentId,
@@ -64,9 +52,7 @@ final class Phase6HardeningTests: XCTestCase {
         let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(
             code: "ITEM-1",
             name: "Demo Item",
-            unit: "NOS",
-            openingQuantity: 2,
-            openingRatePaise: 100
+            unit: "NOS"
         )
         let svc = InventoryService(db: tc.db, companyId: tc.companyId)
 
@@ -74,7 +60,7 @@ final class Phase6HardeningTests: XCTestCase {
             try svc.recordMovement(
                 itemId: item.id,
                 date: DateFormatters.parseDate("2024-06-01")!,
-                type: .sale,
+                type: .stockOut,
                 quantity: 5,
                 ratePaise: 100
             )

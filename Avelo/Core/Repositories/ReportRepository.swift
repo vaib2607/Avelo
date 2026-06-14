@@ -515,116 +515,24 @@ public struct ReportRepository: Sendable {
         guard !accountIds.isEmpty else {
             return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: [], direction: direction, totalPaise: 0)
         }
-        let placeholder = Array(repeating: "?", count: accountIds.count).joined(separator: ",")
-        let billSql = """
-            SELECT ba.party_account_id AS aid,
-                   ba.kind AS kind,
-                   COALESCE(ba.reference_number, v.number) AS ref,
-                   ba.allocated_paise AS allocated,
-                   v.date AS vdate
-            FROM avelo_bill_allocations ba
-            JOIN avelo_vouchers v ON v.id = ba.voucher_id AND v.company_id = ba.company_id
-            WHERE ba.company_id = ? AND ba.party_account_id IN (\(placeholder)) AND v.date <= ?
-            ORDER BY v.date ASC, v.created_at ASC
-        """
-        struct BillRow: Sendable {
-            let partyId: Account.ID
-            let kind: BillAllocationKind
-            let reference: String
-            let allocatedPaise: Int64
-            let voucherDate: Date
-        }
-        let billRows: [BillRow] = try db.query(billSql, bind: [.text(filter.companyId.uuidString)] + accountIds.map { .text($0.uuidString) } + [.date(asOfDate)]) { r in
-            BillRow(
-                partyId: try UUIDParsing.required(r.text("aid"), field: "report.outstanding.party_account_id"),
-                kind: BillAllocationKind(rawValue: r.text("kind")) ?? .newRef,
-                reference: r.text("ref"),
-                allocatedPaise: r.int("allocated"),
-                voucherDate: r.date("vdate")
-            )
-        }
         let legacyTotals = try movementTotals(
             for: accountIds,
             companyId: filter.companyId,
             toDate: asOfDate
         )
 
-        struct BillSummary {
-            var accountName: String
-            var totalPaise: Int64 = 0
-            var age0to30Paise: Int64 = 0
-            var age31to60Paise: Int64 = 0
-            var age61to90Paise: Int64 = 0
-            var age90PlusPaise: Int64 = 0
-            var ageInDays: Int = 0
-            var invoices: [String: (date: Date, amount: Int64)] = [:]
-            var settlements: [String: Int64] = [:]
-        }
-
-        var summaries: [Account.ID: BillSummary] = Dictionary(uniqueKeysWithValues: accounts.map { ($0.0, BillSummary(accountName: $0.1)) })
-        for bill in billRows {
-            guard var summary = summaries[bill.partyId] else { continue }
-            switch bill.kind {
-            case .newRef:
-                let entry = summary.invoices[bill.reference] ?? (date: bill.voucherDate, amount: 0)
-                summary.invoices[bill.reference] = (date: min(entry.date, bill.voucherDate), amount: entry.amount + bill.allocatedPaise)
-            case .agstRef:
-                summary.settlements[bill.reference, default: 0] += bill.allocatedPaise
-            case .advance, .onAccount:
-                break
-            }
-            summaries[bill.partyId] = summary
-        }
-
         var rows: [ReportResult.OutstandingRow] = []
-        for (aid, summary) in summaries {
-            if summary.invoices.isEmpty && summary.settlements.isEmpty {
-                let totals = legacyTotals[aid]
-                let total = (totals?.debitPaise ?? 0) - (totals?.creditPaise ?? 0)
-                if total == 0 { continue }
-                if let account = accounts.first(where: { $0.0 == aid }) {
-                    rows.append(ReportResult.OutstandingRow(
-                        id: aid,
-                        partyName: account.1,
-                        asOf: asOfDate,
-                        amountPaise: total,
-                        age0to30Paise: total,
-                        ageInDays: 0
-                    ))
-                }
-                continue
-            }
-            var total: Int64 = 0
-            var bucket0: Int64 = 0
-            var bucket31: Int64 = 0
-            var bucket61: Int64 = 0
-            var bucket90: Int64 = 0
-            var maxAge = 0
-            for (ref, invoice) in summary.invoices {
-                let settled = summary.settlements[ref, default: 0]
-                let outstanding = invoice.amount - settled
-                guard outstanding > 0 else { continue }
-                total += outstanding
-                let days = max(0, Int(asOfDate.timeIntervalSince(invoice.date) / 86_400))
-                maxAge = max(maxAge, days)
-                switch days {
-                case 0...30: bucket0 += outstanding
-                case 31...60: bucket31 += outstanding
-                case 61...90: bucket61 += outstanding
-                default: bucket90 += outstanding
-                }
-            }
-            guard total > 0 else { continue }
+        for account in accounts {
+            let totals = legacyTotals[account.0]
+            let total = (totals?.debitPaise ?? 0) - (totals?.creditPaise ?? 0)
+            guard total != 0 else { continue }
             rows.append(ReportResult.OutstandingRow(
-                id: aid,
-                partyName: summary.accountName,
+                id: account.0,
+                partyName: account.1,
                 asOf: asOfDate,
                 amountPaise: total,
-                age0to30Paise: bucket0,
-                age31to60Paise: bucket31,
-                age61to90Paise: bucket61,
-                age90PlusPaise: bucket90,
-                ageInDays: maxAge
+                age0to30Paise: total,
+                ageInDays: 0
             ))
         }
         let total = rows.reduce(0) { $0 + $1.amountPaise }
@@ -643,25 +551,25 @@ public struct ReportRepository: Sendable {
         var bind: [SQLValue] = items.map { .text($0.id.uuidString) }
         bind.append(.date(asOfDate))
         struct StockTotals: Sendable {
-            let inQty: Double
-            let outQty: Double
+            let inQty: Int64
+            let outQty: Int64
             let inValuePaise: Int64
             let outValuePaise: Int64
-            let onHandQty: Double
+            let onHandQty: Int64
         }
         let sql = """
             SELECT item_id,
-                   COALESCE(SUM(CASE WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')
+                   COALESCE(SUM(CASE WHEN movement_type = 'in'
                                       THEN quantity ELSE 0 END), 0) AS in_q,
-                   COALESCE(SUM(CASE WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')
+                   COALESCE(SUM(CASE WHEN movement_type = 'out'
                                       THEN quantity ELSE 0 END), 0) AS out_q,
-                   COALESCE(SUM(CASE WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')
+                   COALESCE(SUM(CASE WHEN movement_type = 'in'
                                       THEN total_value_paise ELSE 0 END), 0) AS in_v,
-                   COALESCE(SUM(CASE WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')
+                   COALESCE(SUM(CASE WHEN movement_type = 'out'
                                       THEN total_value_paise ELSE 0 END), 0) AS out_v,
                    COALESCE(SUM(CASE
-                       WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn') THEN quantity
-                       WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut') THEN -quantity
+                       WHEN movement_type = 'in' THEN quantity
+                       WHEN movement_type = 'out' THEN -quantity
                        WHEN movement_type = 'adjustment' THEN quantity
                        ELSE 0 END), 0) AS on_hand
             FROM avelo_stock_movements
@@ -672,33 +580,33 @@ public struct ReportRepository: Sendable {
         _ = try db.query(sql, bind: bind) { row in
             let itemId = try UUIDParsing.required(row.text("item_id"), field: "report.stock_valuation.item_id")
             totalsByItem[itemId] = StockTotals(
-                inQty: row.real("in_q"),
-                outQty: row.real("out_q"),
+                inQty: row.int("in_q"),
+                outQty: row.int("out_q"),
                 inValuePaise: row.int("in_v"),
                 outValuePaise: row.int("out_v"),
-                onHandQty: row.real("on_hand")
+                onHandQty: row.int("on_hand")
             )
         }
         let rows = items.map { item in
             let totals = totalsByItem[item.id] ?? StockTotals(inQty: 0, outQty: 0, inValuePaise: 0, outValuePaise: 0, onHandQty: 0)
             let onHandValuePaise = totals.inValuePaise - totals.outValuePaise
             assert(onHandValuePaise <= Int64.max / 2)
-            let avg = totals.onHandQty > 0 ? Int64((Double(onHandValuePaise) / totals.onHandQty).rounded()) : 0
+            let avg = totals.onHandQty > 0 ? onHandValuePaise / totals.onHandQty : 0
             return ReportResult.StockValuationRow(
                 id: item.id,
                 itemCode: item.code,
                 itemName: item.name,
                 unit: item.unit,
-                quantity: totals.onHandQty,
+                quantity: Double(totals.onHandQty),
                 ratePaise: avg,
                 valuePaise: onHandValuePaise,
                 openingQty: 0,
                 openingValuePaise: 0,
-                inQty: Int64(totals.inQty.rounded()),
+                inQty: totals.inQty,
                 inValuePaise: totals.inValuePaise,
-                outQty: Int64(totals.outQty.rounded()),
+                outQty: totals.outQty,
                 outValuePaise: totals.outValuePaise,
-                closingQty: Int64(totals.onHandQty.rounded()),
+                closingQty: totals.onHandQty,
                 closingValuePaise: onHandValuePaise,
                 averageCostPaise: avg
             )

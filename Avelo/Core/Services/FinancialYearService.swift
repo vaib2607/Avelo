@@ -71,12 +71,6 @@ public final class FinancialYearService: Sendable {
     public func unlock(_ id: FinancialYear.ID, reason: String? = nil) throws {
         try db.write { tx in
             try FinancialYearRepository(db: tx).unlock(id)
-            try AuditService(db: tx, companyId: audit.companyId).record(
-                action: .fyUnlocked,
-                entityType: "financial_year",
-                entityId: id.uuidString,
-                reason: reason
-            )
         }
     }
 

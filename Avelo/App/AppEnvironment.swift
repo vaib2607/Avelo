@@ -64,29 +64,40 @@ public final class AppEnvironment {
     /// Application Support location by degrading to a temporary directory.
     /// Returns any degradation as an `AppError` instead of crashing.
     private static func makeStores() -> (stores: Stores, error: AppError?) {
+        var firstError: Error?
         // Tier 1: the normal Application Support location.
-        if let appSupport = try? FileManager.default.url(
+        do {
+            let appSupport = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask,
             appropriateFor: nil, create: true
-        ) {
+            )
             let dir = appSupport.appendingPathComponent("Avelo", isDirectory: true)
-            if let stores = try? buildStores(in: dir) {
+            do {
+                let stores = try buildStores(in: dir)
                 return (stores, nil)
+            } catch {
+                firstError = error
             }
+        } catch {
+            firstError = error
         }
 
         // Tier 2: a unique temporary directory. Data will not persist across
         // launches, but the app stays usable and the user is told why.
         let tempDir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("Avelo-\(UUID().uuidString)", isDirectory: true)
-        if let stores = try? buildStores(in: tempDir) {
-            let msg = "Couldn't open Avelo's data folder, so a temporary location is being used. Any changes will NOT be saved when you quit. Check disk permissions and restart."
+        do {
+            let stores = try buildStores(in: tempDir)
+            let detail = firstError.map { " \($0.localizedDescription)" } ?? ""
+            let msg = "Couldn't open Avelo's data folder, so a temporary location is being used. Any changes will NOT be saved when you quit. Check disk permissions and restart.\(detail)"
             return (stores, AppError.database(.openFailed(msg)))
+        } catch {
+            firstError = error
         }
 
         // Tier 3: truly unrecoverable I/O environment. A clear, intentional
         // failure beats an opaque force-unwrap crash.
-        preconditionFailure("Avelo could not create a database in either Application Support or a temporary directory. The filesystem is not writable.")
+        preconditionFailure("Avelo could not create a database in either Application Support or a temporary directory. \(firstError?.localizedDescription ?? "The filesystem is not writable.")")
     }
 
     private static func buildStores(in aveloDir: URL) throws -> Stores {
@@ -153,7 +164,6 @@ public final class AppEnvironment {
         let vouchers = VoucherService(db: db, companyId: company.id)
         let inventory = InventoryService(db: db, companyId: company.id)
         let payroll = PayrollService(db: db, companyId: company.id)
-        let banking = BankReconciliationService(db: db, companyId: company.id)
         let report = ReportService(db: db, companyId: company.id)
 
         guard let fy = try fyService.mostRecent() else {
@@ -183,7 +193,7 @@ public final class AppEnvironment {
         }
         let cash = try account("CASH_IN_HAND")
         let bank = try account("BANK_HDFC")
-        let sales = try account("SALES")
+        _ = try account("SALES")
         _ = try account("PURCHASE")
         let salaryExpense = try account("SALARY_EXPENSE")
 
@@ -199,26 +209,20 @@ public final class AppEnvironment {
         _ = try vouchers.post(draft: VoucherDraft(mode: .create, voucherTypeCode: .journal, date: DateFormatters.parseDate("2024-05-10")!, narration: "Salary provision", lines: [.init(accountId: salaryExpense.id, amountPaise: 42_500, side: .debit), .init(accountId: salaryPayable.id, amountPaise: 42_500, side: .credit)]), in: fy)
         _ = try vouchers.post(draft: VoucherDraft(mode: .create, voucherTypeCode: .journal, date: DateFormatters.parseDate("2024-05-12")!, narration: "Travel reimbursement", lines: [.init(accountId: travelExpense.id, amountPaise: 9_500, side: .debit), .init(accountId: cash.id, amountPaise: 9_500, side: .credit)]), in: fy)
 
-        let item = try inventory.createItem(code: "ITEM-001", name: "Demo Widget", unit: "Nos", openingQuantity: 40, openingRatePaise: 1_250, gstRate: 18, stockGroup: "Finished Goods", stockCategory: "Widgets", godown: "Main Store", barcode: "999000111222", hsnSac: "8471")
-        try inventory.linkItemToAccount(itemId: item.id, accountId: sales.id)
-        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-04-12")!, type: .opening, quantity: 20, ratePaise: 1_200, voucherId: serviceInvoice.voucher.id, notes: "Opening demo stock")
-        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-05-02")!, type: .sale, quantity: 8, ratePaise: 1_300, voucherId: serviceInvoice.voucher.id, notes: "Demo issue")
+        let item = try inventory.createItem(code: "ITEM-001", name: "Demo Widget", unit: "Nos")
+        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-04-12")!, type: .stockIn, quantity: 20, ratePaise: 1_200, voucherId: serviceInvoice.voucher.id, notes: "Opening demo stock")
+        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-05-02")!, type: .stockOut, quantity: 8, ratePaise: 1_300, voucherId: serviceInvoice.voucher.id, notes: "Demo issue")
 
-        let employee = try payroll.createEmployee(name: "Priya Shah", employeeCode: "EMP-001", designation: "Accounts Executive", pan: "ABCDE1234F", bankAccount: "123456789012", ifsc: "HDFC0001234", basicPaise: 28_000, hraPaise: 8_000, otherAllowancesPaise: 4_000, pfApplicable: true, esiApplicable: false)
+        let employee = try payroll.createEmployee(name: "Priya Shah", employeeCode: "EMP-001", designation: "Accounts Executive", pan: "ABCDE1234F", baseSalaryPaise: 40_000)
         _ = try payroll.postEntry(
             employeeId: employee.id,
             monthYear: 202404,
-            workingDays: 26,
-            paidDays: 26,
-            overtimePaise: 2_000,
             deductionsPaise: 1_500,
             financialYearId: fy.id,
             salaryExpenseAccountId: salaryExpense.id,
             paymentAccountId: salaryPayable.id
         )
 
-        try banking.importStatement(accountId: bank.id, entries: [.init(id: UUID(), accountId: bank.id, date: DateFormatters.parseDate("2024-04-14")!, amountPaise: 125_000, narration: "Customer receipt", isCleared: false), .init(id: UUID(), accountId: bank.id, date: DateFormatters.parseDate("2024-05-06")!, amountPaise: -58_000, narration: "Vendor payment", isCleared: false)])
-        _ = try banking.reconcile(accountId: bank.id, asOf: DateFormatters.parseDate("2024-05-31")!)
         try BankReconciliationRepository(db: db).upsert(.init(id: UUID(), companyId: company.id, bankAccountId: bank.id, voucherId: serviceInvoice.voucher.id, statementDate: DateFormatters.parseDate("2024-04-14")!, statementAmountPaise: 125_000, isCleared: true, clearedAt: Date(), note: "Auto-matched demo receipt"))
         try BankReconciliationRepository(db: db).upsert(.init(id: UUID(), companyId: company.id, bankAccountId: bank.id, voucherId: paymentVoucher.voucher.id, statementDate: DateFormatters.parseDate("2024-05-06")!, statementAmountPaise: -58_000, isCleared: true, clearedAt: Date(), note: "Demo payment clearing"))
 

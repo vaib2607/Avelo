@@ -8,13 +8,7 @@ public struct NewItemSheet: View {
     @State private var code: String = ""
     @State private var name: String = ""
     @State private var unit: String = "NOS"
-    @State private var stockGroup: String = ""
-    @State private var stockCategory: String = ""
-    @State private var godown: String = ""
-    @State private var openingQty: String = "0.000"
-    @State private var openingRate: String = "0.00"
-    @State private var gstRate: String = "0"
-    @State private var hsn: String = ""
+    @State private var valuationMethod: ValuationMethod = .fifo
     @State private var canSave: Bool = false
 
     public init() {}
@@ -33,13 +27,11 @@ public struct NewItemSheet: View {
                 TextField("Code *", text: $code)
                 TextField("Name *", text: $name)
                 TextField("Unit", text: $unit)
-                TextField("Stock group", text: $stockGroup)
-                TextField("Stock category", text: $stockCategory)
-                TextField("Godown", text: $godown)
-                TextField("Opening quantity", text: $openingQty)
-                MoneyTextField(label: "Opening rate (₹)", text: $openingRate)
-                TextField("GST rate (%)", text: $gstRate)
-                TextField("HSN/SAC", text: $hsn)
+                Picker("Valuation", selection: $valuationMethod) {
+                    ForEach(ValuationMethod.allCases) { method in
+                        Text(method.displayName).tag(method)
+                    }
+                }
             }
             .formStyle(.grouped)
             .onChange(of: code) { _, _ in refresh() }
@@ -55,7 +47,7 @@ public struct NewItemSheet: View {
             }
             .padding(16)
         }
-        .frame(minWidth: 480, minHeight: 520)
+        .frame(minWidth: 480, minHeight: 320)
     }
 
     private func refresh() {
@@ -65,18 +57,9 @@ public struct NewItemSheet: View {
 
     private func save() {
         guard let ctx = env.companyContext else { return }
-        let qty = Double(openingQty) ?? 0
-        let rate = Currency.parseRupeeInput(openingRate) ?? 0
-        let gst = Double(gstRate) ?? 0
         do {
             _ = try InventoryService(db: ctx.database, companyId: ctx.companyId).createItem(
-                code: code, name: name, unit: unit,
-                openingQuantity: qty, openingRatePaise: rate,
-                gstRate: gst,
-                stockGroup: stockGroup.isEmpty ? nil : stockGroup,
-                stockCategory: stockCategory.isEmpty ? nil : stockCategory,
-                godown: godown.isEmpty ? nil : godown,
-                hsnSac: hsn.isEmpty ? nil : hsn
+                code: code, name: name, unit: unit, valuationMethod: valuationMethod
             )
             env.showSuccess("Item created.")
             router.presentedSheet = nil

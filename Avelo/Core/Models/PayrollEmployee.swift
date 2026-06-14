@@ -11,13 +11,6 @@ public struct PayrollEmployee: Identifiable, Hashable, Sendable, Codable {
     public var pan: String?
     public var bankAccountId: Account.ID?
     public var baseSalaryPaise: Int64
-    public var basicPaise: Int64
-    public var hraPaise: Int64
-    public var otherAllowancesPaise: Int64
-    public var bankAccount: String?
-    public var ifsc: String?
-    public var pfApplicable: Bool
-    public var esiApplicable: Bool
     public var isActive: Bool
     public var joinedOn: Date
     public var endDate: Date?
@@ -31,14 +24,8 @@ public struct PayrollEmployee: Identifiable, Hashable, Sendable, Codable {
                 name: String,
                 designation: String? = nil,
                 pan: String? = nil,
-                bankAccount: String? = nil,
-                ifsc: String? = nil,
                 bankAccountId: Account.ID? = nil,
-                basicPaise: Int64,
-                hraPaise: Int64 = 0,
-                otherAllowancesPaise: Int64 = 0,
-                pfApplicable: Bool = true,
-                esiApplicable: Bool = false,
+                baseSalaryPaise: Int64,
                 isActive: Bool = true,
                 joinedOn: Date = Date(),
                 endDate: Date? = nil,
@@ -50,14 +37,7 @@ public struct PayrollEmployee: Identifiable, Hashable, Sendable, Codable {
         self.designation = designation
         self.pan = pan
         self.bankAccountId = bankAccountId
-        self.baseSalaryPaise = basicPaise
-        self.basicPaise = basicPaise
-        self.hraPaise = hraPaise
-        self.otherAllowancesPaise = otherAllowancesPaise
-        self.bankAccount = bankAccount
-        self.ifsc = ifsc
-        self.pfApplicable = pfApplicable
-        self.esiApplicable = esiApplicable
+        self.baseSalaryPaise = baseSalaryPaise
         self.isActive = isActive
         self.joinedOn = joinedOn
         self.endDate = endDate
@@ -86,14 +66,6 @@ public struct PayrollEntry: Identifiable, Hashable, Sendable, Codable {
     public var grossPaise: Int64
     public var deductionsPaise: Int64
     public var netPaise: Int64
-    public var workingDays: Double
-    public var paidDays: Double
-    public var basicPaise: Int64
-    public var hraPaise: Int64
-    public var otherAllowancesPaise: Int64
-    public var overtimePaise: Int64
-    public var pfApplicable: Bool
-    public var esiApplicable: Bool
     public var employeeCode: String
     public var employeeName: String
     public let postedAt: Date
@@ -108,14 +80,6 @@ public struct PayrollEntry: Identifiable, Hashable, Sendable, Codable {
                 grossPaise: Int64,
                 deductionsPaise: Int64,
                 netPaise: Int64,
-                workingDays: Double = 0,
-                paidDays: Double = 0,
-                basicPaise: Int64 = 0,
-                hraPaise: Int64 = 0,
-                otherAllowancesPaise: Int64 = 0,
-                overtimePaise: Int64 = 0,
-                pfApplicable: Bool = true,
-                esiApplicable: Bool = false,
                 employeeCode: String = "",
                 employeeName: String = "",
                 postedAt: Date = Date()) {
@@ -129,14 +93,6 @@ public struct PayrollEntry: Identifiable, Hashable, Sendable, Codable {
         self.grossPaise = grossPaise
         self.deductionsPaise = deductionsPaise
         self.netPaise = netPaise
-        self.workingDays = workingDays
-        self.paidDays = paidDays
-        self.basicPaise = basicPaise
-        self.hraPaise = hraPaise
-        self.otherAllowancesPaise = otherAllowancesPaise
-        self.overtimePaise = overtimePaise
-        self.pfApplicable = pfApplicable
-        self.esiApplicable = esiApplicable
         self.employeeCode = employeeCode
         self.employeeName = employeeName
         self.postedAt = postedAt

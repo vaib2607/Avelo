@@ -83,30 +83,18 @@ private struct InventoryBody: View {
                     TableColumn("Code", value: \.code)
                     TableColumn("Name", value: \.name)
                     TableColumn("Unit", value: \.unit)
-                    TableColumn("Group") { i in
-                        Text(i.stockGroup ?? "—").foregroundStyle(i.stockGroup == nil ? .secondary : .primary)
+                    TableColumn("Valuation") { i in
+                        Text(i.valuationMethod.displayName)
                     }
-                    TableColumn("Category") { i in
-                        Text(i.stockCategory ?? "—").foregroundStyle(i.stockCategory == nil ? .secondary : .primary)
-                    }
-                    TableColumn("Godown") { i in
-                        Text(i.godown ?? "—").foregroundStyle(i.godown == nil ? .secondary : .primary)
-                    }
-                    TableColumn("Opening Qty") { i in
-                        Text(String(format: "%.3f", i.openingQuantity))
-                    }
-                TableColumn("Opening Rate (₹)") { i in
-                    Text(Currency.formatPaise(i.openingRatePaise)).monospacedDigit()
-                }
                 TableColumn("Status") { i in
-                    StatusBadge(kind: i.isArchived ? .neutral : .success,
-                                text: i.isArchived ? "Archived" : "Active")
+                    StatusBadge(kind: i.isActive ? .success : .neutral,
+                                text: i.isActive ? "Active" : "Inactive")
                 }
                 TableColumn("Actions") { i in
                     HStack {
                         Button("Movement…") { showMovement = i.id }
                         Button("Archive") { vm.archive(i.id) }
-                            .disabled(i.isArchived)
+                            .disabled(!i.isActive)
                     }
                 }
             }

@@ -6,13 +6,10 @@ public struct StockMovementSheet: View {
     @Environment(AppRouter.self) private var router
     let itemId: InventoryItem.ID
 
-    @State private var type: InventoryItem.MovementType = .purchase
-    @State private var quantity: String = "0.000"
+    @State private var type: InventoryItem.MovementType = .stockIn
+    @State private var quantity: String = "0"
     @State private var rate: String = "0.00"
     @State private var date: Date = Date()
-    @State private var batchNumber: String = ""
-    @State private var manufactureDate: Date = Date()
-    @State private var expiryDate: Date = Date()
     @State private var notes: String = ""
     @State private var canSave: Bool = false
 
@@ -32,17 +29,11 @@ public struct StockMovementSheet: View {
             Divider()
             Form {
                 Picker("Type", selection: $type) {
-                    ForEach([InventoryItem.MovementType.opening,
-                             .purchase, .purchaseReturn,
-                             .sale, .saleReturn,
-                             .adjustmentIn, .adjustmentOut], id: \.self) { t in
+                    ForEach(InventoryItem.MovementType.allCases, id: \.self) { t in
                         Text(t.displayName).tag(t)
                     }
                 }
                 DatePicker("Date", selection: $date, displayedComponents: .date)
-                TextField("Batch number", text: $batchNumber)
-                DatePicker("Manufacture date", selection: $manufactureDate, displayedComponents: .date)
-                DatePicker("Expiry date", selection: $expiryDate, displayedComponents: .date)
                 TextField("Quantity", text: $quantity)
                 MoneyTextField(label: "Rate (₹)", text: $rate)
                 TextField("Notes (optional)", text: $notes, axis: .vertical)
@@ -66,7 +57,7 @@ public struct StockMovementSheet: View {
     }
 
     private func refresh() {
-        let q = Double(quantity) ?? 0
+        let q = Int64(quantity) ?? 0
         let r = Currency.parseRupeeInput(rate) ?? 0
         canSave = q > 0 && r >= 0
     }
@@ -76,11 +67,8 @@ public struct StockMovementSheet: View {
         do {
             try InventoryService(db: ctx.database, companyId: ctx.companyId).recordMovement(
                 itemId: itemId, date: date, type: type,
-                quantity: Double(quantity) ?? 0,
+                quantity: Int64(quantity) ?? 0,
                 ratePaise: Currency.parseRupeeInput(rate) ?? 0,
-                batchNumber: batchNumber.isEmpty ? nil : batchNumber,
-                manufactureDate: batchNumber.isEmpty ? nil : manufactureDate,
-                expiryDate: batchNumber.isEmpty ? nil : expiryDate,
                 notes: notes.isEmpty ? nil : notes
             )
             env.showSuccess("Movement recorded.")

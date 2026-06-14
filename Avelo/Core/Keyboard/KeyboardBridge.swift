@@ -80,14 +80,6 @@ public final class KeyboardBridge {
         case .contra:      return .newContra
         case .purchase:    return .newPurchase
         case .sales:       return .newSales
-        case .purchaseOrder: return .newPurchaseOrder
-        case .salesOrder:  return .newSalesOrder
-        case .receiptNote: return .newReceiptNote
-        case .deliveryNote: return .newDeliveryNote
-        case .physicalStock: return .newPhysicalStock
-        case .stockJournal: return .newStockJournal
-        case .rejectionIn:  return .newRejectionIn
-        case .rejectionOut: return .newRejectionOut
         case .creditNote:  return .newCreditNote
         case .debitNote:   return .newDebitNote
         case .opening, .payroll:

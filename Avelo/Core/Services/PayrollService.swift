@@ -26,26 +26,16 @@ public final class PayrollService: Sendable {
                                employeeCode: String,
                                designation: String?,
                                pan: String?,
-                               bankAccount: String?,
-                               ifsc: String?,
-                               basicPaise: Int64,
-                               hraPaise: Int64,
-                               otherAllowancesPaise: Int64,
-                               pfApplicable: Bool,
-                               esiApplicable: Bool) throws -> PayrollEmployee {
+                               bankAccountId: Account.ID? = nil,
+                               baseSalaryPaise: Int64) throws -> PayrollEmployee {
         let employee = PayrollEmployee(
             companyId: companyId,
             employeeCode: employeeCode,
             name: name,
             designation: designation,
             pan: pan,
-            bankAccount: bankAccount,
-            ifsc: ifsc,
-            basicPaise: basicPaise,
-            hraPaise: hraPaise,
-            otherAllowancesPaise: otherAllowancesPaise,
-            pfApplicable: pfApplicable,
-            esiApplicable: esiApplicable,
+            bankAccountId: bankAccountId,
+            baseSalaryPaise: baseSalaryPaise,
             isActive: true,
             joinedOn: Date()
         )
@@ -53,7 +43,7 @@ public final class PayrollService: Sendable {
             let repo = PayrollRepository(db: tx)
             try repo.insertEmployee(employee)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .employeeCreated,
+                action: .payrollEmployeeCreated,
                 entityType: "payroll_employee",
                 entityId: employee.id.uuidString,
                 snapshotAfter: employee
@@ -67,7 +57,7 @@ public final class PayrollService: Sendable {
             let repo = PayrollRepository(db: tx)
             try repo.updateEmployee(employee)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .employeeUpdated,
+                action: .payrollEmployeeUpdated,
                 entityType: "payroll_employee",
                 entityId: employee.id.uuidString,
                 snapshotAfter: employee
@@ -80,7 +70,7 @@ public final class PayrollService: Sendable {
             let repo = PayrollRepository(db: tx)
             try repo.deactivateEmployee(id)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .employeeDeactivated,
+                action: .payrollEmployeeTerminated,
                 entityType: "payroll_employee",
                 entityId: id.uuidString
             )
@@ -102,9 +92,6 @@ public final class PayrollService: Sendable {
 
     public func postEntry(employeeId: PayrollEmployee.ID,
                           monthYear: Int,
-                          workingDays: Int,
-                          paidDays: Int,
-                          overtimePaise: Int64,
                           deductionsPaise: Int64,
                           financialYearId: FinancialYear.ID,
                           salaryExpenseAccountId: Account.ID,
@@ -112,7 +99,7 @@ public final class PayrollService: Sendable {
         let employee = try repository.findEmployee(id: employeeId)
         guard let employee = employee else { throw AppError.notFound("Employee") }
 
-        let gross = employee.basicPaise + employee.hraPaise + employee.otherAllowancesPaise + overtimePaise
+        let gross = employee.baseSalaryPaise
         let net = gross - deductionsPaise
         let year = monthYear / 100
         let month = monthYear % 100
@@ -154,14 +141,6 @@ public final class PayrollService: Sendable {
             grossPaise: gross,
             deductionsPaise: deductionsPaise,
             netPaise: net,
-            workingDays: Double(workingDays),
-            paidDays: Double(paidDays),
-            basicPaise: employee.basicPaise,
-            hraPaise: employee.hraPaise,
-            otherAllowancesPaise: employee.otherAllowancesPaise,
-            overtimePaise: overtimePaise,
-            pfApplicable: employee.pfApplicable,
-            esiApplicable: employee.esiApplicable,
             postedAt: Date()
         )
         var voucher: Voucher!

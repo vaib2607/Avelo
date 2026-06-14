@@ -7,14 +7,6 @@ public struct VoucherType: Identifiable, Hashable, Sendable, Codable {
         case journal
         case sales
         case purchase
-        case purchaseOrder
-        case salesOrder
-        case receiptNote
-        case deliveryNote
-        case physicalStock
-        case stockJournal
-        case rejectionIn
-        case rejectionOut
         case payment
         case receipt
         case contra
@@ -30,14 +22,6 @@ public struct VoucherType: Identifiable, Hashable, Sendable, Codable {
             case .journal:     return "Journal"
             case .sales:       return "Sales"
             case .purchase:    return "Purchase"
-            case .purchaseOrder: return "Purchase Order"
-            case .salesOrder:  return "Sales Order"
-            case .receiptNote:  return "Receipt Note"
-            case .deliveryNote: return "Delivery Note"
-            case .physicalStock:return "Physical Stock"
-            case .stockJournal: return "Stock Journal"
-            case .rejectionIn:  return "Rejection In"
-            case .rejectionOut: return "Rejection Out"
             case .payment:     return "Payment"
             case .receipt:     return "Receipt"
             case .contra:      return "Contra"
@@ -53,14 +37,6 @@ public struct VoucherType: Identifiable, Hashable, Sendable, Codable {
             case .journal:     return "JV"
             case .sales:       return "SALES"
             case .purchase:    return "PURCH"
-            case .purchaseOrder: return "PO"
-            case .salesOrder:  return "SO"
-            case .receiptNote:  return "RN"
-            case .deliveryNote: return "DN"
-            case .physicalStock:return "PHYS"
-            case .stockJournal: return "SJ"
-            case .rejectionIn:  return "RIN"
-            case .rejectionOut: return "ROUT"
             case .payment:     return "PAY"
             case .receipt:     return "RCT"
             case .contra:      return "CON"
@@ -73,7 +49,7 @@ public struct VoucherType: Identifiable, Hashable, Sendable, Codable {
 
         public var affectsInventory: Bool {
             switch self {
-            case .sales, .purchase, .purchaseOrder, .salesOrder, .receiptNote, .deliveryNote, .physicalStock, .stockJournal, .rejectionIn, .rejectionOut, .creditNote, .debitNote: return true
+            case .sales, .purchase, .creditNote, .debitNote: return true
             default: return false
             }
         }
@@ -82,14 +58,6 @@ public struct VoucherType: Identifiable, Hashable, Sendable, Codable {
             switch self {
             case .sales:       return "S"
             case .purchase:    return "P"
-            case .purchaseOrder: return "PO"
-            case .salesOrder:  return "SO"
-            case .receiptNote: return "RN"
-            case .deliveryNote:return "DN"
-            case .physicalStock:return "PS"
-            case .stockJournal:return "SJ"
-            case .rejectionIn:  return "RIN"
-            case .rejectionOut: return "ROUT"
             case .payment:     return "PAY"
             case .receipt:     return "RCT"
             case .contra:      return "CON"

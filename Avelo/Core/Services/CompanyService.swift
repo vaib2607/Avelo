@@ -44,7 +44,7 @@ public final class CompanyService: Sendable {
         try db.write { tx in
             try CompanyRepository(db: tx).update(company)
             try AuditService(db: tx, companyId: audit.companyId).record(
-                action: .inventoryModeChanged,
+                action: .companyUpdated,
                 entityType: "company",
                 entityId: company.id.uuidString,
                 snapshotBefore: before,

@@ -8,22 +8,25 @@ public struct InventoryRepository: Sendable {
         self.db = db
     }
 
+    private static let itemColumns = "id, company_id, code, name, unit, valuation_method, is_active, created_at"
+    private static let movementColumns = "id, company_id, item_id, voucher_id, date, movement_type, quantity, unit_cost_paise, total_value_paise, reference_voucher_number, reason, created_at"
+
     public func findItemById(_ id: InventoryItem.ID) throws -> InventoryItem? {
         try db.queryOne(
-            "SELECT id, company_id, code, name, unit, alternate_unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, reorder_level, price_level1_paise, price_level2_paise, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE id = ?",
+            "SELECT \(Self.itemColumns) FROM avelo_inventory_items WHERE id = ?",
             bind: [.text(id.uuidString)]
         ) { try Self.rowToItem($0) }
     }
 
     public func findItemByCode(_ code: String, companyId: Company.ID) throws -> InventoryItem? {
         try db.queryOne(
-            "SELECT id, company_id, code, name, unit, alternate_unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, reorder_level, price_level1_paise, price_level2_paise, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ? AND code = ?",
+            "SELECT \(Self.itemColumns) FROM avelo_inventory_items WHERE company_id = ? AND code = ?",
             bind: [.text(companyId.uuidString), .text(code)]
         ) { try Self.rowToItem($0) }
     }
 
     public func listItemsForCompany(_ companyId: Company.ID, includeInactive: Bool = false) throws -> [InventoryItem] {
-        let sql = "SELECT id, company_id, code, name, unit, alternate_unit, valuation_method, is_active, opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown, reorder_level, price_level1_paise, price_level2_paise, barcode, hsn_sac, is_archived, linked_account_id, created_at FROM avelo_inventory_items WHERE company_id = ?\(includeInactive ? "" : " AND is_active = 1") ORDER BY code COLLATE NOCASE"
+        let sql = "SELECT \(Self.itemColumns) FROM avelo_inventory_items WHERE company_id = ?\(includeInactive ? "" : " AND is_active = 1") ORDER BY code COLLATE NOCASE"
         return try db.query(sql, bind: [.text(companyId.uuidString)]) { try Self.rowToItem($0) }
     }
 
@@ -40,20 +43,16 @@ public struct InventoryRepository: Sendable {
     }
 
     public func setItemAccount(itemId: InventoryItem.ID, accountId: Account.ID) throws {
-        try db.execute(
-            "UPDATE avelo_inventory_items SET linked_account_id = ? WHERE id = ?",
-            [.text(accountId.uuidString), .text(itemId.uuidString)]
-        )
+        _ = (itemId, accountId)
+        throw AppError.featureUnavailable("Inventory-item account linking is deferred outside the frozen schema.")
     }
 
     public func insertItem(_ item: InventoryItem) throws {
         try db.execute(
             """
             INSERT INTO avelo_inventory_items
-            (id, company_id, code, name, unit, alternate_unit, valuation_method, is_active,
-             opening_quantity, opening_rate_paise, gst_rate, stock_group, stock_category, godown,
-             reorder_level, price_level1_paise, price_level2_paise, barcode, hsn_sac, is_archived, linked_account_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, company_id, code, name, unit, valuation_method, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(item.id.uuidString),
@@ -61,22 +60,8 @@ public struct InventoryRepository: Sendable {
                 .text(item.code),
                 .text(item.name),
                 .text(item.unit),
-                .optionalText(item.alternateUnit),
                 .text(item.valuationMethod.rawValue),
                 .bool(item.isActive),
-                .real(item.openingQuantity),
-                .integer(item.openingRatePaise),
-                .real(item.gstRate),
-                .optionalText(item.stockGroup),
-                .optionalText(item.stockCategory),
-                .optionalText(item.godown),
-                .optionalReal(item.reorderLevel),
-                .optionalInteger(item.priceLevel1Paise),
-                .optionalInteger(item.priceLevel2Paise),
-                .optionalText(item.barcode),
-                .optionalText(item.hsnSac),
-                .bool(item.isArchived),
-                .optionalText(item.linkedAccountId?.uuidString),
                 .timestamp(item.createdAt)
             ]
         )
@@ -86,32 +71,15 @@ public struct InventoryRepository: Sendable {
         try db.execute(
             """
             UPDATE avelo_inventory_items SET
-                code = ?, name = ?, unit = ?, alternate_unit = ?, valuation_method = ?, is_active = ?,
-                opening_quantity = ?, opening_rate_paise = ?, gst_rate = ?,
-                stock_group = ?, stock_category = ?, godown = ?, reorder_level = ?,
-                price_level1_paise = ?, price_level2_paise = ?, barcode = ?, hsn_sac = ?, is_archived = ?, linked_account_id = ?
+                code = ?, name = ?, unit = ?, valuation_method = ?, is_active = ?
             WHERE id = ?
             """,
             [
                 .text(item.code),
                 .text(item.name),
                 .text(item.unit),
-                .optionalText(item.alternateUnit),
                 .text(item.valuationMethod.rawValue),
                 .bool(item.isActive),
-                .real(item.openingQuantity),
-                .integer(item.openingRatePaise),
-                .real(item.gstRate),
-                .optionalText(item.stockGroup),
-                .optionalText(item.stockCategory),
-                .optionalText(item.godown),
-                .optionalReal(item.reorderLevel),
-                .optionalInteger(item.priceLevel1Paise),
-                .optionalInteger(item.priceLevel2Paise),
-                .optionalText(item.barcode),
-                .optionalText(item.hsnSac),
-                .bool(item.isArchived),
-                .optionalText(item.linkedAccountId?.uuidString),
                 .text(item.id.uuidString)
             ]
         )
@@ -129,9 +97,8 @@ public struct InventoryRepository: Sendable {
             """
             INSERT INTO avelo_stock_movements
             (id, company_id, item_id, voucher_id, date, movement_type, quantity,
-             unit_cost_paise, total_value_paise, reference_voucher_number, batch_number,
-             manufacture_date, expiry_date, reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             unit_cost_paise, total_value_paise, reference_voucher_number, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(m.id.uuidString),
@@ -140,13 +107,10 @@ public struct InventoryRepository: Sendable {
                 .optionalText(m.voucherId?.uuidString),
                 .date(m.date),
                 .text(m.movementType.rawValue),
-                .real(m.quantity),
+                .integer(m.quantity),
                 .integer(m.unitCostPaise),
                 .integer(m.totalValuePaise),
                 .optionalText(m.referenceVoucherNumber),
-                .optionalText(m.batchNumber),
-                .optionalDate(m.manufactureDate),
-                .optionalDate(m.expiryDate),
                 .optionalText(m.reason),
                 .timestamp(m.createdAt)
             ]
@@ -181,9 +145,7 @@ public struct InventoryRepository: Sendable {
 
     public func listMovements(filter: MovementFilter) throws -> [StockMovement] {
         var sql = """
-            SELECT id, company_id, item_id, voucher_id, date, movement_type, quantity,
-                   unit_cost_paise, total_value_paise, reference_voucher_number, batch_number,
-                   manufacture_date, expiry_date, reason, created_at
+            SELECT \(Self.movementColumns)
             FROM avelo_stock_movements
             WHERE company_id = ?
         """
@@ -212,49 +174,40 @@ public struct InventoryRepository: Sendable {
 
     public struct ItemBalance: Sendable {
         public let itemId: InventoryItem.ID
-        public let inQty: Double
-        public let outQty: Double
-        public let adjustmentQty: Double
+        public let inQty: Int64
+        public let outQty: Int64
+        public let adjustmentQty: Int64
         public let inValuePaise: Int64
         public let outValuePaise: Int64
-        public let onHandQty: Double
+        public let onHandQty: Int64
         public let onHandValuePaise: Int64
     }
 
     public func runningBalance(itemId: InventoryItem.ID, asOf: Date) throws -> ItemBalance {
-        let asOfStr = DateFormatters.formatIsoDate(asOf)
-        // Inbound types: in, opening, purchase, saleReturn, adjustmentIn
-        // Outbound types: out, sale, purchaseReturn, adjustmentOut
-        // Neutral/net types: adjustment
-        let row: (Double, Double, Double, Int64, Int64, Double)? = try db.queryOne(
+        let row: (Int64, Int64, Int64, Int64, Int64, Int64)? = try db.queryOne(
             """
             SELECT
-                COALESCE(SUM(CASE WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')
-                                  THEN quantity ELSE 0 END), 0) AS in_q,
-                COALESCE(SUM(CASE WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')
-                                  THEN quantity ELSE 0 END), 0) AS out_q,
-                COALESCE(SUM(CASE WHEN movement_type = 'adjustment'
-                                  THEN quantity ELSE 0 END), 0) AS adj_q,
-                COALESCE(SUM(CASE WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')
-                                  THEN total_value_paise ELSE 0 END), 0) AS in_v,
-                COALESCE(SUM(CASE WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')
-                                  THEN total_value_paise ELSE 0 END), 0) AS out_v,
+                COALESCE(SUM(CASE WHEN movement_type = 'in' THEN quantity ELSE 0 END), 0) AS in_q,
+                COALESCE(SUM(CASE WHEN movement_type = 'out' THEN quantity ELSE 0 END), 0) AS out_q,
+                COALESCE(SUM(CASE WHEN movement_type = 'adjustment' THEN quantity ELSE 0 END), 0) AS adj_q,
+                COALESCE(SUM(CASE WHEN movement_type = 'in' THEN total_value_paise ELSE 0 END), 0) AS in_v,
+                COALESCE(SUM(CASE WHEN movement_type = 'out' THEN total_value_paise ELSE 0 END), 0) AS out_v,
                 COALESCE(SUM(CASE
-                    WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')  THEN  quantity
-                    WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')          THEN -quantity
-                    WHEN movement_type = 'adjustment'                                             THEN  quantity
+                    WHEN movement_type = 'in' THEN quantity
+                    WHEN movement_type = 'out' THEN -quantity
+                    WHEN movement_type = 'adjustment' THEN quantity
                     ELSE 0 END), 0) AS on_hand
             FROM avelo_stock_movements
             WHERE item_id = ? AND date <= ?
             """,
-            bind: [.text(itemId.uuidString), .text(asOfStr)]
-        ) { r in (r.real(0), r.real(1), r.real(2), r.int(3), r.int(4), r.real(5)) }
-        let inQty   = row?.0 ?? 0
-        let outQty  = row?.1 ?? 0
-        let adjQty  = row?.2 ?? 0
-        let inVal   = row?.3 ?? 0
-        let outVal  = row?.4 ?? 0
-        let onHand  = row?.5 ?? 0
+            bind: [.text(itemId.uuidString), .date(asOf)]
+        ) { r in (r.int(0), r.int(1), r.int(2), r.int(3), r.int(4), r.int(5)) }
+        let inQty = row?.0 ?? 0
+        let outQty = row?.1 ?? 0
+        let adjQty = row?.2 ?? 0
+        let inVal = row?.3 ?? 0
+        let outVal = row?.4 ?? 0
+        let onHand = row?.5 ?? 0
         let onHandVal = inVal - outVal
         assert(inVal <= Int64.max / 2)
         assert(outVal <= Int64.max / 2)
@@ -281,22 +234,8 @@ public struct InventoryRepository: Sendable {
             code: r.text("code"),
             name: r.text("name"),
             unit: r.text("unit"),
-            alternateUnit: r.optionalText("alternate_unit"),
             valuationMethod: vm,
             isActive: r.bool("is_active"),
-            openingQuantity: r.real("opening_quantity"),
-            openingRatePaise: r.int("opening_rate_paise"),
-            gstRate: r.real("gst_rate"),
-            stockGroup: r.optionalText("stock_group"),
-            stockCategory: r.optionalText("stock_category"),
-            godown: r.optionalText("godown"),
-            reorderLevel: r.optionalReal("reorder_level"),
-            priceLevel1Paise: r.optionalInt("price_level1_paise"),
-            priceLevel2Paise: r.optionalInt("price_level2_paise"),
-            barcode: r.optionalText("barcode"),
-            hsnSac: r.optionalText("hsn_sac"),
-            isArchived: r.bool("is_archived"),
-            linkedAccountId: try UUIDParsing.optional(r.optionalText("linked_account_id"), field: "avelo_inventory_items.linked_account_id"),
             createdAt: try r.timestamp("created_at")
         )
     }
@@ -313,14 +252,11 @@ public struct InventoryRepository: Sendable {
             itemId: itemId,
             date: r.date("date"),
             movementType: mt,
-            quantity: r.real("quantity"),
+            quantity: r.int("quantity"),
             unitCostPaise: r.int("unit_cost_paise"),
             totalValuePaise: r.int("total_value_paise"),
             voucherId: voucherId,
             referenceVoucherNumber: r.optionalText("reference_voucher_number"),
-            batchNumber: r.optionalText("batch_number"),
-            manufactureDate: r.optionalDate("manufacture_date"),
-            expiryDate: r.optionalDate("expiry_date"),
             reason: r.optionalText("reason"),
             createdAt: try r.timestamp("created_at")
         )
