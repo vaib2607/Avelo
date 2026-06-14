@@ -7,6 +7,8 @@ The non-negotiables. Every code-generation pass, every review, and every change 
 - No `URLSession`, no `Network`, no `NWConnection`, no Bonjour, no Bluetooth, no IPC over network.
 - No `import Network` outside of the sandbox firewall check at startup.
 - No third-party HTTP, JSON-over-HTTP, or sync libraries. The dependency list is exactly zero.
+- "The dependency list is exactly zero" means zero externally-resolved Swift Package Manager dependencies: no `.package(url:)`, and `Package.resolved` must be empty or absent. Build and runtime network calls remain forbidden.
+- Vendored, version-pinned C/Swift source compiled as a local target is embedded source, not a dependency, and is permitted. V2 at-rest encryption may use the SQLCipher amalgamation compiled with `-DSQLCIPHER_CRYPTO_CC` against Apple CommonCrypto; no OpenSSL vendoring is permitted.
 - Telemetry, analytics, crash reporting, update checks: all forbidden.
 - The app must run, perform all operations, and persist all data with Wi-Fi disabled and the network cable unplugged.
 - App Sandbox is ON. Only the app-support directory, the documents directory, and user-selected files are writable.
