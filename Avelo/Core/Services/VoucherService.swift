@@ -166,8 +166,20 @@ public final class VoucherService: Sendable {
             try markAccountsUsed(accountRepo, lines: lines)
         }
 
-        let prompt: InventoryPromptContext? = nil
+        let prompt = try inventoryPromptContext(for: voucher)
         return PostResult(voucher: voucher, inventoryPrompt: prompt)
+    }
+
+    private func inventoryPromptContext(for voucher: Voucher) throws -> InventoryPromptContext? {
+        guard voucher.voucherTypeCode == .sales || voucher.voucherTypeCode == .purchase else {
+            return nil
+        }
+        guard let company = try CompanyRepository(db: db).findById(companyId),
+              company.isInventoryEnabled,
+              company.inventoryLinkMode == .autoPrompt else {
+            return nil
+        }
+        return InventoryPromptContext(voucherId: voucher.id, voucherNumber: voucher.number, lines: [])
     }
 
     private func recordWorkflow(_ voucher: Voucher, draft: VoucherDraft, workflow: WorkflowInputs, in db: SQLiteDatabase) throws {

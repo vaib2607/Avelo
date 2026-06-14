@@ -37,6 +37,23 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.0, totals?.1)
     }
 
+    func testSalesVoucherReturnsInventoryPromptWhenAutoPromptIsEnabled() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let result = try svc.post(
+            draft: tc.draft(type: .sales, on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 50000, .debit),
+                tc.line(tc.salesId, 50000, .credit)
+            ]),
+            in: tc.fy
+        )
+
+        let prompt = try XCTUnwrap(result.inventoryPrompt)
+        XCTAssertEqual(prompt.voucherId, result.voucher.id)
+        XCTAssertEqual(prompt.voucherNumber, result.voucher.number)
+    }
+
     func testPostBatchPersistsAllVouchersInOneBalancedBatch() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)

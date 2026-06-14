@@ -20,15 +20,24 @@ final class Phase6HardeningTests: XCTestCase {
             esiApplicable: false
         )
 
-        _ = try payroll.postEntry(
+        let entry = try payroll.postEntry(
             employeeId: employee.id,
             monthYear: 202406,
             workingDays: 30,
             paidDays: 30,
             overtimePaise: 0,
             deductionsPaise: 0,
-            financialYearId: tc.fy.id
+            financialYearId: tc.fy.id,
+            salaryExpenseAccountId: tc.rentId,
+            paymentAccountId: tc.cashId
         )
+        let voucherId = try XCTUnwrap(entry.voucherId)
+        let voucher = try XCTUnwrap(VoucherRepository(db: tc.db).findById(voucherId))
+        XCTAssertEqual(voucher.voucherTypeCode, .payroll)
+        XCTAssertEqual(voucher.totalPaise, 65_000)
+        let registerEntry = try XCTUnwrap(payroll.listEntries(employeeId: employee.id, monthYear: 202406).first)
+        XCTAssertEqual(registerEntry.employeeCode, "EMP-001")
+        XCTAssertEqual(registerEntry.employeeName, "Ravi Kumar")
 
         XCTAssertThrowsError(
             try payroll.postEntry(
@@ -38,7 +47,9 @@ final class Phase6HardeningTests: XCTestCase {
                 paidDays: 30,
                 overtimePaise: 0,
                 deductionsPaise: 0,
-                financialYearId: tc.fy.id
+                financialYearId: tc.fy.id,
+                salaryExpenseAccountId: tc.rentId,
+                paymentAccountId: tc.cashId
             )
         ) { error in
             guard case AppError.duplicateSalary(let message) = error else {
@@ -68,10 +79,11 @@ final class Phase6HardeningTests: XCTestCase {
                 ratePaise: 100
             )
         ) { error in
-            guard case AppError.negativeStock(let message) = error else {
-                return XCTFail("Expected negativeStock error, got \(error)")
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected validation error, got \(error)")
             }
-            XCTAssertTrue(message.localizedCaseInsensitiveContains("current stock"))
+            XCTAssertEqual(validation.code, .quantityExceedsStock)
+            XCTAssertTrue(validation.message.localizedCaseInsensitiveContains("current stock"))
         }
     }
 

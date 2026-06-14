@@ -188,34 +188,36 @@ public struct PayrollRepository: Sendable {
 
     public func listEntries(filter: EntryFilter) throws -> [PayrollEntry] {
         var sql = """
-            SELECT id, company_id, employee_id, financial_year_id, voucher_id, month, year,
-                   working_days, paid_days, basic_paise, hra_paise, other_allowances_paise, overtime_paise,
-                   gross_paise, deductions_paise, net_paise, pf_applicable, esi_applicable, posted_at
-            FROM avelo_payroll_entries
-            WHERE company_id = ?
+            SELECT e.id, e.company_id, e.employee_id, e.financial_year_id, e.voucher_id, e.month, e.year,
+                   e.working_days, e.paid_days, e.basic_paise, e.hra_paise, e.other_allowances_paise, e.overtime_paise,
+                   e.gross_paise, e.deductions_paise, e.net_paise, e.pf_applicable, e.esi_applicable, e.posted_at,
+                   p.code AS employee_code, p.name AS employee_name
+            FROM avelo_payroll_entries e
+            JOIN avelo_payroll_employees p ON p.id = e.employee_id
+            WHERE e.company_id = ?
         """
         var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
         if let empId = filter.employeeId {
-            sql += " AND employee_id = ?"
+            sql += " AND e.employee_id = ?"
             bind.append(.text(empId.uuidString))
         }
         if let fyId = filter.financialYearId {
-            sql += " AND financial_year_id = ?"
+            sql += " AND e.financial_year_id = ?"
             bind.append(.text(fyId.uuidString))
         }
         if let my = filter.monthYear {
-            sql += " AND year = ? AND month = ?"
+            sql += " AND e.year = ? AND e.month = ?"
             bind.append(.integer(Int64(my.year)))
             bind.append(.integer(Int64(my.month)))
         } else if let y = filter.year {
-            sql += " AND year = ?"
+            sql += " AND e.year = ?"
             bind.append(.integer(Int64(y)))
         }
         if let m = filter.month, filter.monthYear == nil {
-            sql += " AND month = ?"
+            sql += " AND e.month = ?"
             bind.append(.integer(Int64(m)))
         }
-        sql += " ORDER BY year DESC, month DESC, posted_at DESC LIMIT ? OFFSET ?"
+        sql += " ORDER BY e.year DESC, e.month DESC, e.posted_at DESC LIMIT ? OFFSET ?"
         bind.append(.integer(Int64(filter.limit)))
         bind.append(.integer(Int64(filter.offset)))
         return try db.query(sql, bind: bind) { try Self.rowToEntry($0) }
@@ -272,6 +274,8 @@ public struct PayrollRepository: Sendable {
             overtimePaise: r.int("overtime_paise"),
             pfApplicable: r.bool("pf_applicable"),
             esiApplicable: r.bool("esi_applicable"),
+            employeeCode: r.optionalText("employee_code") ?? "",
+            employeeName: r.optionalText("employee_name") ?? "",
             postedAt: try r.timestamp("posted_at")
         )
     }

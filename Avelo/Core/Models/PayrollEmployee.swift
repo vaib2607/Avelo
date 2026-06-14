@@ -94,6 +94,8 @@ public struct PayrollEntry: Identifiable, Hashable, Sendable, Codable {
     public var overtimePaise: Int64
     public var pfApplicable: Bool
     public var esiApplicable: Bool
+    public var employeeCode: String
+    public var employeeName: String
     public let postedAt: Date
 
     public init(id: ID = UUID(),
@@ -114,6 +116,8 @@ public struct PayrollEntry: Identifiable, Hashable, Sendable, Codable {
                 overtimePaise: Int64 = 0,
                 pfApplicable: Bool = true,
                 esiApplicable: Bool = false,
+                employeeCode: String = "",
+                employeeName: String = "",
                 postedAt: Date = Date()) {
         self.id = id
         self.companyId = companyId
@@ -133,10 +137,10 @@ public struct PayrollEntry: Identifiable, Hashable, Sendable, Codable {
         self.overtimePaise = overtimePaise
         self.pfApplicable = pfApplicable
         self.esiApplicable = esiApplicable
+        self.employeeCode = employeeCode
+        self.employeeName = employeeName
         self.postedAt = postedAt
     }
 
-    public var employeeCode: String { "" }
-    public var employeeName: String { "" }
     public var monthYear: Int { year * 100 + month }
 }

@@ -61,6 +61,10 @@ public enum DemoCompanySeeder {
         let report = ReportService(db: db, companyId: companyId)
 
         guard let fy = try fyService.mostRecent() else { return }
+        try db.execute(
+            "UPDATE avelo_companies SET is_inventory_enabled = 1, inventory_link_mode = ?, updated_at = ? WHERE id = ?",
+            [.text(InventoryLinkMode.autoPrompt.rawValue), .timestamp(Date()), .text(companyId.uuidString)]
+        )
 
         let groups = try accounts.listGroups()
         func group(_ code: String) throws -> AccountGroup {
@@ -111,9 +115,9 @@ public enum DemoCompanySeeder {
 
         let employeeA = try payroll.createEmployee(name: "Priya Shah", employeeCode: "EMP-001", designation: "Accounts Executive", pan: "ABCDE1234F", bankAccount: "123456789012", ifsc: "HDFC0001234", basicPaise: 28_000, hraPaise: 8_000, otherAllowancesPaise: 4_000, pfApplicable: true, esiApplicable: false)
         let employeeB = try payroll.createEmployee(name: "Arjun Mehta", employeeCode: "EMP-002", designation: "Sales Lead", pan: "AAAPM4321Q", bankAccount: "123456789013", ifsc: "SBIN0001234", basicPaise: 32_000, hraPaise: 10_000, otherAllowancesPaise: 6_000, pfApplicable: true, esiApplicable: true)
-        _ = try payroll.postEntry(employeeId: employeeA.id, monthYear: 202404, workingDays: 26, paidDays: 26, overtimePaise: 2_000, deductionsPaise: 1_500, financialYearId: fy.id)
-        _ = try payroll.postEntry(employeeId: employeeA.id, monthYear: 202405, workingDays: 25, paidDays: 24, overtimePaise: 1_000, deductionsPaise: 2_000, financialYearId: fy.id)
-        _ = try payroll.postEntry(employeeId: employeeB.id, monthYear: 202404, workingDays: 26, paidDays: 25, overtimePaise: 3_000, deductionsPaise: 2_500, financialYearId: fy.id)
+        _ = try payroll.postEntry(employeeId: employeeA.id, monthYear: 202404, workingDays: 26, paidDays: 26, overtimePaise: 2_000, deductionsPaise: 1_500, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
+        _ = try payroll.postEntry(employeeId: employeeA.id, monthYear: 202405, workingDays: 25, paidDays: 24, overtimePaise: 1_000, deductionsPaise: 2_000, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
+        _ = try payroll.postEntry(employeeId: employeeB.id, monthYear: 202404, workingDays: 26, paidDays: 25, overtimePaise: 3_000, deductionsPaise: 2_500, financialYearId: fy.id, salaryExpenseAccountId: salaryExpense.id, paymentAccountId: salaryPayable.id)
 
         try banking.importStatement(accountId: bank.id, entries: [
             .init(id: UUID(), accountId: bank.id, date: DateFormatters.parseDate("2024-04-14")!, amountPaise: 125_000, narration: "Customer receipt", isCleared: false),

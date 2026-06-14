@@ -24,6 +24,7 @@ public final class AppEnvironment {
     public let backupService: BackupService
     public let shouldAutoOpenDemoCompany: Bool
     internal var onDemoCompanyCreatedForTesting: ((Company.ID) async throws -> Void)?
+    private var accountTreeReloadTask: Task<Void, Never>?
 
     @MainActor
     public init() {
@@ -158,6 +159,8 @@ public final class AppEnvironment {
         guard let fy = try fyService.mostRecent() else {
             throw AppError.notFound("Financial year")
         }
+        try CompanyService(db: db, companyId: company.id, manager: manager)
+            .setInventoryMode(enabled: true, linkMode: .autoPrompt)
 
         let groups = try accounts.listGroups()
         func group(_ code: String) throws -> AccountGroup {
@@ -202,7 +205,17 @@ public final class AppEnvironment {
         try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-05-02")!, type: .sale, quantity: 8, ratePaise: 1_300, voucherId: serviceInvoice.voucher.id, notes: "Demo issue")
 
         let employee = try payroll.createEmployee(name: "Priya Shah", employeeCode: "EMP-001", designation: "Accounts Executive", pan: "ABCDE1234F", bankAccount: "123456789012", ifsc: "HDFC0001234", basicPaise: 28_000, hraPaise: 8_000, otherAllowancesPaise: 4_000, pfApplicable: true, esiApplicable: false)
-        _ = try payroll.postEntry(employeeId: employee.id, monthYear: 202404, workingDays: 26, paidDays: 26, overtimePaise: 2_000, deductionsPaise: 1_500, financialYearId: fy.id)
+        _ = try payroll.postEntry(
+            employeeId: employee.id,
+            monthYear: 202404,
+            workingDays: 26,
+            paidDays: 26,
+            overtimePaise: 2_000,
+            deductionsPaise: 1_500,
+            financialYearId: fy.id,
+            salaryExpenseAccountId: salaryExpense.id,
+            paymentAccountId: salaryPayable.id
+        )
 
         try banking.importStatement(accountId: bank.id, entries: [.init(id: UUID(), accountId: bank.id, date: DateFormatters.parseDate("2024-04-14")!, amountPaise: 125_000, narration: "Customer receipt", isCleared: false), .init(id: UUID(), accountId: bank.id, date: DateFormatters.parseDate("2024-05-06")!, amountPaise: -58_000, narration: "Vendor payment", isCleared: false)])
         _ = try banking.reconcile(accountId: bank.id, asOf: DateFormatters.parseDate("2024-05-31")!)
@@ -215,7 +228,7 @@ public final class AppEnvironment {
         _ = try report.dayBook(fromDate: fy.startDate, toDate: fy.endDate)
         _ = try report.ledger(accountId: cash.id, financialYearId: fy.id, fromDate: fy.startDate, toDate: fy.endDate)
 
-        try await openCompany(company.id)
+        await openCompany(company.id)
     }
 
     public func openCompany(_ id: Company.ID) async {
@@ -256,7 +269,17 @@ public final class AppEnvironment {
             )
             accountTree = AccountTreeCache(companyId: ctx.companyId, database: ctx.database, financialYearId: fy.id)
             notifyDataChanged()
-            Task { await self.accountTree?.reload() }
+            accountTreeReloadTask?.cancel()
+            let expectedCompanyId = ctx.companyId
+            let expectedFYId = fy.id
+            let tree = accountTree
+            accountTreeReloadTask = Task { [weak self, weak tree] in
+                await tree?.reload()
+                guard !Task.isCancelled else { return }
+                guard let self else { return }
+                guard self.companyContext?.companyId == expectedCompanyId,
+                      self.companyContext?.financialYear.id == expectedFYId else { return }
+            }
             banner = BannerPayload(kind: .info("Financial year switched."), message: "Financial year switched.")
         } catch {
             globalError = AppError.wrap(error)
@@ -264,6 +287,8 @@ public final class AppEnvironment {
     }
 
     public func closeCompany() {
+        accountTreeReloadTask?.cancel()
+        accountTreeReloadTask = nil
         if let ctx = companyContext {
             Task { await manager.closeCompany(id: ctx.companyId) }
         }

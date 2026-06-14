@@ -13,6 +13,9 @@ public struct PostSalarySheet: View {
     @State private var overtime: String = "0.00"
     @State private var deductions: String = "0.00"
     @State private var canSave: Bool = false
+    @State private var accounts: [Account] = []
+    @State private var salaryExpenseAccountId: Account.ID?
+    @State private var paymentAccountId: Account.ID?
 
     public init(employeeId: PayrollEmployee.ID) {
         self.employeeId = employeeId
@@ -30,6 +33,18 @@ public struct PostSalarySheet: View {
             Divider()
             Form {
                 HStack {
+                    Text("Salary Expense")
+                    Spacer()
+                    AccountPicker(selection: $salaryExpenseAccountId, accounts: accounts, placeholder: "Choose expense account…")
+                        .frame(width: 260)
+                }
+                HStack {
+                    Text("Credit Account")
+                    Spacer()
+                    AccountPicker(selection: $paymentAccountId, accounts: accounts, placeholder: "Choose cash, bank, or payable…")
+                        .frame(width: 260)
+                }
+                HStack {
                     Text("Month / Year")
                     Spacer()
                     Picker("", selection: $monthYear) {
@@ -46,7 +61,10 @@ public struct PostSalarySheet: View {
                 MoneyTextField(label: "Deductions", text: $deductions)
             }
             .formStyle(.grouped)
+            .task { loadAccounts() }
             .onChange(of: paidDays) { _, _ in refresh() }
+            .onChange(of: salaryExpenseAccountId) { _, _ in refresh() }
+            .onChange(of: paymentAccountId) { _, _ in refresh() }
             Divider()
             HStack {
                 Spacer()
@@ -64,7 +82,7 @@ public struct PostSalarySheet: View {
     private func refresh() {
         let wd = Int(workingDays) ?? 0
         let pd = Int(paidDays) ?? 0
-        canSave = wd > 0 && pd > 0 && pd <= wd
+        canSave = wd > 0 && pd > 0 && pd <= wd && salaryExpenseAccountId != nil && paymentAccountId != nil
     }
 
     private func generateMonthOptions() -> [Int] {
@@ -82,17 +100,40 @@ public struct PostSalarySheet: View {
 
     private func save() {
         guard let ctx = env.companyContext else { return }
+        guard let salaryExpenseAccountId, let paymentAccountId else {
+            env.showError(.businessRule("Choose the salary expense and credit accounts before posting salary."))
+            return
+        }
         do {
             _ = try PayrollService(db: ctx.database, companyId: ctx.companyId).postEntry(
                 employeeId: employeeId, monthYear: monthYear,
                 workingDays: Int(workingDays) ?? 0, paidDays: Int(paidDays) ?? 0,
                 overtimePaise: Currency.parseRupeeInput(overtime) ?? 0,
                 deductionsPaise: Currency.parseRupeeInput(deductions) ?? 0,
-                financialYearId: ctx.financialYear.id
+                financialYearId: ctx.financialYear.id,
+                salaryExpenseAccountId: salaryExpenseAccountId,
+                paymentAccountId: paymentAccountId
             )
             env.markAccountTreeDirty()
             env.showSuccess("Salary posted.")
             router.presentedSheet = nil
+        } catch {
+            env.showError(AppError.wrap(error))
+        }
+    }
+
+    private func loadAccounts() {
+        guard let ctx = env.companyContext else { return }
+        do {
+            let loaded = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
+            accounts = loaded
+            salaryExpenseAccountId = salaryExpenseAccountId
+                ?? loaded.first(where: { $0.code == "SALARY_EXPENSE" })?.id
+                ?? loaded.first(where: { $0.name.localizedCaseInsensitiveContains("salary") })?.id
+            paymentAccountId = paymentAccountId
+                ?? loaded.first(where: { $0.isBankAccount })?.id
+                ?? loaded.first(where: { $0.code == "CASH_IN_HAND" })?.id
+            refresh()
         } catch {
             env.showError(AppError.wrap(error))
         }

@@ -21,27 +21,25 @@ public struct LedgerLineRepository: Sendable {
     }
 
     public func insertBatch(_ lines: [LedgerLine]) throws {
-        try db.write { tx in
-            for line in lines {
-                try tx.execute(
-                    """
-                    INSERT INTO avelo_ledger_lines
-                    (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    [
-                        .text(line.id.uuidString),
-                        .text(line.companyId.uuidString),
-                        .text(line.voucherId.uuidString),
-                        .text(line.accountId.uuidString),
-                        .integer(line.amountPaise),
-                        .text(line.side.rawValue),
-                        .optionalText(line.taxCode),
-                        .optionalText(line.costCenter),
-                        .integer(Int64(line.lineOrder))
-                    ]
-                )
-            }
+        for line in lines {
+            try db.execute(
+                """
+                INSERT INTO avelo_ledger_lines
+                (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    .text(line.id.uuidString),
+                    .text(line.companyId.uuidString),
+                    .text(line.voucherId.uuidString),
+                    .text(line.accountId.uuidString),
+                    .integer(line.amountPaise),
+                    .text(line.side.rawValue),
+                    .optionalText(line.taxCode),
+                    .optionalText(line.costCenter),
+                    .integer(Int64(line.lineOrder))
+                ]
+            )
         }
     }
 

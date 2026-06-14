@@ -76,6 +76,7 @@ private struct NewVoucherBody: View {
     @Bindable var vm: VoucherEditViewModel
     let initialType: VoucherType.Code
     let onPost: (VoucherEditViewModel) -> Void
+    @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
 
     var body: some View {
@@ -109,8 +110,20 @@ private struct NewVoucherBody: View {
             HStack {
                 Spacer()
                 Button("Paste TSV") { pasteTSV() }
-                Button("Save Template") { try? vm.saveTemplate(named: initialType.rawValue) }
-                Button("Load Template") { try? vm.loadTemplate(named: initialType.rawValue) }
+                Button("Save Template") {
+                    do {
+                        try vm.saveTemplate(named: initialType.rawValue)
+                    } catch {
+                        env.showError(AppError.wrap(error))
+                    }
+                }
+                Button("Load Template") {
+                    do {
+                        try vm.loadTemplate(named: initialType.rawValue)
+                    } catch {
+                        env.showError(AppError.wrap(error))
+                    }
+                }
                 Button { router.presentedSheet = nil } label: {
                     Image(systemName: "xmark.circle.fill")
                 }

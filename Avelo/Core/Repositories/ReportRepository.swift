@@ -97,12 +97,16 @@ public struct ReportRepository: Sendable {
         }
 
         var running = signedOpening
+        var periodDebitPaise: Int64 = 0
+        var periodCreditPaise: Int64 = 0
         var rows: [ReportResult.LedgerRow] = []
         for (vid, date, num, type, narr, amt, side, _) in rawRows {
             if side == .debit {
                 running += amt
+                periodDebitPaise += amt
             } else {
                 running -= amt
+                periodCreditPaise += amt
             }
             rows.append(ReportResult.LedgerRow(
                 date: date,
@@ -120,7 +124,9 @@ public struct ReportRepository: Sendable {
             accountName: accountName,
             openingBalancePaise: signedOpening,
             rows: rows,
-            closingBalancePaise: running
+            closingBalancePaise: running,
+            periodDebitPaise: periodDebitPaise,
+            periodCreditPaise: periodCreditPaise
         )
     }
 
@@ -441,12 +447,7 @@ public struct ReportRepository: Sendable {
             let totals = totalsByAccount[acct.id]
             let dr = totals?.debitPaise ?? 0
             let cr = totals?.creditPaise ?? 0
-            let netAmt: Int64
-            if acct.openingBalanceSide == .debit {
-                netAmt = (dr + acct.openingBalancePaise) - cr
-            } else {
-                netAmt = (cr + acct.openingBalancePaise) - dr
-            }
+            let netAmt = c.sign > 0 ? cr - dr : dr - cr
             assert(netAmt <= Int64.max / 2)
             let label = "\(c.accountCode.replacingOccurrences(of: "_", with: " "))"
             let bucket = ReportResult.GstBucket(id: label, label: label, amountPaise: netAmt)
@@ -464,16 +465,18 @@ public struct ReportRepository: Sendable {
 
     public func dayBook(fromDate: Date, toDate: Date, filter: ReportResult.ReportFilter) throws -> [ReportResult.DayBookRow] {
         let sql = """
-            SELECT v.id, v.created_at, v.number, v.voucher_type_code, v.narration, v.total_paise,
-                   pa.name AS party_name
+            SELECT v.id, v.created_at, v.number, v.voucher_type_code, v.narration,
+                   pa.name AS party_name,
+                   COALESCE(SUM(CASE WHEN l.side = 'debit' THEN l.amount_paise ELSE 0 END), 0) AS total_debit,
+                   COALESCE(SUM(CASE WHEN l.side = 'credit' THEN l.amount_paise ELSE 0 END), 0) AS total_credit
             FROM avelo_vouchers v
             LEFT JOIN avelo_accounts pa ON pa.id = v.party_account_id
+            LEFT JOIN avelo_ledger_lines l ON l.voucher_id = v.id AND l.company_id = v.company_id
             WHERE v.company_id = ? AND v.date BETWEEN ? AND ?
+            GROUP BY v.id, v.created_at, v.number, v.voucher_type_code, v.narration, pa.name
             ORDER BY v.date ASC, v.created_at ASC, v.number ASC
         """
         return try db.query(sql, bind: [.text(filter.companyId.uuidString), .date(fromDate), .date(toDate)]) { r in
-            let total = r.int("total_paise")
-            let half = total / 2
             return ReportResult.DayBookRow(
                 id: try UUIDParsing.required(r.text("id"), field: "report.day_book.voucher_id"),
                 timestamp: try r.timestamp("created_at"),
@@ -481,8 +484,8 @@ public struct ReportRepository: Sendable {
                 voucherTypeCode: VoucherType.Code(rawValue: r.text("voucher_type_code")) ?? .journal,
                 partyName: r.optionalText("party_name") ?? "",
                 narration: r.text("narration"),
-                totalDebitPaise: half,
-                totalCreditPaise: total - half
+                totalDebitPaise: r.int("total_debit"),
+                totalCreditPaise: r.int("total_credit")
             )
         }
     }
@@ -633,29 +636,72 @@ public struct ReportRepository: Sendable {
 
     public func stockValuation(asOfDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.StockValuationReport {
         let items = try InventoryRepository(db: db).listItemsForCompany(filter.companyId, includeInactive: false)
-        let repo = InventoryRepository(db: db)
-        var rows: [ReportResult.StockValuationRow] = []
-        for item in items {
-            let bal = try repo.runningBalance(itemId: item.id, asOf: asOfDate)
-            let avg = bal.onHandQty > 0 ? Int64((Double(bal.onHandValuePaise) / bal.onHandQty).rounded()) : 0
-            rows.append(ReportResult.StockValuationRow(
+        guard !items.isEmpty else {
+            return ReportResult.StockValuationReport(asOfDate: asOfDate, rows: [])
+        }
+        let placeholders = Array(repeating: "?", count: items.count).joined(separator: ",")
+        var bind: [SQLValue] = items.map { .text($0.id.uuidString) }
+        bind.append(.date(asOfDate))
+        struct StockTotals: Sendable {
+            let inQty: Double
+            let outQty: Double
+            let inValuePaise: Int64
+            let outValuePaise: Int64
+            let onHandQty: Double
+        }
+        let sql = """
+            SELECT item_id,
+                   COALESCE(SUM(CASE WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')
+                                      THEN quantity ELSE 0 END), 0) AS in_q,
+                   COALESCE(SUM(CASE WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')
+                                      THEN quantity ELSE 0 END), 0) AS out_q,
+                   COALESCE(SUM(CASE WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn')
+                                      THEN total_value_paise ELSE 0 END), 0) AS in_v,
+                   COALESCE(SUM(CASE WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut')
+                                      THEN total_value_paise ELSE 0 END), 0) AS out_v,
+                   COALESCE(SUM(CASE
+                       WHEN movement_type IN ('in','opening','purchase','saleReturn','adjustmentIn') THEN quantity
+                       WHEN movement_type IN ('out','sale','purchaseReturn','adjustmentOut') THEN -quantity
+                       WHEN movement_type = 'adjustment' THEN quantity
+                       ELSE 0 END), 0) AS on_hand
+            FROM avelo_stock_movements
+            WHERE item_id IN (\(placeholders)) AND date <= ?
+            GROUP BY item_id
+        """
+        var totalsByItem: [InventoryItem.ID: StockTotals] = [:]
+        _ = try db.query(sql, bind: bind) { row in
+            let itemId = try UUIDParsing.required(row.text("item_id"), field: "report.stock_valuation.item_id")
+            totalsByItem[itemId] = StockTotals(
+                inQty: row.real("in_q"),
+                outQty: row.real("out_q"),
+                inValuePaise: row.int("in_v"),
+                outValuePaise: row.int("out_v"),
+                onHandQty: row.real("on_hand")
+            )
+        }
+        let rows = items.map { item in
+            let totals = totalsByItem[item.id] ?? StockTotals(inQty: 0, outQty: 0, inValuePaise: 0, outValuePaise: 0, onHandQty: 0)
+            let onHandValuePaise = totals.inValuePaise - totals.outValuePaise
+            assert(onHandValuePaise <= Int64.max / 2)
+            let avg = totals.onHandQty > 0 ? Int64((Double(onHandValuePaise) / totals.onHandQty).rounded()) : 0
+            return ReportResult.StockValuationRow(
                 id: item.id,
                 itemCode: item.code,
                 itemName: item.name,
                 unit: item.unit,
-                quantity: bal.onHandQty,
+                quantity: totals.onHandQty,
                 ratePaise: avg,
-                valuePaise: bal.onHandValuePaise,
+                valuePaise: onHandValuePaise,
                 openingQty: 0,
                 openingValuePaise: 0,
-                inQty: Int64(bal.inQty.rounded()),
-                inValuePaise: bal.inValuePaise,
-                outQty: Int64(bal.outQty.rounded()),
-                outValuePaise: bal.outValuePaise,
-                closingQty: Int64(bal.onHandQty.rounded()),
-                closingValuePaise: bal.onHandValuePaise,
+                inQty: Int64(totals.inQty.rounded()),
+                inValuePaise: totals.inValuePaise,
+                outQty: Int64(totals.outQty.rounded()),
+                outValuePaise: totals.outValuePaise,
+                closingQty: Int64(totals.onHandQty.rounded()),
+                closingValuePaise: onHandValuePaise,
                 averageCostPaise: avg
-            ))
+            )
         }
         return ReportResult.StockValuationReport(asOfDate: asOfDate, rows: rows)
     }

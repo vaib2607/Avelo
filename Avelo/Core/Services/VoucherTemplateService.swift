@@ -27,7 +27,7 @@ public final class VoucherTemplateService: Sendable {
 
     public func load(name: String) throws -> VoucherDraft? {
         guard let template = try repository.find(companyId: companyId, name: name) else { return nil }
-        let decoded = (try? JSONDecoder().decode([TemplateLineDTO].self, from: Data(template.templateLinesJSON.utf8))) ?? []
+        let decoded = try JSONDecoder().decode([TemplateLineDTO].self, from: Data(template.templateLinesJSON.utf8))
         return VoucherDraft(mode: .create,
                             voucherTypeCode: template.voucherTypeCode,
                             date: Date(),

@@ -42,8 +42,8 @@ struct TestCompany {
                      companyName: String = "Test Co") throws -> TestCompany {
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
-            "INSERT INTO avelo_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            [.text(companyId.uuidString), .text(companyName), .text(now), .text(now)]
+            "INSERT INTO avelo_companies (id, name, is_inventory_enabled, inventory_link_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [.text(companyId.uuidString), .text(companyName), .bool(true), .text(InventoryLinkMode.autoPrompt.rawValue), .text(now), .text(now)]
         )
 
         let fyId = UUID()

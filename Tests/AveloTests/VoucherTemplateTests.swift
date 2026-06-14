@@ -13,4 +13,26 @@ final class VoucherTemplateTests: XCTestCase {
         XCTAssertEqual(loaded.voucherTypeCode, .journal)
         XCTAssertEqual(loaded.lines.count, 2)
     }
+
+    func testMalformedTemplateJSONThrowsInsteadOfLoadingEmptyDraft() throws {
+        let tc = try TestCompany.make()
+        try tc.db.execute(
+            """
+            INSERT INTO avelo_voucher_templates
+            (id, company_id, name, voucher_type_code, template_lines_json, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                .text(UUID().uuidString),
+                .text(tc.companyId.uuidString),
+                .text("Broken"),
+                .text(VoucherType.Code.journal.rawValue),
+                .text("{not-json"),
+                .bool(true),
+                .timestamp(Date())
+            ]
+        )
+
+        XCTAssertThrowsError(try VoucherTemplateService(db: tc.db, companyId: tc.companyId).load(name: "Broken"))
+    }
 }

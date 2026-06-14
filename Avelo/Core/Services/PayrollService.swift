@@ -106,7 +106,9 @@ public final class PayrollService: Sendable {
                           paidDays: Int,
                           overtimePaise: Int64,
                           deductionsPaise: Int64,
-                          financialYearId: FinancialYear.ID) throws -> PayrollEntry {
+                          financialYearId: FinancialYear.ID,
+                          salaryExpenseAccountId: Account.ID,
+                          paymentAccountId: Account.ID) throws -> PayrollEntry {
         let employee = try repository.findEmployee(id: employeeId)
         guard let employee = employee else { throw AppError.notFound("Employee") }
 
@@ -127,11 +129,26 @@ public final class PayrollService: Sendable {
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
         }
+        try FiscalLockChecker(db: db).assertOpen(financialYearId: financialYearId)
+        guard let expenseAccount = try AccountRepository(db: db).findById(salaryExpenseAccountId),
+              expenseAccount.companyId == companyId,
+              expenseAccount.isActive else {
+            throw AppError.notFound("Salary expense account")
+        }
+        guard let paymentAccount = try AccountRepository(db: db).findById(paymentAccountId),
+              paymentAccount.companyId == companyId,
+              paymentAccount.isActive else {
+            throw AppError.notFound("Payroll payment account")
+        }
+        let voucherDate = try salaryVoucherDate(month: month, year: year, financialYearId: financialYearId)
+        let voucherId = UUID()
+        let now = Date()
         let entry = PayrollEntry(
             id: UUID(),
             companyId: companyId,
             employeeId: employeeId,
             financialYearId: financialYearId,
+            voucherId: voucherId,
             month: month,
             year: year,
             grossPaise: gross,
@@ -147,20 +164,103 @@ public final class PayrollService: Sendable {
             esiApplicable: employee.esiApplicable,
             postedAt: Date()
         )
+        var voucher: Voucher!
+        let lines = [
+            LedgerLine(
+                id: UUID(),
+                companyId: companyId,
+                voucherId: voucherId,
+                accountId: salaryExpenseAccountId,
+                amountPaise: gross,
+                side: .debit,
+                lineOrder: 0
+            ),
+            LedgerLine(
+                id: UUID(),
+                companyId: companyId,
+                voucherId: voucherId,
+                accountId: paymentAccountId,
+                amountPaise: gross,
+                side: .credit,
+                lineOrder: 1
+            )
+        ]
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
             let existing = try repo.listEntries(filter: .init(companyId: companyId, employeeId: employeeId, financialYearId: financialYearId, monthYear: (year, month), limit: 1))
             if !existing.isEmpty {
                 throw AppError.duplicateSalary("Payroll already posted for this employee and month.")
             }
+            let number = try VoucherSequenceRepository(db: tx).nextNumber(
+                companyId: companyId,
+                financialYearId: financialYearId,
+                typeCode: .payroll
+            )
+            voucher = Voucher(
+                id: voucherId,
+                companyId: companyId,
+                financialYearId: financialYearId,
+                voucherTypeCode: .payroll,
+                number: number,
+                date: voucherDate,
+                partyAccountId: paymentAccountId,
+                narration: "Salary \(String(format: "%04d-%02d", year, month)) - \(employee.name)",
+                isReversal: false,
+                reversalOfId: nil,
+                isPosted: true,
+                totalPaise: gross,
+                createdAt: now,
+                updatedAt: now
+            )
+            try VoucherRepository(db: tx).insert(voucher)
+            for line in lines {
+                try tx.execute(
+                    """
+                    INSERT INTO avelo_ledger_lines
+                    (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        .text(line.id.uuidString),
+                        .text(line.companyId.uuidString),
+                        .text(line.voucherId.uuidString),
+                        .text(line.accountId.uuidString),
+                        .integer(line.amountPaise),
+                        .text(line.side.rawValue),
+                        .optionalText(line.taxCode),
+                        .optionalText(line.costCenter),
+                        .integer(Int64(line.lineOrder))
+                    ]
+                )
+            }
             try repo.insertEntry(entry)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .payrollEntryPosted,
+                action: .salaryPosted,
                 entityType: "payroll_entry",
                 entityId: entry.id.uuidString,
-                snapshotAfter: entry
+                snapshotAfter: PayrollPostSnapshot(entry: entry, voucher: voucher, lines: lines)
             )
         }
+        ReportService.invalidateCache(companyId: companyId)
         return entry
+    }
+
+    private struct PayrollPostSnapshot: Sendable, Codable {
+        let entry: PayrollEntry
+        let voucher: Voucher
+        let lines: [LedgerLine]
+    }
+
+    private func salaryVoucherDate(month: Int, year: Int, financialYearId: FinancialYear.ID) throws -> Date {
+        guard let fy = try FinancialYearRepository(db: db).findById(financialYearId) else {
+            throw AppError.notFound("Financial year")
+        }
+        guard let monthStart = DateFormatters.parseDate(String(format: "%04d-%02d-01", year, month)) else {
+            throw AppError.businessRule("Invalid salary month.")
+        }
+        guard monthStart >= fy.startDate && monthStart <= fy.endDate else {
+            throw AppError.validation(.init(code: .voucherDateOutsideFY, message: "Salary month is outside the selected financial year."))
+        }
+        return monthStart
     }
 }

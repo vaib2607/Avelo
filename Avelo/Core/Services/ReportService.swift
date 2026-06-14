@@ -35,10 +35,10 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId, fromDate: fromDate, toDate: toDate, accountId: accountId)
         let key = ReportCache.Key(companyId: companyId, reportType: "ledger", financialYearId: financialYearId, fromDate: fromDate, toDate: toDate, accountId: accountId)
         if let cached: ReportResult.LedgerReport = try Self.cache.value(for: key, db: db) { return cached }
-        let voucherCount = try Self.cache.voucherCount(db: db, companyId: companyId)
+        let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.ledgerReport(filter: f, accountId: accountId)
         try ReconciliationCheck.verifyLedger(report, db: db, companyId: companyId, accountId: accountId, fromDate: fromDate, toDate: toDate)
-        try Self.cache.store(report, for: key, voucherCount: voucherCount)
+        try Self.cache.store(report, for: key, changeToken: changeToken)
         return report
     }
 
@@ -46,13 +46,13 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "trial_balance", financialYearId: financialYearId, toDate: asOfDate)
         if let cached: ReportResult.TrialBalance = try Self.cache.value(for: key, db: db) { return cached }
-        let voucherCount = try Self.cache.voucherCount(db: db, companyId: companyId)
+        let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.trialBalance(asOfDate: asOfDate, filter: f)
         try ReconciliationCheck.verifyTrialBalance(report)
         let startDate = try financialYearId.flatMap { try FinancialYearRepository(db: db).findById($0)?.startDate }
             ?? (try FinancialYearRepository(db: db).findMostRecent(companyId)?.startDate)
         try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, fromDate: startDate, toDate: asOfDate)
-        try Self.cache.store(report, for: key, voucherCount: voucherCount)
+        try Self.cache.store(report, for: key, changeToken: changeToken)
         return report
     }
 
@@ -60,10 +60,10 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "profit_loss", financialYearId: financialYearId, fromDate: fromDate, toDate: toDate)
         if let cached: ReportResult.ProfitLoss = try Self.cache.value(for: key, db: db) { return cached }
-        let voucherCount = try Self.cache.voucherCount(db: db, companyId: companyId)
+        let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.profitAndLoss(fromDate: fromDate, toDate: toDate, filter: f)
         try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, fromDate: fromDate, toDate: toDate)
-        try Self.cache.store(report, for: key, voucherCount: voucherCount)
+        try Self.cache.store(report, for: key, changeToken: changeToken)
         return report
     }
 
@@ -71,10 +71,10 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "balance_sheet", financialYearId: financialYearId, toDate: asOfDate)
         if let cached: ReportResult.BalanceSheet = try Self.cache.value(for: key, db: db) { return cached }
-        let voucherCount = try Self.cache.voucherCount(db: db, companyId: companyId)
+        let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.balanceSheet(asOfDate: asOfDate, filter: f)
         try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, toDate: asOfDate)
-        try Self.cache.store(report, for: key, voucherCount: voucherCount)
+        try Self.cache.store(report, for: key, changeToken: changeToken)
         return report
     }
 
@@ -114,7 +114,7 @@ private final class ReportCache: @unchecked Sendable {
     }
 
     private struct Entry {
-        let voucherCount: Int64
+        let changeToken: String
         let value: Any
         var lastUsedAt: Int
     }
@@ -125,10 +125,10 @@ private final class ReportCache: @unchecked Sendable {
     private let maxEntries = 128
 
     func value<T>(for key: Key, db: SQLiteDatabase) throws -> T? {
-        let count = try voucherCount(db: db, companyId: key.companyId)
+        let token = try changeToken(db: db, companyId: key.companyId)
         lock.lock()
         defer { lock.unlock() }
-        guard let entry = entries[key], entry.voucherCount == count else {
+        guard let entry = entries[key], entry.changeToken == token else {
             entries.removeValue(forKey: key)
             return nil
         }
@@ -137,10 +137,10 @@ private final class ReportCache: @unchecked Sendable {
         return entry.value as? T
     }
 
-    func store<T>(_ value: T, for key: Key, voucherCount count: Int64) throws {
+    func store<T>(_ value: T, for key: Key, changeToken token: String) throws {
         lock.lock()
         useCounter &+= 1
-        entries[key] = Entry(voucherCount: count, value: value, lastUsedAt: useCounter)
+        entries[key] = Entry(changeToken: token, value: value, lastUsedAt: useCounter)
         evictIfNeeded()
         lock.unlock()
     }
@@ -151,11 +151,17 @@ private final class ReportCache: @unchecked Sendable {
         lock.unlock()
     }
 
-    func voucherCount(db: SQLiteDatabase, companyId: Company.ID) throws -> Int64 {
+    func changeToken(db: SQLiteDatabase, companyId: Company.ID) throws -> String {
         try db.queryOne(
-            "SELECT COUNT(*) AS c FROM avelo_vouchers WHERE company_id = ? AND is_posted = 1",
+            """
+            SELECT
+                COUNT(*) AS voucher_count,
+                COALESCE(MAX(updated_at), '') AS voucher_updated_at
+            FROM avelo_vouchers
+            WHERE company_id = ? AND is_posted = 1
+            """,
             bind: [.text(companyId.uuidString)]
-        ) { $0.int("c") } ?? 0
+        ) { "\($0.int("voucher_count"))|\($0.text("voucher_updated_at"))" } ?? "0|"
     }
 
     private func evictIfNeeded() {

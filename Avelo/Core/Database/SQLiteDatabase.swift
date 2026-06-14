@@ -164,6 +164,13 @@ public struct Row {
         return sqlite3_column_double(box.stmt, i)
     }
 
+    public func optionalInt(_ name: String) -> Int64? {
+        let i = index(of: name)
+        guard i >= 0, let box else { return nil }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
+        return sqlite3_column_int64(box.stmt, i)
+    }
+
     public func data(_ name: String) -> Data {
         let i = index(of: name)
         guard i >= 0, let box else { return Data() }

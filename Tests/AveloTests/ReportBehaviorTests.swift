@@ -157,8 +157,8 @@ final class ReportBehaviorTests: XCTestCase {
 
         XCTAssertEqual(rows.count, 3)
         XCTAssertEqual(rows.map(\.narration), ["Debtor sale", "Rent payment", "GST collection"])
-        XCTAssertEqual(rows.map(\.totalDebitPaise), [7500, 10000, 900])
-        XCTAssertEqual(rows.map(\.totalCreditPaise), [7500, 10000, 900])
+        XCTAssertEqual(rows.map(\.totalDebitPaise), [15000, 20000, 1800])
+        XCTAssertEqual(rows.map(\.totalCreditPaise), [15000, 20000, 1800])
     }
 
     func testOutstandingRespectsDirectionAndAsOfBoundary() throws {
@@ -369,6 +369,36 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(ledger.rows[1].voucherNumber, activity.rentPayment.number)
         XCTAssertEqual(ledger.rows[2].voucherId, activity.gstCollection.id)
         XCTAssertEqual(ledger.rows[2].voucherNumber, activity.gstCollection.number)
+    }
+
+    func testLedgerCacheInvalidatesWhenVoucherUpdatedWithoutChangingVoucherCount() throws {
+        let tc = try makeSeededCompany()
+        let activity = try seedActivity(tc)
+        let service = ReportService(db: tc.db, companyId: tc.companyId)
+        let from = DateFormatters.parseDate("2024-04-01")!
+        let to = DateFormatters.parseDate("2025-03-31")!
+
+        let first = try service.ledger(accountId: tc.debtorsId, financialYearId: tc.fy.id, fromDate: from, toDate: to)
+        XCTAssertEqual(first.periodDebitPaise, 15000)
+
+        let changedAt = Date(timeIntervalSinceNow: 60)
+        try tc.db.write { tx in
+            try tx.execute(
+                "UPDATE avelo_vouchers SET total_paise = ?, updated_at = ? WHERE id = ?",
+                [.integer(19000), .timestamp(changedAt), .text(activity.debtorSale.id.uuidString)]
+            )
+            try tx.execute(
+                "UPDATE avelo_ledger_lines SET amount_paise = ? WHERE voucher_id = ? AND account_id = ?",
+                [.integer(19000), .text(activity.debtorSale.id.uuidString), .text(tc.debtorsId.uuidString)]
+            )
+            try tx.execute(
+                "UPDATE avelo_ledger_lines SET amount_paise = ? WHERE voucher_id = ? AND account_id = ?",
+                [.integer(19000), .text(activity.debtorSale.id.uuidString), .text(tc.salesId.uuidString)]
+            )
+        }
+
+        let second = try service.ledger(accountId: tc.debtorsId, financialYearId: tc.fy.id, fromDate: from, toDate: to)
+        XCTAssertEqual(second.periodDebitPaise, 19000)
     }
 
     func testDayBookRowsCarrySourceVoucherIdentityForDrillDown() throws {

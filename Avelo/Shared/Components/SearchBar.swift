@@ -57,7 +57,13 @@ public struct SearchBar: View {
         .onChange(of: draftText) { _, newValue in
             debounceTask?.cancel()
             debounceTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 250_000_000)
+                do {
+                    try await Task.sleep(nanoseconds: 250_000_000)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    return
+                }
                 guard !Task.isCancelled else { return }
                 text = newValue
             }

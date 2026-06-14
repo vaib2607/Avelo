@@ -15,11 +15,13 @@ public final class InventoryService: Sendable {
     }
 
     public func listItems(includeArchived: Bool = false) throws -> [InventoryItem] {
-        try repository.listItems(companyId: companyId, includeArchived: includeArchived)
+        try ensureInventoryEnabled()
+        return try repository.listItems(companyId: companyId, includeArchived: includeArchived)
     }
 
     public func findItem(_ id: InventoryItem.ID) throws -> InventoryItem? {
-        try repository.findItem(id: id)
+        try ensureInventoryEnabled()
+        return try repository.findItem(id: id)
     }
 
     public func createItem(code: String,
@@ -33,6 +35,7 @@ public final class InventoryService: Sendable {
                            godown: String? = nil,
                            barcode: String? = nil,
                            hsnSac: String? = nil) throws -> InventoryItem {
+        try ensureInventoryEnabled()
         let item = InventoryItem(
             companyId: companyId,
             code: code,
@@ -63,6 +66,7 @@ public final class InventoryService: Sendable {
     }
 
     public func updateItem(_ item: InventoryItem) throws {
+        try ensureInventoryEnabled()
         try db.write { tx in
             let repo = InventoryRepository(db: tx)
             try repo.updateItem(item)
@@ -76,6 +80,7 @@ public final class InventoryService: Sendable {
     }
 
     public func archiveItem(_ id: InventoryItem.ID) throws {
+        try ensureInventoryEnabled()
         try db.write { tx in
             let repo = InventoryRepository(db: tx)
             try repo.archiveItem(id)
@@ -97,32 +102,8 @@ public final class InventoryService: Sendable {
                                manufactureDate: Date? = nil,
                                expiryDate: Date? = nil,
                                notes: String? = nil) throws {
+        try ensureInventoryEnabled()
         let totalValuePaise = Int64((quantity * Double(ratePaise)).rounded())
-        let onHand: Double
-        do {
-            onHand = try repository.runningBalance(itemId: itemId, asOf: date).onHandQty
-        } catch {
-            throw AppError.wrap(error)
-        }
-        let v = StockMovementValidator().validate(StockMovementValidator.Input(
-            itemId: itemId,
-            date: date,
-            movementType: type,
-            quantity: quantity,
-            unitCostPaise: ratePaise,
-            totalValuePaise: totalValuePaise,
-            currentOnHandQty: onHand
-        ))
-        if case .invalid(let errs) = v {
-            if errs.contains(where: { $0.code == .quantityExceedsStock }) {
-                throw AppError.negativeStock(errs.first?.message ?? "Out quantity exceeds current stock.")
-            }
-            throw AppError.validation(errs[0])
-        }
-        let outTypes: Set<InventoryItem.MovementType> = [.stockOut, .sale, .purchaseReturn, .adjustmentOut]
-        if outTypes.contains(type) && quantity > onHand {
-            throw AppError.negativeStock("Out quantity exceeds current stock.")
-        }
         let movement = StockMovement(
             id: UUID(),
             companyId: companyId,
@@ -140,6 +121,19 @@ public final class InventoryService: Sendable {
         )
         try db.write { tx in
             let repo = InventoryRepository(db: tx)
+            let onHand = try repo.runningBalance(itemId: itemId, asOf: date).onHandQty
+            let validation = StockMovementValidator().validate(StockMovementValidator.Input(
+                itemId: itemId,
+                date: date,
+                movementType: type,
+                quantity: quantity,
+                unitCostPaise: ratePaise,
+                totalValuePaise: totalValuePaise,
+                currentOnHandQty: onHand
+            ))
+            if case .invalid(let errs) = validation {
+                throw AppError.validation(errs[0])
+            }
             try repo.insertMovement(movement)
             try AuditService(db: tx, companyId: companyId).record(
                 action: .stockMoved,
@@ -151,10 +145,12 @@ public final class InventoryService: Sendable {
     }
 
     public func stockAsOf(itemId: InventoryItem.ID, date: Date) throws -> InventoryRepository.ItemBalance {
-        try repository.runningBalance(itemId: itemId, asOf: date)
+        try ensureInventoryEnabled()
+        return try repository.runningBalance(itemId: itemId, asOf: date)
     }
 
     public func linkItemToAccount(itemId: InventoryItem.ID, accountId: Account.ID) throws {
+        try ensureInventoryEnabled()
         try db.write { tx in
             let repo = InventoryRepository(db: tx)
             try repo.setItemAccount(itemId: itemId, accountId: accountId)
@@ -163,6 +159,15 @@ public final class InventoryService: Sendable {
                 entityType: "inventory_item",
                 entityId: itemId.uuidString
             )
+        }
+    }
+
+    private func ensureInventoryEnabled() throws {
+        guard let company = try CompanyRepository(db: db).findById(companyId) else {
+            throw AppError.notFound("Company")
+        }
+        guard company.isInventoryEnabled else {
+            throw AppError.featureUnavailable("Inventory is disabled for this company.")
         }
     }
 }

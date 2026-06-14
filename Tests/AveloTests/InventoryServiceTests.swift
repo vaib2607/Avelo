@@ -23,6 +23,29 @@ final class InventoryServiceTests: XCTestCase {
         XCTAssertEqual(loaded.hsnSac, "1001")
     }
 
+    func testInventoryDisabledCompanyRejectsPublicOperations() throws {
+        let tc = try TestCompany.make()
+        try tc.db.execute(
+            "UPDATE avelo_companies SET is_inventory_enabled = 0 WHERE id = ?",
+            [.text(tc.companyId.uuidString)]
+        )
+        let svc = InventoryService(db: tc.db, companyId: tc.companyId)
+
+        XCTAssertThrowsError(try svc.listItems()) { error in
+            guard case AppError.featureUnavailable(let message) = error else {
+                return XCTFail("Expected featureUnavailable, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("inventory is disabled"))
+        }
+        XCTAssertThrowsError(
+            try svc.createItem(code: "DISABLED", name: "Disabled", unit: "NOS", openingQuantity: 0, openingRatePaise: 0)
+        ) { error in
+            guard case AppError.featureUnavailable = error else {
+                return XCTFail("Expected featureUnavailable, got \(error)")
+            }
+        }
+    }
+
     func testBatchTrackingFieldsRoundTrip() throws {
         let tc = try TestCompany.make()
         let item = try makeItem(tc)
