@@ -48,11 +48,13 @@ public struct BackupService: Sendable {
         let digest = SHA256.hash(data: data)
         let hex = digest.map { String(format: "%02x", $0) }.joined()
         let manifest = BackupManifest(
+            manifestVersion: 1,
             schemaVersion: SchemaVersion.current.rawValue,
             companyName: companyName,
             exportedAt: Date(),
             checksumSHA256: hex,
-            originalFileName: sourceURL.lastPathComponent
+            originalFileName: sourceURL.lastPathComponent,
+            byteCount: Int64(data.count)
         )
         let manifestURL = destinationURL.appendingPathExtension("manifest.json")
         let enc = JSONEncoder()

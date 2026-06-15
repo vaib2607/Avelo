@@ -15,4 +15,16 @@ public struct VoucherSequenceRepository: Sendable {
                                                  financialYearId: financialYearId,
                                                  typeCode: typeCode)
     }
+
+    public func nextNumbers(companyId: Company.ID,
+                            financialYearId: FinancialYear.ID,
+                            typeCode: VoucherType.Code,
+                            count: Int) throws -> [String] {
+        try VoucherNumberGenerator(db: db).nextBatch(
+            companyId: companyId,
+            financialYearId: financialYearId,
+            typeCode: typeCode,
+            count: count
+        )
+    }
 }

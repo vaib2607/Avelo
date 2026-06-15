@@ -33,7 +33,7 @@ final class BenchmarkSuiteTests: XCTestCase {
     }
 
     private func makeManagedFixture() async throws -> (manager: DatabaseManager, companyId: UUID, companyName: String, rootURL: URL) {
-        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let root = BenchmarkConfig.temporaryDirectory
             .appendingPathComponent("avelo-benchmark-managed-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let manager = try DatabaseManager(appSupportDirectory: root)

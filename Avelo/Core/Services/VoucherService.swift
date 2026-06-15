@@ -96,12 +96,82 @@ public final class VoucherService: Sendable {
         var index = drafts.startIndex
         while index < drafts.endIndex {
             let end = drafts.index(index, offsetBy: chunkSize, limitedBy: drafts.endIndex) ?? drafts.endIndex
+            var chunkVouchers: [Voucher] = []
+            chunkVouchers.reserveCapacity(drafts[index..<end].count)
             try db.write { _ in
-                for draft in drafts[index..<end] {
-                    try autoreleasepool {
-                        results.append(try postWithoutCacheInvalidation(draft: draft, in: fy))
-                    }
+                let sequenceRepo = VoucherSequenceRepository(db: db)
+                let vRepo = VoucherRepository(db: db)
+                let lRepo = LedgerLineRepository(db: db)
+                let accountRepo = AccountRepository(db: db)
+                var accountIdsToMark = Set<Account.ID>()
+                var numbersByType: [VoucherType.Code: Array<String>.Iterator] = [:]
+                for typeCode in Set(drafts[index..<end].map(\.voucherTypeCode)) {
+                    let count = drafts[index..<end].filter { $0.voucherTypeCode == typeCode }.count
+                    numbersByType[typeCode] = try sequenceRepo.nextNumbers(
+                        companyId: companyId,
+                        financialYearId: fy.id,
+                        typeCode: typeCode,
+                        count: count
+                    ).makeIterator()
                 }
+                for draft in drafts[index..<end] {
+                    let result = try validate(draft: draft, in: fy)
+                    if case .invalid(let errs) = result {
+                        throw AppError.validation(errs[0])
+                    }
+                    let voucherId = UUID()
+                    let now = Date()
+                    let lines: [LedgerLine] = try draft.filledLines.enumerated().map { idx, line in
+                        guard let accountId = line.accountId else {
+                            throw AppError.validation(.init(code: .internal, message: "Voucher line account is required"))
+                        }
+                        accountIdsToMark.insert(accountId)
+                        return LedgerLine(
+                            id: UUID(),
+                            companyId: companyId,
+                            voucherId: voucherId,
+                            accountId: accountId,
+                            amountPaise: line.amountPaise,
+                            side: line.side,
+                            taxCode: line.taxCode,
+                            costCenter: line.costCenter,
+                            lineOrder: idx
+                        )
+                    }
+                    guard var numbers = numbersByType[draft.voucherTypeCode], let number = numbers.next() else {
+                        throw AppError.database(.rowReadFailed("missing reserved voucher number"))
+                    }
+                    numbersByType[draft.voucherTypeCode] = numbers
+                    let voucher = Voucher(
+                        id: voucherId,
+                        companyId: companyId,
+                        financialYearId: fy.id,
+                        voucherTypeCode: draft.voucherTypeCode,
+                        number: number,
+                        date: draft.date,
+                        partyAccountId: draft.partyAccountId,
+                        narration: draft.narration,
+                        isReversal: false,
+                        reversalOfId: nil,
+                        isPosted: true,
+                        totalPaise: draft.totalDebitPaise,
+                        createdAt: now,
+                        updatedAt: now
+                    )
+                    try vRepo.insert(voucher)
+                    try lRepo.insertBatch(lines)
+                    try AuditService(db: db, companyId: companyId).record(
+                        action: .voucherPosted,
+                        entityType: "voucher",
+                        entityId: voucher.id.uuidString,
+                        snapshotAfter: VoucherAuditSnapshot(voucher: voucher, lines: lines)
+                    )
+                    chunkVouchers.append(voucher)
+                }
+                try accountRepo.markUsedBatch(accountIdsToMark)
+            }
+            for voucher in chunkVouchers {
+                results.append(PostResult(voucher: voucher, inventoryPrompt: try inventoryPromptContext(for: voucher)))
             }
             index = end
         }

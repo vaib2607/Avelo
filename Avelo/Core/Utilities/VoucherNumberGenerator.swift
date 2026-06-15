@@ -13,6 +13,14 @@ public struct VoucherNumberGenerator: Sendable {
     public func next(companyId: Company.ID,
                      financialYearId: FinancialYear.ID,
                      typeCode: VoucherType.Code) throws -> String {
+        try nextBatch(companyId: companyId, financialYearId: financialYearId, typeCode: typeCode, count: 1)[0]
+    }
+
+    public func nextBatch(companyId: Company.ID,
+                          financialYearId: FinancialYear.ID,
+                          typeCode: VoucherType.Code,
+                          count: Int) throws -> [String] {
+        guard count > 0 else { return [] }
         let prefix: String
         let padding: Int
         let fyShort = try Self.shortFY(of: financialYearId, db: db)
@@ -31,31 +39,33 @@ public struct VoucherNumberGenerator: Sendable {
         if let row = row {
             prefix = row.0
             padding = row.1
-            let nextN = row.2 + 1
+            let firstN = row.2 + 1
+            let lastN = row.2 + count
             try db.execute(
                 "UPDATE avelo_voucher_sequences SET last_number = ? WHERE company_id = ? AND financial_year_id = ? AND voucher_type_code = ?",
                 [
-                    .integer(Int64(nextN)),
+                    .integer(Int64(lastN)),
                     .text(companyId.uuidString),
                     .text(financialYearId.uuidString),
                     .text(typeCode.rawValue)
                 ]
             )
-            return formatNumber(prefix: prefix, fyShort: fyShort, n: nextN, padding: padding)
+            return (firstN...lastN).map { formatNumber(prefix: prefix, fyShort: fyShort, n: $0, padding: padding) }
         } else {
             prefix = typeCode.defaultPrefix
             padding = typeCode.defaultPadding
             try db.execute(
-                "INSERT INTO avelo_voucher_sequences (company_id, financial_year_id, voucher_type_code, last_number, prefix, suffix, padding) VALUES (?, ?, ?, 1, ?, NULL, ?)",
+                "INSERT INTO avelo_voucher_sequences (company_id, financial_year_id, voucher_type_code, last_number, prefix, suffix, padding) VALUES (?, ?, ?, ?, ?, NULL, ?)",
                 [
                     .text(companyId.uuidString),
                     .text(financialYearId.uuidString),
                     .text(typeCode.rawValue),
+                    .integer(Int64(count)),
                     .text(prefix),
                     .integer(Int64(padding))
                 ]
             )
-            return formatNumber(prefix: prefix, fyShort: fyShort, n: 1, padding: padding)
+            return (1...count).map { formatNumber(prefix: prefix, fyShort: fyShort, n: $0, padding: padding) }
         }
     }
 

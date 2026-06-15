@@ -114,7 +114,6 @@ public struct RestoreService: Sendable {
             throw AppError.notFound("Backup file not found")
         }
 
-        let tempFile = sourceURL
         let manifestURL: URL = {
             if sourceURL.pathExtension == "manifest.json" {
                 return sourceURL
@@ -122,31 +121,15 @@ public struct RestoreService: Sendable {
             return sourceURL.appendingPathExtension("manifest.json")
         }()
 
-        let manifest: BackupManifest
-        if fm.fileExists(atPath: manifestURL.path) {
-            let data = try Data(contentsOf: manifestURL)
-            let dec = JSONDecoder()
-            dec.dateDecodingStrategy = .iso8601
-            manifest = try dec.decode(BackupManifest.self, from: data)
-        } else {
-            manifest = BackupManifest(
-                schemaVersion: SchemaVersion.current.rawValue,
-                companyName: sourceURL.deletingPathExtension().lastPathComponent,
-                exportedAt: Date(),
-                checksumSHA256: "",
-                originalFileName: sourceURL.lastPathComponent
-            )
-        }
+        let manifest = try Self.loadManifest(
+            manifestURL: manifestURL,
+            sourceURL: sourceURL,
+            fileManager: fm
+        )
+        try Self.validateManifest(manifest, sourceURL: sourceURL)
 
-        let data = try Data(contentsOf: tempFile)
-        if !manifest.checksumSHA256.isEmpty {
-            let digest = SHA256.hash(data: data)
-            let hex = digest.map { String(format: "%02x", $0) }.joined()
-            if hex != manifest.checksumSHA256 {
-                AveloRestoreLogger.error("restore checksum mismatch for \(sourceURL.lastPathComponent, privacy: .public)")
-                throw AppError.database(.checksumMismatch)
-            }
-        }
+        let data = try Data(contentsOf: sourceURL)
+        try Self.validateBackupData(data, manifest: manifest, sourceURL: sourceURL)
 
         let registryEntries = try await manager.listCompanies()
         if registryEntries.contains(where: { $0.name.caseInsensitiveCompare(manifest.companyName) == .orderedSame }) {
@@ -156,6 +139,9 @@ public struct RestoreService: Sendable {
 
         let newId = UUID()
         let destURL = manager.companiesDirectory.appendingPathComponent("\(newId.uuidString).sqlite")
+        let stagingURL = manager.companiesDirectory.appendingPathComponent(".restore-\(newId.uuidString).sqlite")
+        Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm)
+        defer { Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm) }
         if fm.fileExists(atPath: destURL.path) {
             do {
                 try fm.removeItem(at: destURL)
@@ -164,17 +150,20 @@ public struct RestoreService: Sendable {
             }
         }
         do {
-            try fm.copyItem(at: tempFile, to: destURL)
+            try fm.copyItem(at: sourceURL, to: stagingURL)
         } catch {
-            AveloRestoreLogger.error("restore copy failed to \(destURL.path, privacy: .public)")
-            throw AppError.fileSystem("Unable to copy backup into restored company file at \(destURL.lastPathComponent): \(error.localizedDescription)")
+            AveloRestoreLogger.error("restore staging copy failed to \(stagingURL.path, privacy: .public)")
+            throw AppError.fileSystem("Unable to stage backup for restore at \(stagingURL.lastPathComponent): \(error.localizedDescription)")
         }
 
         do {
-            let db = try SQLiteDatabase(path: destURL.path)
+            let db = try SQLiteDatabase(path: stagingURL.path)
             defer { db.close() }
             try Self.validateIntegrity(db: db)
             let current = db.userVersion()
+            guard current <= SchemaVersion.current.rawValue else {
+                throw AppError.database(.schemaMismatch("Backup schema version \(current) is newer than this app supports."))
+            }
             if current < SchemaVersion.current.rawValue {
                 try MigrationRunner().runMigrations(on: db)
                 try Self.validateIntegrity(db: db)
@@ -185,6 +174,7 @@ public struct RestoreService: Sendable {
                 restoredCompanyName: manifest.companyName
             )
             try Self.validateIntegrity(db: db)
+            try Self.validatePreparedCompany(db: db, companyId: newId, companyName: manifest.companyName)
 
             let entry = CompanyRegistryEntry(
                 id: newId,
@@ -193,12 +183,68 @@ public struct RestoreService: Sendable {
                 lastOpenedAt: nil,
                 createdAt: Date()
             )
+            db.close()
+            try fm.moveItem(at: stagingURL, to: destURL)
             try await manager.registerCompany(entry)
             return entry
         } catch {
-            AveloRestoreLogger.error("restore failed, cleaning up \(destURL.path, privacy: .public)")
+            AveloRestoreLogger.error("restore failed, cleaning up \(stagingURL.path, privacy: .public)")
             Self.cleanupRestoredCompanyFile(at: destURL, fileManager: fm)
+            Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm)
             throw error
+        }
+    }
+
+    private static func loadManifest(
+        manifestURL: URL,
+        sourceURL: URL,
+        fileManager: FileManager
+    ) throws -> BackupManifest {
+        guard fileManager.fileExists(atPath: manifestURL.path) else {
+            return BackupManifest(
+                schemaVersion: SchemaVersion.current.rawValue,
+                companyName: sourceURL.deletingPathExtension().lastPathComponent,
+                exportedAt: Date(),
+                checksumSHA256: "",
+                originalFileName: sourceURL.lastPathComponent
+            )
+        }
+        do {
+            let data = try Data(contentsOf: manifestURL)
+            let dec = JSONDecoder()
+            dec.dateDecodingStrategy = .iso8601
+            return try dec.decode(BackupManifest.self, from: data)
+        } catch {
+            throw AppError.database(.schemaMismatch("Backup manifest could not be read or decoded."))
+        }
+    }
+
+    private static func validateManifest(_ manifest: BackupManifest, sourceURL: URL) throws {
+        guard manifest.manifestVersion == 1 else {
+            throw AppError.database(.schemaMismatch("Unsupported backup manifest version \(manifest.manifestVersion)."))
+        }
+        guard manifest.schemaVersion > 0, manifest.schemaVersion <= SchemaVersion.current.rawValue else {
+            throw AppError.database(.schemaMismatch("Unsupported backup schema version \(manifest.schemaVersion)."))
+        }
+        guard !manifest.companyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AppError.database(.schemaMismatch("Backup manifest is missing the company name."))
+        }
+        if !manifest.originalFileName.isEmpty && URL(fileURLWithPath: manifest.originalFileName).pathExtension != "sqlite" {
+            throw AppError.database(.schemaMismatch("Backup manifest original file name must identify a SQLite company file."))
+        }
+    }
+
+    private static func validateBackupData(_ data: Data, manifest: BackupManifest, sourceURL: URL) throws {
+        if manifest.byteCount > 0, manifest.byteCount != Int64(data.count) {
+            throw AppError.database(.schemaMismatch("Backup file size does not match its manifest."))
+        }
+        if !manifest.checksumSHA256.isEmpty {
+            let digest = SHA256.hash(data: data)
+            let hex = digest.map { String(format: "%02x", $0) }.joined()
+            if hex != manifest.checksumSHA256 {
+                AveloRestoreLogger.error("restore checksum mismatch for \(sourceURL.lastPathComponent, privacy: .public)")
+                throw AppError.database(.checksumMismatch)
+            }
         }
     }
 
@@ -262,6 +308,20 @@ public struct RestoreService: Sendable {
         let rows = try db.query("PRAGMA integrity_check") { $0.text(0) }
         guard rows.count == 1, rows.first == "ok" else {
             throw AppError.database(.schemaMismatch("Restore integrity check failed; original company was kept."))
+        }
+    }
+
+    private static func validatePreparedCompany(db: SQLiteDatabase, companyId: Company.ID, companyName: String) throws {
+        let companies = try CompanyRepository(db: db).listForRegistry()
+        guard companies.count == 1, let company = companies.first else {
+            throw AppError.database(.schemaMismatch("Restore validation expects exactly one prepared company."))
+        }
+        guard company.id == companyId, company.name == companyName else {
+            throw AppError.database(.schemaMismatch("Restore validation found mismatched company metadata."))
+        }
+        let foreignKeyIssues = try db.query("PRAGMA foreign_key_check") { _ in true }
+        guard foreignKeyIssues.isEmpty else {
+            throw AppError.database(.schemaMismatch("Restore validation found foreign-key violations."))
         }
     }
 

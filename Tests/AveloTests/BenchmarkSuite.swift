@@ -52,9 +52,9 @@ final class BenchmarkSuite {
     }
 
     func writeScorecard(kind: String) throws {
-        let desktop = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Desktop", isDirectory: true)
-        let url = desktop.appendingPathComponent("avelo_bench_\(kind).json")
+        let outputDirectory = BenchmarkConfig.outputDirectory
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        let url = outputDirectory.appendingPathComponent("avelo_bench_\(kind).json")
         var output = scorecard
         if let data = try? Data(contentsOf: url) {
             let decoder = JSONDecoder()

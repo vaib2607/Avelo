@@ -35,6 +35,54 @@ final class RestoreServiceTests: XCTestCase {
         }
     }
 
+    func testRestoreRejectsManifestOriginalFileNameThatIsNotSQLiteBeforeRegisteringCompany() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let sourceCompany = try await CompanyService.create(
+            companyInput: .init(name: "Manifest Mismatch Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: sourceManager
+        )
+
+        let backupURL = sourceRoot.appendingPathComponent("manifest-mismatch.avelobackup")
+        _ = try await BackupService(manager: sourceManager).export(
+            companyId: sourceCompany.id,
+            companyName: "Manifest Mismatch Co",
+            to: backupURL
+        )
+        let manifestURL = backupURL.appendingPathExtension("manifest.json")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var manifest = try decoder.decode(BackupManifest.self, from: Data(contentsOf: manifestURL))
+        manifest.originalFileName = "other.avelobackup"
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(manifest).write(to: manifestURL)
+
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot)
+        do {
+            _ = try await RestoreService(manager: targetManager).restore(from: backupURL)
+            XCTFail("Expected manifest mismatch to fail")
+        } catch {
+            let entries = try await targetManager.listCompanies()
+            XCTAssertTrue(entries.isEmpty)
+        }
+    }
+
     func testRestoreCleanupSwallowsSecondaryDeleteFailures() throws {
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try Data("x".utf8).write(to: temp)
@@ -298,7 +346,7 @@ final class RestoreServiceTests: XCTestCase {
             guard case AppError.fileSystem(let message) = AppError.wrap(error) else {
                 return XCTFail("Expected fileSystem error, got \(error)")
             }
-            XCTAssertTrue(message.localizedCaseInsensitiveContains("copy backup"))
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("stage backup"))
         }
     }
 }

@@ -172,6 +172,22 @@ public struct AccountRepository: Sendable {
         }
     }
 
+    public func markUsedBatch(_ ids: Set<Account.ID>) throws {
+        guard !ids.isEmpty else { return }
+        let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ",")
+        var bind: [SQLValue] = [.timestamp(Date())]
+        for id in ids {
+            bind.append(.text(id.uuidString))
+        }
+        try db.execute(
+            "UPDATE avelo_accounts SET last_used_at = ? WHERE id IN (\(placeholders))",
+            bind
+        )
+        if db.changes() == 0 {
+            throw AppError.notFound("Accounts not found for usage update")
+        }
+    }
+
     static func rowToAccount(_ r: Row) throws -> Account {
         let id = try UUIDParsing.required(r.text("id"), field: "avelo_accounts.id")
         let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_accounts.company_id")

@@ -27,7 +27,7 @@ struct TestCompany {
     }
 
     static func makeOnDisk(name: String = "Test Co") throws -> (fixture: TestCompany, cleanupURL: URL) {
-        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let root = BenchmarkConfig.temporaryDirectory
             .appendingPathComponent("avelo-benchmark-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let dbURL = root.appendingPathComponent("company.sqlite")

@@ -3,6 +3,51 @@ import XCTest
 
 final class SQLiteDatabaseTests: XCTestCase {
 
+    func testFileBackedDatabaseIsEncryptedAtRestAndReopensWithDefaultKey() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("avelo-sqlcipher-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("encrypted.sqlite")
+
+        do {
+            let db = try SQLiteDatabase(path: url.path)
+            defer { db.close() }
+            try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+            try db.execute("INSERT INTO t (value) VALUES (?)", [.text("sealed")])
+        }
+
+        let header = try Data(contentsOf: url).prefix(16)
+        XCTAssertNotEqual(String(data: header, encoding: .utf8), "SQLite format 3\u{0}")
+
+        let reopened = try SQLiteDatabase(path: url.path)
+        defer { reopened.close() }
+        let value = try reopened.queryOne("SELECT value FROM t WHERE id = 1") { $0.text(0) }
+        XCTAssertEqual(value, "sealed")
+    }
+
+    func testEncryptedDatabaseRejectsWrongPassphrase() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("avelo-sqlcipher-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("encrypted.sqlite")
+
+        let db = try SQLiteDatabase(path: url.path, encryptionKey: .passphrase("correct"))
+        try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+        db.close()
+
+        do {
+            _ = try SQLiteDatabase(path: url.path, encryptionKey: .passphrase("wrong"))
+            XCTFail("Expected wrong passphrase to fail")
+        } catch {
+            guard case AppError.database(.openFailed(let message)) = error else {
+                return XCTFail("Expected openFailed, got \(error)")
+            }
+            XCTAssertTrue(message.contains("encryption key rejected"))
+        }
+    }
+
     func testWriteResetsTransactionDepthAfterCommitFailure() throws {
         let db = try SQLiteDatabase(path: ":memory:")
         defer { db.close() }
