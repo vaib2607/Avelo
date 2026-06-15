@@ -98,6 +98,16 @@ public final class ReportService: Sendable {
         return try repository.stockValuation(asOfDate: asOfDate, filter: f)
     }
 
+    public func cashFlow(fromDate: Date, toDate: Date) throws -> ReportResult.CashFlowStatement {
+        let f = makeFilter()
+        return try repository.cashFlow(fromDate: fromDate, toDate: toDate, filter: f)
+    }
+
+    public func stockAgeing(asOfDate: Date) throws -> ReportResult.StockAgeingReport {
+        let f = makeFilter()
+        return try repository.stockAgeing(asOfDate: asOfDate, filter: f)
+    }
+
     public static func invalidateCache(companyId: Company.ID) {
         cache.invalidate(companyId: companyId)
     }

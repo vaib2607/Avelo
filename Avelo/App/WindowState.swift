@@ -35,6 +35,8 @@ public enum ReportSelection: String, CaseIterable, Identifiable, Sendable {
     case gstFiling
     case outstanding
     case stockValuation
+    case cashFlow
+    case stockAgeing
 
     public var id: String { rawValue }
 
@@ -55,6 +57,8 @@ public enum ReportSelection: String, CaseIterable, Identifiable, Sendable {
         case .gstFiling:     return "GST Filing Views"
         case .outstanding:   return "Outstanding"
         case .stockValuation:return "Stock Summary"
+        case .cashFlow:      return "Cash Flow"
+        case .stockAgeing:   return "Stock Ageing"
         }
     }
 }

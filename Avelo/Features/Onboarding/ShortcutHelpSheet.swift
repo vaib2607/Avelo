@@ -66,6 +66,8 @@ public struct ShortcutHelpSheet: View {
                         ("Cmd+Opt+8", "Bank Book"),
                         ("Cmd+Opt+9", "Receivables"),
                         ("Cmd+Opt+0", "Payables"),
+                        ("Cmd+Opt+Shift+1", "Cash Flow"),
+                        ("Cmd+Opt+Shift+2", "Stock Ageing"),
                     ])
 
                     section("Other", rows: [

@@ -43,6 +43,9 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_companies",
             "avelo_financial_years",
             "avelo_inventory_items",
+            "avelo_inventory_order_lines",
+            "avelo_inventory_orders",
+            "avelo_inventory_reorder_levels",
             "avelo_ledger_lines",
             "avelo_migrations",
             "avelo_payroll_employees",
@@ -83,6 +86,37 @@ final class SchemaDriftTests: XCTestCase {
             "reference_voucher_number",
             "reason",
             "created_at"
+        ])
+        XCTAssertEqual(try columns("avelo_inventory_orders", in: db), [
+            "id",
+            "company_id",
+            "order_type",
+            "number",
+            "party_account_id",
+            "order_date",
+            "expected_date",
+            "status",
+            "created_at",
+            "updated_at"
+        ])
+        XCTAssertEqual(try columns("avelo_inventory_order_lines", in: db), [
+            "id",
+            "company_id",
+            "order_id",
+            "item_id",
+            "quantity",
+            "fulfilled_quantity",
+            "unit_rate_paise",
+            "created_at"
+        ])
+        XCTAssertEqual(try columns("avelo_inventory_reorder_levels", in: db), [
+            "id",
+            "company_id",
+            "item_id",
+            "minimum_quantity",
+            "reorder_quantity",
+            "created_at",
+            "updated_at"
         ])
         XCTAssertEqual(try columns("avelo_payroll_employees", in: db), [
             "id",

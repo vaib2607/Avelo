@@ -241,6 +241,9 @@ avelo_voucher_types
 avelo_vouchers
 avelo_ledger_lines
 avelo_inventory_items
+avelo_inventory_orders
+avelo_inventory_order_lines
+avelo_inventory_reorder_levels
 avelo_stock_movements
 avelo_payroll_employees
 avelo_payroll_entries

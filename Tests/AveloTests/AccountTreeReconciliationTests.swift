@@ -228,13 +228,9 @@ final class AccountTreeReconciliationTests: XCTestCase {
         let started = expectation(description: "reload started")
         let secondStart = expectation(description: "second reload started")
         secondStart.isInverted = true
-        let lock = NSLock()
-        var startCount = 0
+        let startCounter = LockedCounter()
         cache.onBackgroundLoad = { _ in
-            lock.lock()
-            startCount += 1
-            let current = startCount
-            lock.unlock()
+            let current = startCounter.increment()
             if current == 1 {
                 started.fulfill()
             } else {
@@ -251,5 +247,17 @@ final class AccountTreeReconciliationTests: XCTestCase {
         await fulfillment(of: [secondStart], timeout: 0.2)
         XCTAssertNil(cache.lastError)
         XCTAssertFalse(cache.isLoading)
+    }
+}
+
+private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    func increment() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        value += 1
+        return value
     }
 }

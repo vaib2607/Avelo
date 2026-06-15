@@ -281,7 +281,55 @@ END;
 
 UNIQUE `(company_id, code)`.
 
-## 9. avelo_stock_movements
+## 9. avelo_inventory_orders
+
+| Column | Type | Constraint |
+|---|---|---|
+| id | TEXT | PK |
+| company_id | TEXT | NOT NULL, FK avelo_companies(id) |
+| order_type | TEXT | NOT NULL, CHECK(order_type IN ('purchaseOrder','salesOrder')) |
+| number | TEXT | NOT NULL |
+| party_account_id | TEXT | NOT NULL, FK avelo_accounts(id) |
+| order_date | TEXT | NOT NULL, `yyyy-MM-dd` |
+| expected_date | TEXT | nullable |
+| status | TEXT | NOT NULL DEFAULT 'open', CHECK(status IN ('open','closed','cancelled')) |
+| created_at | TEXT | NOT NULL |
+| updated_at | TEXT | NOT NULL |
+
+UNIQUE `(company_id, order_type, number)`.
+
+## 10. avelo_inventory_order_lines
+
+| Column | Type | Constraint |
+|---|---|---|
+| id | TEXT | PK |
+| company_id | TEXT | NOT NULL, FK avelo_companies(id) |
+| order_id | TEXT | NOT NULL, FK avelo_inventory_orders(id) ON DELETE RESTRICT |
+| item_id | TEXT | NOT NULL, FK avelo_inventory_items(id) |
+| quantity | INTEGER | NOT NULL, CHECK(quantity > 0) |
+| fulfilled_quantity | INTEGER | NOT NULL DEFAULT 0, CHECK(fulfilled_quantity >= 0 AND fulfilled_quantity <= quantity) |
+| unit_rate_paise | INTEGER | NOT NULL DEFAULT 0, CHECK(unit_rate_paise >= 0) |
+| created_at | TEXT | NOT NULL |
+
+Indexes:
+- `idx_avelo_inventory_order_lines_order` on `(order_id)`
+- `idx_avelo_inventory_order_lines_item` on `(company_id, item_id)`
+
+## 11. avelo_inventory_reorder_levels
+
+| Column | Type | Constraint |
+|---|---|---|
+| id | TEXT | PK |
+| company_id | TEXT | NOT NULL, FK avelo_companies(id) |
+| item_id | TEXT | NOT NULL, FK avelo_inventory_items(id) |
+| minimum_quantity | INTEGER | NOT NULL, CHECK(minimum_quantity >= 0) |
+| reorder_quantity | INTEGER | NOT NULL, CHECK(reorder_quantity >= 0) |
+| created_at | TEXT | NOT NULL |
+| updated_at | TEXT | NOT NULL |
+
+UNIQUE `(company_id, item_id)`.
+
+## 12. avelo_stock_movements
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -303,7 +351,7 @@ Indexes:
 - `idx_avelo_mov_company_date` on `(company_id, date)`
 - `idx_avelo_mov_voucher` on `(voucher_id)`
 
-## 10. avelo_payroll_employees
+## 13. avelo_payroll_employees
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -322,7 +370,7 @@ Indexes:
 
 UNIQUE `(company_id, code)`.
 
-## 11. avelo_payroll_entries
+## 14. avelo_payroll_entries
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -342,7 +390,7 @@ Indexes:
 - `idx_avelo_payroll_emp_period` on `(employee_id, year, month)`
 - `idx_avelo_payroll_company_period` on `(company_id, year, month)`
 
-## 12. avelo_audit_events
+## 15. avelo_audit_events
 
 Append-only. Triggers reject UPDATE and DELETE.
 
@@ -374,7 +422,7 @@ BEFORE DELETE ON avelo_audit_events
 BEGIN SELECT RAISE(ABORT, 'Audit events are immutable'); END;
 ```
 
-## 13. avelo_voucher_sequences
+## 16. avelo_voucher_sequences
 
 Per (company, FY, type) counter. Updated atomically when a voucher is posted.
 
@@ -390,7 +438,7 @@ Per (company, FY, type) counter. Updated atomically when a voucher is posted.
 
 PRIMARY KEY `(company_id, financial_year_id, voucher_type_code)`.
 
-## 14. avelo_voucher_templates
+## 17. avelo_voucher_templates
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -405,7 +453,7 @@ PRIMARY KEY `(company_id, financial_year_id, voucher_type_code)`.
 
 UNIQUE `(company_id, name)`.
 
-## 15. avelo_bank_reconciliations
+## 18. avelo_bank_reconciliations
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -423,7 +471,7 @@ UNIQUE `(company_id, name)`.
 UNIQUE `(voucher_id)` — one reconciliation row per voucher.
 Index `idx_avelo_br_account_cleared` on `(bank_account_id, is_cleared)`.
 
-## 16. avelo_migrations
+## 19. avelo_migrations
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -431,7 +479,7 @@ Index `idx_avelo_br_account_cleared` on `(bank_account_id, is_cleared)`.
 | applied_at | TEXT | NOT NULL |
 | description | TEXT | NOT NULL |
 
-## 17. Registry DB tables (`avelo_registry.sqlite`)
+## 20. Registry DB tables (`avelo_registry.sqlite`)
 
 ### avelo_registry_companies
 
@@ -443,7 +491,7 @@ Index `idx_avelo_br_account_cleared` on `(bank_account_id, is_cleared)`.
 | last_opened_at | TEXT | nullable |
 | created_at | TEXT | NOT NULL |
 
-## 18. Index summary (one place)
+## 21. Index summary (one place)
 
 ```
 idx_avelo_companies_name
@@ -462,6 +510,10 @@ idx_avelo_vouchers_reversal
 idx_avelo_lines_voucher
 idx_avelo_lines_account
 idx_avelo_lines_company_side
+idx_avelo_inventory_orders_company_status
+idx_avelo_inventory_order_lines_order
+idx_avelo_inventory_order_lines_item
+idx_avelo_inventory_reorder_company_item
 idx_avelo_mov_item_date
 idx_avelo_mov_company_date
 idx_avelo_mov_voucher
@@ -472,9 +524,9 @@ idx_avelo_audit_time
 idx_avelo_br_account_cleared
 ```
 
-## 19. Migration policy
+## 22. Migration policy
 
-- `SchemaVersion.current = 1` initially.
+- `SchemaVersion.current = 3`.
 - `MigrationRunner` reads `PRAGMA user_version`, compares to highest `avelo_migrations.version`, and applies missing migrations in order inside a single transaction.
 - Each migration is a `struct: Migration` with a numeric version, a description, and a `func up(db: SQLiteDatabase) throws` body.
 - Migrations are append-only. Never edit a past migration.

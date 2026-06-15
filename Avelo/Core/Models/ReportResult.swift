@@ -362,4 +362,56 @@ public enum ReportResult {
             self.totalPaise = totalPaise
         }
     }
+
+    public struct CashFlowRow: Identifiable, Hashable, Sendable {
+        public let id: String
+        public let section: Section
+        public let accountCode: String
+        public let accountName: String
+        public let inflowPaise: Int64
+        public let outflowPaise: Int64
+        public let netPaise: Int64
+
+        public enum Section: String, CaseIterable, Sendable {
+            case operating
+            case investing
+            case financing
+
+            public var displayName: String {
+                switch self {
+                case .operating: return "Operating Activities"
+                case .investing: return "Investing Activities"
+                case .financing: return "Financing Activities"
+                }
+            }
+        }
+    }
+
+    public struct CashFlowStatement: Sendable, Hashable {
+        public let fromDate: Date
+        public let toDate: Date
+        public let rows: [CashFlowRow]
+        public let operatingNetPaise: Int64
+        public let investingNetPaise: Int64
+        public let financingNetPaise: Int64
+        public let netCashFlowPaise: Int64
+    }
+
+    public struct StockAgeingRow: Identifiable, Hashable, Sendable {
+        public let id: InventoryItem.ID
+        public let itemCode: String
+        public let itemName: String
+        public let unit: String
+        public let onHandQty: Int64
+        public let onHandValuePaise: Int64
+        public let age0to30Qty: Int64
+        public let age31to60Qty: Int64
+        public let age61to90Qty: Int64
+        public let age90PlusQty: Int64
+    }
+
+    public struct StockAgeingReport: Sendable, Hashable {
+        public let asOfDate: Date
+        public let rows: [StockAgeingRow]
+    }
 }

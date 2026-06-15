@@ -86,6 +86,8 @@ private struct ReportsBody: View {
                     case .stockRegister: stockRegisterSection
                     case .outstanding:   outstandingSection
                     case .stockValuation: stockSummarySection
+                    case .cashFlow:      cashFlowSection
+                    case .stockAgeing:   stockAgeingSection
                     }
                 }
                 .padding(16)
@@ -97,9 +99,9 @@ private struct ReportsBody: View {
     private var controls: some View {
         HStack {
             switch vm.selection {
-            case .trialBalance, .balanceSheet, .outstanding, .stockValuation:
+            case .trialBalance, .balanceSheet, .outstanding, .stockValuation, .stockAgeing:
                 DatePicker("As of", selection: $vm.asOf, displayedComponents: .date)
-            case .profitLoss, .gstSummary, .gstFiling, .dayBook, .ledger, .cashBook, .bankBook, .receivables, .payables, .stockMovement, .stockRegister:
+            case .profitLoss, .gstSummary, .gstFiling, .dayBook, .ledger, .cashBook, .bankBook, .receivables, .payables, .stockMovement, .stockRegister, .cashFlow:
                 DatePicker("From", selection: $vm.fromDate, displayedComponents: .date)
                 DatePicker("To", selection: $vm.toDate, displayedComponents: .date)
             }
@@ -561,6 +563,69 @@ private struct ReportsBody: View {
                 title: "No stock summary",
                 message: "Select a different date range or stock movement mode to see stock valuation rows.",
                 systemImage: "shippingbox",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var cashFlowSection: some View {
+        if let s = vm.cashFlow {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Cash Flow").font(.headline)
+                Table(s.rows) {
+                    TableColumn("Section") { row in
+                        Text(row.section.displayName)
+                    }
+                    TableColumn("Account", value: \.accountName)
+                    TableColumn("Inflow (₹)") { row in
+                        Text(Currency.formatPaise(row.inflowPaise)).monospacedDigit()
+                    }
+                    TableColumn("Outflow (₹)") { row in
+                        Text(Currency.formatPaise(row.outflowPaise)).monospacedDigit()
+                    }
+                    TableColumn("Net (₹)") { row in
+                        Text(Currency.formatPaise(row.netPaise)).monospacedDigit()
+                    }
+                }
+                Text("Net cash flow: \(Currency.formatPaise(s.netCashFlowPaise))").monospacedDigit().bold()
+            }
+        } else {
+            EmptyStateView(
+                title: "No cash flow",
+                message: "Cash flow appears when cash or bank ledger movements exist in the selected period.",
+                systemImage: "indianrupeesign.arrow.circlepath",
+                actionTitle: "Refresh",
+                action: { vm.reload() }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var stockAgeingSection: some View {
+        if let s = vm.stockAgeing {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Stock Ageing").font(.headline)
+                Table(s.rows) {
+                    TableColumn("Item", value: \.itemName)
+                    TableColumn("On hand") { row in
+                        Text("\(row.onHandQty) \(row.unit)")
+                    }
+                    TableColumn("0-30") { row in Text("\(row.age0to30Qty)") }
+                    TableColumn("31-60") { row in Text("\(row.age31to60Qty)") }
+                    TableColumn("61-90") { row in Text("\(row.age61to90Qty)") }
+                    TableColumn("90+") { row in Text("\(row.age90PlusQty)") }
+                    TableColumn("Value (₹)") { row in
+                        Text(Currency.formatPaise(row.onHandValuePaise)).monospacedDigit()
+                    }
+                }
+            }
+        } else {
+            EmptyStateView(
+                title: "No stock ageing",
+                message: "Stock ageing is empty when inventory is disabled or no stock is on hand.",
+                systemImage: "calendar.badge.clock",
                 actionTitle: "Refresh",
                 action: { vm.reload() }
             )

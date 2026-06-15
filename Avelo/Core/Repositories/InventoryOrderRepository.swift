@@ -1,0 +1,148 @@
+import Foundation
+
+public struct InventoryOrderRepository: Sendable {
+    public let db: SQLiteDatabase
+
+    public init(db: SQLiteDatabase) {
+        self.db = db
+    }
+
+    public func insertOrder(_ order: InventoryOrder, lines: [InventoryOrderLine]) throws {
+        try db.write { tx in
+            try tx.execute(
+                """
+                INSERT INTO avelo_inventory_orders
+                (id, company_id, order_type, number, party_account_id, order_date, expected_date, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    .text(order.id.uuidString),
+                    .text(order.companyId.uuidString),
+                    .text(order.orderType.rawValue),
+                    .text(order.number),
+                    .text(order.partyAccountId.uuidString),
+                    .date(order.orderDate),
+                    .optionalDate(order.expectedDate),
+                    .text(order.status.rawValue),
+                    .timestamp(order.createdAt),
+                    .timestamp(order.updatedAt)
+                ]
+            )
+            for line in lines {
+                try tx.execute(
+                    """
+                    INSERT INTO avelo_inventory_order_lines
+                    (id, company_id, order_id, item_id, quantity, fulfilled_quantity, unit_rate_paise, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        .text(line.id.uuidString),
+                        .text(line.companyId.uuidString),
+                        .text(line.orderId.uuidString),
+                        .text(line.itemId.uuidString),
+                        .integer(line.quantity),
+                        .integer(line.fulfilledQuantity),
+                        .integer(line.unitRatePaise),
+                        .timestamp(line.createdAt)
+                    ]
+                )
+            }
+        }
+    }
+
+    public func pendingLines(companyId: Company.ID, orderType: InventoryOrderType? = nil) throws -> [PendingInventoryOrderLine] {
+        var sql = """
+            SELECT l.id, o.id AS order_id, o.order_type, o.number, o.expected_date,
+                   party.name AS party_name,
+                   i.id AS item_id, i.name AS item_name,
+                   l.quantity, l.fulfilled_quantity,
+                   (l.quantity - l.fulfilled_quantity) AS pending_quantity
+            FROM avelo_inventory_order_lines l
+            JOIN avelo_inventory_orders o ON o.id = l.order_id AND o.company_id = l.company_id
+            JOIN avelo_inventory_items i ON i.id = l.item_id AND i.company_id = l.company_id
+            JOIN avelo_accounts party ON party.id = o.party_account_id AND party.company_id = o.company_id
+            WHERE l.company_id = ?
+              AND o.status = 'open'
+              AND i.is_active = 1
+              AND l.fulfilled_quantity < l.quantity
+        """
+        var bind: [SQLValue] = [.text(companyId.uuidString)]
+        if let orderType {
+            sql += " AND o.order_type = ?"
+            bind.append(.text(orderType.rawValue))
+        }
+        sql += " ORDER BY o.expected_date IS NULL, o.expected_date, o.order_date, o.number"
+        return try db.query(sql, bind: bind) { row in
+            PendingInventoryOrderLine(
+                id: try UUIDParsing.required(row.text("id"), field: "avelo_inventory_order_lines.id"),
+                orderId: try UUIDParsing.required(row.text("order_id"), field: "avelo_inventory_orders.id"),
+                orderType: InventoryOrderType(rawValue: row.text("order_type")) ?? .purchaseOrder,
+                orderNumber: row.text("number"),
+                partyAccountName: row.text("party_name"),
+                itemId: try UUIDParsing.required(row.text("item_id"), field: "avelo_inventory_items.id"),
+                itemName: row.text("item_name"),
+                quantity: row.int("quantity"),
+                fulfilledQuantity: row.int("fulfilled_quantity"),
+                pendingQuantity: row.int("pending_quantity"),
+                expectedDate: row.optionalDate("expected_date")
+            )
+        }
+    }
+
+    public func upsertReorderLevel(_ level: InventoryReorderLevel) throws {
+        try db.execute(
+            """
+            INSERT INTO avelo_inventory_reorder_levels
+            (id, company_id, item_id, minimum_quantity, reorder_quantity, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(company_id, item_id) DO UPDATE SET
+                minimum_quantity = excluded.minimum_quantity,
+                reorder_quantity = excluded.reorder_quantity,
+                updated_at = excluded.updated_at
+            """,
+            [
+                .text(level.id.uuidString),
+                .text(level.companyId.uuidString),
+                .text(level.itemId.uuidString),
+                .integer(level.minimumQuantity),
+                .integer(level.reorderQuantity),
+                .timestamp(level.createdAt),
+                .timestamp(level.updatedAt)
+            ]
+        )
+    }
+
+    public func reorderAlerts(companyId: Company.ID, asOfDate: Date) throws -> [ReorderAlert] {
+        guard try CompanyRepository(db: db).findById(companyId)?.isInventoryEnabled == true else {
+            return []
+        }
+        let sql = """
+            SELECT i.id,
+                   i.name,
+                   r.minimum_quantity,
+                   r.reorder_quantity,
+                   COALESCE(SUM(CASE
+                       WHEN m.movement_type = 'in' THEN m.quantity
+                       WHEN m.movement_type = 'out' THEN -m.quantity
+                       WHEN m.movement_type = 'adjustment' THEN m.quantity
+                       ELSE 0 END), 0) AS on_hand
+            FROM avelo_inventory_reorder_levels r
+            JOIN avelo_inventory_items i ON i.id = r.item_id AND i.company_id = r.company_id
+            LEFT JOIN avelo_stock_movements m ON m.item_id = i.id AND m.company_id = i.company_id AND m.date <= ?
+            WHERE r.company_id = ?
+              AND i.is_active = 1
+            GROUP BY i.id, i.name, r.minimum_quantity, r.reorder_quantity
+            HAVING on_hand <= r.minimum_quantity
+            ORDER BY i.name COLLATE NOCASE
+        """
+        return try db.query(sql, bind: [.date(asOfDate), .text(companyId.uuidString)]) { row in
+            ReorderAlert(
+                id: try UUIDParsing.required(row.text("id"), field: "avelo_inventory_reorder_levels.item_id"),
+                itemName: row.text("name"),
+                onHandQuantity: row.int("on_hand"),
+                minimumQuantity: row.int("minimum_quantity"),
+                reorderQuantity: row.int("reorder_quantity")
+            )
+        }
+    }
+}

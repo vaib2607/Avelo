@@ -250,6 +250,94 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertFalse(text.contains("/ 100.0"))
     }
 
+    func testGstr1InvoiceExportIsInvoiceWiseAndOfflineOnly() throws {
+        let tc = try makeSeededCompany()
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-10-01")!,
+                partyAccountId: tc.debtorsId,
+                narration: "Tax invoice",
+                lines: [
+                    .init(accountId: tc.debtorsId, amountPaise: 11800, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 10000, side: .credit),
+                    .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
+                    .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit)
+                ]
+            ),
+            in: tc.fy
+        ).voucher
+
+        let gst = GSTService(db: tc.db, companyId: tc.companyId)
+        let rows = try gst.gstr1InvoiceRows(
+            fromDate: DateFormatters.parseDate("2024-10-01")!,
+            toDate: DateFormatters.parseDate("2024-10-31")!
+        )
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.voucherId, posted.id)
+        XCTAssertEqual(rows.first?.taxableValuePaise, 10000)
+        XCTAssertEqual(rows.first?.cgstPaise, 900)
+        XCTAssertEqual(rows.first?.sgstPaise, 900)
+        XCTAssertEqual(rows.first?.invoiceValuePaise, 11800)
+
+        let csv = String(decoding: try gst.exportGSTR1InvoiceCSV(
+            fromDate: DateFormatters.parseDate("2024-10-01")!,
+            toDate: DateFormatters.parseDate("2024-10-31")!
+        ), as: UTF8.self)
+        XCTAssertTrue(csv.contains("Invoice Number,Invoice Date,Party Name"))
+        XCTAssertTrue(csv.contains(posted.number))
+        XCTAssertTrue(csv.contains("100.00,0.00,9.00,9.00,0.00,118.00"))
+    }
+
+    func testCashFlowStatementMapsIncomeAndExpenseCashMovements() throws {
+        let tc = try makeSeededCompany()
+        try seedActivity(tc)
+
+        let cashFlow = try ReportService(db: tc.db, companyId: tc.companyId).cashFlow(
+            fromDate: DateFormatters.parseDate("2024-04-01")!,
+            toDate: DateFormatters.parseDate("2024-07-31")!
+        )
+
+        let sales = try XCTUnwrap(cashFlow.rows.first(where: { $0.accountName == "Sales" }))
+        XCTAssertEqual(sales.section, .operating)
+        XCTAssertEqual(sales.inflowPaise, 10000)
+        XCTAssertEqual(sales.outflowPaise, 0)
+
+        let rent = try XCTUnwrap(cashFlow.rows.first(where: { $0.accountName == "Rent Expense" }))
+        XCTAssertEqual(rent.section, .operating)
+        XCTAssertEqual(rent.inflowPaise, 0)
+        XCTAssertEqual(rent.outflowPaise, 20000)
+        XCTAssertEqual(cashFlow.operatingNetPaise, -10000)
+        XCTAssertEqual(cashFlow.netCashFlowPaise, -10000)
+    }
+
+    func testStockAgeingReturnsNoOpRowsWhenInventoryIsDisabled() throws {
+        let tc = try TestCompany.make()
+        let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(
+            code: "RAW-1",
+            name: "Raw Material",
+            unit: "pcs"
+        )
+        try InventoryService(db: tc.db, companyId: tc.companyId).recordMovement(
+            itemId: item.id,
+            date: DateFormatters.parseDate("2024-04-01")!,
+            type: .stockIn,
+            quantity: 10,
+            ratePaise: 250,
+            notes: "Opening stock"
+        )
+        try tc.db.execute(
+            "UPDATE avelo_companies SET is_inventory_enabled = 0, inventory_link_mode = ? WHERE id = ?",
+            [.text(InventoryLinkMode.manual.rawValue), .text(tc.companyId.uuidString)]
+        )
+
+        let report = try ReportService(db: tc.db, companyId: tc.companyId).stockAgeing(
+            asOfDate: DateFormatters.parseDate("2024-05-01")!
+        )
+        XCTAssertTrue(report.rows.isEmpty)
+    }
+
     func testReportDateBoundariesExcludeLaterActivity() throws {
         let tc = try makeSeededCompany()
         try seedActivity(tc)

@@ -188,6 +188,10 @@ struct AveloApp: App {
                     Button("Stock Movement") { environment.router.openReport(.stockMovement) }
                     Button("Stock Register") { environment.router.openReport(.stockRegister) }
                     Button("GST Filing Views") { environment.router.openReport(.gstFiling) }
+                    Button("Cash Flow") { environment.router.openReport(.cashFlow) }
+                        .keyboardShortcut("1", modifiers: [.command, .option, .shift])
+                    Button("Stock Ageing") { environment.router.openReport(.stockAgeing) }
+                        .keyboardShortcut("2", modifiers: [.command, .option, .shift])
                 }
             }
         }

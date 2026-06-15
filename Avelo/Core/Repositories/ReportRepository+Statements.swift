@@ -394,4 +394,152 @@ extension ReportRepository {
         }
         return ReportResult.StockValuationReport(asOfDate: asOfDate, rows: rows)
     }
+
+    public func cashFlow(fromDate: Date, toDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.CashFlowStatement {
+        let sql = """
+            WITH cash_lines AS (
+                SELECT l.voucher_id, l.side, l.amount_paise
+                FROM avelo_ledger_lines l
+                JOIN avelo_accounts a ON a.id = l.account_id
+                JOIN avelo_vouchers v ON v.id = l.voucher_id
+                WHERE l.company_id = ?
+                  AND v.company_id = ?
+                  AND v.is_posted = 1
+                  AND v.date BETWEEN ? AND ?
+                  AND (UPPER(a.code) LIKE '%CASH%' OR UPPER(a.code) LIKE '%BANK%')
+            )
+            SELECT a.code,
+                   a.name,
+                   g.nature,
+                   COALESCE(SUM(CASE
+                       WHEN cl.side = 'debit' AND l.side = 'credit' THEN l.amount_paise
+                       ELSE 0 END), 0) AS inflow,
+                   COALESCE(SUM(CASE
+                       WHEN cl.side = 'credit' AND l.side = 'debit' THEN l.amount_paise
+                       ELSE 0 END), 0) AS outflow
+            FROM cash_lines cl
+            JOIN avelo_ledger_lines l ON l.voucher_id = cl.voucher_id AND l.company_id = ?
+            JOIN avelo_accounts a ON a.id = l.account_id
+            JOIN avelo_account_groups g ON g.id = a.group_id
+            WHERE NOT (UPPER(a.code) LIKE '%CASH%' OR UPPER(a.code) LIKE '%BANK%')
+            GROUP BY a.id, a.code, a.name, g.nature
+            HAVING inflow != 0 OR outflow != 0
+            ORDER BY g.nature, a.code
+        """
+        var operating: Int64 = 0
+        var investing: Int64 = 0
+        var financing: Int64 = 0
+        let rows = try db.query(
+            sql,
+            bind: [
+                .text(filter.companyId.uuidString),
+                .text(filter.companyId.uuidString),
+                .date(fromDate),
+                .date(toDate),
+                .text(filter.companyId.uuidString)
+            ]
+        ) { row in
+            let nature = AccountNature(rawValue: row.text("nature")) ?? .expense
+            let section: ReportResult.CashFlowRow.Section
+            switch nature {
+            case .assets:
+                section = .investing
+            case .liabilities:
+                section = .financing
+            case .income, .expense:
+                section = .operating
+            }
+            let inflow = row.int("inflow")
+            let outflow = row.int("outflow")
+            let net = inflow - outflow
+            switch section {
+            case .operating: operating += net
+            case .investing: investing += net
+            case .financing: financing += net
+            }
+            return ReportResult.CashFlowRow(
+                id: "\(section.rawValue)-\(row.text("code"))",
+                section: section,
+                accountCode: row.text("code"),
+                accountName: row.text("name"),
+                inflowPaise: inflow,
+                outflowPaise: outflow,
+                netPaise: net
+            )
+        }
+        let net = operating + investing + financing
+        assert(net <= Int64.max / 2)
+        return ReportResult.CashFlowStatement(
+            fromDate: fromDate,
+            toDate: toDate,
+            rows: rows,
+            operatingNetPaise: operating,
+            investingNetPaise: investing,
+            financingNetPaise: financing,
+            netCashFlowPaise: net
+        )
+    }
+
+    public func stockAgeing(asOfDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.StockAgeingReport {
+        guard try CompanyRepository(db: db).findById(filter.companyId)?.isInventoryEnabled == true else {
+            return ReportResult.StockAgeingReport(asOfDate: asOfDate, rows: [])
+        }
+        let items = try InventoryRepository(db: db).listItemsForCompany(filter.companyId, includeInactive: false)
+        guard !items.isEmpty else {
+            return ReportResult.StockAgeingReport(asOfDate: asOfDate, rows: [])
+        }
+        let placeholders = Array(repeating: "?", count: items.count).joined(separator: ",")
+        var bind: [SQLValue] = items.map { .text($0.id.uuidString) }
+        bind.append(.date(asOfDate))
+        let sql = """
+            SELECT item_id,
+                   COALESCE(SUM(CASE
+                       WHEN movement_type = 'in' AND julianday(?) - julianday(date) BETWEEN 0 AND 30 THEN quantity
+                       ELSE 0 END), 0) AS age_0_30,
+                   COALESCE(SUM(CASE
+                       WHEN movement_type = 'in' AND julianday(?) - julianday(date) BETWEEN 31 AND 60 THEN quantity
+                       ELSE 0 END), 0) AS age_31_60,
+                   COALESCE(SUM(CASE
+                       WHEN movement_type = 'in' AND julianday(?) - julianday(date) BETWEEN 61 AND 90 THEN quantity
+                       ELSE 0 END), 0) AS age_61_90,
+                   COALESCE(SUM(CASE
+                       WHEN movement_type = 'in' AND julianday(?) - julianday(date) > 90 THEN quantity
+                       ELSE 0 END), 0) AS age_90_plus,
+                   COALESCE(SUM(CASE
+                       WHEN movement_type = 'in' THEN quantity
+                       WHEN movement_type = 'out' THEN -quantity
+                       WHEN movement_type = 'adjustment' THEN quantity
+                       ELSE 0 END), 0) AS on_hand,
+                   COALESCE(SUM(CASE
+                       WHEN movement_type = 'in' THEN total_value_paise
+                       WHEN movement_type = 'out' THEN -total_value_paise
+                       ELSE 0 END), 0) AS value_paise
+            FROM avelo_stock_movements
+            WHERE item_id IN (\(placeholders)) AND date <= ?
+            GROUP BY item_id
+        """
+        var ageingBind: [SQLValue] = [.date(asOfDate), .date(asOfDate), .date(asOfDate), .date(asOfDate)]
+        ageingBind.append(contentsOf: bind)
+        var rowsByItem: [InventoryItem.ID: ReportResult.StockAgeingRow] = [:]
+        _ = try db.query(sql, bind: ageingBind) { row in
+            let itemId = try UUIDParsing.required(row.text("item_id"), field: "report.stock_ageing.item_id")
+            guard let item = items.first(where: { $0.id == itemId }) else { return }
+            let onHand = row.int("on_hand")
+            if onHand <= 0 { return }
+            rowsByItem[itemId] = ReportResult.StockAgeingRow(
+                id: itemId,
+                itemCode: item.code,
+                itemName: item.name,
+                unit: item.unit,
+                onHandQty: onHand,
+                onHandValuePaise: row.int("value_paise"),
+                age0to30Qty: row.int("age_0_30"),
+                age31to60Qty: row.int("age_31_60"),
+                age61to90Qty: row.int("age_61_90"),
+                age90PlusQty: row.int("age_90_plus")
+            )
+        }
+        let rows = items.compactMap { rowsByItem[$0.id] }
+        return ReportResult.StockAgeingReport(asOfDate: asOfDate, rows: rows)
+    }
 }

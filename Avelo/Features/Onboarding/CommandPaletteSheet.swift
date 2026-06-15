@@ -66,6 +66,8 @@ public struct CommandPaletteSheet: View {
         out.append(Command(title: "Stock Movement", subtitle: "Report", symbol: "arrow.left.arrow.right") { $0.openReport(.stockMovement) })
         out.append(Command(title: "Stock Register", subtitle: "Report", symbol: "list.bullet.rectangle") { $0.openReport(.stockRegister) })
         out.append(Command(title: "GST Filing Views", subtitle: "Report", symbol: "doc.text.magnifyingglass") { $0.openReport(.gstFiling) })
+        out.append(Command(title: "Cash Flow", subtitle: "Report", symbol: "chart.line.uptrend.xyaxis") { $0.openReport(.cashFlow) })
+        out.append(Command(title: "Stock Ageing", subtitle: "Report", symbol: "calendar.badge.clock") { $0.openReport(.stockAgeing) })
         return out
     }
 

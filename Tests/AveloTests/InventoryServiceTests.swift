@@ -174,4 +174,71 @@ final class InventoryServiceTests: XCTestCase {
         XCTAssertFalse(v.isValid)
         XCTAssertTrue(v.errors.contains(where: { $0.code == ValidationErrorCode.quantityExceedsStock }))
     }
+
+    func testPendingPurchaseAndSalesOrderVisibilityUsesSourceOrderLines() throws {
+        let tc = try TestCompany.make()
+        let item = try makeItem(tc)
+        let service = InventoryOrderService(db: tc.db, companyId: tc.companyId)
+
+        let purchase = try service.createOrder(
+            type: .purchaseOrder,
+            number: "PO-001",
+            partyAccountId: tc.capitalId,
+            orderDate: DateFormatters.parseDate("2024-07-01")!,
+            expectedDate: DateFormatters.parseDate("2024-07-10")!,
+            lines: [.init(itemId: item.id, quantity: 10, fulfilledQuantity: 4, unitRatePaise: 1200)]
+        )
+        _ = try service.createOrder(
+            type: .salesOrder,
+            number: "SO-001",
+            partyAccountId: tc.salesId,
+            orderDate: DateFormatters.parseDate("2024-07-02")!,
+            expectedDate: DateFormatters.parseDate("2024-07-11")!,
+            lines: [.init(itemId: item.id, quantity: 6, fulfilledQuantity: 1, unitRatePaise: 1500)]
+        )
+
+        let purchaseLines = try service.pendingLines(type: .purchaseOrder)
+        XCTAssertEqual(purchaseLines.count, 1)
+        XCTAssertEqual(purchaseLines.first?.orderId, purchase.id)
+        XCTAssertEqual(purchaseLines.first?.pendingQuantity, 6)
+
+        let allLines = try service.pendingLines()
+        XCTAssertEqual(allLines.map(\.pendingQuantity).reduce(0, +), 11)
+    }
+
+    func testReorderAlertsDoNotFireWhenInventoryIsDisabled() throws {
+        let tc = try TestCompany.make()
+        let item = try makeItem(tc)
+        let service = InventoryOrderService(db: tc.db, companyId: tc.companyId)
+        try service.setReorderLevel(itemId: item.id, minimumQuantity: 5, reorderQuantity: 20)
+        try tc.db.execute(
+            "UPDATE avelo_companies SET is_inventory_enabled = 0 WHERE id = ?",
+            [.text(tc.companyId.uuidString)]
+        )
+
+        let alerts = try service.reorderAlerts(asOfDate: DateFormatters.parseDate("2024-07-01")!)
+        XCTAssertTrue(alerts.isEmpty)
+    }
+
+    func testInventoryOrderWritesRejectForeignCompanyItem() throws {
+        let tc = try TestCompany.make()
+        let other = try TestCompany.seed(into: tc.db, companyId: UUID(), companyName: "Other Co")
+        let foreignItem = try InventoryService(db: tc.db, companyId: other.companyId)
+            .createItem(code: "OTHER", name: "Other Item", unit: "KG")
+
+        XCTAssertThrowsError(
+            try InventoryOrderService(db: tc.db, companyId: tc.companyId).createOrder(
+                type: .purchaseOrder,
+                number: "PO-FOREIGN",
+                partyAccountId: tc.capitalId,
+                orderDate: DateFormatters.parseDate("2024-07-01")!,
+                expectedDate: nil,
+                lines: [.init(itemId: foreignItem.id, quantity: 1)]
+            )
+        ) { error in
+            guard case AppError.validation = error else {
+                return XCTFail("Expected validation error, got \(error)")
+            }
+        }
+    }
 }

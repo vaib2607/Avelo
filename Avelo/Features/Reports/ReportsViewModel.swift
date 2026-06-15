@@ -17,6 +17,8 @@ public final class ReportsViewModel {
     public var ledger: ReportResult.LedgerReport?
     public var outstanding: ReportResult.OutstandingReport?
     public var stockValuation: ReportResult.StockValuationReport?
+    public var cashFlow: ReportResult.CashFlowStatement?
+    public var stockAgeing: ReportResult.StockAgeingReport?
     public var stockMovements: [StockMovement] = []
     public var stockRegisterRows: [StockRegisterRow] = []
     public var ledgerAccountId: Account.ID?
@@ -99,6 +101,10 @@ public final class ReportsViewModel {
                 outstanding = try svc.outstanding(asOfDate: asOf, direction: .receivables)
             case .stockValuation:
                 stockValuation = try svc.stockValuation(asOfDate: asOf)
+            case .cashFlow:
+                cashFlow = try svc.cashFlow(fromDate: fromDate, toDate: toDate)
+            case .stockAgeing:
+                stockAgeing = try svc.stockAgeing(asOfDate: asOf)
             }
         } catch {
             self.error = AppError.wrap(error)
