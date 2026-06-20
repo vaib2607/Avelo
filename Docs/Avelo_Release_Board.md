@@ -27,6 +27,7 @@ Release split rule:
 - Fail loudly on malformed UUIDs instead of substituting fresh IDs. Status: done in shipped repository, registry, and report-decode paths with regression coverage.
 - Keep restore safe and deterministic; minimize mutation during restore and preserve checksum verification.
 - Preserve core correctness guarantees already in place: WAL, foreign keys, transactions, locked fiscal years, audit immutability, company isolation.
+- `VoucherService.postBatch` commits in bounded chunks of 500 drafts; if a later chunk fails, already-committed chunks remain durable and the failing/later chunks are not partially persisted.
 - Add basic handling for missing or moved company files that gives a clear recovery path or explicit re-link workflow. Status: core open and backup paths now honor registry `sqlite_file_name`, preserve a legacy `id.sqlite` fallback, and fail with explicit re-link or restore guidance when the registered file is missing.
 - Add minimum viability checks for permissions, disk-full, and backup-write failures so the app fails cleanly.
 - Prevent obvious large-ledger or report slow paths that would make core accounting unusable at launch.
@@ -35,7 +36,7 @@ Release split rule:
 - Migrate from plain UUIDs to UUIDv7 for time-sortable IDs and better offline merge behavior.
 - Add stronger restore hardening and more explicit integrity verification around imported backups.
 - Add basic large-dataset performance work: better pagination, query-plan tuning, prepared-statement reuse, and benchmark-driven regression checks.
-- Add SQLCipher or equivalent at-rest encryption if product or security requirements demand it.
+- SQLCipher at-rest encryption is active for app-managed company databases with per-company raw keys stored in Keychain and user-custody recovery keys for cross-machine restore.
 - Add clearer recovery for unusual filesystem cases like network volumes or antivirus locks.
 
 ### V3: Later Hardening / Scale Work

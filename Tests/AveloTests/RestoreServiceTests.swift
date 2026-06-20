@@ -18,7 +18,7 @@ final class RestoreServiceTests: XCTestCase {
         try Data("not sqlite".utf8).write(to: backupURL)
 
         let restoreRoot = root.appendingPathComponent("restore", isDirectory: true)
-        let manager = try DatabaseManager(appSupportDirectory: restoreRoot)
+        let manager = try DatabaseManager(appSupportDirectory: restoreRoot, keyStore: InMemoryCompanyKeyStore())
 
         do {
             _ = try await RestoreService(manager: manager).restore(from: backupURL)
@@ -45,7 +45,7 @@ final class RestoreServiceTests: XCTestCase {
             try? FileManager.default.removeItem(at: targetRoot)
         }
 
-        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot, keyStore: InMemoryCompanyKeyStore())
         let sourceCompany = try await CompanyService.create(
             companyInput: .init(name: "Manifest Mismatch Co", gstin: nil, pan: nil),
             fyInput: .init(
@@ -73,7 +73,7 @@ final class RestoreServiceTests: XCTestCase {
         encoder.dateEncodingStrategy = .iso8601
         try encoder.encode(manifest).write(to: manifestURL)
 
-        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot)
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
         do {
             _ = try await RestoreService(manager: targetManager).restore(from: backupURL)
             XCTFail("Expected manifest mismatch to fail")
@@ -124,6 +124,31 @@ final class RestoreServiceTests: XCTestCase {
         XCTAssertEqual(auditEvents.first?.entityId, targetCompanyId.uuidString)
     }
 
+    func testPrepareRestoredCompanyDatabasePreservesOriginalErrorWhenTriggerCleanupFails() throws {
+        let tc = try TestCompany.make()
+        let targetCompanyId = UUID()
+        try tc.db.execute("DROP TABLE avelo_inventory_items")
+        try tc.db.execute("DROP TABLE avelo_vouchers")
+
+        do {
+            try RestoreService.prepareRestoredCompanyDatabase(
+                db: tc.db,
+                restoredCompanyId: targetCompanyId,
+                restoredCompanyName: "Broken Restore Co"
+            )
+            XCTFail("Expected prepare to fail")
+        } catch {
+            let message: String
+            switch AppError.wrap(error) {
+            case .database(.execFailed(let value)), .database(.prepareFailed(let value)):
+                message = value
+            default:
+                return XCTFail("Expected original SQLite error, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("avelo_vouchers"))
+        }
+    }
+
     func testBackupRestoreRoundTripPreservesCompanyData() async throws {
         let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -134,12 +159,13 @@ final class RestoreServiceTests: XCTestCase {
             try? FileManager.default.removeItem(at: targetRoot)
         }
 
-        let manager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let manager = try DatabaseManager(appSupportDirectory: sourceRoot, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         _ = try await manager.createCompanyFile(companyId: companyId)
         let dbURL = sourceRoot.appendingPathComponent("Companies", isDirectory: true)
             .appendingPathComponent("\(companyId.uuidString).sqlite")
-        let db = try SQLiteDatabase(path: dbURL.path)
+        let key = try XCTUnwrap(try manager.keyStore.retrieve(companyId: companyId))
+        let db = try SQLiteDatabase(path: dbURL.path, key: key)
         defer { db.close() }
 
         let source = try TestCompany.seed(into: db, companyId: companyId, companyName: "Roundtrip Co")
@@ -161,8 +187,11 @@ final class RestoreServiceTests: XCTestCase {
             to: backupURL
         )
 
-        let restoreManager = try DatabaseManager(appSupportDirectory: targetRoot)
-        let restored = try await RestoreService(manager: restoreManager).restore(from: backupURL)
+        let restoreManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
+        let restored = try await RestoreService(manager: restoreManager).restore(
+            from: backupURL,
+            recoveryKey: RecoveryKeyCodec.encode(key)
+        )
         let restoredHandle = try await restoreManager.openCompany(id: restored.id)
         defer { Task { await restoreManager.closeCompany(id: restored.id) } }
 
@@ -191,12 +220,13 @@ final class RestoreServiceTests: XCTestCase {
             try? FileManager.default.removeItem(at: sourceRoot)
         }
 
-        let manager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let manager = try DatabaseManager(appSupportDirectory: sourceRoot, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         _ = try await manager.createCompanyFile(companyId: companyId)
         let dbURL = sourceRoot.appendingPathComponent("Companies", isDirectory: true)
             .appendingPathComponent("\(companyId.uuidString).sqlite")
-        let db = try SQLiteDatabase(path: dbURL.path)
+        let key = try XCTUnwrap(try manager.keyStore.retrieve(companyId: companyId))
+        let db = try SQLiteDatabase(path: dbURL.path, key: key)
         defer { db.close() }
 
         let source = try TestCompany.seed(into: db, companyId: companyId, companyName: "Soak Restore Co")
@@ -223,8 +253,11 @@ final class RestoreServiceTests: XCTestCase {
             try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: targetRoot) }
 
-            let restoreManager = try DatabaseManager(appSupportDirectory: targetRoot)
-            let restored = try await RestoreService(manager: restoreManager).restore(from: backupURL)
+            let restoreManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
+            let restored = try await RestoreService(manager: restoreManager).restore(
+                from: backupURL,
+                recoveryKey: RecoveryKeyCodec.encode(key)
+            )
             let restoredHandle = try await restoreManager.openCompany(id: restored.id)
 
             let restoredCompany = try XCTUnwrap(CompanyRepository(db: restoredHandle.db).findById(restored.id))
@@ -256,7 +289,7 @@ final class RestoreServiceTests: XCTestCase {
             try? FileManager.default.removeItem(at: targetRoot)
         }
 
-        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot, keyStore: InMemoryCompanyKeyStore())
         let sourceCompany = try await CompanyService.create(
             companyInput: .init(name: "Duplicate Restore Co", gstin: nil, pan: nil),
             fyInput: .init(
@@ -276,7 +309,7 @@ final class RestoreServiceTests: XCTestCase {
             to: backupURL
         )
 
-        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot)
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
         _ = try await CompanyService.create(
             companyInput: .init(name: "Duplicate Restore Co", gstin: nil, pan: nil),
             fyInput: .init(
@@ -312,7 +345,7 @@ final class RestoreServiceTests: XCTestCase {
             try? FileManager.default.removeItem(at: targetRoot)
         }
 
-        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot, keyStore: InMemoryCompanyKeyStore())
         let sourceCompany = try await CompanyService.create(
             companyInput: .init(name: "Restore Permission Co", gstin: nil, pan: nil),
             fyInput: .init(
@@ -332,7 +365,7 @@ final class RestoreServiceTests: XCTestCase {
             to: backupURL
         )
 
-        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot)
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
         let companiesDirectory = await targetManager.companiesDirectory
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o555],

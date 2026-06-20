@@ -79,6 +79,10 @@ struct AveloApp: App {
 
 `AppEnvironment.live()` is the only initializer used in the shipped app. A future `AppEnvironment.inMemory` is reserved for previews and is intentionally **not** implemented in MVP.
 
+## 3.1. At-rest encryption
+
+Company databases are opened through `DatabaseManager`, which retrieves or creates a random 32-byte per-company SQLCipher key through `CompanyKeyStore`. `SQLiteDatabase` accepts explicit raw keys only; the old shared passphrase path is legacy migration input, not a live app secret. Backups copy encrypted database bytes and never include keys, so cross-machine restore requires the user-custody recovery key shown at company creation.
+
 ## 4. Threading and concurrency
 
 - `SQLiteDatabase` is `@unchecked Sendable`. It serializes all `sqlite3_*` calls through a private `DispatchQueue`. No two operations on the same connection run concurrently.

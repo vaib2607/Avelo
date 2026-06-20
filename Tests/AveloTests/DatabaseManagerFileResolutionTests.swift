@@ -8,7 +8,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         let companyName = "Registry Path Co"
         let actualURL = root.appendingPathComponent("Companies", isDirectory: true)
@@ -37,7 +37,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         try await manager.registerCompany(
             CompanyRegistryEntry(id: companyId, name: "Missing File Co", sqliteFileName: "missing-company.sqlite")
@@ -60,7 +60,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         let legacyURL = root.appendingPathComponent("Companies", isDirectory: true)
             .appendingPathComponent("\(companyId.uuidString).sqlite")
@@ -86,7 +86,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         let sourceURL = root.appendingPathComponent("Companies", isDirectory: true)
             .appendingPathComponent("custom-export-source.sqlite")
@@ -116,7 +116,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         let sourceURL = root.appendingPathComponent("Companies", isDirectory: true)
             .appendingPathComponent("backup-source.sqlite")
@@ -157,7 +157,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
             try? FileManager.default.removeItem(at: root)
         }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         let sourceURL = root.appendingPathComponent("Companies", isDirectory: true)
             .appendingPathComponent("backup-source.sqlite")
@@ -197,7 +197,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         let companiesURL = root.appendingPathComponent("Companies", isDirectory: true)
         let registeredURL = companiesURL.appendingPathComponent("registry-backed.sqlite")
@@ -224,6 +224,8 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: registeredURL.path + "-shm"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path + "-wal"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path + "-shm"))
+        let deletedEntry = try await manager.findCompany(id: companyId)
+        XCTAssertNil(deletedEntry)
     }
 
     func testDeleteCompanyFilesStillCleansSidecarsWhenPrimaryFileIsMissing() async throws {
@@ -231,7 +233,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         let companiesURL = root.appendingPathComponent("Companies", isDirectory: true)
         let registeredURL = companiesURL.appendingPathComponent("gone-primary.sqlite")
@@ -252,5 +254,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: registeredWal.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: registeredShm.path))
+        let deletedEntry = try await manager.findCompany(id: companyId)
+        XCTAssertNil(deletedEntry)
     }
 }

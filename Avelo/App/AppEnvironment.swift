@@ -155,9 +155,8 @@ public final class AppEnvironment {
         )
         try await onDemoCompanyCreatedForTesting?(company.id)
 
-        let dbURL = try await manager.companyFileURL(id: company.id)
-        let db = try SQLiteDatabase(path: dbURL.path)
-        defer { db.close() }
+        let handle = try await manager.openCompany(id: company.id)
+        let db = handle.db
 
         let accounts = AccountService(db: db, companyId: company.id)
         let fyService = FinancialYearService(db: db, companyId: company.id)

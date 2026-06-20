@@ -36,11 +36,12 @@ final class BenchmarkSuiteTests: XCTestCase {
         let root = BenchmarkConfig.temporaryDirectory
             .appendingPathComponent("avelo-benchmark-managed-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let companyId = UUID()
         let companyName = "Managed Benchmark Co"
         let companyURL = try await manager.createCompanyFile(companyId: companyId)
-        let db = try SQLiteDatabase(path: companyURL.path)
+        let key = try XCTUnwrap(try manager.keyStore.retrieve(companyId: companyId))
+        let db = try SQLiteDatabase(path: companyURL.path, key: key)
         defer { db.close() }
         _ = try TestCompany.seed(into: db, companyId: companyId, companyName: companyName)
         let entry = CompanyRegistryEntry(
@@ -258,7 +259,7 @@ final class BenchmarkSuiteTests: XCTestCase {
 
         let restoreRoot = rootURL.appendingPathComponent("restore", isDirectory: true)
         try FileManager.default.createDirectory(at: restoreRoot, withIntermediateDirectories: true)
-        let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot)
+        let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot, keyStore: InMemoryCompanyKeyStore())
         defer { try? FileManager.default.removeItem(at: restoreRoot) }
         let restoreService = RestoreService(manager: restoreManager)
 

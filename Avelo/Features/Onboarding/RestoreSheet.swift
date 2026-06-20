@@ -7,6 +7,7 @@ public struct RestoreSheet: View {
     @Environment(AppRouter.self) private var router
     @State private var status: String = ""
     @State private var isWorking: Bool = false
+    @State private var recoveryKey: String = ""
 
     public init() {}
 
@@ -15,6 +16,8 @@ public struct RestoreSheet: View {
             Text("Restore Backup").font(.title2.bold())
             Text("Choose a Avelo `.avelobackup` file. A new company is created from its contents; your existing data is not modified.")
                 .foregroundStyle(.secondary)
+            TextField("Recovery key for encrypted backups", text: $recoveryKey)
+                .textFieldStyle(.roundedBorder)
             HStack {
                 if isWorking { ProgressView() }
                 Button("Choose File…") { run() }
@@ -48,7 +51,8 @@ public struct RestoreSheet: View {
                 let result = await NSPanelBridge.runOpen(panel)
                 if result == .OK, let url = panel.url {
                     let restore = RestoreService(manager: env.manager)
-                    let restored = try await restore.restore(from: url)
+                    let key = recoveryKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let restored = try await restore.restore(from: url, recoveryKey: key.isEmpty ? nil : key)
                     await env.openCompany(restored.id)
                     env.notifyDataChanged()
                     env.showSuccess("Restored as new company.")

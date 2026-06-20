@@ -85,11 +85,13 @@ public final class CompanyService: Sendable {
             endDate: fyInput.endDate,
             booksBeginDate: fyInput.booksBeginDate
         )
-        _ = try await manager.createCompanyFile(companyId: company.id)
+        let companyKey = try manager.keyStore.generateKey()
+        _ = try await manager.createCompanyFile(companyId: company.id, key: companyKey)
 
         let db = try SQLiteDatabase(path: manager.companiesDirectory
                                             .appendingPathComponent("\(company.id.uuidString).sqlite")
-                                            .path)
+                                            .path,
+                                    key: companyKey)
         defer { db.close() }
 
         try db.write { tx in

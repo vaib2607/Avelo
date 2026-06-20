@@ -37,9 +37,8 @@ public enum DemoCompanySeeder {
     }
 
     public static func seedIfNeeded(manager: DatabaseManager, companyId: Company.ID, companyName: String) async throws {
-        let url = try await manager.companyFileURL(id: companyId)
-        let db = try SQLiteDatabase(path: url.path)
-        defer { db.close() }
+        let handle = try await manager.openCompany(id: companyId)
+        let db = handle.db
 
         let company = try CompanyRepository(db: db).findById(companyId)
         guard company != nil else { return }

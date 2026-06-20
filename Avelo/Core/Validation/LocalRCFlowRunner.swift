@@ -183,7 +183,10 @@ enum LocalRCFlowRunner {
             to: backupURL
         )
 
-        let restored = try await RestoreService(manager: restoreManager).restore(from: backupURL)
+        let restored = try await RestoreService(manager: restoreManager).restore(
+            from: backupURL,
+            recoveryKey: try manager.recoveryKey(for: ctx.companyId)
+        )
         let restoredHandle = try await restoreManager.openCompany(id: restored.id)
         defer { Task { await restoreManager.closeCompany(id: restored.id) } }
 

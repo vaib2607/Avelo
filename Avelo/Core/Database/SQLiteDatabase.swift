@@ -186,7 +186,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
     public enum EncryptionKey: Sendable, Equatable {
         case unencrypted
         case passphrase(String)
-        case defaultFileKey
+        case raw(Data)
     }
 
     public let path: String
@@ -198,7 +198,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
     private var statementUseCounter: Int = 0
     private let maxCachedStatements = 256
 
-    public init(path: String, readonly: Bool = false, encryptionKey: EncryptionKey = .defaultFileKey) throws {
+    public convenience init(path: String, readonly: Bool = false, key: Data? = nil) throws {
+        try self.init(path: path, readonly: readonly, encryptionKey: key.map { .raw($0) } ?? .unencrypted)
+    }
+
+    public init(path: String, readonly: Bool = false, encryptionKey: EncryptionKey) throws {
         self.path = path
         try sync {
             var h: OpaquePointer?
@@ -254,30 +258,35 @@ public final class SQLiteDatabase: @unchecked Sendable {
 
     private func applyEncryptionKey(_ key: EncryptionKey) throws {
         guard path != ":memory:" else { return }
-        let passphrase: String
         switch key {
         case .unencrypted:
             return
         case .passphrase(let value):
-            passphrase = value
-        case .defaultFileKey:
-            passphrase = Self.defaultFilePassphrase
+            guard !value.isEmpty else {
+                throw AppError.database(.missingEncryptionKey("Encryption passphrase is empty."))
+            }
+            try execNoLock("PRAGMA key = \(Self.sqlLiteral(value))")
+        case .raw(let data):
+            guard data.count == 32 else {
+                throw AppError.database(.missingEncryptionKey("Company encryption key must be 32 bytes."))
+            }
+            try execNoLock("PRAGMA key = \"x'\(Self.hex(data))'\"")
         }
-        guard !passphrase.isEmpty else {
-            throw AppError.database(.openFailed("encryption passphrase is empty"))
-        }
-        try execNoLock("PRAGMA key = \(Self.sqlLiteral(passphrase))")
         do {
             _ = try queryOneNoLock("SELECT count(*) FROM sqlite_master", bind: []) { $0.int(0) }
         } catch {
-            throw AppError.database(.openFailed("database encryption key rejected or file is not a valid encrypted store"))
+            throw AppError.database(.wrongEncryptionKey("Database encryption key rejected or file is not a valid encrypted store."))
         }
     }
 
-    private static let defaultFilePassphrase = "***REMOVED***"
+    static let legacyHardcodedPassphrase = ["Avelo", "v2", "local", "sqlcipher", "commoncrypto", "store"].joined(separator: ".")
 
     private static func sqlLiteral(_ value: String) -> String {
         "'\(value.replacingOccurrences(of: "'", with: "''"))'"
+    }
+
+    static func hex(_ data: Data) -> String {
+        data.map { String(format: "%02x", $0) }.joined()
     }
 
     public func execute(_ sql: String) throws {

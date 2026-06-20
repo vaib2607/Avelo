@@ -9,7 +9,7 @@ final class AppEnvironmentFlowTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let registryDb = try await SQLiteDatabase(path: manager.registryPath)
         defer { registryDb.close() }
 
@@ -34,7 +34,7 @@ final class AppEnvironmentFlowTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let registryDb = try await SQLiteDatabase(path: manager.registryPath)
         defer { registryDb.close() }
 
@@ -76,7 +76,7 @@ final class AppEnvironmentFlowTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let registryDb = try await SQLiteDatabase(path: manager.registryPath)
         defer { registryDb.close() }
 
@@ -139,7 +139,7 @@ final class AppEnvironmentFlowTests: XCTestCase {
             try? FileManager.default.removeItem(at: targetRoot)
         }
 
-        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot)
+        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot, keyStore: InMemoryCompanyKeyStore())
         let sourceCompany = try await CompanyService.create(
             companyInput: .init(name: "Restore Flow Co", gstin: nil, pan: nil),
             fyInput: .init(
@@ -159,7 +159,7 @@ final class AppEnvironmentFlowTests: XCTestCase {
             to: backupURL
         )
 
-        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot)
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
         let targetRegistryPath = await targetManager.registryPath
         let targetRegistryDb = try SQLiteDatabase(path: targetRegistryPath)
         defer { targetRegistryDb.close() }
@@ -172,7 +172,10 @@ final class AppEnvironmentFlowTests: XCTestCase {
             backupService: BackupService(manager: targetManager)
         )
 
-        let restored = try await RestoreService(manager: targetManager).restore(from: backupURL)
+        let restored = try await RestoreService(manager: targetManager).restore(
+            from: backupURL,
+            recoveryKey: try sourceManager.recoveryKey(for: sourceCompany.id)
+        )
         await env.openCompany(restored.id)
 
         let ctx = try XCTUnwrap(env.companyContext)
@@ -189,7 +192,7 @@ final class AppEnvironmentFlowTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let registryDb = try await SQLiteDatabase(path: manager.registryPath)
         defer { registryDb.close() }
 
@@ -242,7 +245,7 @@ final class AppEnvironmentFlowTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let registryDb = try await SQLiteDatabase(path: manager.registryPath)
         defer { registryDb.close() }
 
@@ -283,7 +286,7 @@ final class AppEnvironmentFlowTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let registryDb = try await SQLiteDatabase(path: manager.registryPath)
         defer { registryDb.close() }
 
@@ -297,7 +300,10 @@ final class AppEnvironmentFlowTests: XCTestCase {
 
         env.onDemoCompanyCreatedForTesting = { companyId in
             let dbURL = try await manager.companyFileURL(id: companyId)
-            let db = try SQLiteDatabase(path: dbURL.path)
+            guard let key = try manager.keyStore.retrieve(companyId: companyId) else {
+                throw AppError.database(.missingEncryptionKey("Company encryption key is missing."))
+            }
+            let db = try SQLiteDatabase(path: dbURL.path, key: key)
             defer { db.close() }
             try tcLikeDeleteAccountCodeIfExists(db: db, code: "PURCHASE")
         }

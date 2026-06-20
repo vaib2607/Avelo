@@ -23,9 +23,11 @@ public final actor DatabaseManager {
 
     private var openHandles: [Company.ID: CompanyHandle] = [:]
     private var registryDb: SQLiteDatabase?
+    public nonisolated let keyStore: CompanyKeyStoring
 
-    public init(appSupportDirectory: URL) throws {
+    public init(appSupportDirectory: URL, keyStore: CompanyKeyStoring = CompanyKeyStore()) throws {
         self.appSupportDirectory = appSupportDirectory
+        self.keyStore = keyStore
         let companiesURL = appSupportDirectory.appendingPathComponent("Companies", isDirectory: true)
         self.companiesDirectory = companiesURL
         let registryURL = appSupportDirectory.appendingPathComponent("avelo_registry.sqlite")
@@ -105,9 +107,11 @@ public final actor DatabaseManager {
         )
     }
 
-    public func createCompanyFile(companyId: UUID) throws -> URL {
+    public func createCompanyFile(companyId: UUID, key: Data? = nil) throws -> URL {
         let url = companiesDirectory.appendingPathComponent("\(companyId.uuidString).sqlite")
-        let db = try SQLiteDatabase(path: url.path)
+        let companyKey = try key ?? keyStore.generateKey()
+        try keyStore.store(key: companyKey, companyId: companyId)
+        let db = try SQLiteDatabase(path: url.path, key: companyKey)
         defer { db.close() }
         try MigrationRunner().runMigrations(on: db)
         return url
@@ -120,7 +124,8 @@ public final actor DatabaseManager {
         if !fm.fileExists(atPath: url.path) {
             throw AppError.notFound("Company file not found: \(url.lastPathComponent)")
         }
-        let db = try SQLiteDatabase(path: url.path)
+        let key = try LegacyKeyMigrationService(keyStore: keyStore).migrateIfNeeded(companyId: id, fileURL: url)
+        let db = try SQLiteDatabase(path: url.path, key: key)
         let current = db.userVersion()
         if current < SchemaVersion.current.rawValue {
             do {
@@ -174,7 +179,8 @@ public final actor DatabaseManager {
             return legacyURL
         }
 
-        let registeredURL = companiesDirectory.appendingPathComponent(entry.sqliteFileName)
+        let sqliteFileName = entry.sqliteFileName
+        let registeredURL = companiesDirectory.appendingPathComponent(sqliteFileName)
         if fm.fileExists(atPath: registeredURL.path) {
             return registeredURL
         }
@@ -183,7 +189,7 @@ public final actor DatabaseManager {
         }
 
         throw AppError.notFound(
-            "Company file missing. Expected \(entry.sqliteFileName). Re-link or restore the company file before opening it."
+            "Company file missing. Expected \(sqliteFileName). Re-link or restore the company file before opening it."
         )
     }
 
@@ -212,5 +218,20 @@ public final actor DatabaseManager {
                 try fm.removeItem(at: url)
             }
         }
+        if let reg = registryDb {
+            try RegistryRepository(db: reg).unregister(id: id)
+        }
+        try keyStore.delete(companyId: id)
+    }
+
+    public func storeRecoveryKey(_ recoveryKey: String, for companyId: Company.ID) throws {
+        try keyStore.store(key: RecoveryKeyCodec.decode(recoveryKey), companyId: companyId)
+    }
+
+    public func recoveryKey(for companyId: Company.ID) throws -> String {
+        guard let key = try keyStore.retrieve(companyId: companyId) else {
+            throw AppError.database(.missingEncryptionKey("Company encryption key is missing."))
+        }
+        return RecoveryKeyCodec.encode(key)
     }
 }

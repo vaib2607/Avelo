@@ -3,15 +3,17 @@ import XCTest
 
 final class SQLiteDatabaseTests: XCTestCase {
 
-    func testFileBackedDatabaseIsEncryptedAtRestAndReopensWithDefaultKey() throws {
+    func testFileBackedDatabaseIsEncryptedAtRestAndReopensWithRawKey() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("avelo-sqlcipher-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("encrypted.sqlite")
 
+        let key = Data((0..<32).map { UInt8($0) })
+
         do {
-            let db = try SQLiteDatabase(path: url.path)
+            let db = try SQLiteDatabase(path: url.path, key: key)
             defer { db.close() }
             try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
             try db.execute("INSERT INTO t (value) VALUES (?)", [.text("sealed")])
@@ -20,7 +22,7 @@ final class SQLiteDatabaseTests: XCTestCase {
         let header = try Data(contentsOf: url).prefix(16)
         XCTAssertNotEqual(String(data: header, encoding: .utf8), "SQLite format 3\u{0}")
 
-        let reopened = try SQLiteDatabase(path: url.path)
+        let reopened = try SQLiteDatabase(path: url.path, key: key)
         defer { reopened.close() }
         let value = try reopened.queryOne("SELECT value FROM t WHERE id = 1") { $0.text(0) }
         XCTAssertEqual(value, "sealed")
@@ -33,18 +35,20 @@ final class SQLiteDatabaseTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("encrypted.sqlite")
 
-        let db = try SQLiteDatabase(path: url.path, encryptionKey: .passphrase("correct"))
+        let correct = Data(repeating: 1, count: 32)
+        let wrong = Data(repeating: 2, count: 32)
+        let db = try SQLiteDatabase(path: url.path, key: correct)
         try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
         db.close()
 
         do {
-            _ = try SQLiteDatabase(path: url.path, encryptionKey: .passphrase("wrong"))
+            _ = try SQLiteDatabase(path: url.path, key: wrong)
             XCTFail("Expected wrong passphrase to fail")
         } catch {
-            guard case AppError.database(.openFailed(let message)) = error else {
-                return XCTFail("Expected openFailed, got \(error)")
+            guard case AppError.database(.wrongEncryptionKey(let message)) = error else {
+                return XCTFail("Expected wrongEncryptionKey, got \(error)")
             }
-            XCTAssertTrue(message.contains("encryption key rejected"))
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("key rejected"))
         }
     }
 

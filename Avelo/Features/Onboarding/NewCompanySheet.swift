@@ -5,6 +5,8 @@ public struct NewCompanySheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @State private var vm = OnboardingViewModel()
+    @State private var createdRecoveryKey: String?
+    @State private var recoveryAcknowledged: Bool = false
 
     public init() {}
 
@@ -20,6 +22,7 @@ public struct NewCompanySheet: View {
                     fySection
                     chartSection
                     inventorySection
+                    recoverySection
                 }
                 .padding(20)
             }
@@ -52,6 +55,7 @@ public struct NewCompanySheet: View {
                 Image(systemName: "xmark.circle.fill")
             }
             .buttonStyle(.plain)
+            .disabled(createdRecoveryKey != nil && !recoveryAcknowledged)
         }
         .padding(16)
     }
@@ -116,6 +120,24 @@ public struct NewCompanySheet: View {
     }
 
     @ViewBuilder
+    private var recoverySection: some View {
+        if let createdRecoveryKey {
+            card(title: "Recovery Key") {
+                Text("Save this key now. Avelo does not store a recovery copy, and encrypted backups need it on another Mac.")
+                    .foregroundStyle(.secondary)
+                Text(createdRecoveryKey)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                Toggle("I've saved this recovery key", isOn: $recoveryAcknowledged)
+            }
+        }
+    }
+
+    @ViewBuilder
     private func card<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
@@ -156,12 +178,13 @@ public struct NewCompanySheet: View {
     private var footer: some View {
         HStack {
             Spacer()
-            Button("Cancel") { router.presentedSheet = nil }
+            Button(createdRecoveryKey == nil ? "Cancel" : "Close") { router.presentedSheet = nil }
                 .keyboardShortcut(.cancelAction)
+                .disabled(createdRecoveryKey != nil && !recoveryAcknowledged)
             Button("Create") { create() }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .disabled(!vm.canCreate)
+                .disabled(!vm.canCreate || createdRecoveryKey != nil)
         }
         .padding(16)
     }
@@ -198,8 +221,8 @@ public struct NewCompanySheet: View {
                     }
                 }
                 env.notifyDataChanged()
-                env.showSuccess("Company created.")
-                router.presentedSheet = nil
+                createdRecoveryKey = try await env.manager.recoveryKey(for: company.id)
+                env.showSuccess("Company created. Save the recovery key before closing.")
             } catch {
                 env.showError(AppError.wrap(error))
             }

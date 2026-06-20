@@ -24,6 +24,7 @@ The non-negotiables. Every code-generation pass, every review, and every change 
 ## R-3. SQLite is the system of record
 
 - The SQLite file under `Application Support/Avelo/Companies/<uuid>.sqlite` is the only authoritative store.
+- App-managed company SQLite files are encrypted at rest with SQLCipher using a random 32-byte per-company key stored in Keychain. Backups contain encrypted database bytes only; Avelo never embeds or exports the key except as a user-visible recovery key that the user must save.
 - No in-memory cache is ever the source of truth. Views query live.
 - Reports are live SQL aggregations. No cached totals, no materialised rollups, no precomputed balances.
 - Every write goes through `SQLiteDatabase.write { ... }` which is a `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK` block. Any throw rolls back the entire block.

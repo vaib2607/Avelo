@@ -74,6 +74,8 @@ public enum SQLiteError: Error, Sendable, Equatable {
     case schemaMismatch(String)
     case migrationFailed(String)
     case checksumMismatch
+    case missingEncryptionKey(String)
+    case wrongEncryptionKey(String)
 
     public var message: String {
         switch self {
@@ -87,6 +89,8 @@ public enum SQLiteError: Error, Sendable, Equatable {
         case .schemaMismatch(let s):    return s
         case .migrationFailed(let s):   return s
         case .checksumMismatch:         return "backup checksum does not match"
+        case .missingEncryptionKey(let s): return s
+        case .wrongEncryptionKey(let s): return s
         }
     }
 }

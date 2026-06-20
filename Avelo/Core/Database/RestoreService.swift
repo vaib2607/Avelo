@@ -110,7 +110,7 @@ public struct RestoreService: Sendable {
         self.manager = manager
     }
 
-    public func restore(from sourceURL: URL) async throws -> CompanyRegistryEntry {
+    public func restore(from sourceURL: URL, recoveryKey: String? = nil) async throws -> CompanyRegistryEntry {
         let fm = FileManager.default
         guard fm.fileExists(atPath: sourceURL.path) else {
             AveloRestoreLogger.error("restore source missing: \(sourceURL.path, privacy: .public)")
@@ -160,7 +160,9 @@ public struct RestoreService: Sendable {
         }
 
         do {
-            let db = try SQLiteDatabase(path: stagingURL.path)
+            let decodedRecoveryKey = try recoveryKey.map { try RecoveryKeyCodec.decode($0) }
+            let opened = try Self.openStagedDatabase(stagingURL: stagingURL, key: decodedRecoveryKey)
+            let db = opened.db
             defer { db.close() }
             try Self.validateIntegrity(db: db)
             let current = db.userVersion()
@@ -179,6 +181,30 @@ public struct RestoreService: Sendable {
             try Self.validateIntegrity(db: db)
             try Self.validatePreparedCompany(db: db, companyId: newId, companyName: manifest.companyName)
 
+            let storedKey: Data
+            switch opened.source {
+            case .keyed(let key):
+                storedKey = key
+            case .plaintext:
+                storedKey = try manager.keyStore.generateKey()
+                db.close()
+                try LegacyKeyMigrationService(keyStore: manager.keyStore).migrate(
+                    companyId: newId,
+                    fileURL: stagingURL,
+                    source: .plaintext,
+                    newKey: storedKey
+                )
+            case .legacyPassphrase:
+                storedKey = try manager.keyStore.generateKey()
+                db.close()
+                try LegacyKeyMigrationService(keyStore: manager.keyStore).migrate(
+                    companyId: newId,
+                    fileURL: stagingURL,
+                    source: .hardcodedPassphrase,
+                    newKey: storedKey
+                )
+            }
+
             let entry = CompanyRegistryEntry(
                 id: newId,
                 name: manifest.companyName,
@@ -188,6 +214,7 @@ public struct RestoreService: Sendable {
             )
             db.close()
             try fm.moveItem(at: stagingURL, to: destURL)
+            try manager.keyStore.store(key: storedKey, companyId: newId)
             try await manager.registerCompany(entry)
             return entry
         } catch {
@@ -195,6 +222,30 @@ public struct RestoreService: Sendable {
             Self.cleanupRestoredCompanyFile(at: destURL, fileManager: fm)
             Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm)
             throw error
+        }
+    }
+
+    private enum StagedSource {
+        case keyed(Data)
+        case plaintext
+        case legacyPassphrase
+    }
+
+    private static func openStagedDatabase(stagingURL: URL, key: Data?) throws -> (db: SQLiteDatabase, source: StagedSource) {
+        if let key {
+            return (try SQLiteDatabase(path: stagingURL.path, key: key), .keyed(key))
+        }
+        do {
+            return (try SQLiteDatabase(path: stagingURL.path), .plaintext)
+        } catch {
+            do {
+                return (
+                    try SQLiteDatabase(path: stagingURL.path, encryptionKey: .passphrase(SQLiteDatabase.legacyHardcodedPassphrase)),
+                    .legacyPassphrase
+                )
+            } catch {
+                throw AppError.database(.missingEncryptionKey("This encrypted backup requires the company recovery key before it can be restored."))
+            }
         }
     }
 

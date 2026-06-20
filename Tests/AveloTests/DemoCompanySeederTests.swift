@@ -8,10 +8,11 @@ final class DemoCompanySeederTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let entry = try await DemoCompanySeeder.ensureDemoCompany(manager: manager)
         let dbURL = try await manager.companyFileURL(id: entry.id)
-        let db = try SQLiteDatabase(path: dbURL.path)
+        let key = try XCTUnwrap(try manager.keyStore.retrieve(companyId: entry.id))
+        let db = try SQLiteDatabase(path: dbURL.path, key: key)
         defer { db.close() }
 
         let company = try XCTUnwrap(CompanyRepository(db: db).findById(entry.id))

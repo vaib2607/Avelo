@@ -88,16 +88,25 @@ final class VoucherServiceTests: XCTestCase {
                 tc.line(tc.salesId, 1000 + Int64(i), .credit)
             ])
         }
-        drafts.append(contentsOf: [
+        drafts.append(contentsOf: (0..<499).map { i in
             tc.draft(on: "2024-06-02", lines: [
-                tc.line(tc.cashId, 1000, .debit),
-                tc.line(tc.salesId, 1000, .credit)
-            ]),
+                tc.line(tc.cashId, 2000 + Int64(i), .debit),
+                tc.line(tc.salesId, 2000 + Int64(i), .credit)
+            ])
+        })
+        drafts.append(
             tc.draft(on: "2024-06-03", lines: [
                 tc.line(tc.cashId, 1000, .debit),
                 tc.line(tc.salesId, 900, .credit)
             ])
-        ])
+        )
+        drafts.append(contentsOf: (0..<200).map { i in
+            tc.draft(on: "2024-06-04", lines: [
+                tc.line(tc.cashId, 3000 + Int64(i), .debit),
+                tc.line(tc.salesId, 3000 + Int64(i), .credit)
+            ])
+        })
+        XCTAssertEqual(drafts.count, 1200)
 
         XCTAssertThrowsError(try svc.postBatch(drafts, in: tc.fy))
 
