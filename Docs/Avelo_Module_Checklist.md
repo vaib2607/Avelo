@@ -63,6 +63,9 @@ Legend: `[ ]` pending · `[x]` done · `[-]` deferred (with reason) · `[!]` blo
 - [x] `Core/Database/SeedLoader.swift`
 - [x] `Core/Database/BackupService.swift`
 - [x] `Core/Database/RestoreService.swift`
+- [x] `Core/Database/CompanyKeyStore.swift`
+- [x] `Core/Database/LegacyKeyMigrationService.swift`
+- [x] `Core/Database/RecoveryKeyCodec.swift`
 - [x] `Core/Database/Migrations/MigrationV001.swift` — full schema
 
 ## Pass 4 — Resources
@@ -83,6 +86,8 @@ Legend: `[ ]` pending · `[x]` done · `[-]` deferred (with reason) · `[!]` blo
 - [x] `Core/Repositories/PayrollRepository.swift`
 - [x] `Core/Repositories/AuditRepository.swift`
 - [x] `Core/Repositories/ReportRepository.swift`
+- [x] `Core/Repositories/ReportRepository+FinancialStatements.swift`
+- [x] `Core/Repositories/ReportRepository+ComplianceReports.swift`
 - [x] `Core/Repositories/RegistryRepository.swift`
 - [x] `Core/Repositories/BankReconciliationRepository.swift`
 
@@ -172,6 +177,12 @@ Legend: `[ ]` pending · `[x]` done · `[-]` deferred (with reason) · `[!]` blo
 - [x] `Features/Reports/OutstandingView.swift`
 - [x] `Features/Reports/ReportDrillDownView.swift`
 - [x] `Features/Reports/ReportsViewModel.swift`
+- [x] `Features/Reports/ReportsBody+FinancialStatements.swift`
+- [x] `Features/Reports/ReportsBody+GST.swift`
+- [x] `Features/Reports/ReportsBody+Activity.swift`
+- [x] `Features/Reports/ReportsBody+Outstanding.swift`
+- [x] `Features/Reports/ReportsBody+Inventory.swift`
+- [x] `Features/Reports/ReportsBody+Navigation.swift`
 
 ### Inventory
 - [x] `Features/Inventory/InventoryHomeView.swift`

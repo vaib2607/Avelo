@@ -37,7 +37,18 @@ Release split rule:
 - Add stronger restore hardening and more explicit integrity verification around imported backups.
 - Add basic large-dataset performance work: better pagination, query-plan tuning, prepared-statement reuse, and benchmark-driven regression checks.
 - SQLCipher at-rest encryption is active for app-managed company databases with per-company raw keys stored in Keychain and user-custody recovery keys for cross-machine restore.
+- Backup manifests carry `manifestVersion`; restore rejects unsupported versions before opening imported bytes and verifies checksum/byte-count before encrypted open or copy.
+- Backup export stages the database and manifest through same-directory temp files before atomic replacement; restore/migration paths continue to stage work before final replacement.
 - Add clearer recovery for unusual filesystem cases like network volumes or antivirus locks.
+
+### V2 Encryption Performance Pass — 2026-06-20
+- Encrypted `postBatch` 10k vouchers: 5.226s vs 7.858s baseline, below the 9.037s +15% threshold.
+- Encrypted `postBatch` 100k vouchers: 97.805s vs 92.505s baseline, below the 106.381s +15% threshold; no SQLCipher KDF/page-size tuning applied.
+- `PRAGMA journal_mode` remains `wal` for encrypted on-disk benchmark fixtures.
+- Encrypted `postBatch` failure semantics remain chunked at 500 drafts: completed chunks persist, failing chunk rolls back, later chunks are not attempted.
+- `AccountTreeCache.reload()` with 500 added ledgers and FY-scoped balances: 0.095s.
+- 50k-voucher encrypted report timings: trial balance 0.736s, P&L 0.270s, balance sheet 0.297s, GST summary 0.000s, cash flow 0.951s, stock ageing 0.001s.
+- `ReportRepository+Statements.swift` was split into financial-statement and compliance-report extensions, and `ReportsView+Content.swift` report sections were split into focused `ReportsBody+...` extensions without changing `ReportService` cache keys or invalidation behavior.
 
 ### V3: Later Hardening / Scale Work
 - Filesystem-type detection and FAT32-specific backup warnings.

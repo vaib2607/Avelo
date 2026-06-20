@@ -145,7 +145,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
             guard case AppError.fileSystem(let message) = AppError.wrap(error) else {
                 return XCTFail("Expected fileSystem error, got \(error)")
             }
-            XCTAssertTrue(message.localizedCaseInsensitiveContains("copy backup file"))
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("backup file"))
         }
     }
 
@@ -188,7 +188,7 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
             guard case AppError.fileSystem(let message) = AppError.wrap(error) else {
                 return XCTFail("Expected fileSystem error, got \(error)")
             }
-            XCTAssertTrue(message.localizedCaseInsensitiveContains("replace existing backup file"))
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("backup file"))
         }
     }
 

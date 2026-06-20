@@ -9,6 +9,32 @@ final class RestoreServiceTests: XCTestCase {
         }
     }
 
+    private func makeBackedUpCompany(
+        root: URL,
+        name: String = "Backup Source Co"
+    ) async throws -> (manager: DatabaseManager, company: Company, backupURL: URL, recoveryKey: String) {
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
+        let company = try await CompanyService.create(
+            companyInput: .init(name: name, gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: manager
+        )
+        let backupURL = root.appendingPathComponent("\(UUID().uuidString).avelobackup")
+        _ = try await BackupService(manager: manager).export(companyId: company.id, companyName: company.name, to: backupURL)
+        return (manager, company, backupURL, try await manager.recoveryKey(for: company.id))
+    }
+
+    private func tempArtifacts(in directory: URL) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix(".") && $0.lastPathComponent.contains(".tmp") }
+    }
+
     func testCorruptRestoreFailsWithoutRegisteringCompany() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -80,6 +106,68 @@ final class RestoreServiceTests: XCTestCase {
         } catch {
             let entries = try await targetManager.listCompanies()
             XCTAssertTrue(entries.isEmpty)
+        }
+    }
+
+    func testRestoreRejectsUnsupportedManifestVersionBeforeOpeningBackup() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let backedUp = try await makeBackedUpCompany(root: sourceRoot, name: "Manifest Version Co")
+        let manifestURL = backedUp.backupURL.appendingPathExtension("manifest.json")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var manifest = try decoder.decode(BackupManifest.self, from: Data(contentsOf: manifestURL))
+        manifest.manifestVersion = 99
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(manifest).write(to: manifestURL)
+
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
+        do {
+            _ = try await RestoreService(manager: targetManager).restore(from: backedUp.backupURL, recoveryKey: backedUp.recoveryKey)
+            XCTFail("Expected unsupported manifest version to fail")
+        } catch {
+            guard case AppError.database(.schemaMismatch(let message)) = AppError.wrap(error) else {
+                return XCTFail("Expected schemaMismatch, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("manifest version"))
+            let companies = try await targetManager.listCompanies()
+            XCTAssertTrue(companies.isEmpty)
+        }
+    }
+
+    func testRestoreChecksChecksumBeforeOpeningOrRegisteringBackup() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let backedUp = try await makeBackedUpCompany(root: sourceRoot, name: "Checksum Co")
+        let handle = try FileHandle(forWritingTo: backedUp.backupURL)
+        let size = try handle.seekToEnd()
+        try handle.seek(toOffset: size - 1)
+        try handle.write(contentsOf: Data([0x01]))
+        try handle.close()
+
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
+        do {
+            _ = try await RestoreService(manager: targetManager).restore(from: backedUp.backupURL, recoveryKey: backedUp.recoveryKey)
+            XCTFail("Expected checksum mismatch")
+        } catch {
+            XCTAssertEqual(AppError.wrap(error), .database(.checksumMismatch))
+            let companies = try await targetManager.listCompanies()
+            XCTAssertTrue(companies.isEmpty)
         }
     }
 
@@ -276,6 +364,95 @@ final class RestoreServiceTests: XCTestCase {
             XCTAssertEqual(balanceSheet.totalAssetsPaise, balanceSheet.totalLiabilitiesPaise + balanceSheet.totalEquityPaise, "Iteration \(index)")
 
             await restoreManager.closeCompany(id: restored.id)
+        }
+    }
+
+    func testFreshKeychainRecoveryKeyRestoreSoakDoesNotLeakKeysOrCorruptFiles() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: sourceRoot) }
+
+        let backedUp = try await makeBackedUpCompany(root: sourceRoot, name: "Fresh Keychain Soak Co")
+        let originalSize = try FileManager.default.attributesOfItem(atPath: backedUp.backupURL.path)[.size] as? NSNumber
+
+        for index in 0..<10 {
+            let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: targetRoot) }
+
+            let keyStore = InMemoryCompanyKeyStore()
+            let restoreManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: keyStore)
+            let restored = try await RestoreService(manager: restoreManager).restore(from: backedUp.backupURL, recoveryKey: backedUp.recoveryKey)
+            let handle = try await restoreManager.openCompany(id: restored.id)
+            let company = try XCTUnwrap(CompanyRepository(db: handle.db).findById(restored.id), "Iteration \(index)")
+            XCTAssertEqual(company.name, "Fresh Keychain Soak Co")
+            XCTAssertEqual(keyStore.storedKeyCount, 1, "Iteration \(index)")
+            let restoredURL = try await restoreManager.companyFileURL(id: restored.id)
+            let restoredSize = try FileManager.default.attributesOfItem(atPath: restoredURL.path)[.size] as? NSNumber
+            XCTAssertNotNil(restoredSize)
+            XCTAssertNotEqual(restoredSize?.int64Value, 0)
+            await restoreManager.closeCompany(id: restored.id)
+        }
+
+        let finalSize = try FileManager.default.attributesOfItem(atPath: backedUp.backupURL.path)[.size] as? NSNumber
+        XCTAssertEqual(finalSize, originalSize)
+    }
+
+    func testRepeatedBackupRestoreCyclesKeepBackupStableAndRestoresReadable() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let backedUp = try await makeBackedUpCompany(root: sourceRoot, name: "Backup Restore Soak Co")
+        var previousSize = try XCTUnwrap((try FileManager.default.attributesOfItem(atPath: backedUp.backupURL.path)[.size] as? NSNumber)?.int64Value)
+        for index in 0..<50 {
+            _ = try await BackupService(manager: backedUp.manager).export(
+                companyId: backedUp.company.id,
+                companyName: backedUp.company.name,
+                to: backedUp.backupURL
+            )
+            let size = try XCTUnwrap((try FileManager.default.attributesOfItem(atPath: backedUp.backupURL.path)[.size] as? NSNumber)?.int64Value)
+            XCTAssertEqual(size, previousSize, "Backup size drifted at cycle \(index)")
+            previousSize = size
+
+            let restoreManager = try DatabaseManager(
+                appSupportDirectory: targetRoot.appendingPathComponent("restore-\(index)", isDirectory: true),
+                keyStore: InMemoryCompanyKeyStore()
+            )
+            let restored = try await RestoreService(manager: restoreManager).restore(from: backedUp.backupURL, recoveryKey: backedUp.recoveryKey)
+            let handle = try await restoreManager.openCompany(id: restored.id)
+            XCTAssertNotNil(try CompanyRepository(db: handle.db).findById(restored.id), "Cycle \(index)")
+            await restoreManager.closeCompany(id: restored.id)
+        }
+    }
+
+    func testBackupStagingFailureCleansTemporaryArtifactsAndKeepsNoPartialManifest() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let backedUp = try await makeBackedUpCompany(root: root, name: "Backup Failure Cleanup Co")
+        let blockedURL = root.appendingPathComponent("missing-parent", isDirectory: true)
+            .appendingPathComponent("blocked.avelobackup")
+
+        do {
+            _ = try await BackupService(manager: backedUp.manager).export(
+                companyId: backedUp.company.id,
+                companyName: backedUp.company.name,
+                to: blockedURL
+            )
+            XCTFail("Expected backup replace failure")
+        } catch {
+            guard case AppError.fileSystem = AppError.wrap(error) else {
+                return XCTFail("Expected fileSystem error, got \(error)")
+            }
+            XCTAssertTrue(try tempArtifacts(in: root).isEmpty)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: blockedURL.appendingPathExtension("manifest.json").path))
         }
     }
 

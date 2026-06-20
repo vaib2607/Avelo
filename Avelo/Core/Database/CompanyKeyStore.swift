@@ -124,4 +124,10 @@ public final class InMemoryCompanyKeyStore: CompanyKeyStoring, @unchecked Sendab
         defer { lock.unlock() }
         keys.removeValue(forKey: companyId)
     }
+
+    public var storedKeyCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return keys.count
+    }
 }

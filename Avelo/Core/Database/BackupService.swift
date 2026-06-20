@@ -17,9 +17,15 @@ public struct BackupService: Sendable {
                        to destinationURL: URL) async throws -> BackupManifest {
         let sourceURL = try await manager.companyFileURL(id: companyId)
         let fm = FileManager.default
-        let tempURL = fm.temporaryDirectory
-            .appendingPathComponent("avelo-backup-\(UUID().uuidString)-\(destinationURL.lastPathComponent)")
-        defer { try? fm.removeItem(at: tempURL) }
+        let tempURL = destinationURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(destinationURL.lastPathComponent).\(UUID().uuidString).tmp")
+        let manifestURL = destinationURL.appendingPathExtension("manifest.json")
+        let manifestTempURL = manifestURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(manifestURL.lastPathComponent).\(UUID().uuidString).tmp")
+        defer {
+            try? fm.removeItem(at: tempURL)
+            try? fm.removeItem(at: manifestTempURL)
+        }
         guard fm.fileExists(atPath: sourceURL.path) else {
             AveloBackupLogger.error("backup source missing: \(sourceURL.path, privacy: .public)")
             throw AppError.notFound("Source company file missing")
@@ -56,7 +62,6 @@ public struct BackupService: Sendable {
             originalFileName: sourceURL.lastPathComponent,
             byteCount: Int64(data.count)
         )
-        let manifestURL = destinationURL.appendingPathExtension("manifest.json")
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         let json: Data
@@ -66,29 +71,27 @@ public struct BackupService: Sendable {
             AveloBackupLogger.error("backup manifest encode failed: \(tempURL.path, privacy: .public)")
             throw AppError.fileSystem("Unable to encode backup manifest for \(tempURL.lastPathComponent): \(error.localizedDescription)")
         }
-        if fm.fileExists(atPath: destinationURL.path) {
-            do {
-                try fm.removeItem(at: destinationURL)
-            } catch {
-                AveloBackupLogger.error("backup replace failed: \(destinationURL.path, privacy: .public)")
-                throw AppError.fileSystem("Unable to replace existing backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
-            }
-        }
         do {
-            try fm.copyItem(at: tempURL, to: destinationURL)
+            try Self.replaceItemAtomically(tempURL: tempURL, destinationURL: destinationURL, fileManager: fm)
         } catch {
-            AveloBackupLogger.error("backup copy failed: \(destinationURL.path, privacy: .public)")
-            try? fm.removeItem(at: destinationURL)
-            throw AppError.fileSystem("Unable to copy backup file to \(destinationURL.lastPathComponent): \(error.localizedDescription)")
+            AveloBackupLogger.error("backup atomic replace failed: \(destinationURL.path, privacy: .public)")
+            throw AppError.fileSystem("Unable to replace backup file at \(destinationURL.lastPathComponent): \(error.localizedDescription)")
         }
         do {
-            try json.write(to: manifestURL)
+            try json.write(to: manifestTempURL, options: .atomic)
+            try Self.replaceItemAtomically(tempURL: manifestTempURL, destinationURL: manifestURL, fileManager: fm)
         } catch {
             AveloBackupLogger.error("backup manifest write failed: \(manifestURL.path, privacy: .public)")
-            try? fm.removeItem(at: manifestURL)
-            try? fm.removeItem(at: destinationURL)
             throw AppError.fileSystem("Unable to write backup manifest at \(manifestURL.lastPathComponent): \(error.localizedDescription)")
         }
         return manifest
+    }
+
+    private static func replaceItemAtomically(tempURL: URL, destinationURL: URL, fileManager: FileManager) throws {
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            _ = try fileManager.replaceItemAt(destinationURL, withItemAt: tempURL, backupItemName: nil, options: [])
+        } else {
+            try fileManager.moveItem(at: tempURL, to: destinationURL)
+        }
     }
 }
