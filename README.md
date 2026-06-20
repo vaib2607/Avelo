@@ -2,7 +2,7 @@
 
 Offline accounting for macOS.
 
-Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no network calls. All data lives on your Mac under `~/Library/Application Support/Avelo/`.
+Native Swift 5.9 + SwiftUI, raw SQLite/SQLCipher C APIs, no external Swift packages, no network calls. All data lives on your Mac under `~/Library/Application Support/Avelo/`.
 
 ## Screenshots
 
@@ -19,13 +19,14 @@ Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no ne
 | Core engine | `v1.1` hardening for speed, accuracy, and reliability |
 | Benchmark focus | cold launch, company switching, voucher posting, reports, backup/restore, 500k stress |
 | Math model | paise-exact, deterministic rounding, reconciliation checks |
-| Storage | local SQLite, per-company files, no network dependency |
+| Storage | local SQLCipher-encrypted per-company files, no network dependency |
 
 ## Release Focus
 
 - `v1.1` hardens the core engine for speed, accuracy, and reliability.
-- Benchmark validation now covers cold launch, company switching, voucher posting, reports, backup/restore, and 500k-voucher stress runs on the same machine and dataset.
+- Benchmark validation now covers cold launch, company switching, encrypted voucher posting, reports, backup/restore, and large-voucher stress runs on the same machine and dataset.
 - Paise-exact accounting remains the priority: no drift, deterministic rounding, and reconciliation checks on the core report paths.
+- App-managed company databases are encrypted at rest with per-company random keys stored in Keychain. Recovery keys are user-custody credentials for restoring encrypted backups on another Mac.
 
 ## What Changed
 
@@ -45,19 +46,21 @@ Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no ne
 - Added voucher template save/load support.
 - Added TSV paste support for voucher lines.
 - Confirmed keyboard shortcut help and F1 through F12 plus navigation shortcut coverage.
+- Added SQLCipher at-rest encryption for app-managed company databases, per-company Keychain keys, recovery-key restore, and legacy database migration coverage.
+- Hardened backup/restore with manifest version checks, SHA-256 and byte-count verification before restore open/copy, temp-file staging, and repeated restore soak coverage.
+- Added encryption-aware benchmark tests with explicit thresholds for 10k/100k voucher posting, report generation, and large account-tree reload.
+- Split report repository and report UI sections into focused files without changing report calculations or cache keys.
 
 ### Deferred / Not Yet Shipped
 
 - Purchase order and sales order workflow visibility across pending receipts and deliveries.
-- Cash flow or funds flow statement.
-- GST summary CSV export with a clearly labeled summary-only scope.
 - Cross-company consolidation and group-company reporting.
-- Stock ageing and reorder-level reporting.
+- Reorder-level reporting.
 
 ### Already There
 
 - Core offline accounting flow, multi-company storage, paise-based double-entry posting, reports, backup/restore, audit logging, and financial-year locking.
-- Local SQLite storage with no network dependency.
+- Local encrypted SQLite storage with no network dependency.
 - Existing shipped workflows remain intact while the surface widened around them.
 
 ### Why It Is Better
@@ -73,15 +76,29 @@ Native Swift 5.9 + SwiftUI, raw `import SQLite3`, no third-party packages, no ne
 | Multi-company | Separate `.sqlite` file per company, selectable at launch |
 | Accounting | `Int64` paise double-entry with Indian currency formatting |
 | Vouchers | Journal, Payment, Receipt, Contra, Purchase, Sales, Credit Note, Debit Note |
-| Reports | Trial Balance, P&L, Balance Sheet, GST Summary, Day Book, Ledger, Outstanding, Stock Valuation |
+| Reports | Trial Balance, P&L, Balance Sheet, GST Summary, Day Book, Ledger, Outstanding, Stock Valuation, Cash Flow, Stock Ageing |
 | Inventory | Stock groups, categories, units, godowns, batch tracking, physical stock, stock journal, BOM support |
 | Payroll | Employees and monthly salary postings |
 | Banking | CSV import and reconciliation against posted vouchers |
 | Audit | Append-only ledger of every write |
 | Financial years | Locking and closing with overlap protection |
-| Backup / restore | Portable `.zip` backups with SHA-256 manifest |
+| Backup / restore | Portable encrypted `.avelobackup` files with SHA-256 manifest and recovery-key restore |
 | Speedups | Cached statements, report caching, transaction batching, tighter cleanup under stress |
 | Entry helpers | Voucher templates, TSV line paste, and function-key shortcuts |
+
+## Current Benchmark Proof
+
+Latest encrypted benchmark run on `v1.1-dev`:
+
+| Benchmark | Result | Baseline / threshold |
+| --- | ---: | --- |
+| `postBatch` 10k vouchers | `5.226s` | baseline `7.858s`, +15% threshold `9.037s` |
+| `postBatch` 100k vouchers | `97.805s` | baseline `92.505s`, +15% threshold `106.381s` |
+| `AccountTreeCache.reload()` with 500+ ledgers | `0.095s` | threshold `2.000s` |
+| 50k trial balance | `0.736s` | threshold `8.000s` |
+| 50k P&L | `0.270s` | threshold `8.000s` |
+| 50k balance sheet | `0.297s` | threshold `8.000s` |
+| 50k cash flow | `0.951s` | threshold `8.000s` |
 
 ## Requirements
 
@@ -155,12 +172,13 @@ open dist/Avelo.app
 │   ├── <uuid-2>.sqlite
 │   └── ...
 └── Backups/
-    └── *.zip
+    └── *.avelobackup
 ```
+
+Company files are encrypted. Keys are stored in the macOS Keychain for the local Mac; keep the shown recovery key somewhere safe if the company needs to be restored on a different machine. Backups include encrypted database bytes, not the key.
 
 ## Docs
 
-See `Docs/Avelo_Master_PRD.md` for the product spec, and `Docs/Avelo_Architecture.md` for the layer map. `Docs/Avelo_ASSEMBLY.md` lists every file and what it does.
-For the Tally study and gap-analysis map, see `Docs/Tally_Master_Study_Guide.md`.
+See `Docs/Avelo_Master_PRD.md` for the product spec, `Docs/Avelo_Architecture.md` for the layer map, and `Docs/Avelo_Release_Board.md` for the current hardening board and benchmark numbers.
 
 Copyright © 2026 Karbonteck. All rights reserved.
