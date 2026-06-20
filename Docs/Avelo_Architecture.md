@@ -286,15 +286,16 @@ The key SQL patterns are documented inline in `ReportRepository.swift`. The key 
 
 `BackupService.export(companyId:to: URL) throws`:
 1. Asks `DatabaseManager` to flush the WAL by issuing a passive checkpoint.
-2. Copies the SQLite file to the destination URL.
+2. Copies the encrypted SQLite file to the destination URL.
 3. Writes a sidecar `manifest.json` with schema version, company name, exported-at, SHA-256 of the SQLite file.
 4. Returns a `BackupManifest`.
 
-`RestoreService.restore(from: URL, to: appSupportDirectory) throws -> CompanyRegistryEntry`:
+`RestoreService.restore(from: URL, recoveryKey: String?) throws -> CompanyRegistryEntry`:
 1. Validates the sidecar manifest, checks the SHA-256.
-2. Copies the file to a new `<uuid>.sqlite` under `Companies/`.
-3. Registers the company in the registry DB.
-4. Returns the registry entry. The user must explicitly switch to the restored company from the picker.
+2. Opens encrypted backups with the supplied recovery key when the local Keychain has no usable key.
+3. Copies the file to a new `<uuid>.sqlite` under `Companies/`.
+4. Registers the company in the registry DB.
+5. Returns the registry entry. The user must explicitly switch to the restored company from the picker.
 
 Restore never overwrites an existing company. The user is asked to pick a target name; collisions fail fast.
 

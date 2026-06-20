@@ -43,8 +43,8 @@ The only files that call `sqlite3_*`.
 - `MigrationRunner.swift` — `Migration` protocol + runner that compares `PRAGMA user_version` to the latest `SchemaVersion`.
 - `SchemaVersion.swift` — `current = 1`.
 - `SeedLoader.swift` — loads `DefaultChartOfAccounts.json` (or built-in fallback) and seeds the default chart, voucher types, and per-type sequences.
-- `BackupService.swift` — `await export(companyId:to:)` zips the `.sqlite` + manifest with SHA-256.
-- `RestoreService.swift` — `await restore(from:)` validates checksum, copies to a new uuid, registers.
+- `BackupService.swift` — `await export(companyId:to:)` checkpoints and copies the encrypted `.sqlite` + manifest with SHA-256.
+- `RestoreService.swift` — `await restore(from:recoveryKey:)` validates checksum, opens encrypted backups with a user recovery key when needed, copies to a new uuid, registers.
 - `Migrations/MigrationV001.swift` — full v1 schema in a Swift string literal (also duplicated in `Resources/SQL/schema_v1.sql`).
 
 ### Core/Models/

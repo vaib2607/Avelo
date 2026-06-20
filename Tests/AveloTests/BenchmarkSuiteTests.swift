@@ -264,7 +264,7 @@ final class BenchmarkSuiteTests: XCTestCase {
         let restoreService = RestoreService(manager: restoreManager)
 
         let restore = try await BenchmarkClock.measureAsync("backup_restore") {
-            _ = try await restoreService.restore(from: backupURL)
+            _ = try await restoreService.restore(from: backupURL, recoveryKey: try manager.recoveryKey(for: companyId))
         }
         suite.record(restore)
         BenchmarkClock.emit(restore)
