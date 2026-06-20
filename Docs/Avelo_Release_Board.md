@@ -49,6 +49,7 @@ Release split rule:
 - `AccountTreeCache.reload()` with 500 added ledgers and FY-scoped balances: 0.095s.
 - 50k-voucher encrypted report timings: trial balance 0.736s, P&L 0.270s, balance sheet 0.297s, GST summary 0.000s, cash flow 0.951s, stock ageing 0.001s.
 - `ReportRepository+Statements.swift` was split into financial-statement and compliance-report extensions, and `ReportsView+Content.swift` report sections were split into focused `ReportsBody+...` extensions without changing `ReportService` cache keys or invalidation behavior.
+- Release mechanics re-run on 2026-06-21: `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES swift build` passed, `make net-check` reported 0 matches, release build and bundle validation passed, and `Scripts/bundle_selftest.sh` passed for company setup, voucher CRUD, FY lock, reports, backup, and recovery-key restore.
 
 ### V3: Later Hardening / Scale Work
 - Filesystem-type detection and FAT32-specific backup warnings.

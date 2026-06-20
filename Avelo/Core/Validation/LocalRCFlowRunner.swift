@@ -20,8 +20,8 @@ enum LocalRCFlowRunner {
             try? FileManager.default.removeItem(at: restoreRoot)
         }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
-        let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot)
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
+        let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot, keyStore: InMemoryCompanyKeyStore())
 
         func requireDate(_ string: String) throws -> Date {
             guard let date = DateFormatters.parseDate(string) else {
