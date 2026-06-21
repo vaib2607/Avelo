@@ -184,12 +184,13 @@ public struct NewCompanySheet: View {
             Button("Create") { create() }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .disabled(!vm.canCreate || createdRecoveryKey != nil)
+                .disabled(!vm.canCreate || createdRecoveryKey != nil || env.isBusy)
         }
         .padding(16)
     }
 
     private func create() {
+        guard !env.isBusy else { return }
         env.isBusy = true
         Task {
             defer { env.isBusy = false }

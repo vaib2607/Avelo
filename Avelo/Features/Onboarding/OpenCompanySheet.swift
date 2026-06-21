@@ -6,6 +6,7 @@ public struct OpenCompanySheet: View {
     @Environment(AppRouter.self) private var router
     @State private var entries: [CompanyRegistryEntry] = []
     @State private var query: String = ""
+    @State private var isOpening: Bool = false
 
     public init() {}
 
@@ -32,11 +33,15 @@ public struct OpenCompanySheet: View {
                         }
                         Spacer()
                         Button("Open") {
+                            guard !isOpening && !env.isBusy else { return }
+                            isOpening = true
                             Task {
+                                defer { isOpening = false }
                                 await env.openCompany(entry.id)
                                 router.presentedSheet = nil
                             }
                         }
+                        .disabled(isOpening || env.isBusy)
                     }
                 }
             }
