@@ -3,6 +3,32 @@ import XCTest
 
 final class FinancialYearServiceTests: XCTestCase {
 
+    func testCloseFinancialYearConfirmationCancelAbortsWithoutStateChange() throws {
+        var confirmation = CloseFinancialYearConfirmationState()
+        let closed = false
+
+        confirmation.requestClose()
+        XCTAssertTrue(confirmation.isPresented)
+
+        confirmation.cancel()
+
+        XCTAssertFalse(confirmation.isPresented)
+        XCTAssertFalse(closed)
+    }
+
+    func testCloseFinancialYearConfirmationConfirmProceeds() throws {
+        var confirmation = CloseFinancialYearConfirmationState()
+        var closed = false
+
+        confirmation.requestClose()
+        confirmation.confirm {
+            closed = true
+        }
+
+        XCTAssertFalse(confirmation.isPresented)
+        XCTAssertTrue(closed)
+    }
+
     func testLockWritesAuditEvent() throws {
         let tc = try TestCompany.make()
         let service = FinancialYearService(db: tc.db, companyId: tc.companyId)
