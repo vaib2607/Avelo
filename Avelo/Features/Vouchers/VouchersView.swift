@@ -163,6 +163,7 @@ private struct VouchersBody: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search by narration / number / party…")
+                    .onChange(of: vm.query) { _, _ in vm.reloadFirstPage() }
                 Button { showTypeFilter.toggle() } label: {
                     Label("Type", systemImage: "line.3.horizontal.decrease.circle")
                 }
