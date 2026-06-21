@@ -18,6 +18,10 @@ public final class AccountService: Sendable {
         try repository.listForCompany(audit.companyId)
     }
 
+    public func listAccounts(limit: Int, offset: Int = 0) throws -> [Account] {
+        try repository.listForCompany(audit.companyId, limit: limit, offset: offset)
+    }
+
     public func listActiveAccounts() throws -> [Account] {
         try repository.listActiveForCompany(audit.companyId)
     }

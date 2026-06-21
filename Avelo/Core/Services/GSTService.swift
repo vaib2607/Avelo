@@ -167,7 +167,14 @@ public final class GSTService: Sendable {
     }
 
     private static func csvField(_ value: String) -> String {
-        guard value.contains(",") || value.contains("\"") || value.contains("\n") else { return value }
-        return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+        let hardened: String
+        if let first = escaped.first, ["=", "+", "-", "@"].contains(first) {
+            hardened = "'" + escaped
+        } else {
+            hardened = escaped
+        }
+        guard hardened.contains(",") || hardened.contains("\"") || hardened.contains("\n") else { return hardened }
+        return "\"\(hardened)\""
     }
 }

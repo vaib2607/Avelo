@@ -143,7 +143,7 @@ public final class PayrollService: Sendable {
             netPaise: net,
             postedAt: Date()
         )
-        var voucher: Voucher!
+        var voucher: Voucher?
         let lines = [
             LedgerLine(
                 id: UUID(),
@@ -175,7 +175,7 @@ public final class PayrollService: Sendable {
                 financialYearId: financialYearId,
                 typeCode: .payroll
             )
-            voucher = Voucher(
+            let payrollVoucher = Voucher(
                 id: voucherId,
                 companyId: companyId,
                 financialYearId: financialYearId,
@@ -191,7 +191,7 @@ public final class PayrollService: Sendable {
                 createdAt: now,
                 updatedAt: now
             )
-            try VoucherRepository(db: tx).insert(voucher)
+            try VoucherRepository(db: tx).insert(payrollVoucher)
             for line in lines {
                 try tx.execute(
                     """
@@ -217,8 +217,12 @@ public final class PayrollService: Sendable {
                 action: .salaryPosted,
                 entityType: "payroll_entry",
                 entityId: entry.id.uuidString,
-                snapshotAfter: PayrollPostSnapshot(entry: entry, voucher: voucher, lines: lines)
+                snapshotAfter: PayrollPostSnapshot(entry: entry, voucher: payrollVoucher, lines: lines)
             )
+            voucher = payrollVoucher
+        }
+        guard voucher != nil else {
+            throw AppError.validation(.init(code: .internal, message: "Payroll posting did not produce a voucher."))
         }
         ReportService.invalidateCache(companyId: companyId)
         return entry

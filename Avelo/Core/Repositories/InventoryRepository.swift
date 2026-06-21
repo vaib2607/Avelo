@@ -34,6 +34,14 @@ public struct InventoryRepository: Sendable {
         try listItemsForCompany(companyId, includeInactive: includeArchived)
     }
 
+    public func listItems(companyId: Company.ID, includeArchived: Bool = false, limit: Int, offset: Int = 0) throws -> [InventoryItem] {
+        let sql = "SELECT \(Self.itemColumns) FROM avelo_inventory_items WHERE company_id = ?\(includeArchived ? "" : " AND is_active = 1") ORDER BY code COLLATE NOCASE LIMIT ? OFFSET ?"
+        return try db.query(
+            sql,
+            bind: [.text(companyId.uuidString), .integer(Int64(limit)), .integer(Int64(offset))]
+        ) { try Self.rowToItem($0) }
+    }
+
     public func findItem(id: InventoryItem.ID) throws -> InventoryItem? {
         try findItemById(id)
     }

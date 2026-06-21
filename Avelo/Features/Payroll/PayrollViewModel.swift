@@ -15,6 +15,9 @@ public final class PayrollViewModel {
     public let companyId: Company.ID
     public let db: SQLiteDatabase
     public let fyId: FinancialYear.ID
+    internal var onResultsReady: (@Sendable () async -> Void)?
+    private var reloadTask: Task<Void, Never>?
+    private var reloadGeneration: UUID = UUID()
 
     public init(companyId: Company.ID, db: SQLiteDatabase, fyId: FinancialYear.ID) {
         self.companyId = companyId
@@ -24,21 +27,28 @@ public final class PayrollViewModel {
 
     public func reload() {
         isLoading = true
+        reloadTask?.cancel()
+        let generation = UUID()
+        reloadGeneration = generation
+        error = nil
         let db = db
         let companyId = companyId
         let monthYear = monthYear
-        Task.detached {
+        reloadTask = Task.detached { [weak self] in
             do {
                 let svc = PayrollService(db: db, companyId: companyId)
                 let employees = try svc.listEmployees()
                 let entries = try svc.listEntries(monthYear: monthYear)
-                await MainActor.run {
+                await self?.onResultsReady?()
+                await MainActor.run { [weak self] in
+                    guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
                     self.employees = employees
                     self.entries = entries
                     self.isLoading = false
                 }
             } catch {
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
                     self.error = AppError.wrap(error)
                     self.isLoading = false
                 }

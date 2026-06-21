@@ -252,6 +252,10 @@ final class ReportBehaviorTests: XCTestCase {
 
     func testGstr1InvoiceExportIsInvoiceWiseAndOfflineOnly() throws {
         let tc = try makeSeededCompany()
+        try tc.db.execute(
+            "UPDATE avelo_accounts SET name = ? WHERE id = ?",
+            [.text("=CMD|' /C calc'!A0"), .text(tc.debtorsId.uuidString)]
+        )
         let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
             draft: VoucherDraft(
                 mode: .create,
@@ -287,6 +291,7 @@ final class ReportBehaviorTests: XCTestCase {
         ), as: UTF8.self)
         XCTAssertTrue(csv.contains("Invoice Number,Invoice Date,Party Name"))
         XCTAssertTrue(csv.contains(posted.number))
+        XCTAssertTrue(csv.contains(",'=CMD|' /C calc'!A0,"))
         XCTAssertTrue(csv.contains("100.00,0.00,9.00,9.00,0.00,118.00"))
     }
 

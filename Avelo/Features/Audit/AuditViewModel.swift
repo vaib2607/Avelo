@@ -15,6 +15,9 @@ public final class AuditViewModel {
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase
+    internal var onResultsReady: (@Sendable () async -> Void)?
+    private var reloadTask: Task<Void, Never>?
+    private var reloadGeneration: UUID = UUID()
 
     public init(companyId: Company.ID, db: SQLiteDatabase) {
         self.companyId = companyId
@@ -23,13 +26,17 @@ public final class AuditViewModel {
 
     public func reload() {
         isLoading = true
+        reloadTask?.cancel()
+        let generation = UUID()
+        reloadGeneration = generation
+        error = nil
         let db = db
         let companyId = companyId
         let query = query
         let entityTypeFilter = entityTypeFilter
         let fromDate = fromDate
         let toDate = toDate
-        Task.detached {
+        reloadTask = Task.detached { [weak self] in
             do {
                 let repo = AuditRepository(db: db)
                 var f = AuditRepository.Filter(companyId: companyId, limit: 1000)
@@ -38,12 +45,15 @@ public final class AuditViewModel {
                 f.fromDate = fromDate
                 f.toDate = toDate
                 let events = try repo.list(filter: f)
-                await MainActor.run {
+                await self?.onResultsReady?()
+                await MainActor.run { [weak self] in
+                    guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
                     self.events = events
                     self.isLoading = false
                 }
             } catch {
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
                     self.error = AppError.wrap(error)
                     self.isLoading = false
                 }

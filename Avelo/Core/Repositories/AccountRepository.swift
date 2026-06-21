@@ -66,6 +66,20 @@ public struct AccountRepository: Sendable {
         ) { try Self.rowToAccount($0) }
     }
 
+    public func listForCompany(_ companyId: Company.ID, limit: Int, offset: Int = 0) throws -> [Account] {
+        try db.query(
+            """
+            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
+                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            FROM avelo_accounts
+            WHERE company_id = ?
+            ORDER BY code COLLATE NOCASE
+            LIMIT ? OFFSET ?
+            """,
+            bind: [.text(companyId.uuidString), .integer(Int64(limit)), .integer(Int64(offset))]
+        ) { try Self.rowToAccount($0) }
+    }
+
     public func listLedgersForGroup(_ groupId: AccountGroup.ID) throws -> [Account] {
         try db.query(
             """

@@ -205,14 +205,14 @@ public final class VoucherService: Sendable {
                 lineOrder: idx
             )
         }
-        var voucher: Voucher!
+        var voucher: Voucher?
         try db.write { tx in
             let number = try VoucherSequenceRepository(db: tx).nextNumber(
                 companyId: companyId,
                 financialYearId: fy.id,
                 typeCode: draft.voucherTypeCode
             )
-            voucher = Voucher(
+            let postedVoucher = Voucher(
                 id: voucherId,
                 companyId: companyId,
                 financialYearId: fy.id,
@@ -231,17 +231,21 @@ public final class VoucherService: Sendable {
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
             let accountRepo = AccountRepository(db: tx)
-            try vRepo.insert(voucher)
+            try vRepo.insert(postedVoucher)
             try lRepo.insertBatch(lines)
             try AuditService(db: tx, companyId: companyId).record(
                 action: .voucherPosted,
                 entityType: "voucher",
-                entityId: voucher.id.uuidString,
-                snapshotAfter: VoucherAuditSnapshot(voucher: voucher, lines: lines)
+                entityId: postedVoucher.id.uuidString,
+                snapshotAfter: VoucherAuditSnapshot(voucher: postedVoucher, lines: lines)
             )
             try markAccountsUsed(accountRepo, lines: lines)
+            voucher = postedVoucher
         }
 
+        guard let voucher else {
+            throw AppError.validation(.init(code: .internal, message: "Voucher posting did not produce a voucher."))
+        }
         let prompt = try inventoryPromptContext(for: voucher)
         return PostResult(voucher: voucher, inventoryPrompt: prompt)
     }
