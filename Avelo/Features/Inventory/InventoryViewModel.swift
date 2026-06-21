@@ -8,10 +8,19 @@ public final class InventoryViewModel {
     public var items: [InventoryItem] = []
     public var query: String = ""
     public var includeArchived: Bool = false
-    public var limit: Int = 200
-    public var offset: Int = 0
+    public var pagination = PaginationState()
     public var isLoading: Bool = false
     public var error: AppError?
+
+    public var limit: Int {
+        get { pagination.limit }
+        set { pagination.limit = max(1, newValue) }
+    }
+
+    public var offset: Int {
+        get { pagination.offset }
+        set { pagination.offset = max(0, newValue) }
+    }
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase
@@ -35,14 +44,24 @@ public final class InventoryViewModel {
         let includeArchived = includeArchived
         let limit = limit
         let offset = offset
+        let query = query
         reloadTask = Task.detached { [weak self] in
             do {
-                let items = try InventoryService(db: db, companyId: companyId)
-                    .listItems(includeArchived: includeArchived, limit: limit, offset: offset)
+                let filter = InventoryRepository.ItemFilter(
+                    companyId: companyId,
+                    includeArchived: includeArchived,
+                    searchText: query,
+                    limit: limit,
+                    offset: offset
+                )
+                let service = InventoryService(db: db, companyId: companyId)
+                let items = try service.listItems(filter: filter)
+                let totalCount = try service.countItems(filter: filter)
                 await self?.onResultsReady?()
                 await MainActor.run { [weak self] in
                     guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
                     self.items = items
+                    self.pagination.totalCount = totalCount
                     self.isLoading = false
                 }
             } catch {
@@ -56,11 +75,22 @@ public final class InventoryViewModel {
     }
 
     public var filtered: [InventoryItem] {
-        guard !query.isEmpty else { return items }
-        return items.filter {
-            $0.name.localizedCaseInsensitiveContains(query)
-                || $0.code.localizedCaseInsensitiveContains(query)
-        }
+        items
+    }
+
+    public func reloadFirstPage() {
+        pagination.reset()
+        reload()
+    }
+
+    public func previousPage() {
+        pagination.goPrevious()
+        reload()
+    }
+
+    public func nextPage() {
+        pagination.goNext()
+        reload()
     }
 
     public func archive(_ id: InventoryItem.ID) {

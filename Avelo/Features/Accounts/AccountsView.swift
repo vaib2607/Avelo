@@ -99,6 +99,7 @@ private struct AccountsBody: View {
                 Section {
                     Button {
                         vm.selectedGroupId = nil
+                        vm.reloadFirstPage()
                     } label: {
                         HStack {
                             Text("All groups")
@@ -114,7 +115,10 @@ private struct AccountsBody: View {
                             Spacer()
                         }
                         .contentShape(Rectangle())
-                        .onTapGesture { vm.selectedGroupId = g.id }
+                        .onTapGesture {
+                            vm.selectedGroupId = g.id
+                            vm.reloadFirstPage()
+                        }
                     }
                 }
             }
@@ -136,12 +140,14 @@ private struct AccountsBody: View {
             .padding(.top, 8)
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search accounts")
+                    .onChange(of: vm.query) { _, _ in vm.reloadFirstPage() }
                 Toggle("Show disabled", isOn: $vm.showDisabled)
                     .toggleStyle(.switch)
+                    .onChange(of: vm.showDisabled) { _, _ in vm.reloadFirstPage() }
                 Spacer()
             }
             .padding(12)
-                List(vm.filtered) { account in
+            List(vm.filtered) { account in
                 HStack {
                     VStack(alignment: .leading) {
                         Text(account.name.capitalized).font(.headline)
@@ -175,6 +181,12 @@ private struct AccountsBody: View {
                 }
                 .contentShape(Rectangle())
             }
+            PaginationControls(
+                state: vm.pagination,
+                isLoading: vm.isLoading,
+                previous: { vm.previousPage() },
+                next: { vm.nextPage() }
+            )
         }
     }
 }

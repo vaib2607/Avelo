@@ -70,6 +70,7 @@ final class ViewModelHardeningTests: XCTestCase {
 
         waitForReload(vm)
         XCTAssertEqual(vm.accounts.map(\.code), ["A000", "A001"])
+        XCTAssertEqual(vm.pagination.totalCount, 12)
     }
 
     func testInventoryReloadIgnoresStaleResultsAndRespectsPagination() throws {
@@ -105,6 +106,7 @@ final class ViewModelHardeningTests: XCTestCase {
 
         waitForReload(vm)
         XCTAssertEqual(vm.items.map(\.code), ["SKU004", "SKU005"])
+        XCTAssertEqual(vm.pagination.totalCount, 8)
     }
 
     func testPayrollReloadIgnoresStaleResults() throws {

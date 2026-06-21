@@ -24,6 +24,16 @@ public final class InventoryService: Sendable {
         return try repository.listItems(companyId: companyId, includeArchived: includeArchived, limit: limit, offset: offset)
     }
 
+    public func listItems(filter: InventoryRepository.ItemFilter) throws -> [InventoryItem] {
+        try ensureInventoryEnabled()
+        return try repository.listItems(filter: filter)
+    }
+
+    public func countItems(filter: InventoryRepository.ItemFilter) throws -> Int {
+        try ensureInventoryEnabled()
+        return try repository.countItems(filter: filter)
+    }
+
     public func findItem(_ id: InventoryItem.ID) throws -> InventoryItem? {
         try ensureInventoryEnabled()
         return try repository.findItem(id: id)

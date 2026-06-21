@@ -8,6 +8,29 @@ public struct AccountRepository: Sendable {
         self.db = db
     }
 
+    public struct Filter: Sendable {
+        public var companyId: Company.ID
+        public var groupId: AccountGroup.ID?
+        public var searchText: String?
+        public var includeInactive: Bool
+        public var limit: Int
+        public var offset: Int
+
+        public init(companyId: Company.ID,
+                    groupId: AccountGroup.ID? = nil,
+                    searchText: String? = nil,
+                    includeInactive: Bool = true,
+                    limit: Int = 200,
+                    offset: Int = 0) {
+            self.companyId = companyId
+            self.groupId = groupId
+            self.searchText = searchText
+            self.includeInactive = includeInactive
+            self.limit = limit
+            self.offset = offset
+        }
+    }
+
     public func findById(_ id: Account.ID) throws -> Account? {
         try db.queryOne(
             """
@@ -67,17 +90,47 @@ public struct AccountRepository: Sendable {
     }
 
     public func listForCompany(_ companyId: Company.ID, limit: Int, offset: Int = 0) throws -> [Account] {
-        try db.query(
+        try list(filter: .init(companyId: companyId, limit: limit, offset: offset))
+    }
+
+    public func list(filter: Filter) throws -> [Account] {
+        let built = Self.filterWhereClause(filter)
+        return try db.query(
             """
             SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
                    is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
             FROM avelo_accounts
-            WHERE company_id = ?
+            \(built.sql)
             ORDER BY code COLLATE NOCASE
             LIMIT ? OFFSET ?
             """,
-            bind: [.text(companyId.uuidString), .integer(Int64(limit)), .integer(Int64(offset))]
+            bind: built.bind + [.integer(Int64(filter.limit)), .integer(Int64(filter.offset))]
         ) { try Self.rowToAccount($0) }
+    }
+
+    public func count(filter: Filter) throws -> Int {
+        let built = Self.filterWhereClause(filter)
+        let sql = "SELECT COUNT(*) FROM avelo_accounts \(built.sql)"
+        return Int(try db.queryOne(sql, bind: built.bind) { $0.int(0) } ?? 0)
+    }
+
+    private static func filterWhereClause(_ filter: Filter) -> (sql: String, bind: [SQLValue]) {
+        var sql = "WHERE company_id = ?"
+        var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
+        if let groupId = filter.groupId {
+            sql += " AND group_id = ?"
+            bind.append(.text(groupId.uuidString))
+        }
+        if !filter.includeInactive {
+            sql += " AND is_active = 1"
+        }
+        if let search = filter.searchText?.trimmingCharacters(in: .whitespacesAndNewlines), !search.isEmpty {
+            sql += " AND (name LIKE ? OR code LIKE ?)"
+            let term = "%\(search)%"
+            bind.append(.text(term))
+            bind.append(.text(term))
+        }
+        return (sql, bind)
     }
 
     public func listLedgersForGroup(_ groupId: AccountGroup.ID) throws -> [Account] {

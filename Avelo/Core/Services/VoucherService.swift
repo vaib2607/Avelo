@@ -432,6 +432,10 @@ public final class VoucherService: Sendable {
         try repository.list(filter: filter)
     }
 
+    public func count(filter: VoucherRepository.Filter) throws -> Int {
+        try repository.count(filter: filter)
+    }
+
     public func findById(_ id: Voucher.ID) throws -> Voucher? {
         try repository.findById(id)
     }

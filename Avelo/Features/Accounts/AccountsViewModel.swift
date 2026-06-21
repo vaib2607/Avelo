@@ -10,10 +10,19 @@ public final class AccountsViewModel {
     public var query: String = ""
     public var selectedGroupId: AccountGroup.ID?
     public var showDisabled: Bool = false
-    public var limit: Int = 200
-    public var offset: Int = 0
+    public var pagination = PaginationState()
     public var isLoading: Bool = false
     public var error: AppError?
+
+    public var limit: Int {
+        get { pagination.limit }
+        set { pagination.limit = max(1, newValue) }
+    }
+
+    public var offset: Int {
+        get { pagination.offset }
+        set { pagination.offset = max(0, newValue) }
+    }
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase
@@ -36,16 +45,29 @@ public final class AccountsViewModel {
         let companyId = companyId
         let limit = limit
         let offset = offset
+        let selectedGroupId = selectedGroupId
+        let showDisabled = showDisabled
+        let query = query
         reloadTask = Task.detached { [weak self] in
             do {
                 let svc = AccountService(db: db, companyId: companyId)
-                let accounts = try svc.listAccounts(limit: limit, offset: offset)
+                let filter = AccountRepository.Filter(
+                    companyId: companyId,
+                    groupId: selectedGroupId,
+                    searchText: query,
+                    includeInactive: showDisabled,
+                    limit: limit,
+                    offset: offset
+                )
+                let accounts = try svc.listAccounts(filter: filter)
+                let totalCount = try svc.countAccounts(filter: filter)
                 let groups = try svc.listGroups()
                 await self?.onResultsReady?()
                 await MainActor.run { [weak self] in
                     guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
                     self.accounts = accounts
                     self.groups = groups
+                    self.pagination.totalCount = totalCount
                     self.isLoading = false
                 }
             } catch {
@@ -59,15 +81,22 @@ public final class AccountsViewModel {
     }
 
     public var filtered: [Account] {
-        accounts.filter { acc in
-            if !showDisabled && !acc.isActive { return false }
-            if let gid = selectedGroupId, acc.groupId != gid { return false }
-            if !query.isEmpty {
-                return acc.name.localizedCaseInsensitiveContains(query)
-                    || acc.code.localizedCaseInsensitiveContains(query)
-            }
-            return true
-        }
+        accounts
+    }
+
+    public func reloadFirstPage() {
+        pagination.reset()
+        reload()
+    }
+
+    public func previousPage() {
+        pagination.goPrevious()
+        reload()
+    }
+
+    public func nextPage() {
+        pagination.goNext()
+        reload()
     }
 
     public func disable(_ id: Account.ID) {

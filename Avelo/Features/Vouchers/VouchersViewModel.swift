@@ -12,10 +12,19 @@ public final class VouchersViewModel {
     public var typeFilter: Set<VoucherType.Code> = []
     public var fromDate: Date?
     public var toDate: Date?
-    public var limit: Int = 200
-    public var offset: Int = 0
+    public var pagination = PaginationState()
     public var isLoading: Bool = false
     public var error: AppError?
+
+    public var limit: Int {
+        get { pagination.limit }
+        set { pagination.limit = max(1, newValue) }
+    }
+
+    public var offset: Int {
+        get { pagination.offset }
+        set { pagination.offset = max(0, newValue) }
+    }
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase
@@ -61,12 +70,14 @@ public final class VouchersViewModel {
                 f.limit = limit
                 f.offset = offset
                 let vouchers = try svc.list(filter: f)
+                let totalCount = try svc.count(filter: f)
                 let accounts = try acct.listActiveAccounts()
                 await self?.onResultsReady?()
                 await MainActor.run { [weak self] in
                     guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
                     self.vouchers = vouchers
                     self.accounts = accounts
+                    self.pagination.totalCount = totalCount
                     self.isLoading = false
                 }
             } catch {
@@ -77,6 +88,21 @@ public final class VouchersViewModel {
                 }
             }
         }
+    }
+
+    public func reloadFirstPage() {
+        pagination.reset()
+        reload()
+    }
+
+    public func previousPage() {
+        pagination.goPrevious()
+        reload()
+    }
+
+    public func nextPage() {
+        pagination.goNext()
+        reload()
     }
 
     public func accountName(_ id: Account.ID) -> String {

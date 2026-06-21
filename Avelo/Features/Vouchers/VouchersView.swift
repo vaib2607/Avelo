@@ -104,6 +104,12 @@ private struct VouchersBody: View {
             } else {
                 voucherTable
             }
+            PaginationControls(
+                state: vm.pagination,
+                isLoading: vm.isLoading,
+                previous: { vm.previousPage() },
+                next: { vm.nextPage() }
+            )
             ModuleFooterBar(items: [
                 .init(title: "Next", detail: "Use Edit or Reverse on any row to continue the workflow."),
                 .init(title: "Shortcut", detail: "F4-F11 open the common voucher entry screens."),
@@ -189,7 +195,7 @@ private struct VouchersBody: View {
                     .padding(12)
                     .frame(minWidth: 260)
                 }
-                Button("Apply") { vm.reload() }
+                Button("Apply") { vm.reloadFirstPage() }
                     .buttonStyle(.bordered)
             }
         }

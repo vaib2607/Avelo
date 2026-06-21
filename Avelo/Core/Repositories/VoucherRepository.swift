@@ -56,7 +56,28 @@ public struct VoucherRepository: Sendable {
     }
 
     public func list(filter: Filter) throws -> [Voucher] {
-        var sql = Self.selectAllSQL + " WHERE v.company_id = ?"
+        let built = Self.filterWhereClause(filter)
+        var sql = Self.selectAllSQL + built.sql
+        var bind = built.bind
+        sql += " ORDER BY v.date DESC, v.number DESC LIMIT ? OFFSET ?"
+        bind.append(.integer(Int64(filter.limit)))
+        bind.append(.integer(Int64(filter.offset)))
+        return try db.query(sql, bind: bind) { try Self.rowToVoucher($0) }
+    }
+
+    public func count(filter: Filter) throws -> Int {
+        let built = Self.filterWhereClause(filter)
+        let sql = """
+            SELECT COUNT(*)
+            FROM avelo_vouchers v
+            LEFT JOIN avelo_accounts a ON a.id = v.party_account_id
+            \(built.sql)
+            """
+        return Int(try db.queryOne(sql, bind: built.bind) { $0.int(0) } ?? 0)
+    }
+
+    private static func filterWhereClause(_ filter: Filter) -> (sql: String, bind: [SQLValue]) {
+        var sql = " WHERE v.company_id = ?"
         var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
         if let fy = filter.financialYearId {
             sql += " AND v.financial_year_id = ?"
@@ -99,10 +120,7 @@ public struct VoucherRepository: Sendable {
         if filter.onlyUnreversed {
             sql += " AND v.is_reversal = 0"
         }
-        sql += " ORDER BY v.date DESC, v.number DESC LIMIT ? OFFSET ?"
-        bind.append(.integer(Int64(filter.limit)))
-        bind.append(.integer(Int64(filter.offset)))
-        return try db.query(sql, bind: bind) { try Self.rowToVoucher($0) }
+        return (sql, bind)
     }
 
     public func insert(_ voucher: Voucher) throws {

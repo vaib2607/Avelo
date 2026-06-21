@@ -73,9 +73,10 @@ private struct InventoryBody: View {
             )
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search items…")
+                    .onChange(of: vm.query) { _, _ in vm.reloadFirstPage() }
                 Toggle("Archived", isOn: $vm.includeArchived)
                     .toggleStyle(.switch)
-                    .onChange(of: vm.includeArchived) { _, _ in vm.reload() }
+                    .onChange(of: vm.includeArchived) { _, _ in vm.reloadFirstPage() }
             }
             .padding(12)
             Divider()
@@ -98,6 +99,12 @@ private struct InventoryBody: View {
                     }
                 }
             }
+            PaginationControls(
+                state: vm.pagination,
+                isLoading: vm.isLoading,
+                previous: { vm.previousPage() },
+                next: { vm.nextPage() }
+            )
             ModuleFooterBar(items: [
                 .init(title: "Next", detail: "Open Movement… to inspect item-level stock flow."),
                 .init(title: "Shortcut", detail: "⌘1 switches to stock items; ⇧⌘N creates a new item."),

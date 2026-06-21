@@ -11,6 +11,26 @@ public struct InventoryRepository: Sendable {
     private static let itemColumns = "id, company_id, code, name, unit, valuation_method, is_active, created_at"
     private static let movementColumns = "id, company_id, item_id, voucher_id, date, movement_type, quantity, unit_cost_paise, total_value_paise, reference_voucher_number, reason, created_at"
 
+    public struct ItemFilter: Sendable {
+        public var companyId: Company.ID
+        public var includeArchived: Bool
+        public var searchText: String?
+        public var limit: Int
+        public var offset: Int
+
+        public init(companyId: Company.ID,
+                    includeArchived: Bool = false,
+                    searchText: String? = nil,
+                    limit: Int = 200,
+                    offset: Int = 0) {
+            self.companyId = companyId
+            self.includeArchived = includeArchived
+            self.searchText = searchText
+            self.limit = limit
+            self.offset = offset
+        }
+    }
+
     public func findItemById(_ id: InventoryItem.ID) throws -> InventoryItem? {
         try db.queryOne(
             "SELECT \(Self.itemColumns) FROM avelo_inventory_items WHERE id = ?",
@@ -35,11 +55,36 @@ public struct InventoryRepository: Sendable {
     }
 
     public func listItems(companyId: Company.ID, includeArchived: Bool = false, limit: Int, offset: Int = 0) throws -> [InventoryItem] {
-        let sql = "SELECT \(Self.itemColumns) FROM avelo_inventory_items WHERE company_id = ?\(includeArchived ? "" : " AND is_active = 1") ORDER BY code COLLATE NOCASE LIMIT ? OFFSET ?"
+        try listItems(filter: .init(companyId: companyId, includeArchived: includeArchived, limit: limit, offset: offset))
+    }
+
+    public func listItems(filter: ItemFilter) throws -> [InventoryItem] {
+        let built = Self.itemFilterWhereClause(filter)
+        let sql = "SELECT \(Self.itemColumns) FROM avelo_inventory_items \(built.sql) ORDER BY code COLLATE NOCASE LIMIT ? OFFSET ?"
         return try db.query(
             sql,
-            bind: [.text(companyId.uuidString), .integer(Int64(limit)), .integer(Int64(offset))]
+            bind: built.bind + [.integer(Int64(filter.limit)), .integer(Int64(filter.offset))]
         ) { try Self.rowToItem($0) }
+    }
+
+    public func countItems(filter: ItemFilter) throws -> Int {
+        let built = Self.itemFilterWhereClause(filter)
+        return Int(try db.queryOne("SELECT COUNT(*) FROM avelo_inventory_items \(built.sql)", bind: built.bind) { $0.int(0) } ?? 0)
+    }
+
+    private static func itemFilterWhereClause(_ filter: ItemFilter) -> (sql: String, bind: [SQLValue]) {
+        var sql = "WHERE company_id = ?"
+        var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
+        if !filter.includeArchived {
+            sql += " AND is_active = 1"
+        }
+        if let search = filter.searchText?.trimmingCharacters(in: .whitespacesAndNewlines), !search.isEmpty {
+            sql += " AND (name LIKE ? OR code LIKE ?)"
+            let term = "%\(search)%"
+            bind.append(.text(term))
+            bind.append(.text(term))
+        }
+        return (sql, bind)
     }
 
     public func findItem(id: InventoryItem.ID) throws -> InventoryItem? {
