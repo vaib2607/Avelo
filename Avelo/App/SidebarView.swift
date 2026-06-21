@@ -4,13 +4,11 @@ public struct SidebarView: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
-    @Environment(WindowState.self) private var windowState
 
     public init() {}
 
     public var body: some View {
         @Bindable var router = router
-        @Bindable var windowState = windowState
 
         List(selection: $router.selection) {
             Section("Workspace") {
@@ -59,15 +57,6 @@ public struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .navigationTitle("Avelo")
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    windowState.toggleSidebar()
-                } label: {
-                    Image(systemName: "sidebar.left")
-                }
-            }
-        }
     }
 
     private var currentCompanyName: String {
