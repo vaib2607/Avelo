@@ -300,6 +300,20 @@ public final class AppEnvironment {
         router.reset()
     }
 
+    public func deleteCompany(_ id: Company.ID) async {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            try await manager.deleteCompanyFiles(id: id)
+            if companyContext?.companyId == id {
+                closeCompany()
+            }
+            banner = BannerPayload(kind: .success("Company deleted."), message: "Company deleted.")
+        } catch {
+            globalError = AppError.wrap(error)
+        }
+    }
+
     public func markAccountTreeDirty() {
         accountTree?.invalidate()
     }

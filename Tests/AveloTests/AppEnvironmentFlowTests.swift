@@ -281,6 +281,58 @@ final class AppEnvironmentFlowTests: XCTestCase {
         XCTAssertNil(env.router.presentedSheet)
     }
 
+    func testDeleteNonOpenCompanyRemovesFilesAndRegistryEntry() async throws {
+        let fixture = try await makeEnvironmentFixture()
+        defer { fixture.cleanup() }
+
+        let company = try await makeCompany(named: "Delete Non Open Co", manager: fixture.manager)
+        let dbURL = try await fixture.manager.companyFileURL(id: company.id)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dbURL.path))
+
+        await fixture.env.deleteCompany(company.id)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dbURL.path))
+        XCTAssertNil(try fixture.registry.findById(company.id))
+        XCTAssertNil(fixture.env.companyContext)
+        XCTAssertFalse(fixture.env.isBusy)
+        XCTAssertEqual(fixture.env.banner?.message, "Company deleted.")
+    }
+
+    func testDeleteOpenCompanyClearsContextAndRouterState() async throws {
+        let fixture = try await makeEnvironmentFixture()
+        defer { fixture.cleanup() }
+
+        let company = try await makeCompany(named: "Delete Open Co", manager: fixture.manager)
+        let dbURL = try await fixture.manager.companyFileURL(id: company.id)
+        await fixture.env.openCompany(company.id)
+        fixture.env.router.selection = .reports
+        fixture.env.router.present(.newVoucher)
+
+        await fixture.env.deleteCompany(company.id)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dbURL.path))
+        XCTAssertNil(try fixture.registry.findById(company.id))
+        XCTAssertNil(fixture.env.companyContext)
+        XCTAssertNil(fixture.env.accountTree)
+        XCTAssertEqual(fixture.env.router.selection, .dashboard)
+        XCTAssertNil(fixture.env.router.presentedSheet)
+        XCTAssertFalse(fixture.env.isBusy)
+    }
+
+    func testDeleteCompanyConfirmationCancelAbortsWithoutStartingAction() throws {
+        let companyId = UUID()
+        var rowActions = OpenCompanyRowActionState()
+
+        rowActions.requestDelete(companyId)
+        XCTAssertEqual(rowActions.pendingDeleteCompanyId, companyId)
+
+        rowActions.cancelDelete()
+
+        XCTAssertNil(rowActions.pendingDeleteCompanyId)
+        XCTAssertNil(rowActions.activeAction)
+        XCTAssertFalse(rowActions.beginDelete(companyId, appIsBusy: false))
+    }
+
     func testDemoBootstrapDoesNotForceCrashWhenExpectedSeedAccountsAreMissing() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -324,5 +376,50 @@ private func tcLikeDeleteAccountCodeIfExists(db: SQLiteDatabase, code: String) t
     _ = try db.execute(
         "DELETE FROM avelo_accounts WHERE code = ?",
         [.text(code)]
+    )
+}
+
+@MainActor
+private struct AppEnvironmentTestFixture {
+    let root: URL
+    let manager: DatabaseManager
+    let registryDb: SQLiteDatabase
+    let registry: RegistryRepository
+    let env: AppEnvironment
+
+    func cleanup() {
+        registryDb.close()
+        try? FileManager.default.removeItem(at: root)
+    }
+}
+
+@MainActor
+private func makeEnvironmentFixture() async throws -> AppEnvironmentTestFixture {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
+    let registryDb = try await SQLiteDatabase(path: manager.registryPath)
+    let registry = RegistryRepository(db: registryDb)
+    let env = AppEnvironment(
+        manager: manager,
+        router: AppRouter(),
+        keyboard: KeyboardRouter(),
+        registry: registry,
+        backupService: BackupService(manager: manager)
+    )
+    return AppEnvironmentTestFixture(root: root, manager: manager, registryDb: registryDb, registry: registry, env: env)
+}
+
+private func makeCompany(named name: String, manager: DatabaseManager) async throws -> Company {
+    try await CompanyService.create(
+        companyInput: .init(name: name, gstin: nil, pan: nil),
+        fyInput: .init(
+            label: "2024-25",
+            startDate: DateFormatters.parseDate("2024-04-01")!,
+            endDate: DateFormatters.parseDate("2025-03-31")!,
+            booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+        ),
+        seedDefaults: true,
+        manager: manager
     )
 }
