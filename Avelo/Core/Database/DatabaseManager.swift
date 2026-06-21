@@ -16,6 +16,7 @@ public final class CompanyHandle: @unchecked Sendable {
 }
 
 public final actor DatabaseManager {
+    public typealias DatabaseOpener = @Sendable (_ path: String, _ key: Data?) throws -> SQLiteDatabase
 
     public let appSupportDirectory: URL
     public let companiesDirectory: URL
@@ -24,10 +25,14 @@ public final actor DatabaseManager {
     private var openHandles: [Company.ID: CompanyHandle] = [:]
     private var registryDb: SQLiteDatabase?
     public nonisolated let keyStore: CompanyKeyStoring
+    private let databaseOpener: DatabaseOpener
 
-    public init(appSupportDirectory: URL, keyStore: CompanyKeyStoring = CompanyKeyStore()) throws {
+    public init(appSupportDirectory: URL,
+                keyStore: CompanyKeyStoring = CompanyKeyStore(),
+                databaseOpener: @escaping DatabaseOpener = { path, key in try SQLiteDatabase(path: path, key: key) }) throws {
         self.appSupportDirectory = appSupportDirectory
         self.keyStore = keyStore
+        self.databaseOpener = databaseOpener
         let companiesURL = appSupportDirectory.appendingPathComponent("Companies", isDirectory: true)
         self.companiesDirectory = companiesURL
         let registryURL = appSupportDirectory.appendingPathComponent("avelo_registry.sqlite")
@@ -111,7 +116,7 @@ public final actor DatabaseManager {
         let url = companiesDirectory.appendingPathComponent("\(companyId.uuidString).sqlite")
         let companyKey = try key ?? keyStore.generateKey()
         try keyStore.store(key: companyKey, companyId: companyId)
-        let db = try SQLiteDatabase(path: url.path, key: companyKey)
+        let db = try databaseOpener(url.path, companyKey)
         defer { db.close() }
         try MigrationRunner().runMigrations(on: db)
         return url
@@ -125,7 +130,7 @@ public final actor DatabaseManager {
             throw AppError.notFound("Company file not found: \(url.lastPathComponent)")
         }
         let key = try LegacyKeyMigrationService(keyStore: keyStore).migrateIfNeeded(companyId: id, fileURL: url)
-        let db = try SQLiteDatabase(path: url.path, key: key)
+        let db = try databaseOpener(url.path, key)
         let current = db.userVersion()
         if current < SchemaVersion.current.rawValue {
             do {

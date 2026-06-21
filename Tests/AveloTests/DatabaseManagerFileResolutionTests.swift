@@ -3,6 +3,50 @@ import XCTest
 
 final class DatabaseManagerFileResolutionTests: XCTestCase {
 
+    func testConcurrentOpenCompanyCreatesOnlyOneDatabaseHandle() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let counter = DatabaseOpenCounter()
+        let manager = try DatabaseManager(
+            appSupportDirectory: root,
+            keyStore: InMemoryCompanyKeyStore(),
+            databaseOpener: { path, key in
+                counter.increment()
+                return try SQLiteDatabase(path: path, key: key)
+            }
+        )
+        let companyId = UUID()
+        let companyURL = try await manager.createCompanyFile(companyId: companyId)
+        counter.reset()
+
+        let companyKey = try XCTUnwrap(try manager.keyStore.retrieve(companyId: companyId))
+        let db = try SQLiteDatabase(path: companyURL.path, key: companyKey)
+        _ = try TestCompany.seed(into: db, companyId: companyId, companyName: "Concurrent Open Co")
+        db.close()
+        try await manager.registerCompany(
+            CompanyRegistryEntry(id: companyId, name: "Concurrent Open Co", sqliteFileName: companyURL.lastPathComponent)
+        )
+
+        let handles = try await withThrowingTaskGroup(of: ObjectIdentifier.self) { group in
+            for _ in 0..<20 {
+                group.addTask {
+                    let handle = try await manager.openCompany(id: companyId)
+                    return ObjectIdentifier(handle)
+                }
+            }
+            var identifiers: [ObjectIdentifier] = []
+            for try await identifier in group {
+                identifiers.append(identifier)
+            }
+            return identifiers
+        }
+
+        XCTAssertEqual(Set(handles).count, 1)
+        XCTAssertEqual(counter.value, 1)
+    }
+
     func testOpenCompanyUsesRegistrySQLiteFileNameWhenItDiffersFromLegacyPattern() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -256,5 +300,27 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: registeredShm.path))
         let deletedEntry = try await manager.findCompany(id: companyId)
         XCTAssertNil(deletedEntry)
+    }
+}
+
+private final class DatabaseOpenCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int {
+        lock.lock(); defer { lock.unlock() }
+        return count
+    }
+
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+
+    func reset() {
+        lock.lock()
+        count = 0
+        lock.unlock()
     }
 }
