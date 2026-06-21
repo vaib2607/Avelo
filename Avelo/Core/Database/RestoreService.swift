@@ -24,7 +24,8 @@ public struct RestoreService: Sendable {
         "avelo_audit_events",
         "avelo_voucher_sequences",
         "avelo_voucher_templates",
-        "avelo_bank_reconciliations"
+        "avelo_bank_reconciliations",
+        "avelo_bank_statement_lines"
     ]
     private static let auditImmutabilityTriggerSQL: [String] = [
         """

@@ -22,11 +22,31 @@ public struct BankReconciliationRepository: Sendable {
 
     public struct StatementLine: Sendable, Identifiable, Hashable, Codable {
         public let id: UUID
+        public let companyId: Company.ID
         public let accountId: Account.ID
         public let date: Date
         public let amountPaise: Int64
         public let narration: String
+        public let matchedVoucherId: Voucher.ID?
         public let isCleared: Bool
+
+        public init(id: UUID,
+                    companyId: Company.ID,
+                    accountId: Account.ID,
+                    date: Date,
+                    amountPaise: Int64,
+                    narration: String,
+                    matchedVoucherId: Voucher.ID? = nil,
+                    isCleared: Bool) {
+            self.id = id
+            self.companyId = companyId
+            self.accountId = accountId
+            self.date = date
+            self.amountPaise = amountPaise
+            self.narration = narration
+            self.matchedVoucherId = matchedVoucherId
+            self.isCleared = isCleared
+        }
     }
 
     public typealias StatementEntry = StatementLine
@@ -91,17 +111,56 @@ public struct BankReconciliationRepository: Sendable {
         }
     }
 
-    public func insertStatementLine(accountId: Account.ID,
+    public func insertStatementLine(companyId: Company.ID,
+                                    accountId: Account.ID,
                                     date: Date,
                                     amountPaise: Int64,
-                                    narration: String) throws {
-        _ = (accountId, date, amountPaise, narration)
-        throw AppError.featureUnavailable("Bank statement line import is deferred outside the frozen schema.")
+                                    narration: String,
+                                    importBatchId: UUID? = nil) throws {
+        try db.execute(
+            """
+            INSERT INTO avelo_bank_statement_lines
+            (id, company_id, bank_account_id, statement_date, amount_paise,
+             narration, import_batch_id, imported_at, matched_voucher_id, is_cleared, cleared_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL)
+            """,
+            [
+                .text(UUID().uuidString),
+                .text(companyId.uuidString),
+                .text(accountId.uuidString),
+                .date(date),
+                .integer(amountPaise),
+                .text(narration),
+                .optionalText(importBatchId?.uuidString),
+                .timestamp(Date())
+            ]
+        )
     }
 
     public func statementLines(accountId: Account.ID, asOf: Date) throws -> [StatementLine] {
-        _ = (accountId, asOf)
-        throw AppError.featureUnavailable("Bank statement line import is deferred outside the frozen schema.")
+        try db.query(
+            """
+            SELECT id, company_id, bank_account_id, statement_date, amount_paise,
+                   narration, matched_voucher_id, is_cleared
+            FROM avelo_bank_statement_lines
+            WHERE bank_account_id = ? AND statement_date <= ?
+            ORDER BY statement_date ASC, imported_at ASC, id ASC
+            """,
+            bind: [.text(accountId.uuidString), .date(asOf)]
+        ) { r in
+            StatementLine(
+                id: try UUIDParsing.required(r.text("id"), field: "avelo_bank_statement_lines.id"),
+                companyId: try UUIDParsing.required(r.text("company_id"), field: "avelo_bank_statement_lines.company_id"),
+                accountId: try UUIDParsing.required(r.text("bank_account_id"), field: "avelo_bank_statement_lines.bank_account_id"),
+                date: r.date("statement_date"),
+                amountPaise: r.int("amount_paise"),
+                narration: r.text("narration"),
+                matchedVoucherId: try r.optionalText("matched_voucher_id").map {
+                    try UUIDParsing.required($0, field: "avelo_bank_statement_lines.matched_voucher_id")
+                },
+                isCleared: r.bool("is_cleared")
+            )
+        }
     }
 
     public func candidateVouchers(accountId: Account.ID, asOf: Date) throws -> [VoucherCandidate] {
@@ -143,7 +202,13 @@ public struct BankReconciliationRepository: Sendable {
     }
 
     public func clearStatementLine(id: UUID) throws {
-        _ = id
-        throw AppError.featureUnavailable("Bank statement line import is deferred outside the frozen schema.")
+        try db.execute(
+            """
+            UPDATE avelo_bank_statement_lines
+            SET is_cleared = 1, cleared_at = ?
+            WHERE id = ?
+            """,
+            [.timestamp(Date()), .text(id.uuidString)]
+        )
     }
 }

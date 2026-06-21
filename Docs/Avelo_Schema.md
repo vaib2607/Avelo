@@ -471,7 +471,30 @@ UNIQUE `(company_id, name)`.
 UNIQUE `(voucher_id)` — one reconciliation row per voucher.
 Index `idx_avelo_br_account_cleared` on `(bank_account_id, is_cleared)`.
 
-## 19. avelo_migrations
+## 19. avelo_bank_statement_lines
+
+Raw imported bank statement lines are a deliberate v4 schema extension. The original frozen schema stored only matched reconciliation rows, which made the Banking import UI unable to retain unmatched statement lines or reconcile them later when voucher dates and bank clearing dates drifted. This table is append-only relative to the v1-v3 tables and does not alter any frozen table.
+
+| Column | Type | Constraint |
+|---|---|---|
+| id | TEXT | PK |
+| company_id | TEXT | NOT NULL, FK |
+| bank_account_id | TEXT | NOT NULL, FK avelo_accounts(id) |
+| statement_date | TEXT | NOT NULL |
+| amount_paise | INTEGER | NOT NULL |
+| narration | TEXT | NOT NULL |
+| import_batch_id | TEXT | nullable |
+| imported_at | TEXT | NOT NULL |
+| matched_voucher_id | TEXT | nullable, FK avelo_vouchers(id) |
+| is_cleared | INTEGER | NOT NULL DEFAULT 0, CHECK IN (0,1) |
+| cleared_at | TEXT | nullable |
+
+Indexes:
+- `idx_avelo_bank_statement_lines_account_date` on `(bank_account_id, statement_date)`.
+- `idx_avelo_bank_statement_lines_clearance` on `(company_id, is_cleared, statement_date)`.
+- `idx_avelo_bank_statement_lines_matched_voucher` on `(matched_voucher_id)`.
+
+## 20. avelo_migrations
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -479,7 +502,7 @@ Index `idx_avelo_br_account_cleared` on `(bank_account_id, is_cleared)`.
 | applied_at | TEXT | NOT NULL |
 | description | TEXT | NOT NULL |
 
-## 20. Registry DB tables (`avelo_registry.sqlite`)
+## 21. Registry DB tables (`avelo_registry.sqlite`)
 
 ### avelo_registry_companies
 
@@ -522,11 +545,14 @@ idx_avelo_payroll_company_period
 idx_avelo_audit_entity
 idx_avelo_audit_time
 idx_avelo_br_account_cleared
+idx_avelo_bank_statement_lines_account_date
+idx_avelo_bank_statement_lines_clearance
+idx_avelo_bank_statement_lines_matched_voucher
 ```
 
 ## 22. Migration policy
 
-- `SchemaVersion.current = 3`.
+- `SchemaVersion.current = 4`.
 - `MigrationRunner` reads `PRAGMA user_version`, compares to highest `avelo_migrations.version`, and applies missing migrations in order inside a single transaction.
 - Each migration is a `struct: Migration` with a numeric version, a description, and a `func up(db: SQLiteDatabase) throws` body.
 - Migrations are append-only. Never edit a past migration.

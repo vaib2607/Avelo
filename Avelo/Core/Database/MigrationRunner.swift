@@ -17,7 +17,8 @@ public struct MigrationRunner: Sendable {
     public static let defaultMigrations: [Migration] = [
         MigrationV001(),
         MigrationV002(),
-        MigrationV003()
+        MigrationV003(),
+        MigrationV004()
     ]
 
     public func runMigrations(on db: SQLiteDatabase) throws {
@@ -31,6 +32,10 @@ public struct MigrationRunner: Sendable {
                 try insertMigrationRecord(tx, version: migration.version, description: migration.description)
                 try tx.setUserVersion(migration.version.rawValue)
             }
+        }
+        let recordedVersion = try fetchAppliedVersions(db).map(\.rawValue).max() ?? db.userVersion()
+        if db.userVersion() < recordedVersion {
+            try db.setUserVersion(recordedVersion)
         }
     }
 

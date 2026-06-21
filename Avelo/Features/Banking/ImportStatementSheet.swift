@@ -66,33 +66,79 @@ public struct ImportStatementSheet: View {
         guard let aid = accountId else { return }
         isWorking = true
         status = "Parsing…"
-        let lines = csvText.split(separator: "\n").map(String.init)
-        var entries: [BankReconciliationService.StatementEntry] = []
-        let iso = DateFormatters.isoDate
-        for (idx, raw) in lines.enumerated() {
-            if idx == 0 && raw.lowercased().contains("date") { continue }
-            let parts = raw.split(separator: ",", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
-            guard parts.count >= 3 else { continue }
-            guard let d = iso.date(from: parts[0]) else { continue }
-            guard let paise = Currency.parseRupeeInput(parts[1]) else { continue }
-            let narration = parts[2...].joined(separator: ",")
-            entries.append(BankReconciliationService.StatementEntry(
-                id: UUID(),
-                accountId: aid,
-                date: d,
-                amountPaise: paise,
-                narration: narration,
-                isCleared: false
-            ))
+        let parsed = BankStatementCSVParser.parse(csvText, companyId: companyId, accountId: aid)
+        let entries = parsed.entries
+        guard !entries.isEmpty else {
+            status = parsed.errors.isEmpty ? "No rows found." : parsed.errors.joined(separator: "\n")
+            isWorking = false
+            return
         }
         do {
             try BankReconciliationService(db: db, companyId: companyId)
                 .importStatement(accountId: aid, entries: entries)
-            status = "Imported \(entries.count) entries."
+            if parsed.errors.isEmpty {
+                status = "Imported \(entries.count) entries."
+            } else {
+                status = "Imported \(entries.count) entries. Skipped \(parsed.errors.count) row(s):\n\(parsed.errors.joined(separator: "\n"))"
+            }
             env.showSuccess("Statement imported.")
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }
         isWorking = false
+    }
+}
+
+public struct BankStatementCSVParser: Sendable {
+    public struct Result: Sendable, Equatable {
+        public let entries: [BankReconciliationService.StatementEntry]
+        public let errors: [String]
+    }
+
+    public static func parse(_ csvText: String,
+                             companyId: Company.ID,
+                             accountId: Account.ID) -> Result {
+        let lines = csvText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var entries: [BankReconciliationService.StatementEntry] = []
+        var errors: [String] = []
+        let iso = DateFormatters.isoDate
+
+        for (idx, raw) in lines.enumerated() {
+            let rowNumber = idx + 1
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { continue }
+            if idx == 0 && trimmed.lowercased().contains("date") { continue }
+
+            let parts = raw.split(separator: ",", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count >= 3 else {
+                errors.append("Row \(rowNumber): expected date, amount, narration.")
+                continue
+            }
+            guard let date = iso.date(from: parts[0]) else {
+                errors.append("Row \(rowNumber): invalid date '\(parts[0])'.")
+                continue
+            }
+            guard let parsedAmountPaise = Currency.parseRupeeInput(parts[1]) else {
+                errors.append("Row \(rowNumber): invalid amount '\(parts[1])'.")
+                continue
+            }
+            let amountPaise = parts[1].hasPrefix("-") ? -abs(parsedAmountPaise) : parsedAmountPaise
+            let narration = parts[2...].joined(separator: ",").trimmingCharacters(in: .whitespaces)
+            guard !narration.isEmpty else {
+                errors.append("Row \(rowNumber): narration is required.")
+                continue
+            }
+            entries.append(BankReconciliationService.StatementEntry(
+                id: UUID(),
+                companyId: companyId,
+                accountId: accountId,
+                date: date,
+                amountPaise: amountPaise,
+                narration: narration,
+                isCleared: false
+            ))
+        }
+        return Result(entries: entries, errors: errors)
     }
 }

@@ -51,12 +51,15 @@ public final class BankReconciliationService: Sendable {
                                 entries: [StatementEntry]) throws {
         try db.write { tx in
             let repo = BankReconciliationRepository(db: tx)
+            let importBatchId = UUID()
             for e in entries {
                 try repo.insertStatementLine(
+                    companyId: companyId,
                     accountId: accountId,
                     date: e.date,
                     amountPaise: e.amountPaise,
-                    narration: e.narration
+                    narration: e.narration,
+                    importBatchId: importBatchId
                 )
             }
         }
@@ -64,7 +67,8 @@ public final class BankReconciliationService: Sendable {
 
     public func reconcile(accountId: Account.ID,
                           asOf: Date,
-                          tolerancePaise: Int64 = 0) throws -> ReconciliationResult {
+                          tolerancePaise: Int64 = 0,
+                          dateToleranceDays: Int = 3) throws -> ReconciliationResult {
         let bookBalance: Int64
         let statement: [StatementEntry]
         let vouchers: [BankReconciliationRepository.VoucherCandidate]
@@ -83,7 +87,7 @@ public final class BankReconciliationService: Sendable {
             for s in statement {
                 if let v = vouchers.first(where: { v in
                     !matchedVoucherIds.contains(v.id)
-                        && v.date == s.date
+                        && Self.isWithinDateTolerance(v.date, s.date, days: dateToleranceDays)
                         && abs(v.amountPaise - abs(s.amountPaise)) <= tolerancePaise
                 }) {
                     m.append(Match(
@@ -115,5 +119,14 @@ public final class BankReconciliationService: Sendable {
             let repo = BankReconciliationRepository(db: tx)
             try repo.clearStatementLine(id: id)
         }
+    }
+
+    private static func isWithinDateTolerance(_ lhs: Date, _ rhs: Date, days: Int) -> Bool {
+        let allowedDays = max(0, days)
+        let calendar = Calendar(identifier: .gregorian)
+        let start = calendar.startOfDay(for: lhs)
+        let end = calendar.startOfDay(for: rhs)
+        let delta = calendar.dateComponents([.day], from: start, to: end).day ?? Int.max
+        return abs(delta) <= allowedDays
     }
 }

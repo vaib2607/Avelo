@@ -40,6 +40,7 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_accounts",
             "avelo_audit_events",
             "avelo_bank_reconciliations",
+            "avelo_bank_statement_lines",
             "avelo_companies",
             "avelo_financial_years",
             "avelo_inventory_items",
