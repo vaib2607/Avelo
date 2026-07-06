@@ -36,6 +36,7 @@ Package.resolved
 # SwiftPM build output
 .swiftpm/
 .build/
+.swift-dev/
 
 # Editors
 .vscode/

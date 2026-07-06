@@ -4,6 +4,58 @@ Offline accounting for macOS.
 
 Native Swift 5.9 + SwiftUI, raw SQLite/SQLCipher C APIs, no external Swift packages, no network calls. All data lives on your Mac under `~/Library/Application Support/Avelo/`.
 
+## Quick start
+
+Use one first-run path:
+
+```bash
+cd ~/Developer/Avelo
+make setup
+```
+
+What you should see:
+- Swift 5.9+ is detected from Xcode Command Line Tools.
+- The package builds without blocking `ModuleCache`, `org.swift.swiftpm`, or `sandbox_apply` permission failures.
+- The full test suite passes.
+- `dist/Avelo.app` is created and ready to open.
+
+Then launch the app:
+
+```bash
+open dist/Avelo.app
+```
+
+What you should see:
+- Avelo opens as a normal macOS app.
+- On a fresh Mac, Gatekeeper may require right-clicking the app and choosing **Open** once.
+
+If you want the full local proof set after bootstrap:
+
+```bash
+make verify
+```
+
+What you should see:
+- Rule audit passes.
+- Tests pass.
+- Bundle validation passes.
+- The bundled self-test prints `SELFTEST OK`.
+
+### Alternatives
+
+- `make dev`
+  What you should see: the debug app launches from `.build/debug/Avelo`.
+- `make test`
+  What you should see: the full `AveloTests` suite completes with repo-local SwiftPM caches.
+- `make bundle`
+  What you should see: a signed local bundle appears at `dist/Avelo.app`.
+
+### Upgrading from earlier local workflows
+
+- Prefer `make test`, `make verify`, or `./Scripts/swiftw.sh ...` over raw `swift build` and `swift test` when your machine restricts `~/Library` or `~/.cache`.
+- The repo now keeps SwiftPM caches and scratch data under `.swift-dev/` and `.build/swiftpm-scratch/` so first-run permissions are deterministic.
+- Use `make verify` as the single release-confidence command instead of manually chaining build, test, bundle, and self-test steps.
+
 ## Screenshots
 
 ![Dashboard](appscreenshotformarketing/Generated%20image%201.png)
@@ -106,21 +158,26 @@ Latest encrypted benchmark run on `v1.1-dev`:
 - Xcode 15+ Command Line Tools (Swift 5.9+)
 - No Xcode project file is required; build with `swift build` or open the source tree in Xcode as a Swift Package
 
+If raw `swift` commands fail because your machine blocks writes to `~/Library/org.swift.swiftpm` or `~/.cache/clang`, rerun the same step through `make` or `./Scripts/swiftw.sh`. Avelo ships a repo-local fallback for SwiftPM caches.
+
 ## Build
 
 ```bash
-cd ~/Developer/Avelo
-swift build -c release
+make bundle
 ```
 
-To produce an `.app` bundle, first build the release binary, then run the helper in `Scripts/bundle.sh`, which assembles `Avelo.app` from the build output.
+What you should see:
+- The release binary builds with repo-local SwiftPM caches.
+- `Created .../dist/Avelo.app` prints at the end.
+
+To build without bundling:
 
 ```bash
-swift build -c release
-./Scripts/bundle.sh
+./Scripts/swiftw.sh build -c release
 ```
 
-The assembled app bundle is written to `dist/Avelo.app`.
+What you should see:
+- `Build complete!` prints with no blocking cache-permission failures.
 
 The local RC bundle is ad-hoc signed, so on a fresh Mac you may need to right-click the app and choose Open the first time to clear the Gatekeeper warning.
 
@@ -130,19 +187,25 @@ Validate the bundle structure and signature:
 ./Scripts/validate_bundle.sh
 ```
 
+What you should see:
+- The script exits cleanly with no signature or structure errors.
+
 Smoke-launch the bundled app and confirm it stays up long enough to count as a valid local artifact:
 
 ```bash
 ./Scripts/launch_smoke.sh
 ```
 
+What you should see:
+- The app launches and remains alive for the smoke window.
+
 Or run the repeatable local RC proof set in one go:
 
 ```bash
-make rc-local
+make verify
 ```
 
-This runs the rule audit, full test suite, release build, bundle assembly, and bundle validation. The GUI launch smoke check remains a separate step because it needs a normal local app-launch context.
+This runs the rule audit, full test suite, release build, bundle assembly, bundle validation, and bundled self-test. The GUI launch smoke check remains separate because it needs a normal local app-launch context.
 
 For a bundled-binary accountant-flow self-check without GUI interaction:
 
@@ -150,17 +213,26 @@ For a bundled-binary accountant-flow self-check without GUI interaction:
 ./Scripts/bundle_selftest.sh
 ```
 
+What you should see:
+- Output that includes `SELFTEST OK` and a balanced trial balance.
+
 ## Run
 
 ```bash
-.build/release/Avelo
+make dev
 ```
 
-Or launch the bundled app:
+What you should see:
+- The debug binary launches locally.
+
+Or launch the bundled app directly:
 
 ```bash
 open dist/Avelo.app
 ```
+
+What you should see:
+- The app opens from `dist/Avelo.app`.
 
 ## Where data lives
 
@@ -180,5 +252,11 @@ Company files are encrypted. Keys are stored in the macOS Keychain for the local
 ## Docs
 
 See `Docs/Avelo_Master_PRD.md` for the product spec, `Docs/Avelo_Architecture.md` for the layer map, and `Docs/Avelo_Release_Board.md` for the current hardening board and benchmark numbers.
+
+For the developer loop, proof-set commands, and benchmark interpretation, see `Docs/DX.md`.
+
+## Contributing
+
+Start with `CONTRIBUTING.md` for branch naming, commit style, test expectations, and pull request requirements.
 
 Copyright © 2026 Karbonteck. All rights reserved.

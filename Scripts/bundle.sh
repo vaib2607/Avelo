@@ -3,7 +3,10 @@ set -euo pipefail
 
 CONFIGURATION="${1:-release}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD_DIR="$(cd "$ROOT_DIR" && swift build -c "$CONFIGURATION" --show-bin-path)"
+SWIFTW="$ROOT_DIR/Scripts/swiftw.sh"
+
+"$SWIFTW" build -c "$CONFIGURATION" >/dev/null
+BUILD_DIR="$("$SWIFTW" build -c "$CONFIGURATION" --show-bin-path)"
 APP_DIR="$ROOT_DIR/dist/Avelo.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -15,7 +18,7 @@ ENTITLEMENTS_FILE="$ROOT_DIR/Avelo/Avelo.entitlements"
 
 if [[ ! -x "$EXECUTABLE_PATH" ]]; then
   echo "error: expected built executable at $EXECUTABLE_PATH" >&2
-  echo "hint: run 'swift build -c $CONFIGURATION' first" >&2
+  echo "hint: run './Scripts/swiftw.sh build -c $CONFIGURATION' first" >&2
   exit 1
 fi
 

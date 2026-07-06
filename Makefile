@@ -2,18 +2,29 @@
 # Run from repo root.
 
 SRC_DIR := .
+SWIFT := ./Scripts/swiftw.sh
 
-.PHONY: all build bundle validate-bundle launch-smoke bundle-selftest benchmark benchmark-million rc-local test net-check rule-audit board todo count help
+.PHONY: all setup dev build bundle verify validate-bundle launch-smoke bundle-selftest benchmark benchmark-million rc-local test net-check rule-audit board todo count help
 
 all: net-check build test
 
+setup:
+	./Scripts/bootstrap.sh
+
+dev:
+	$(SWIFT) build
+	./.build/debug/Avelo
+
 # Swift Package Manager build
 build:
-	swift build 2>&1
+	$(SWIFT) build 2>&1
 
 # Assemble a local .app bundle from the release binary
 bundle:
-	./Scripts/bundle.sh
+	./Scripts/bundle.sh release
+
+verify: rule-audit test bundle validate-bundle bundle-selftest
+	@echo "Verification complete. Run './Scripts/launch_smoke.sh' from a normal local GUI session to confirm the bundled app opens cleanly."
 
 validate-bundle:
 	./Scripts/validate_bundle.sh
@@ -30,16 +41,11 @@ benchmark:
 benchmark-million:
 	./Scripts/benchmark.sh million
 
-rc-local: rule-audit test
-	swift build -c release
-	./Scripts/bundle.sh
-	./Scripts/validate_bundle.sh
-	./Scripts/bundle_selftest.sh
-	@echo "Local RC proof complete. Run './Scripts/launch_smoke.sh' from a normal local GUI session to confirm bundled app launch."
+rc-local: verify
 
 # Run full test suite
 test:
-	swift test 2>&1
+	$(SWIFT) test 2>&1
 
 # CRITICAL: Must be 0 for V1
 net-check:
@@ -112,4 +118,22 @@ count:
 	@grep -c "^- \[ \]" .agents/TASK_BOARD.md || echo "0"
 
 help:
-	@echo "Targets: build | test | net-check | r16-check | r15-check | rule-audit | board | todo | count"
+	@echo "Top-level targets:"
+	@echo "  setup            Verify tools, build, test, bundle, and print the next step"
+	@echo "  dev              Build the debug binary and launch Avelo locally"
+	@echo "  test             Run the full test suite with repo-local SwiftPM caches"
+	@echo "  bundle           Build the release binary and assemble dist/Avelo.app"
+	@echo "  verify           Run the proof set: rule audit, tests, bundle, validation, self-test"
+	@echo ""
+	@echo "Advanced targets:"
+	@echo "  build            Build the debug package only"
+	@echo "  validate-bundle  Check app bundle structure and signature"
+	@echo "  launch-smoke     Launch the bundled app for a local GUI smoke test"
+	@echo "  bundle-selftest  Run the bundled binary self-test without GUI interaction"
+	@echo "  benchmark        Run the core benchmark suite"
+	@echo "  benchmark-million Run the large benchmark suite"
+	@echo "  rule-audit       Run offline, TODO, and money-path checks"
+	@echo "  net-check        Verify the shipped app contains zero network calls"
+	@echo "  board            Show the full task board"
+	@echo "  todo             Show incomplete task-board items"
+	@echo "  count            Count remaining task-board items"
