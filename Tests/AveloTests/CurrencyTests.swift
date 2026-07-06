@@ -26,17 +26,30 @@ final class CurrencyTests: XCTestCase {
         XCTAssertEqual(Currency.formatPaise(0, style: .signedIndianGrouping), "₹0.00")
     }
 
-    func testRupeesToPaiseAndBack() {
-        let paise = Currency.rupeesToPaise(Decimal(string: "123.45")!)
+    func testFormatPaiseHandlesInt64MinWithoutTrapping() {
+        XCTAssertEqual(Currency.formatPaise(Int64.min), "-₹92,23,37,20,36,85,47,758.08")
+    }
+
+    func testRupeesToPaiseAndBack() throws {
+        let paise = try Currency.rupeesToPaise(Decimal(string: "123.45")!)
         XCTAssertEqual(paise, 12345)
         XCTAssertEqual(Currency.paiseToRupees(12345), Decimal(string: "123.45")!)
     }
 
-    func testRupeesToPaiseRoundsToPaise() {
+    func testRupeesToPaiseRoundsToPaise() throws {
         // 1 paise = 0.01 rupee; sub-paise input must round to nearest paise.
-        XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.014")!), 1001)
-        XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.015")!), 1002)
-        XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.016")!), 1002)
+        XCTAssertEqual(try Currency.rupeesToPaise(Decimal(string: "10.014")!), 1001)
+        XCTAssertEqual(try Currency.rupeesToPaise(Decimal(string: "10.015")!), 1002)
+        XCTAssertEqual(try Currency.rupeesToPaise(Decimal(string: "10.016")!), 1002)
+    }
+
+    func testRupeesToPaiseThrowsOnOverflow() {
+        XCTAssertThrowsError(try Currency.rupeesToPaise(Decimal(string: "999999999999999999999")!)) { error in
+            guard case AppError.businessRule(let message) = error else {
+                return XCTFail("Expected businessRule overflow, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("overflow"))
+        }
     }
 
     func testParseRupeeInputRoundTrip() {

@@ -59,12 +59,12 @@ final class AccountTreeReconciliationTests: XCTestCase {
         let tb = try ReportService(db: tc.db, companyId: tc.companyId)
             .trialBalance(asOfDate: tc.fy.endDate)
 
-        XCTAssertEqual(tb.totalDebitPaise, 80000)
-        XCTAssertEqual(tb.totalCreditPaise, 80000)
+        XCTAssertEqual(tb.totalDebitPaise, 60000)
+        XCTAssertEqual(tb.totalCreditPaise, 60000)
 
         let rowsById = Dictionary(uniqueKeysWithValues: tb.rows.map { ($0.id, $0) })
-        XCTAssertEqual(rowsById[tc.cashId]?.debitPaise, 60000)
-        XCTAssertEqual(rowsById[tc.cashId]?.creditPaise, 20000)
+        XCTAssertEqual(rowsById[tc.cashId]?.debitPaise, 40000)
+        XCTAssertEqual(rowsById[tc.cashId]?.creditPaise, 0)
         XCTAssertEqual(rowsById[tc.salesId]?.debitPaise, 0)
         XCTAssertEqual(rowsById[tc.salesId]?.creditPaise, 50000)
         XCTAssertEqual(rowsById[tc.rentId]?.debitPaise, 20000)
@@ -178,8 +178,13 @@ final class AccountTreeReconciliationTests: XCTestCase {
         var expectedCredit: Int64 = 0
         for (_, openingBalance, openingSide, debitMovement, creditMovement) in sqlRows {
             let signedOpening = openingSide == "debit" ? openingBalance : -openingBalance
-            expectedDebit += (signedOpening > 0 ? signedOpening : 0) + debitMovement
-            expectedCredit += (signedOpening < 0 ? -signedOpening : 0) + creditMovement
+            let openingDebit = signedOpening > 0 ? signedOpening : 0
+            let openingCredit = signedOpening < 0 ? -signedOpening : 0
+            let grossDebit = openingDebit + debitMovement
+            let grossCredit = openingCredit + creditMovement
+            let net = grossDebit - grossCredit
+            expectedDebit += max(net, 0)
+            expectedCredit += max(-net, 0)
         }
 
         XCTAssertEqual(tb.totalDebitPaise, expectedDebit)
@@ -218,6 +223,28 @@ final class AccountTreeReconciliationTests: XCTestCase {
 
         XCTAssertNotNil(cache.tree)
         XCTAssertEqual(cache.tree?.findLedger(tc.cashId)?.balancePaise, 40000)
+    }
+
+    func testReloadFailsClosedOnLedgerBalanceOverflow() async throws {
+        let tc = try TestCompany.make()
+        try tc.db.execute(
+            "UPDATE avelo_accounts SET opening_balance_paise = ?, opening_balance_side = 'debit' WHERE id = ?",
+            [.integer(Int64.max), .text(tc.cashId.uuidString)]
+        )
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 1, .debit),
+            tc.line(tc.salesId, 1, .credit)
+        ]), in: tc.fy)
+
+        let cache = AccountTreeCache(companyId: tc.companyId, database: tc.db)
+        await cache.reload()
+
+        XCTAssertNil(cache.tree)
+        guard case AppError.businessRule(let message)? = cache.lastError else {
+            return XCTFail("Expected overflow businessRule, got \(String(describing: cache.lastError))")
+        }
+        XCTAssertTrue(message.localizedCaseInsensitiveContains("overflow"))
     }
 
     func testEnsureLoadedDoesNotSpawnConcurrentReloads() async throws {

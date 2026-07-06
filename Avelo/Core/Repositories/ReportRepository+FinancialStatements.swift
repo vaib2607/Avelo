@@ -13,10 +13,9 @@ extension ReportRepository {
         let directExpense = try sectionRows(filter: filter, fromDate: fromDate, toDate: toDate, nature: .expense, rootCodes: ["DIRECT_EXPENSE"], groupById: groupById)
         let indirectExpense = try sectionRows(filter: filter, fromDate: fromDate, toDate: toDate, nature: .expense, rootCodes: ["INDIRECT_EXPENSE"], groupById: groupById)
 
-        let ti = directIncome.totalPaise + indirectIncome.totalPaise
-        let te = directExpense.totalPaise + indirectExpense.totalPaise
-        assert(ti <= Int64.max / 2)
-        assert(te <= Int64.max / 2)
+        let ti = try CheckedMath.add(directIncome.totalPaise, indirectIncome.totalPaise, context: "calculating total income")
+        let te = try CheckedMath.add(directExpense.totalPaise, indirectExpense.totalPaise, context: "calculating total expense")
+        let netProfit = try CheckedMath.subtract(ti, te, context: "calculating net profit")
         return ReportResult.ProfitLoss(
             fromDate: fromDate, toDate: toDate,
             directIncome: directIncome,
@@ -25,7 +24,7 @@ extension ReportRepository {
             indirectExpense: indirectExpense,
             totalIncomePaise: ti,
             totalExpensePaise: te,
-            netProfitPaise: ti - te
+            netProfitPaise: netProfit
         )
     }
 
@@ -78,14 +77,19 @@ extension ReportRepository {
             let absNet: Int64
             switch nature {
             case .income:
-                absNet = cr - dr - (signedOpening < 0 ? -signedOpening : 0) + (signedOpening > 0 ? signedOpening : 0)
+                let openingCredit = signedOpening < 0 ? try CheckedMath.abs(signedOpening, context: "calculating profit and loss opening credit") : 0
+                let credited = try CheckedMath.add(cr, signedOpening > 0 ? signedOpening : 0, context: "calculating profit and loss income credits")
+                let debited = try CheckedMath.add(dr, openingCredit, context: "calculating profit and loss income debits")
+                absNet = try CheckedMath.subtract(credited, debited, context: "calculating profit and loss income net")
             case .expense:
-                absNet = dr - cr + (signedOpening > 0 ? signedOpening : 0) - (signedOpening < 0 ? -signedOpening : 0)
+                let openingCredit = signedOpening < 0 ? try CheckedMath.abs(signedOpening, context: "calculating profit and loss opening credit") : 0
+                let debited = try CheckedMath.add(dr, signedOpening > 0 ? signedOpening : 0, context: "calculating profit and loss expense debits")
+                let credited = try CheckedMath.add(cr, openingCredit, context: "calculating profit and loss expense credits")
+                absNet = try CheckedMath.subtract(debited, credited, context: "calculating profit and loss expense net")
             case .assets, .liabilities:
                 absNet = 0
             }
-            sectionTotal += absNet
-            assert(sectionTotal <= Int64.max / 2)
+            sectionTotal = try CheckedMath.add(sectionTotal, absNet, context: "summing profit and loss section total")
             rows.append(ReportResult.TrialBalanceRow(
                 id: id, accountCode: code, accountName: name, groupPath: gcode,
                 debitPaise: 0, creditPaise: 0
@@ -119,11 +123,9 @@ extension ReportRepository {
         let liabilityCodes = ["CAPITAL", "LOANS", "CURRENT_LIAB", "DUTIES_TAXES"]
         let assetSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .assets, rootCodes: assetCodes, groupById: groupById)
         let liabSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .liabilities, rootCodes: liabilityCodes, groupById: groupById)
-        let totalAssets = assetSections.reduce(0) { $0 + $1.totalPaise }
-        let totalLiab = liabSections.reduce(0) { $0 + $1.totalPaise }
-        assert(totalAssets <= Int64.max / 2)
-        assert(totalLiab <= Int64.max / 2)
-        let equity = totalAssets - totalLiab
+        let totalAssets = try CheckedMath.sum(assetSections.map(\.totalPaise), context: "summing balance sheet assets")
+        let totalLiab = try CheckedMath.sum(liabSections.map(\.totalPaise), context: "summing balance sheet liabilities")
+        let equity = try CheckedMath.subtract(totalAssets, totalLiab, context: "calculating balance sheet equity")
         return ReportResult.BalanceSheet(
             asOfDate: asOfDate,
             assets: assetSections,
@@ -180,19 +182,30 @@ extension ReportRepository {
             let signedOpening: Int64 = obs == "debit" ? ob : -ob
             let net: Int64
             if nature == .assets {
-                net = dr - cr + signedOpening
+                net = try CheckedMath.add(
+                    try CheckedMath.subtract(dr, cr, context: "calculating balance sheet asset movement"),
+                    signedOpening,
+                    context: "calculating balance sheet asset net"
+                )
             } else {
-                net = cr - dr - signedOpening
+                net = try CheckedMath.subtract(
+                    try CheckedMath.subtract(cr, dr, context: "calculating balance sheet liability movement"),
+                    signedOpening,
+                    context: "calculating balance sheet liability net"
+                )
             }
             if net == 0 { continue }
             let row = ReportResult.TrialBalanceRow(
                 id: id, accountCode: code, accountName: name, groupPath: gcode,
                 debitPaise: net > 0 ? net : 0,
-                creditPaise: net < 0 ? -net : 0
+                creditPaise: net < 0 ? try CheckedMath.abs(net, context: "calculating balance sheet net credit") : 0
             )
             byGname[gname, default: []].append(row)
-            totals[gname, default: 0] += net
-            assert(totals[gname, default: 0] <= Int64.max / 2)
+            totals[gname, default: 0] = try CheckedMath.add(
+                totals[gname, default: 0],
+                net,
+                context: "summing balance sheet section total"
+            )
         }
         return byGname.keys.sorted().map { gname in
             ReportResult.BalanceSheetSection(id: gname, title: gname, rows: byGname[gname] ?? [], totalPaise: totals[gname] ?? 0)
@@ -255,11 +268,11 @@ extension ReportRepository {
             }
             let inflow = row.int("inflow")
             let outflow = row.int("outflow")
-            let net = inflow - outflow
+            let net = try CheckedMath.subtract(inflow, outflow, context: "calculating cash flow row net")
             switch section {
-            case .operating: operating += net
-            case .investing: investing += net
-            case .financing: financing += net
+            case .operating: operating = try CheckedMath.add(operating, net, context: "summing operating cash flow")
+            case .investing: investing = try CheckedMath.add(investing, net, context: "summing investing cash flow")
+            case .financing: financing = try CheckedMath.add(financing, net, context: "summing financing cash flow")
             }
             return ReportResult.CashFlowRow(
                 id: "\(section.rawValue)-\(row.text("code"))",
@@ -271,8 +284,7 @@ extension ReportRepository {
                 netPaise: net
             )
         }
-        let net = operating + investing + financing
-        assert(net <= Int64.max / 2)
+        let net = try CheckedMath.sum([operating, investing, financing], context: "summing net cash flow")
         return ReportResult.CashFlowStatement(
             fromDate: fromDate,
             toDate: toDate,

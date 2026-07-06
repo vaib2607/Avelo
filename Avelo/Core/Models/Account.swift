@@ -59,10 +59,16 @@ public struct Account: Identifiable, Hashable, Sendable, Codable {
         self.updatedAt = updatedAt
     }
 
-    public func signedOpeningBalancePaise() -> Int64 {
+    public func signedOpeningBalancePaise() throws -> Int64 {
         switch openingBalanceSide {
-        case .debit:  return openingBalancePaise
-        case .credit: return -openingBalancePaise
+        case .debit:
+            return openingBalancePaise
+        case .credit:
+            return try CheckedMath.multiply(
+                openingBalancePaise,
+                -1,
+                context: "calculating signed opening balance"
+            )
         }
     }
 }

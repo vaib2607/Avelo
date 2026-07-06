@@ -149,13 +149,17 @@ public final class VoucherEditViewModel {
     }
 
     public var totalDebitPaise: Int64 {
-        lines.filter { $0.side == .debit }
-            .reduce(Int64(0)) { $0 + (Currency.parseRupeeInput($1.amount) ?? 0) }
+        (try? CheckedMath.sum(
+            lines.lazy.filter { $0.side == .debit }.map { Currency.parseRupeeInput($0.amount) ?? 0 },
+            context: "summing voucher editor debit lines"
+        )) ?? 0
     }
 
     public var totalCreditPaise: Int64 {
-        lines.filter { $0.side == .credit }
-            .reduce(Int64(0)) { $0 + (Currency.parseRupeeInput($1.amount) ?? 0) }
+        (try? CheckedMath.sum(
+            lines.lazy.filter { $0.side == .credit }.map { Currency.parseRupeeInput($0.amount) ?? 0 },
+            context: "summing voucher editor credit lines"
+        )) ?? 0
     }
 
     public var isBalanced: Bool { totalDebitPaise == totalCreditPaise && totalDebitPaise > 0 }

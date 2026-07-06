@@ -64,7 +64,14 @@ public struct InventoryOrderLine: Identifiable, Hashable, Sendable, Codable {
     public var unitRatePaise: Int64
     public let createdAt: Date
 
-    public var pendingQuantity: Int64 { max(0, quantity - fulfilledQuantity) }
+    public var pendingQuantity: Int64 {
+        guard fulfilledQuantity < quantity else { return 0 }
+        return (try? CheckedMath.subtract(
+            quantity,
+            fulfilledQuantity,
+            context: "calculating pending inventory order quantity"
+        )) ?? 0
+    }
 
     public init(id: ID = UUID(),
                 companyId: Company.ID,

@@ -199,6 +199,20 @@ Execute only after the prior item's dependencies are satisfied; status and proof
 
 Next after these prerequisites: `AVL-P0-019`, `AVL-P0-001`, `AVL-P0-005`, and `AVL-P0-032`.
 
+### Latest Evidence
+
+- `2026-07-06 14:51 IST` — `AVL-P0-011` automated proof advanced but is still `Open` pending manual accountant acceptance. Landed shared checked arithmetic, overflow-safe currency conversion/percentage math, `Int64.min` formatting coverage, overflow-safe stock movement posting/validation, and overflow-safe ledger/trial-balance verification. Evidence: `swift test --filter CurrencyTests`, `swift test --filter InventoryServiceTests`, `swift test --filter Phase6MathRoundingTests`, `swift test --filter Phase6HardeningTests`, and `swift test`.
+
+- `2026-07-06 14:51 IST` — `AVL-P0-024` automated proof advanced but is still `Open` pending manual accountant acceptance. Trial-balance rows now net opening and movement into exactly one closing side, and reconciliation fixtures were updated to assert normalized totals instead of the historical gross-per-side bug. Evidence: `swift test --filter TrialBalanceNettingTests`, `swift test --filter AccountTreeReconciliationTests`, and `swift test`.
+
+- `2026-07-06 14:58 IST` — `AVL-P0-011` automated proof advanced further but is still `Open` pending full-path completion and manual accountant acceptance. Added checked voucher-draft totals, overflow-safe voucher mismatch reporting, overflow-safe profit/loss, balance sheet, cash-flow, GST summary, outstanding, ledger-running-balance, bank-reconciliation, and RC-flow arithmetic; replaced remaining `abs(Int64)` UI/status hotspots with magnitude-safe formatting; added adversarial overflow fixtures for voucher drafts and `Int64.min` bank statement matching. Evidence: `swift test --filter VoucherDraftTests`, `swift test --filter VoucherServiceTests`, `swift test --filter ReportBehaviorTests`, `swift test --filter BankReconciliationServiceTests`, and `swift test`.
+
+- `2026-07-06 15:02 IST` — `AVL-P0-011` automated proof advanced again but is still `Open` pending remaining-path completion and manual accountant acceptance. Converted `AccountTree`, `AccountTreeCache`, dashboard live-trial-balance totals, and dashboard bank/stock aggregations to checked arithmetic with fail-closed overflow behavior; added a cache-level adversarial overflow fixture proving tree reload reports a business-rule error instead of wrapping. Evidence: `swift test --filter AccountTreeReconciliationTests` and `swift test`.
+
+- `2026-07-06 15:13 IST` — `AVL-P0-011` automated proof advanced again but is still `Open` pending remaining-path completion and manual accountant acceptance. Added checked payroll net validation/posting, checked outstanding-balance subtraction, checked invoice-PDF visible-line total validation, fail-closed voucher-draft non-throwing helpers, checked dashboard cash/net displays, checked banking/report display deltas, and throwing signed account/ledger amount helpers to remove remaining direct negation traps. Added adversarial fixtures proving payroll net overflow is reported as validation failure and invoice-PDF total overflow aborts export instead of wrapping. Evidence: `swift test --filter VoucherDraftTests`, `swift test --filter Phase6HardeningTests`, `swift test --filter InvoicePDFServiceTests`, `swift test --filter ReportBehaviorTests`, and `swift test`.
+
+- `2026-07-06 15:16 IST` — `AVL-P0-011` automated proof advanced again but is still `Open` pending any remaining-path audit plus manual accountant acceptance. Converted bank-statement CSV negative-amount parsing and pending inventory-order quantity derivation to checked fail-closed arithmetic, then added adversarial fixtures proving the parser safely preserves the largest negative importable `Int64` amount and corrupt fulfilled-quantity rows collapse to zero pending quantity instead of overflowing. Evidence: `swift test --filter BankReconciliationServiceTests`, `swift test --filter InventoryServiceTests`, and `swift test`.
+
 ### Historical Completed Lanes
 
 The struck items below preserve earlier implementation history and are not the active readiness queue.

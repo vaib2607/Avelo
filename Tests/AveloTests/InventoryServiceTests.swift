@@ -175,6 +175,35 @@ final class InventoryServiceTests: XCTestCase {
         XCTAssertTrue(v.errors.contains(where: { $0.code == ValidationErrorCode.quantityExceedsStock }))
     }
 
+    func testValidatorRejectsOverflowingQuantityTimesCost() {
+        let v = StockMovementValidator().validate(.init(
+            itemId: UUID(), date: Date(), movementType: .stockIn,
+            quantity: Int64.max, unitCostPaise: 2, totalValuePaise: 0, currentOnHandQty: 0
+        ))
+        XCTAssertFalse(v.isValid)
+        XCTAssertTrue(v.errors.contains(where: { $0.code == ValidationErrorCode.arithmeticOverflow }))
+    }
+
+    func testRecordMovementThrowsOnOverflowingTotalValue() throws {
+        let tc = try TestCompany.make()
+        let item = try makeItem(tc)
+
+        XCTAssertThrowsError(
+            try InventoryService(db: tc.db, companyId: tc.companyId).recordMovement(
+                itemId: item.id,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                type: .stockIn,
+                quantity: Int64.max,
+                ratePaise: 2
+            )
+        ) { error in
+            guard case AppError.businessRule(let message) = error else {
+                return XCTFail("Expected businessRule overflow, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("overflow"))
+        }
+    }
+
     func testPendingPurchaseAndSalesOrderVisibilityUsesSourceOrderLines() throws {
         let tc = try TestCompany.make()
         let item = try makeItem(tc)
@@ -204,6 +233,19 @@ final class InventoryServiceTests: XCTestCase {
 
         let allLines = try service.pendingLines()
         XCTAssertEqual(allLines.map(\.pendingQuantity).reduce(0, +), 11)
+    }
+
+    func testPendingQuantityFailsClosedOnOverflowingCorruptOrderLine() {
+        let line = InventoryOrderLine(
+            companyId: UUID(),
+            orderId: UUID(),
+            itemId: UUID(),
+            quantity: Int64.max,
+            fulfilledQuantity: -1,
+            unitRatePaise: 0
+        )
+
+        XCTAssertEqual(line.pendingQuantity, 0)
     }
 
     func testReorderAlertsDoNotFireWhenInventoryIsDisabled() throws {

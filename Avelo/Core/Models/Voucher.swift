@@ -82,10 +82,16 @@ public struct LedgerLine: Identifiable, Hashable, Sendable, Codable {
         self.lineOrder = lineOrder
     }
 
-    public func signedAmountPaise() -> Int64 {
+    public func signedAmountPaise() throws -> Int64 {
         switch side {
-        case .debit:  return amountPaise
-        case .credit: return -amountPaise
+        case .debit:
+            return amountPaise
+        case .credit:
+            return try CheckedMath.multiply(
+                amountPaise,
+                -1,
+                context: "calculating signed ledger line amount"
+            )
         }
     }
 }

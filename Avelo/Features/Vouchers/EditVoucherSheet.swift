@@ -211,12 +211,12 @@ private struct EditVoucherBody: View {
     }
 
     private var totalsSection: some View {
-        let difference = vm.totalDebitPaise - vm.totalCreditPaise
+        let difference = (try? CheckedMath.subtract(vm.totalDebitPaise, vm.totalCreditPaise, context: "calculating edit voucher sheet difference")) ?? 0
         return HStack {
             Spacer()
             Text("Debit: \(Currency.formatPaise(vm.totalDebitPaise))").monospacedDigit()
             Text("Credit: \(Currency.formatPaise(vm.totalCreditPaise))").monospacedDigit()
-            Text(difference == 0 ? "Balanced" : "Difference: \(Currency.formatPaise(abs(difference)))")
+            Text(difference == 0 ? "Balanced" : "Difference: \(Currency.formatAbsolutePaise(difference))")
                 .foregroundStyle(difference == 0 ? .green : .red)
         }
     }

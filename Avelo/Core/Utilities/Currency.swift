@@ -4,11 +4,21 @@ public enum Currency {
 
     public static let paisePerRupee: Int64 = 100
 
-    public static func rupeesToPaise(_ rupees: Decimal) -> Int64 {
+    public static func rupeesToPaise(_ rupees: Decimal) throws -> Int64 {
         var value = rupees * Decimal(paisePerRupee)
         var rounded = Decimal()
         NSDecimalRound(&rounded, &value, 0, .plain)
-        return NSDecimalNumber(decimal: rounded).int64Value
+        let number = NSDecimalNumber(decimal: rounded)
+        guard number != .notANumber else {
+            throw AppError.businessRule("Invalid amount.")
+        }
+        let decimalValue = number.decimalValue
+        let min = Decimal(Int64.min)
+        let max = Decimal(Int64.max)
+        guard decimalValue >= min, decimalValue <= max else {
+            throw AppError.businessRule("Arithmetic overflow while converting rupees to paise.")
+        }
+        return number.int64Value
     }
 
     public static func paiseToRupees(_ paise: Int64) -> Decimal {
@@ -23,16 +33,16 @@ public enum Currency {
 
     public static func formatPaise(_ paise: Int64, style: FormatStyle = .indianGrouping) -> String {
         let sign: String
-        let abs: Int64
+        let absPaise: UInt64
         if paise < 0 {
             sign = "-"
-            abs = -paise
+            absPaise = paise.magnitude
         } else {
             sign = ""
-            abs = paise
+            absPaise = UInt64(paise)
         }
-        let rupees = abs / paisePerRupee
-        let p = abs % paisePerRupee
+        let rupees = absPaise / UInt64(paisePerRupee)
+        let p = absPaise % UInt64(paisePerRupee)
         let rupeesStr = formatIndianGrouping(rupees)
         let paiseStr = String(format: "%02d", p)
         let body = "₹\(rupeesStr).\(paiseStr)"
@@ -43,7 +53,21 @@ public enum Currency {
         }
     }
 
-    private static func formatIndianGrouping(_ value: Int64) -> String {
+    public static func formatAbsolutePaise(_ paise: Int64, style: FormatStyle = .indianGrouping) -> String {
+        let absPaise = paise.magnitude
+        let rupees = absPaise / UInt64(paisePerRupee)
+        let p = absPaise % UInt64(paisePerRupee)
+        let rupeesStr = formatIndianGrouping(rupees)
+        let paiseStr = String(format: "%02d", p)
+        switch style {
+        case .indianGrouping, .signedIndianGrouping:
+            return "₹\(rupeesStr).\(paiseStr)"
+        case .plain:
+            return "\(rupees).\(paiseStr)"
+        }
+    }
+
+    private static func formatIndianGrouping(_ value: UInt64) -> String {
         let s = String(value)
         if s.count <= 3 { return s }
         let last3 = String(s.suffix(3))
@@ -67,15 +91,17 @@ public enum Currency {
         if filtered.isEmpty { return nil }
         let normalized = filtered.replacingOccurrences(of: ",", with: "")
         guard let decimal = Decimal(string: normalized) else { return nil }
-        return rupeesToPaise(decimal)
+        return try? rupeesToPaise(decimal)
     }
 
-    public static func percentagePaise(_ amountPaise: Int64, ratePercent: Int64) -> Int64 {
-        let scaled = amountPaise * ratePercent
+    public static func percentagePaise(_ amountPaise: Int64, ratePercent: Int64) throws -> Int64 {
+        let scaled = try CheckedMath.multiply(amountPaise, ratePercent, context: "calculating percentage paise")
         if scaled >= 0 {
-            return (scaled + 50) / 100
+            let adjusted = try CheckedMath.add(scaled, 50, context: "rounding percentage paise")
+            return adjusted / 100
         } else {
-            return (scaled - 50) / 100
+            let adjusted = try CheckedMath.subtract(scaled, 50, context: "rounding percentage paise")
+            return adjusted / 100
         }
     }
 

@@ -100,7 +100,11 @@ public final class PayrollService: Sendable {
         guard let employee = employee else { throw AppError.notFound("Employee") }
 
         let gross = employee.baseSalaryPaise
-        let net = gross - deductionsPaise
+        let net = try CheckedMath.subtract(
+            gross,
+            deductionsPaise,
+            context: "calculating payroll net salary"
+        )
         let year = monthYear / 100
         let month = monthYear % 100
         let result = PayrollDraftValidator().validate(PayrollDraftValidator.Input(

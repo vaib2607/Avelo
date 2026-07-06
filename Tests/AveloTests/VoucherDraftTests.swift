@@ -25,6 +25,24 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertFalse(d.isBalanced)
     }
 
+    func testCheckedTotalsThrowOnOverflow() {
+        let d = draft([line(Int64.max, .debit), line(1, .debit), line(Int64.max, .credit)])
+        XCTAssertThrowsError(try d.checkedTotals()) { error in
+            guard case AppError.businessRule(let message) = error else {
+                return XCTFail("Expected businessRule overflow, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("overflow"))
+        }
+    }
+
+    func testOverflowingDraftFailsClosedForNonThrowingHelpers() {
+        let d = draft([line(Int64.max, .debit), line(1, .debit), line(Int64.max, .credit)])
+        XCTAssertEqual(d.totalDebitPaise, 0)
+        XCTAssertEqual(d.totalCreditPaise, 0)
+        XCTAssertEqual(d.differencePaise, 0)
+        XCTAssertFalse(d.isBalanced)
+    }
+
     func testFilledLinesExcludesEmptyAndZero() {
         let d = draft([
             line(50000, .debit),

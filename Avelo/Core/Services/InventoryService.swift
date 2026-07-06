@@ -99,7 +99,11 @@ public final class InventoryService: Sendable {
                                voucherId: Voucher.ID? = nil,
                                notes: String? = nil) throws {
         try ensureInventoryEnabled()
-        let totalValuePaise = quantity * ratePaise
+        let totalValuePaise = try CheckedMath.multiply(
+            quantity,
+            ratePaise,
+            context: "calculating stock movement total value"
+        )
         let movement = StockMovement(
             id: UUID(),
             companyId: companyId,

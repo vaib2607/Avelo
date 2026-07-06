@@ -20,7 +20,7 @@ public struct AccountTree: Sendable {
     public init(companyId: Company.ID,
                 groups: [AccountGroup],
                 ledgers: [Account],
-                ledgerBalances: [Account.ID: LedgerBalance]) {
+                ledgerBalances: [Account.ID: LedgerBalance]) throws {
         self.companyId = companyId
         self.builtAt = Date()
 
@@ -28,12 +28,12 @@ public struct AccountTree: Sendable {
         var ledgersById: [Account.ID: LedgerNode] = [:]
         for ledger in ledgers {
             let bal = ledgerBalances[ledger.id] ?? LedgerBalance()
-            let node = LedgerNode(
+            let node = try LedgerNode(
                 id: ledger.id,
                 groupId: ledger.groupId,
                 code: ledger.code,
                 name: ledger.name,
-                openingBalancePaise: ledger.signedOpeningBalancePaise(),
+                openingBalancePaise: try ledger.signedOpeningBalancePaise(),
                 movementDebitPaise: bal.debitPaise,
                 movementCreditPaise: bal.creditPaise,
                 isActive: ledger.isActive,
@@ -58,10 +58,10 @@ public struct AccountTree: Sendable {
             childrenGroups[id] = list.sorted { $0.sortOrder < $1.sortOrder || ($0.sortOrder == $1.sortOrder && $0.code < $1.code) }
         }
 
-        func buildGroup(_ group: AccountGroup) -> GroupNode {
-            let childGroups = (childrenGroups[group.id] ?? []).map(buildGroup)
+        func buildGroup(_ group: AccountGroup) throws -> GroupNode {
+            let childGroups = try (childrenGroups[group.id] ?? []).map(buildGroup)
             let childLedgers = ledgerByGroup[group.id] ?? []
-            return GroupNode(
+            return try GroupNode(
                 id: group.id,
                 parentId: group.parentGroupId,
                 code: group.code,
@@ -76,9 +76,7 @@ public struct AccountTree: Sendable {
         let roots = groups
             .filter { $0.parentGroupId == nil }
             .sorted { $0.sortOrder < $1.sortOrder || ($0.sortOrder == $1.sortOrder && $0.code < $1.code) }
-            .map(buildGroup)
-
-        self.roots = roots
+        self.roots = try roots.map(buildGroup)
         self.ledgersById = ledgersById
 
         var groupsByIdResolved: [AccountGroup.ID: GroupNode] = [:]
@@ -86,7 +84,7 @@ public struct AccountTree: Sendable {
             groupsByIdResolved[node.id] = node
             node.childGroups.forEach(register)
         }
-        roots.forEach(register)
+        self.roots.forEach(register)
         self.groupsById = groupsByIdResolved
     }
 
@@ -142,7 +140,7 @@ public final class GroupNode: Identifiable, Hashable, @unchecked Sendable {
                 nature: AccountNature,
                 sortOrder: Int,
                 childGroups: [GroupNode],
-                childLedgers: [LedgerNode]) {
+                childLedgers: [LedgerNode]) throws {
         self.id = id
         self.parentId = parentId
         self.code = code
@@ -151,8 +149,9 @@ public final class GroupNode: Identifiable, Hashable, @unchecked Sendable {
         self.sortOrder = sortOrder
         self.childGroups = childGroups
         self.childLedgers = childLedgers
-        self.balancePaise = (childGroups.map { $0.balancePaise }.reduce(0, +)) +
-                            (childLedgers.map { $0.balancePaise }.reduce(0, +))
+        let groupBalance = try CheckedMath.sum(childGroups.map(\.balancePaise), context: "summing account-tree child groups")
+        let ledgerBalance = try CheckedMath.sum(childLedgers.map(\.balancePaise), context: "summing account-tree child ledgers")
+        self.balancePaise = try CheckedMath.add(groupBalance, ledgerBalance, context: "calculating account-tree group balance")
     }
 
     public static func == (lhs: GroupNode, rhs: GroupNode) -> Bool { lhs.id == rhs.id }
@@ -181,7 +180,7 @@ public final class LedgerNode: Identifiable, Hashable, @unchecked Sendable {
                 movementCreditPaise: Int64,
                 isActive: Bool,
                 isBankAccount: Bool,
-                gstin: String?) {
+                gstin: String?) throws {
         self.id = id
         self.groupId = groupId
         self.code = code
@@ -192,7 +191,11 @@ public final class LedgerNode: Identifiable, Hashable, @unchecked Sendable {
         self.isActive = isActive
         self.isBankAccount = isBankAccount
         self.gstin = gstin
-        self.balancePaise = openingBalancePaise + movementDebitPaise - movementCreditPaise
+        self.balancePaise = try CheckedMath.subtract(
+            try CheckedMath.add(openingBalancePaise, movementDebitPaise, context: "calculating account-tree ledger debit balance"),
+            movementCreditPaise,
+            context: "calculating account-tree ledger closing balance"
+        )
     }
 
     public static func == (lhs: LedgerNode, rhs: LedgerNode) -> Bool { lhs.id == rhs.id }

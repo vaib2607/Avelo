@@ -49,8 +49,23 @@ public struct StockMovementValidator: Sendable {
             ))
         }
 
-        let expectedTotal = input.quantity * input.unitCostPaise
-        if expectedTotal != input.totalValuePaise {
+        let expectedTotal: Int64?
+        do {
+            expectedTotal = try CheckedMath.multiply(
+                input.quantity,
+                input.unitCostPaise,
+                context: "validating stock movement total value"
+            )
+        } catch {
+            expectedTotal = nil
+            errors.append(ValidationError(
+                code: .arithmeticOverflow,
+                field: "totalValue",
+                message: "Quantity and unit cost overflow Int64 when multiplied."
+            ))
+        }
+
+        if let expectedTotal, expectedTotal != input.totalValuePaise {
             errors.append(ValidationError(
                 code: .stockMovementCostMismatch,
                 field: "totalValue",

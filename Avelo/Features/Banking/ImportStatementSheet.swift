@@ -123,7 +123,20 @@ public struct BankStatementCSVParser: Sendable {
                 errors.append("Row \(rowNumber): invalid amount '\(parts[1])'.")
                 continue
             }
-            let amountPaise = parts[1].hasPrefix("-") ? -abs(parsedAmountPaise) : parsedAmountPaise
+            let amountPaise: Int64
+            if parts[1].hasPrefix("-") {
+                guard let negated = try? CheckedMath.multiply(
+                    parsedAmountPaise,
+                    -1,
+                    context: "parsing imported bank statement amount"
+                ) else {
+                    errors.append("Row \(rowNumber): amount overflowed Int64.")
+                    continue
+                }
+                amountPaise = negated
+            } else {
+                amountPaise = parsedAmountPaise
+            }
             let narration = parts[2...].joined(separator: ",").trimmingCharacters(in: .whitespaces)
             guard !narration.isEmpty else {
                 errors.append("Row \(rowNumber): narration is required.")

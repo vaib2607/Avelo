@@ -30,13 +30,17 @@ extension ReportRepository {
             let totals = totalsByAccount[acct.id]
             let dr = totals?.debitPaise ?? 0
             let cr = totals?.creditPaise ?? 0
-            let netAmt = c.sign > 0 ? cr - dr : dr - cr
-            assert(netAmt <= Int64.max / 2)
+            let netAmt = c.sign > 0
+                ? try CheckedMath.subtract(cr, dr, context: "calculating GST bucket output net")
+                : try CheckedMath.subtract(dr, cr, context: "calculating GST bucket input net")
             let label = "\(c.accountCode.replacingOccurrences(of: "_", with: " "))"
             let bucket = ReportResult.GstBucket(id: label, label: label, amountPaise: netAmt)
             if c.sign > 0 { output.append(bucket) } else { input.append(bucket) }
-            net += netAmt * Int64(c.sign)
-            assert(net <= Int64.max / 2)
+            net = try CheckedMath.add(
+                net,
+                try CheckedMath.multiply(netAmt, Int64(c.sign), context: "calculating GST summary net payable"),
+                context: "summing GST summary net payable"
+            )
         }
         return ReportResult.GstSummary(
             fromDate: fromDate, toDate: toDate,
@@ -107,7 +111,11 @@ extension ReportRepository {
         var rows: [ReportResult.OutstandingRow] = []
         for account in accounts {
             let totals = legacyTotals[account.0]
-            let total = (totals?.debitPaise ?? 0) - (totals?.creditPaise ?? 0)
+            let total = try CheckedMath.subtract(
+                totals?.debitPaise ?? 0,
+                totals?.creditPaise ?? 0,
+                context: "calculating outstanding balance"
+            )
             guard total != 0 else { continue }
             rows.append(ReportResult.OutstandingRow(
                 id: account.0,
@@ -118,8 +126,7 @@ extension ReportRepository {
                 ageInDays: 0
             ))
         }
-        let total = rows.reduce(0) { $0 + $1.amountPaise }
-        assert(total <= Int64.max / 2)
+        let total = try CheckedMath.sum(rows.map(\.amountPaise), context: "summing outstanding total")
         return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: rows, direction: direction, totalPaise: total)
     }
 
@@ -170,10 +177,13 @@ extension ReportRepository {
                 onHandQty: row.int("on_hand")
             )
         }
-        let rows = items.map { item in
+        let rows = try items.map { item in
             let totals = totalsByItem[item.id] ?? StockTotals(inQty: 0, outQty: 0, inValuePaise: 0, outValuePaise: 0, onHandQty: 0)
-            let onHandValuePaise = totals.inValuePaise - totals.outValuePaise
-            assert(onHandValuePaise <= Int64.max / 2)
+            let onHandValuePaise = try CheckedMath.subtract(
+                totals.inValuePaise,
+                totals.outValuePaise,
+                context: "calculating stock valuation on-hand value"
+            )
             let avg = totals.onHandQty > 0 ? onHandValuePaise / totals.onHandQty : 0
             return ReportResult.StockValuationRow(
                 id: item.id,

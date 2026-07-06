@@ -44,16 +44,25 @@ public struct VoucherDraftValidator: Sendable {
             ))
         }
 
-        if !draft.isBalanced {
-            let dr = Currency.formatPaise(draft.totalDebitPaise, style: .indianGrouping)
-            let cr = Currency.formatPaise(draft.totalCreditPaise, style: .indianGrouping)
-            let diff = Currency.formatPaise(abs(draft.differencePaise), style: .indianGrouping)
-            let larger = draft.differencePaise > 0 ? "debit" : "credit"
+        do {
+            let totals = try draft.checkedTotals()
+            if totals.difference != 0 {
+                let dr = Currency.formatPaise(totals.debit, style: .indianGrouping)
+                let cr = Currency.formatPaise(totals.credit, style: .indianGrouping)
+                let diff = Currency.formatAbsolutePaise(totals.difference, style: .indianGrouping)
+                let larger = totals.difference > 0 ? "debit" : "credit"
+                errors.append(ValidationError(
+                    code: .voucherDebitCreditMismatch,
+                    field: "lines",
+                    message: "Debit total (\(dr)) does not match Credit total (\(cr)). Difference: \(diff) on \(larger) side.",
+                    suggestedFix: "Adjust amounts so debit equals credit."
+                ))
+            }
+        } catch {
             errors.append(ValidationError(
-                code: .voucherDebitCreditMismatch,
+                code: .arithmeticOverflow,
                 field: "lines",
-                message: "Debit total (\(dr)) does not match Credit total (\(cr)). Difference: \(diff) on \(larger) side.",
-                suggestedFix: "Adjust amounts so debit equals credit."
+                message: "Voucher totals overflow Int64 while validating debit and credit lines."
             ))
         }
 

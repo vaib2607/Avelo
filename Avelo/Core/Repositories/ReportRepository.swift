@@ -58,8 +58,7 @@ public struct ReportRepository: Sendable {
         let account = try AccountRepository(db: db).findById(accountId)
         let accountName = account?.name ?? "Unknown"
         let groupNature = (try account.flatMap { try AccountGroupRepository(db: db).findById($0.groupId) })?.nature ?? .assets
-        let normalSide = groupNature.normalBalance
-        let signedOpening: Int64 = (account?.signedOpeningBalancePaise() ?? 0) * (normalSide == .debit ? 1 : 1)
+        let signedOpening: Int64 = try account?.signedOpeningBalancePaise() ?? 0
 
         var sql = """
             SELECT v.id AS vid, v.date AS vdate, v.number AS vnum, v.voucher_type_code AS vtype,
@@ -102,11 +101,11 @@ public struct ReportRepository: Sendable {
         var rows: [ReportResult.LedgerRow] = []
         for (vid, date, num, type, narr, amt, side, _) in rawRows {
             if side == .debit {
-                running += amt
-                periodDebitPaise += amt
+                running = try CheckedMath.add(running, amt, context: "calculating ledger running balance")
+                periodDebitPaise = try CheckedMath.add(periodDebitPaise, amt, context: "summing ledger period debit")
             } else {
-                running -= amt
-                periodCreditPaise += amt
+                running = try CheckedMath.subtract(running, amt, context: "calculating ledger running balance")
+                periodCreditPaise = try CheckedMath.add(periodCreditPaise, amt, context: "summing ledger period credit")
             }
             rows.append(ReportResult.LedgerRow(
                 date: date,
@@ -192,8 +191,13 @@ public struct ReportRepository: Sendable {
             let moveDr = movement?.debitPaise ?? 0
             let moveCr = movement?.creditPaise ?? 0
             let signedOpening: Int64 = raw.obs == "debit" ? raw.ob : -raw.ob
-            let netDebit = (signedOpening > 0 ? signedOpening : 0) + moveDr
-            let netCredit = (signedOpening < 0 ? -signedOpening : 0) + moveCr
+            let openingDebit = signedOpening > 0 ? signedOpening : 0
+            let openingCredit = signedOpening < 0 ? try CheckedMath.abs(signedOpening, context: "calculating trial balance opening credit") : 0
+            let grossDebit = try CheckedMath.add(openingDebit, moveDr, context: "calculating trial balance gross debit")
+            let grossCredit = try CheckedMath.add(openingCredit, moveCr, context: "calculating trial balance gross credit")
+            let netDelta = try CheckedMath.subtract(grossDebit, grossCredit, context: "netting trial balance row")
+            let netDebit = netDelta > 0 ? netDelta : 0
+            let netCredit = netDelta < 0 ? try CheckedMath.abs(netDelta, context: "calculating trial balance net credit") : 0
             let groupPath = groupPathText(for: raw.gcode, groups: groupById)
             rows.append(ReportResult.TrialBalanceRow(
                 id: raw.id,
@@ -203,10 +207,8 @@ public struct ReportRepository: Sendable {
                 debitPaise: netDebit,
                 creditPaise: netCredit
             ))
-            totalDr += netDebit
-            totalCr += netCredit
-            assert(totalDr <= Int64.max / 2)
-            assert(totalCr <= Int64.max / 2)
+            totalDr = try CheckedMath.add(totalDr, netDebit, context: "summing trial balance debit total")
+            totalCr = try CheckedMath.add(totalCr, netCredit, context: "summing trial balance credit total")
         }
         return ReportResult.TrialBalance(
             asOfDate: asOfDate,

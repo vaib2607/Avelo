@@ -83,14 +83,19 @@ private struct BankingBody: View {
             Divider()
             ScrollView {
                 if let r = vm.result {
+                    let difference = (try? CheckedMath.subtract(
+                        r.bookBalancePaise,
+                        r.bankBalancePaise,
+                        context: "calculating banking reconciliation difference"
+                    )) ?? 0
                     VStack(alignment: .leading, spacing: 16) {
                         GroupBox("Summary") {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Book balance: \(Currency.formatPaise(r.bookBalancePaise))").monospacedDigit()
                                 Text("Bank balance: \(Currency.formatPaise(r.bankBalancePaise))").monospacedDigit()
-                                Text("Difference: \(Currency.formatPaise(r.bookBalancePaise - r.bankBalancePaise))")
+                                Text("Difference: \(Currency.formatPaise(difference))")
                                     .monospacedDigit()
-                                    .foregroundStyle(r.bookBalancePaise - r.bankBalancePaise == 0 ? .green : .red)
+                                    .foregroundStyle(difference == 0 ? .green : .red)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(8)

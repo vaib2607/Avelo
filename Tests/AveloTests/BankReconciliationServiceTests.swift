@@ -30,6 +30,23 @@ final class BankReconciliationServiceTests: XCTestCase {
         ])
     }
 
+    func testCSVParserPreservesLargestNegativeInt64SafeAmount() {
+        let companyId = UUID()
+        let accountId = UUID()
+        let parsed = BankStatementCSVParser.parse(
+            """
+            date,amount,narration
+            2024-06-03,-92233720368547758.07,Extreme payment
+            """,
+            companyId: companyId,
+            accountId: accountId
+        )
+
+        XCTAssertEqual(parsed.errors, [])
+        XCTAssertEqual(parsed.entries.count, 1)
+        XCTAssertEqual(parsed.entries.first?.amountPaise, -Int64.max)
+    }
+
     func testReconcileMatchesStatementLinesWithinDateTolerance() throws {
         let tc = try TestCompany.make()
         let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
@@ -69,6 +86,31 @@ final class BankReconciliationServiceTests: XCTestCase {
         XCTAssertEqual(tolerant.matched.first?.voucherId, posted.voucher.id)
         XCTAssertEqual(tolerant.unmatchedStatement.count, 0)
         XCTAssertEqual(tolerant.bankBalancePaise, -10_000)
+    }
+
+    func testReconcileDoesNotTrapOnInt64MinStatementAmount() throws {
+        let tc = try TestCompany.make()
+        let service = BankReconciliationService(db: tc.db, companyId: tc.companyId)
+        try service.importStatement(accountId: tc.cashId, entries: [
+            .init(
+                id: UUID(),
+                companyId: tc.companyId,
+                accountId: tc.cashId,
+                date: DateFormatters.parseDate("2024-06-03")!,
+                amountPaise: Int64.min,
+                narration: "Extreme reversal",
+                isCleared: false
+            )
+        ])
+
+        let result = try service.reconcile(
+            accountId: tc.cashId,
+            asOf: DateFormatters.parseDate("2024-06-30")!,
+            dateToleranceDays: 3
+        )
+        XCTAssertEqual(result.matched.count, 0)
+        XCTAssertEqual(result.unmatchedStatement.count, 1)
+        XCTAssertEqual(result.bankBalancePaise, Int64.min)
     }
 
     func testClearStatementLineMarksImportedLineCleared() throws {

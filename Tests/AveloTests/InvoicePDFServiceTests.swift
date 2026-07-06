@@ -74,4 +74,79 @@ final class InvoicePDFServiceTests: XCTestCase {
         XCTAssertTrue(fullText.contains(Currency.formatPaise(118000)))
         XCTAssertTrue(fullText.contains(voucher.number))
     }
+
+    func testExportFailsClosedWhenVisibleInvoiceLinesOverflow() throws {
+        let tc = try TestCompany.make()
+        let voucherId = UUID()
+        let timestamp = DateFormatters.formatIsoTimestamp(Date())
+        try tc.db.execute(
+            """
+            INSERT INTO avelo_vouchers
+            (id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
+             narration, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                .text(voucherId.uuidString),
+                .text(tc.companyId.uuidString),
+                .text(tc.fy.id.uuidString),
+                .text(VoucherType.Code.sales.rawValue),
+                .text("SLS-OVERFLOW"),
+                .date(DateFormatters.parseDate("2024-06-15")!),
+                .null,
+                .text("Overflow invoice"),
+                .bool(false),
+                .null,
+                .bool(true),
+                .integer(Int64.max),
+                .text(timestamp),
+                .text(timestamp)
+            ]
+        )
+
+        for (lineOrder, line) in [
+            LedgerLine(
+                companyId: tc.companyId,
+                voucherId: voucherId,
+                accountId: tc.salesId,
+                amountPaise: Int64.max,
+                side: .credit,
+                lineOrder: 0
+            ),
+            LedgerLine(
+                companyId: tc.companyId,
+                voucherId: voucherId,
+                accountId: tc.rentId,
+                amountPaise: 1,
+                side: .credit,
+                lineOrder: 1
+            )
+        ].enumerated() {
+            try tc.db.execute(
+                """
+                INSERT INTO avelo_ledger_lines
+                (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    .text(line.id.uuidString),
+                    .text(line.companyId.uuidString),
+                    .text(line.voucherId.uuidString),
+                    .text(line.accountId.uuidString),
+                    .integer(line.amountPaise),
+                    .text(line.side.rawValue),
+                    .null,
+                    .null,
+                    .integer(Int64(lineOrder))
+                ]
+            )
+        }
+
+        XCTAssertThrowsError(try InvoicePDFService(db: tc.db).exportTaxInvoicePDF(voucherId: voucherId)) { error in
+            guard case AppError.businessRule(let message) = error else {
+                return XCTFail("Expected businessRule overflow, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("overflow"))
+        }
+    }
 }

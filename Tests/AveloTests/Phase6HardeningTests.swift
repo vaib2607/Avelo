@@ -73,9 +73,27 @@ final class Phase6HardeningTests: XCTestCase {
         }
     }
 
-    func testPercentagePaiseUsesHalfUpRounding() {
-        XCTAssertEqual(Currency.percentagePaise(1, ratePercent: 50), 1)
-        XCTAssertEqual(Currency.percentagePaise(199, ratePercent: 1), 2)
+    func testPercentagePaiseUsesHalfUpRounding() throws {
+        XCTAssertEqual(try Currency.percentagePaise(1, ratePercent: 50), 1)
+        XCTAssertEqual(try Currency.percentagePaise(199, ratePercent: 1), 2)
+    }
+
+    func testPayrollValidatorFlagsOverflowingNetCalculation() {
+        let result = PayrollDraftValidator().validate(.init(
+            employeeId: UUID(),
+            month: 4,
+            year: 2024,
+            grossPaise: Int64.max,
+            deductionsPaise: -1,
+            netPaise: 0,
+            employeeActive: true,
+            employeeHasEndDate: false
+        ))
+
+        guard case .invalid(let errors) = result else {
+            return XCTFail("Expected invalid payroll draft")
+        }
+        XCTAssertTrue(errors.contains(where: { $0.code == .arithmeticOverflow && $0.field == "net" }))
     }
 
     func testBackupExportCleansUpExistingDestinationOnFailure() async throws {

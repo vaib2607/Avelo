@@ -102,8 +102,6 @@ public struct LedgerLineRepository: Sendable {
         }
         let debit = result?.0 ?? 0
         let credit = result?.1 ?? 0
-        assert(debit <= Int64.max / 2)
-        assert(credit <= Int64.max / 2)
         return Totals(debit: debit, credit: credit)
     }
 

@@ -67,11 +67,24 @@ public struct PayrollDraftValidator: Sendable {
             ))
         }
 
-        if input.netPaise != input.grossPaise - input.deductionsPaise {
+        do {
+            let expectedNet = try CheckedMath.subtract(
+                input.grossPaise,
+                input.deductionsPaise,
+                context: "calculating payroll net salary"
+            )
+            if input.netPaise != expectedNet {
+                errors.append(ValidationError(
+                    code: .payrollNetMismatch,
+                    field: "net",
+                    message: "Net salary does not equal gross minus deductions."
+                ))
+            }
+        } catch {
             errors.append(ValidationError(
-                code: .payrollNetMismatch,
+                code: .arithmeticOverflow,
                 field: "net",
-                message: "Net salary does not equal gross minus deductions."
+                message: "Payroll net salary overflowed Int64 while validating gross minus deductions."
             ))
         }
 

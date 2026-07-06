@@ -113,7 +113,7 @@ public struct DashboardView: View {
                 Divider().frame(height: 40)
                 LabeledMoney(title: "At bank", paise: vm.bankBalancePaise)
                 Divider().frame(height: 40)
-                LabeledMoney(title: "Total", paise: vm.cashBalancePaise + vm.bankBalancePaise, bold: true)
+                LabeledMoney(title: "Total", paise: cashPositionTotalPaise, bold: true)
                 Spacer()
             }
             .padding(8)
@@ -136,9 +136,10 @@ public struct DashboardView: View {
                         Text(Currency.formatPaise(row.expensePaise)).monospacedDigit()
                     }
                     TableColumn("Net (₹)") { row in
-                        Text(Currency.formatPaise(row.incomePaise - row.expensePaise))
+                        let net = monthlyNetPaise(for: row)
+                        Text(Currency.formatPaise(net))
                             .monospacedDigit()
-                            .foregroundStyle(row.incomePaise - row.expensePaise >= 0 ? .green : .red)
+                            .foregroundStyle(net >= 0 ? .green : .red)
                     }
                 }
                 .frame(minHeight: 200)
@@ -170,6 +171,22 @@ public struct DashboardView: View {
     private func reload() {
         guard let ctx = env.companyContext else { return }
         vm.reload(ctx: ctx)
+    }
+
+    private var cashPositionTotalPaise: Int64 {
+        (try? CheckedMath.add(
+            vm.cashBalancePaise,
+            vm.bankBalancePaise,
+            context: "calculating dashboard cash position total"
+        )) ?? 0
+    }
+
+    private func monthlyNetPaise(for row: DashboardViewModel.MonthlyTotal) -> Int64 {
+        (try? CheckedMath.subtract(
+            row.incomePaise,
+            row.expensePaise,
+            context: "calculating dashboard monthly profit and loss net"
+        )) ?? 0
     }
 }
 
@@ -218,7 +235,12 @@ private struct AccountTreeStrip: View {
         var cr: Int64 = 0
         for ledger in t.allLedgers where ledger.isActive {
             let bal = ledger.balancePaise
-            if bal >= 0 { dr += bal } else { cr += -bal }
+            if bal >= 0 {
+                dr = (try? CheckedMath.add(dr, bal, context: "summing dashboard live debit total")) ?? 0
+            } else {
+                let creditMagnitude = (try? CheckedMath.abs(bal, context: "calculating dashboard live credit magnitude")) ?? 0
+                cr = (try? CheckedMath.add(cr, creditMagnitude, context: "summing dashboard live credit total")) ?? 0
+            }
         }
         return (dr, cr)
     }
@@ -229,7 +251,13 @@ private struct AccountTreeStrip: View {
         return GroupBox("Trial Balance (live)") {
             HStack(spacing: 16) {
                 Label {
-                    Text(cache.tree == nil ? "stale" : (balanced ? "balanced" : "off by \(Currency.formatPaise(abs(t.debit - t.credit)))"))
+                    Text(
+                        cache.tree == nil
+                            ? "stale"
+                            : (balanced
+                                ? "balanced"
+                                : "off by \(Currency.formatAbsolutePaise((try? CheckedMath.subtract(t.debit, t.credit, context: "calculating dashboard trial balance difference")) ?? 0))")
+                    )
                 } icon: {
                     Image(systemName: cache.tree == nil ? "exclamationmark.triangle"
                           : (balanced ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"))

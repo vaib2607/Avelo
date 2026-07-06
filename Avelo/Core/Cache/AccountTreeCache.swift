@@ -47,10 +47,10 @@ public final class AccountTreeCache {
                     let groups = try AccountGroupRepository(db: tx).listForCompany(companyId)
                     let ledgers = try AccountRepository(db: tx).listForCompany(companyId)
                     let balances = try Self.loadLedgerBalances(db: tx, financialYearId: financialYearId, ledgers: ledgers)
-                    return AccountTree(companyId: companyId,
-                                       groups: groups,
-                                       ledgers: ledgers,
-                                       ledgerBalances: balances)
+                    return try AccountTree(companyId: companyId,
+                                           groups: groups,
+                                           ledgers: ledgers,
+                                           ledgerBalances: balances)
                 }
             }.value
             self.tree = tree
@@ -123,8 +123,6 @@ public final class AccountTreeCache {
                 if let idStr = row.optionalText("account_id"), let id = UUID(uuidString: idStr) {
                     let debit = row.int("dr")
                     let credit = row.int("cr")
-                    assert(debit <= Int64.max / 2)
-                    assert(credit <= Int64.max / 2)
                     out[id] = LedgerBalance(
                         debitPaise: debit,
                         creditPaise: credit

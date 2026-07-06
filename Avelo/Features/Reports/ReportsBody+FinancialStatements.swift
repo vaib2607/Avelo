@@ -2,11 +2,19 @@ import SwiftUI
 
 @MainActor
 extension ReportsBody {
+    private func safeDebitLessCredit(_ row: ReportResult.TrialBalanceRow, context: String) -> Int64 {
+        (try? CheckedMath.subtract(row.debitPaise, row.creditPaise, context: context)) ?? 0
+    }
+
+    private func safeCreditLessDebit(_ row: ReportResult.TrialBalanceRow, context: String) -> Int64 {
+        (try? CheckedMath.subtract(row.creditPaise, row.debitPaise, context: context)) ?? 0
+    }
+
     var trialBalanceSection: some View {
         let rows = vm.trialBalance
-        let debitTotal = rows.reduce(Int64(0)) { $0 + $1.debitPaise }
-        let creditTotal = rows.reduce(Int64(0)) { $0 + $1.creditPaise }
-        let difference = debitTotal - creditTotal
+        let debitTotal = (try? CheckedMath.sum(rows.map(\.debitPaise), context: "summing trial balance debit total for UI")) ?? 0
+        let creditTotal = (try? CheckedMath.sum(rows.map(\.creditPaise), context: "summing trial balance credit total for UI")) ?? 0
+        let difference = (try? CheckedMath.subtract(debitTotal, creditTotal, context: "calculating trial balance difference for UI")) ?? 0
         return Group {
             if rows.isEmpty {
                 EmptyStateView(
@@ -19,7 +27,7 @@ extension ReportsBody {
             } else {
                 if difference != 0 {
                     Label(
-                        "Trial balance does not tie out. Difference: \(Currency.formatPaise(abs(difference))) on the \(difference > 0 ? "debit" : "credit") side.",
+                        "Trial balance does not tie out. Difference: \(Currency.formatAbsolutePaise(difference)) on the \(difference > 0 ? "debit" : "credit") side.",
                         systemImage: "exclamationmark.triangle.fill"
                     )
                     .font(.callout)
@@ -65,7 +73,7 @@ extension ReportsBody {
                             .buttonStyle(.plain)
                     }
                     TableColumn("Amount (₹)", content: { (r: ReportResult.TrialBalanceRow) in
-                        Text(Currency.formatPaise(r.debitPaise - r.creditPaise)).monospacedDigit()
+                        Text(Currency.formatPaise(safeDebitLessCredit(r, context: "rendering profit and loss income amount"))).monospacedDigit()
                     })
                 }
                 Text("Total income: \(Currency.formatPaise(pl.totalIncomePaise))").monospacedDigit().bold()
@@ -77,7 +85,7 @@ extension ReportsBody {
                             .buttonStyle(.plain)
                     }
                     TableColumn("Amount (₹)", content: { (r: ReportResult.TrialBalanceRow) in
-                        Text(Currency.formatPaise(r.creditPaise - r.debitPaise)).monospacedDigit()
+                        Text(Currency.formatPaise(safeCreditLessDebit(r, context: "rendering profit and loss expense amount"))).monospacedDigit()
                     })
                 }
                 Text("Total expense: \(Currency.formatPaise(pl.totalExpensesPaise))").monospacedDigit().bold()
@@ -109,7 +117,7 @@ extension ReportsBody {
                                 .buttonStyle(.plain)
                         }
                         TableColumn("Amount (₹)") { r in
-                            Text(Currency.formatPaise(r.debitPaise - r.creditPaise)).monospacedDigit()
+                            Text(Currency.formatPaise(safeDebitLessCredit(r, context: "rendering balance sheet asset amount"))).monospacedDigit()
                         }
                     }
                     Text("Total assets: \(Currency.formatPaise(bs.totalAssetsPaise))").monospacedDigit().bold()
@@ -122,7 +130,7 @@ extension ReportsBody {
                                 .buttonStyle(.plain)
                         }
                         TableColumn("Amount (₹)") { r in
-                            Text(Currency.formatPaise(r.creditPaise - r.debitPaise)).monospacedDigit()
+                            Text(Currency.formatPaise(safeCreditLessDebit(r, context: "rendering balance sheet liability amount"))).monospacedDigit()
                         }
                     }
                     Text("Total liabilities: \(Currency.formatPaise(bs.totalLiabilitiesPaise))").monospacedDigit().bold()
@@ -134,7 +142,7 @@ extension ReportsBody {
                                 .buttonStyle(.plain)
                         }
                         TableColumn("Amount (₹)") { r in
-                            Text(Currency.formatPaise(r.creditPaise - r.debitPaise)).monospacedDigit()
+                            Text(Currency.formatPaise(safeCreditLessDebit(r, context: "rendering balance sheet equity amount"))).monospacedDigit()
                         }
                     }
                     Text("Total equity: \(Currency.formatPaise(bs.totalEquityPaise))").monospacedDigit().bold()

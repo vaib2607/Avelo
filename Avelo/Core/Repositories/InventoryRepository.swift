@@ -261,10 +261,7 @@ public struct InventoryRepository: Sendable {
         let inVal = row?.3 ?? 0
         let outVal = row?.4 ?? 0
         let onHand = row?.5 ?? 0
-        let onHandVal = inVal - outVal
-        assert(inVal <= Int64.max / 2)
-        assert(outVal <= Int64.max / 2)
-        assert(onHandVal <= Int64.max / 2)
+        let onHandVal = try CheckedMath.subtract(inVal, outVal, context: "calculating inventory on-hand value")
         return ItemBalance(
             itemId: itemId,
             inQty: inQty,

@@ -135,8 +135,8 @@ enum LocalRCFlowRunner {
         _ = try voucherService.post(draft: purchaseDraft, in: fy)
 
         let trialBalance = try reportService.trialBalance(asOfDate: fy.endDate, financialYearId: fy.id)
-        let totalDebits = trialBalance.rows.reduce(Int64(0)) { $0 + $1.debitPaise }
-        let totalCredits = trialBalance.rows.reduce(Int64(0)) { $0 + $1.creditPaise }
+        let totalDebits = try CheckedMath.sum(trialBalance.rows.map(\.debitPaise), context: "summing RC flow trial balance debits")
+        let totalCredits = try CheckedMath.sum(trialBalance.rows.map(\.creditPaise), context: "summing RC flow trial balance credits")
 
         _ = try reportService.profitAndLoss(
             fromDate: fy.startDate,
@@ -195,8 +195,8 @@ enum LocalRCFlowRunner {
         }
         let restoredReports = ReportService(db: restoredHandle.db, companyId: restored.id)
         let restoredTB = try restoredReports.trialBalance(asOfDate: restoredFY.endDate, financialYearId: restoredFY.id)
-        let restoredDebits = restoredTB.rows.reduce(Int64(0)) { $0 + $1.debitPaise }
-        let restoredCredits = restoredTB.rows.reduce(Int64(0)) { $0 + $1.creditPaise }
+        let restoredDebits = try CheckedMath.sum(restoredTB.rows.map(\.debitPaise), context: "summing restored RC flow trial balance debits")
+        let restoredCredits = try CheckedMath.sum(restoredTB.rows.map(\.creditPaise), context: "summing restored RC flow trial balance credits")
 
         let restoreAudit = try AuditRepository(db: restoredHandle.db).list(
             filter: .init(companyId: restored.id, action: .backupImported)

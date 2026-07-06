@@ -86,9 +86,16 @@ public final class BankReconciliationService: Sendable {
 
             for s in statement {
                 if let v = vouchers.first(where: { v in
-                    !matchedVoucherIds.contains(v.id)
-                        && Self.isWithinDateTolerance(v.date, s.date, days: dateToleranceDays)
-                        && abs(v.amountPaise - abs(s.amountPaise)) <= tolerancePaise
+                    guard !matchedVoucherIds.contains(v.id),
+                          Self.isWithinDateTolerance(v.date, s.date, days: dateToleranceDays) else {
+                        return false
+                    }
+                    guard let statementMagnitude = try? CheckedMath.abs(s.amountPaise, context: "matching bank statement amount"),
+                          let delta = try? CheckedMath.subtract(v.amountPaise, statementMagnitude, context: "matching bank statement delta"),
+                          let deltaMagnitude = try? CheckedMath.abs(delta, context: "matching bank statement delta") else {
+                        return false
+                    }
+                    return deltaMagnitude <= tolerancePaise
                 }) {
                     m.append(Match(
                         statementEntry: s,
@@ -103,7 +110,7 @@ public final class BankReconciliationService: Sendable {
             }
             matched = m
             unmatched = statement.filter { !matchedStatementIds.contains($0.id) }
-            bankBalance = statement.reduce(Int64(0)) { $0 + $1.amountPaise }
+            bankBalance = try CheckedMath.sum(statement.map(\.amountPaise), context: "summing bank statement balance")
         }
         return ReconciliationResult(
             asOf: asOf,

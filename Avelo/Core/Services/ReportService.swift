@@ -196,8 +196,8 @@ public enum ReconciliationCheck {
         let totals = try LedgerLineRepository(db: db).aggregate(
             filter: .init(companyId: companyId, accountId: accountId, fromDate: fromDate, toDate: toDate)
         )
-        let rowDebits = report.rows.reduce(Int64(0)) { $0 + $1.debitPaise }
-        let rowCredits = report.rows.reduce(Int64(0)) { $0 + $1.creditPaise }
+        let rowDebits = try CheckedMath.sum(report.rows.map(\.debitPaise), context: "summing ledger debit rows")
+        let rowCredits = try CheckedMath.sum(report.rows.map(\.creditPaise), context: "summing ledger credit rows")
         guard totals.debitPaise == rowDebits,
               totals.creditPaise == rowCredits else {
             throw AppError.database(.schemaMismatch("Ledger report does not reconcile to paise."))
@@ -226,10 +226,6 @@ public enum ReconciliationCheck {
             bind.append(.date(toDate))
         }
         let row = try db.queryOne(sql, bind: bind) { ($0.int("dr"), $0.int("cr")) }
-        if let row {
-            assert(row.0 <= Int64.max / 2)
-            assert(row.1 <= Int64.max / 2)
-        }
         guard row?.0 == row?.1 else {
             throw AppError.database(.schemaMismatch("Posted vouchers do not reconcile to paise."))
         }
