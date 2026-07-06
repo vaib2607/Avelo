@@ -183,6 +183,7 @@ final class RestoreServiceTests: XCTestCase {
     func testPrepareRestoredCompanyDatabaseRemapsCompanyAndWritesAudit() throws {
         let tc = try TestCompany.make()
         let targetCompanyId = UUID()
+        try AuditTestKeySupport.ensureKey(for: targetCompanyId)
 
         try RestoreService.prepareRestoredCompanyDatabase(
             db: tc.db,
@@ -215,6 +216,7 @@ final class RestoreServiceTests: XCTestCase {
     func testPrepareRestoredCompanyDatabasePreservesOriginalErrorWhenTriggerCleanupFails() throws {
         let tc = try TestCompany.make()
         let targetCompanyId = UUID()
+        try AuditTestKeySupport.ensureKey(for: targetCompanyId)
         try tc.db.execute("DROP TABLE avelo_inventory_items")
         try tc.db.execute("DROP TABLE avelo_vouchers")
 

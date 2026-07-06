@@ -17,6 +17,7 @@ final class ProfitLossReconciliationTests: XCTestCase {
         try MigrationRunner().runMigrations(on: db)
 
         let companyId = UUID()
+        try AuditTestKeySupport.ensureKey(for: companyId)
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO avelo_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",

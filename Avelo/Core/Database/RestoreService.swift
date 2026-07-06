@@ -391,6 +391,13 @@ public struct RestoreService: Sendable {
                 try MigrationRunner().runMigrations(on: db)
                 try Self.validateIntegrity(db: db)
             }
+            let storedKey: Data = switch opened.source {
+            case .keyed(let key):
+                key
+            case .plaintext, .legacyPassphrase:
+                try manager.keyStore.generateKey()
+            }
+            try manager.keyStore.store(key: storedKey, companyId: newId)
             try Self.prepareRestoredCompanyDatabase(
                 db: db,
                 restoredCompanyId: newId,
@@ -399,12 +406,10 @@ public struct RestoreService: Sendable {
             try Self.validateIntegrity(db: db)
             try Self.validatePreparedCompany(db: db, companyId: newId, companyName: manifest.companyName)
 
-            let storedKey: Data
             switch opened.source {
             case .keyed(let key):
-                storedKey = key
+                assert(key == storedKey)
             case .plaintext:
-                storedKey = try manager.keyStore.generateKey()
                 db.close()
                 try LegacyKeyMigrationService(keyStore: manager.keyStore).migrate(
                     companyId: newId,
@@ -413,7 +418,6 @@ public struct RestoreService: Sendable {
                     newKey: storedKey
                 )
             case .legacyPassphrase:
-                storedKey = try manager.keyStore.generateKey()
                 db.close()
                 try LegacyKeyMigrationService(keyStore: manager.keyStore).migrate(
                     companyId: newId,
@@ -432,13 +436,13 @@ public struct RestoreService: Sendable {
             )
             db.close()
             try fm.moveItem(at: stagingURL, to: destURL)
-            try manager.keyStore.store(key: storedKey, companyId: newId)
             try await manager.registerCompany(entry)
             return entry
         } catch {
             AveloRestoreLogger.error("restore failed, cleaning up \(stagingURL.path, privacy: .public)")
             Self.cleanupRestoredCompanyFile(at: destURL, fileManager: fm)
             Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm)
+            try? manager.keyStore.delete(companyId: newId)
             throw error
         }
     }
@@ -557,6 +561,7 @@ public struct RestoreService: Sendable {
                     )
                 }
 
+                try rebuildAuditChain(db: tx, companyId: restoredCompanyId)
                 try writeRestoreAuditEvent(db: tx, companyId: restoredCompanyId)
 
                 try recreateLockedFinancialYearTriggers(db: tx)
@@ -620,6 +625,78 @@ public struct RestoreService: Sendable {
             entityId: companyId.uuidString,
             reason: "Restore from backup"
         )
+    }
+
+    private static func rebuildAuditChain(db: SQLiteDatabase, companyId: Company.ID) throws {
+        struct ExistingAuditRow {
+            let id: String
+            let timestamp: String
+            let actor: String
+            let action: String
+            let entityType: String
+            let entityId: String
+            let snapshotBeforeJson: String?
+            let snapshotAfterJson: String?
+            let reason: String?
+        }
+
+        let rows: [ExistingAuditRow] = try db.query(
+            """
+            SELECT id, timestamp, actor, action, entity_type, entity_id,
+                   snapshot_before_json, snapshot_after_json, reason
+            FROM avelo_audit_events
+            WHERE company_id = ?
+            ORDER BY sequence_number ASC, timestamp ASC, id ASC
+            """,
+            bind: [.text(companyId.uuidString)]
+        ) { row in
+            ExistingAuditRow(
+                id: try row.requiredText("id"),
+                timestamp: try row.requiredText("timestamp"),
+                actor: try row.requiredText("actor"),
+                action: try row.requiredText("action"),
+                entityType: try row.requiredText("entity_type"),
+                entityId: try row.requiredText("entity_id"),
+                snapshotBeforeJson: try row.checkedOptionalText("snapshot_before_json"),
+                snapshotAfterJson: try row.checkedOptionalText("snapshot_after_json"),
+                reason: try row.checkedOptionalText("reason")
+            )
+        }
+
+        let chain = AuditChainIntegrity(db: db)
+        var previousSequence: Int64 = 0
+        var previousChainHMAC: String?
+        for row in rows {
+            let state = try chain.appendStateForMigration(
+                companyId: companyId,
+                id: row.id,
+                timestamp: row.timestamp,
+                actor: row.actor,
+                action: row.action,
+                entityType: row.entityType,
+                entityId: row.entityId,
+                snapshotBeforeJson: row.snapshotBeforeJson,
+                snapshotAfterJson: row.snapshotAfterJson,
+                reason: row.reason,
+                previousSequence: previousSequence,
+                previousChainHMAC: previousChainHMAC
+            )
+            try db.execute(
+                """
+                UPDATE avelo_audit_events
+                SET sequence_number = ?, previous_chain_hmac = ?, chain_hmac = ?
+                WHERE id = ?
+                """,
+                [
+                    .integer(state.sequenceNumber),
+                    .optionalText(state.previousChainHMAC),
+                    .text(state.chainHMAC),
+                    .text(row.id)
+                ]
+            )
+            previousSequence = state.sequenceNumber
+            previousChainHMAC = state.chainHMAC
+        }
     }
 
     private static func dropAuditImmutabilityTriggers(db: SQLiteDatabase) throws {

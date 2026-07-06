@@ -203,3 +203,135 @@ These items stay open here because proof closure is still incomplete even though
   - `swift test --filter AuditRepositoryTests`
   - `swift test --filter SchemaDriftTests`
 - None of those items may move to `Manual acceptance remaining` until relevant full-suite proof is rerun from the current worktree after any dependent changes.
+
+## Wave P0-A evidence log
+
+### AVL-P0-012
+
+- Implemented: [Avelo/Core/Services/AuditChainIntegrity.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/AuditChainIntegrity.swift), [Avelo/Core/Repositories/AuditRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/AuditRepository.swift), [Avelo/Core/Database/DatabaseManager.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/DatabaseManager.swift), and [Avelo/Core/Database/RestoreService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/RestoreService.swift). Invariant: every audit event is sequence-linked and HMAC-signed from the company key, restore remaps rebuild the chain for the new company identity, and company open fails closed on tampered or mismatched chains.
+- Automated proof:
+  - `swift test --filter AuditTamperEvidenceTests` — pass
+  - `swift test --filter DatabaseManagerFileResolutionTests` — pass
+  - `swift test --filter AuditRepositoryTests` — pass
+  - `swift test --filter SchemaDriftTests` — pass
+  - `swift test --filter RestoreServiceTests` — pass
+  - `swift test --filter AppEnvironmentFlowTests` — pass
+  - `swift test --filter ReportBehaviorTests` — pass
+  - `swift test --filter BalanceSheetReconciliationTests` — pass
+  - `swift test --filter ProfitLossReconciliationTests` — pass
+  - `swift test` — pass (`278` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create a company, post at least one voucher, export a backup, and restore it into a new company entry.
+  2. Open the restored company and confirm it loads without an integrity warning.
+  3. Close Avelo, tamper with the restored company database by changing one row in `avelo_audit_events` or deleting one audit row, then reopen Avelo.
+  4. Attempt to open the tampered company from the picker.
+  5. Expected result: Avelo refuses to open the company, reports audit-chain verification failure clearly, does not silently repair or continue, and untampered companies still open normally.
+  6. Restore the original untampered backup again and verify the re-restored company opens and reports remain readable.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-012 closure evidence.
+
+### AVL-P0-011
+
+- Implemented: [Avelo/Core/Utilities/Currency.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Utilities/Currency.swift), [Avelo/Core/Services/InventoryService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/InventoryService.swift), [Avelo/Core/Validation/StockMovementValidator.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Validation/StockMovementValidator.swift), [Avelo/Core/Repositories/ReportRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/ReportRepository.swift), [Avelo/Core/Services/VoucherService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/VoucherService.swift), and related checked-math callers. Invariant: money/quantity arithmetic, reductions, and `Int64.min` formatting fail closed with explicit errors instead of trapping, wrapping, or silently saturating.
+- Automated proof:
+  - `swift test --filter CurrencyTests` — pass
+  - `swift test --filter InventoryServiceTests` — pass
+  - `swift test --filter Phase6MathRoundingTests` — pass
+  - `swift test --filter Phase6HardeningTests` — pass
+  - `swift test --filter VoucherDraftTests` — pass
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test --filter ReportBehaviorTests` — pass
+  - `swift test --filter BankReconciliationServiceTests` — pass
+  - `swift test --filter AccountTreeReconciliationTests` — pass
+  - `swift test --filter InvoicePDFServiceTests` — pass
+  - `swift test` — pass (`278` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. In a test company, prepare one voucher draft, one payroll entry, one bank import line, and one inventory movement near known numeric boundaries.
+  2. Try posting values that should still succeed at the edge of valid range, including the largest negative displayable amount and normal high-value voucher totals.
+  3. Then try one clearly overflowing amount in each flow: voucher total, payroll net, inventory quantity × rate, and bank statement amount.
+  4. Open the affected reports and invoice/PDF export flow for the valid entries.
+  5. Expected result: valid boundary values save and display correctly; invalid overflowing values are rejected with explicit validation/business-rule errors; the app never crashes, never shows wrapped amounts, and never exports a PDF with corrupted totals.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-011 closure evidence.
+
+### AVL-P0-025
+
+- Implemented: [Avelo/Core/Validation/FinancialYearInputValidator.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Validation/FinancialYearInputValidator.swift), [Avelo/Core/Utilities/FiscalLockChecker.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Utilities/FiscalLockChecker.swift), [Avelo/Core/Database/Migrations/MigrationV010.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV010.swift), and restore validation in [Avelo/Core/Database/RestoreService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/RestoreService.swift). Invariant: overlapping financial years are rejected on create/update/restore, adjacent years resolve to exactly one containing FY, and corrupt ambiguity fails closed instead of returning an arbitrary row.
+- Automated proof:
+  - `swift test --filter FinancialYearServiceTests` — pass
+  - `swift test --filter RestoreServiceTests` — pass
+  - `swift test --filter SchemaDriftTests` — pass
+  - `swift test` — pass (`278` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. In Company Settings, create one FY covering `2024-04-01` to `2025-03-31`.
+  2. Attempt to create a second FY that overlaps it by one day, one month, and a full contained range.
+  3. Create an adjacent non-overlapping FY for `2025-04-01` to `2026-03-31`.
+  4. Post or draft vouchers on the boundary dates `2025-03-31` and `2025-04-01`.
+  5. Restore a backup whose FYs are known-good, then restore a deliberately corrupted backup with overlapping FY ranges.
+  6. Expected result: overlapping FY creation/update is rejected with a clear validation error; adjacent FYs are accepted; boundary dates resolve into exactly one FY each; good backups restore normally; corrupted overlapping-FY backups fail closed before reopening books.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-025 closure evidence.
+
+### AVL-P0-026
+
+- Implemented: [Avelo/Core/Utilities/FiscalLockChecker.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Utilities/FiscalLockChecker.swift), fiscal-lock trigger coverage in [Avelo/Core/Database/Migrations/MigrationV011.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV011.swift), restore trigger recreation in [Avelo/Core/Database/RestoreService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/RestoreService.swift), and locked-write rejection paths exercised through banking, payroll, opening-balance, voucher, and inventory services. Invariant: locked-period voucher, line, stock, payroll, banking, and opening-balance mutations fail closed at both service and trigger boundaries, including voucher-date moves into locked FYs.
+- Automated proof:
+  - `swift test --filter FiscalLockEnforcementTests` — pass
+  - `swift test --filter BankReconciliationServiceTests` — pass
+  - `swift test --filter InventoryServiceTests` — pass
+  - `swift test --filter SchemaDriftTests` — pass
+  - `swift test` — pass (`278` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create a company with one FY, post representative voucher, stock, payroll, and bank activity, then lock that FY.
+  2. Attempt each locked-period mutation from the UI: edit an existing voucher, backdate a stock movement, import/clear a bank line in the locked range, edit opening balances, and post payroll into the locked FY.
+  3. Attempt a voucher date edit that moves an otherwise valid voucher into the locked FY.
+  4. Restore a backup of that company and repeat one voucher edit plus one bank/stock mutation in the restored copy.
+  5. Expected result: every locked-period mutation is rejected with a clear lock error; no partial write persists; restored databases keep the same protection; current open FY work still succeeds normally.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-026 closure evidence.
+
+### AVL-P0-030
+
+- Implemented: [Avelo/Core/Database/Migrations/MigrationV014.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV014.swift), [Avelo/Core/Repositories/VoucherRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/VoucherRepository.swift), [Avelo/Core/Services/VoucherService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/VoucherService.swift), [Avelo/Core/Services/InventoryService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/InventoryService.swift), and company-scoping guards exercised across banking, payroll, inventory, and voucher writes. Invariant: cross-company references fail closed at trigger and service boundaries, and read/write flows remain scoped to the active company instead of accepting foreign IDs that happen to satisfy standalone foreign keys.
+- Automated proof:
+  - `swift test --filter CompanyIsolationTests` — pass
+  - `swift test --filter BankReconciliationServiceTests` — pass
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test` — pass (`278` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create two companies with distinct ledgers, bank accounts, inventory items, employees, and financial years.
+  2. In Company A, attempt each foreign-reference action using an identifier from Company B: post a voucher against B's ledger, import or reconcile a bank line against B's bank account, record inventory against B's item, and post payroll using B's employee or financial year.
+  3. Attempt the same actions once through the UI flow and once through any import/restore path that can surface raw IDs indirectly.
+  4. Browse vouchers, ledgers, bank items, and stock views in Company A after the rejected actions.
+  5. Expected result: every cross-company write is rejected with a clear ownership/isolation error; no partial rows persist; Company A lists only Company A data; Company B remains unaffected and fully readable.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-030 closure evidence.
+
+### AVL-P0-027
+
+- Implemented: [Avelo/Core/Database/SQLiteDatabase.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/SQLiteDatabase.swift), [Avelo/Core/Repositories/BankReconciliationRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/BankReconciliationRepository.swift), [Avelo/Core/Repositories/VoucherRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/VoucherRepository.swift), [Avelo/Core/Repositories/ReportRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/ReportRepository.swift), [Avelo/Core/Services/InventoryService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/InventoryService.swift), and strict row decoders covered by [Tests/AveloTests/MalformedUUIDHandlingTests.swift](/Users/vaibhavkakar/Developer/Avelo/Tests/AveloTests/MalformedUUIDHandlingTests.swift). Invariant: malformed dates, enum codes, UUIDs, booleans, and missing columns are rejected explicitly at decode/open time instead of silently coercing to epoch dates, default enums, or partial rows.
+- Automated proof:
+  - `swift test --filter MalformedUUIDHandlingTests` — pass
+  - `swift test --filter SQLiteDatabaseTests` — pass
+  - `swift test --filter BankReconciliationServiceTests` — pass
+  - `swift test --filter ReportBehaviorTests` — pass
+  - `swift test --filter InventoryServiceTests` — pass
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test` — pass (`278` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Start from a disposable backup copy of a valid company database.
+  2. Corrupt one persisted field at a time: replace a voucher type with an unknown code, damage a UUID, remove a required column from a query/view path if supported by the fixture, and replace one ISO date with malformed text.
+  3. Reopen the company and navigate to the affected workflow or report after each corruption.
+  4. Attempt one read-only report and one write flow that would previously have defaulted the bad value.
+  5. Expected result: Avelo fails closed with a clear data-corruption/decode error, does not reinterpret the row as Journal/Debit/FIFO/1970-01-01, and does not allow downstream posting from corrupted state.
+  6. Restore the clean backup and confirm normal open/read/write behavior resumes.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-027 closure evidence.
+
+### AVL-P0-002
+
+- Implemented: [Avelo/Core/Services/VoucherService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/VoucherService.swift), [Avelo/Core/Repositories/VoucherRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/VoucherRepository.swift), voucher-number sequencing in the database layer, and cancellation/reversal tests in [Tests/AveloTests/VoucherServiceTests.swift](/Users/vaibhavkakar/Developer/Avelo/Tests/AveloTests/VoucherServiceTests.swift). Invariant: successful posts allocate contiguous voucher numbers exactly once, failed posts and failed batch chunks do not consume numbers, and cancelled vouchers preserve history without allowing number reuse.
+- Automated proof:
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test` — pass (`278` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create a test company and post a known sequence of vouchers until you have at least five consecutive voucher numbers.
+  2. Trigger one failed post and one failed batch chunk using a validation error, then post the next valid voucher.
+  3. Cancel one existing voucher through the supported cancellation flow and then post another new voucher.
+  4. If a concurrent-entry screen is available, submit two valid vouchers near-simultaneously from separate windows or rapid user actions.
+  5. Expected result: only successful vouchers consume numbers; failed attempts leave no gaps; cancellation keeps the original voucher number in history and the next new voucher gets a new sequential number; concurrent successes remain gap-free and unique.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-002 closure evidence.

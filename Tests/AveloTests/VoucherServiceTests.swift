@@ -402,6 +402,7 @@ final class VoucherServiceTests: XCTestCase {
         try MigrationRunner().runMigrations(on: db)
 
         let companyId = UUID()
+        try AuditTestKeySupport.ensureKey(for: companyId)
         let timestamp = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO avelo_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",

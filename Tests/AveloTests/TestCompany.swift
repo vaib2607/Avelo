@@ -4,8 +4,6 @@ import Foundation
 /// Builds a fully-migrated in-memory company database seeded with a small,
 /// balanced chart of accounts for service- and tree-level tests.
 struct TestCompany {
-    static let auditKeyStore = InMemoryCompanyKeyStore()
-
     let db: SQLiteDatabase
     let companyId: Company.ID
     let fy: FinancialYear
@@ -46,8 +44,7 @@ struct TestCompany {
     static func seed(into db: SQLiteDatabase,
                      companyId: Company.ID,
                      companyName: String = "Test Co") throws -> TestCompany {
-        AuditChainKeyProvider.registerStore(auditKeyStore)
-        try auditKeyStore.store(key: try auditKeyStore.generateKey(), companyId: companyId)
+        try AuditTestKeySupport.ensureKey(for: companyId)
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO avelo_companies (id, name, is_inventory_enabled, inventory_link_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
