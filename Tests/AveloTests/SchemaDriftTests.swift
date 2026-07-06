@@ -322,4 +322,46 @@ final class SchemaDriftTests: XCTestCase {
         ) { $0.text(0) }
         XCTAssertTrue(indexNames.contains("idx_avelo_audit_sequence"), "Missing idx_avelo_audit_sequence in \(indexNames)")
     }
+
+    func testMigrationV013RepairsLegacyPayrollBankAccountColumn() throws {
+        let db = try migratedDB()
+
+        try db.execute("ALTER TABLE avelo_payroll_employees RENAME TO avelo_payroll_employees_old;")
+        try db.execute(
+            """
+            CREATE TABLE avelo_payroll_employees (
+                id TEXT NOT NULL PRIMARY KEY,
+                company_id TEXT NOT NULL REFERENCES avelo_companies(id),
+                code TEXT NOT NULL,
+                name TEXT NOT NULL,
+                designation TEXT,
+                pan TEXT,
+                base_salary_paise INTEGER NOT NULL CHECK(base_salary_paise >= 0),
+                is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+                joined_on TEXT NOT NULL,
+                end_date TEXT,
+                created_at TEXT NOT NULL,
+                CHECK(length(trim(code)) > 0),
+                CHECK(length(trim(name)) > 0),
+                CHECK(length(pan) = 10 OR pan IS NULL),
+                UNIQUE(company_id, code)
+            );
+            """
+        )
+        try db.execute(
+            """
+            INSERT INTO avelo_payroll_employees
+            (id, company_id, code, name, designation, pan, base_salary_paise, is_active, joined_on, end_date, created_at)
+            SELECT id, company_id, code, name, designation, pan, base_salary_paise, is_active, joined_on, end_date, created_at
+            FROM avelo_payroll_employees_old;
+            """
+        )
+        try db.execute("DROP TABLE avelo_payroll_employees_old;")
+        try db.execute("DELETE FROM avelo_migrations WHERE version = 13;")
+        try db.setUserVersion(12)
+
+        try MigrationRunner().runMigrations(on: db)
+
+        XCTAssertEqual(try columns("avelo_payroll_employees", in: db).last, "bank_account_id")
+    }
 }

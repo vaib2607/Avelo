@@ -6,19 +6,7 @@ public struct SettingsView: View {
     @State private var vm: SettingsViewModel?
     @State private var costCentres: [CostCentre] = []
     @State private var costCategories: [CostCategory] = []
-    @State private var masterSheet: MasterSheet?
-
-    private enum MasterSheet: Identifiable {
-        case costCentre(CostCentre? = nil)
-        case costCategory(CostCategory? = nil)
-
-        var id: String {
-            switch self {
-            case .costCentre(let c): return "cc-\(c?.id.uuidString ?? "new")"
-            case .costCategory(let c): return "cat-\(c?.id.uuidString ?? "new")"
-            }
-        }
-    }
+    @State private var masterErrorMessage: String?
 
     public init() {}
 
@@ -44,6 +32,14 @@ public struct SettingsView: View {
                 .init(title: "Shortcut", detail: "⇧⌘B backs up; ⇧⌘R restores from a local file."),
                 .init(title: "Workflow", detail: "Feature toggles affect downstream inventory and reporting screens.")
             ])
+        }
+        .alert("Feature unavailable", isPresented: Binding(
+            get: { masterErrorMessage != nil },
+            set: { if !$0 { masterErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { masterErrorMessage = nil }
+        } message: {
+            Text(masterErrorMessage ?? "This feature is unavailable.")
         }
         .toolbar {
             if let ctx = env.companyContext, let vm {
@@ -84,10 +80,17 @@ public struct SettingsView: View {
             }
             Section("Cost Masters") {
                 HStack {
-                    Button("New Cost Centre") { masterSheet = .costCentre() }
-                    Button("New Cost Category") { masterSheet = .costCategory() }
+                    Button("New Cost Centre") {
+                        masterErrorMessage = "Cost centres are deferred outside the frozen schema."
+                    }
+                    Button("New Cost Category") {
+                        masterErrorMessage = "Cost categories are deferred outside the frozen schema."
+                    }
                     Spacer()
                 }
+                Text("Cost masters are currently unavailable in the frozen schema.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Table(costCentres) {
                     TableColumn("Code", value: \.code)
                     TableColumn("Name", value: \.name)
@@ -96,7 +99,9 @@ public struct SettingsView: View {
                     }
                     TableColumn("Actions") { c in
                         HStack {
-                            Button("Edit") { masterSheet = .costCentre(c) }
+                            Button("Edit") {
+                                masterErrorMessage = "Cost centres are deferred outside the frozen schema."
+                            }
                             Button("Disable") { disableCostCentre(c.id) }
                                 .disabled(!c.isActive)
                         }
@@ -110,7 +115,9 @@ public struct SettingsView: View {
                     }
                     TableColumn("Actions") { c in
                         HStack {
-                            Button("Edit") { masterSheet = .costCategory(c) }
+                            Button("Edit") {
+                                masterErrorMessage = "Cost categories are deferred outside the frozen schema."
+                            }
                             Button("Disable") { disableCostCategory(c.id) }
                                 .disabled(!c.isActive)
                         }
@@ -177,14 +184,6 @@ public struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .sheet(item: $masterSheet) { sheet in
-            switch sheet {
-            case .costCentre(let c):
-                CostMasterSheet(kind: .costCentre, existingCentre: c)
-            case .costCategory(let c):
-                CostMasterSheet(kind: .costCategory, existingCategory: c)
-            }
-        }
     }
 
     private func setup() {
@@ -206,6 +205,14 @@ public struct SettingsView: View {
             let svc = MasterDataService(db: ctx.database, companyId: ctx.companyId)
             costCentres = try svc.listCostCentres()
             costCategories = try svc.listCostCategories()
+        } catch let appError as AppError {
+            switch appError {
+            case .featureUnavailable:
+                costCentres = []
+                costCategories = []
+            default:
+                env.showError(appError)
+            }
         } catch {
             env.showError(AppError.wrap(error))
         }
