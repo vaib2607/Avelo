@@ -472,6 +472,102 @@ Sections:
 | kToggleSidebar | Cmd+Ctrl+S | Toggle sidebar |
 | kPostInventoryLink | Cmd+Shift+P | Post inventory link prompt |
 
+#### 8.1.1 Multi-binding shortcut contract (`AVL-P0-020`, `AVL-P1-026`, `AVL-P1-036`–`AVL-P1-044`, `AVL-P2-011`–`AVL-P2-020`)
+
+The table above records the original macOS bindings. A command may also have one or more Tally-compatible aliases. Bindings are resolved by action and active context, not by a single global key-to-command dictionary.
+
+```swift
+enum ShortcutContext: Sendable, Hashable {
+    case global, voucherBrowser, voucherEditor, voucherAmountField
+    case reportBrowser, allocationEditor, inventoryEditor, textInput
+}
+
+struct ShortcutBinding: Sendable, Hashable {
+    let action: ShortcutAction
+    let chord: KeyChord
+    let contexts: Set<ShortcutContext>
+    let requiresConfirmation: Bool
+}
+```
+
+Normative rules:
+
+- Existing macOS bindings remain valid; Tally chords are compatibility aliases.
+- Context-specific bindings beat global bindings. Ordinary text input wins unless its active editor explicitly owns the command.
+- A collision must resolve deterministically and appear in shortcut help. `Ctrl+R` recalls narration in voucher entry without replacing the existing macOS reverse action; `Ctrl+I` inserts while browsing without replacing narration focus; `Alt+F6` means logistics or cost allocation according to active context.
+- F4–F9 must switch the active voucher type inside the editor after validating whether current fields can be preserved. Opening a separate sheet while suppressing editor switching is incomplete.
+- Email, DSC signing, destructive repair, and any externally visible action always require confirmation.
+- The daily-use alias matrix is normative: F4–F9 voucher types; Alt+F8/F9 orders; Ctrl+F8/F9 notes; Alt+F7 stock journal; Alt+F5/F6 logistics; Ctrl+V mode; Alt+C master creation; Alt+2 duplicate; Ctrl+R narration recall; Ctrl+I insert; Alt+X cancel; Ctrl+Alt+R repair; Ctrl+N calculator; PgUp/PgDn navigation; Alt+F6 allocations; Alt+Z zoom; Alt+E export; Alt+M email; Alt+S/Ctrl+T post-date; Alt+N comparative columns.
+
+#### 8.1.2 Voucher cancellation and continuous-flow contract (`AVL-P0-032`, `AVL-P1-037`, `AVL-P1-038`, `AVL-P1-041`)
+
+- Cancellation never deletes a voucher, ledger line, number, or audit history. It records status, reason, timestamp, actor, and any linked corrective voucher.
+- A cancelled number is never reused. Reports include or exclude cancelled records according to an explicit report policy and expose the cancellation state on drill-down.
+- Duplicate creates a new draft with fresh IDs and number allocation while retaining a read-only source-voucher link.
+- PgUp/PgDn navigation, insert, edit, cancel, drill-down, and return preserve Day Book filters and row position.
+- A Payment or Receipt voucher supports multiple ledger and cost-allocation lines in one grid without forcing submodal entry.
+- Voucher/invoice mode and post-dated state are explicit persisted concepts, distinct from cheque/PDC status.
+
+### 8.1.3 Accounting-engine contracts
+
+#### Inventory valuation layers (`AVL-P0-008`–`AVL-P0-011`, `AVL-P0-019`, `AVL-P1-029`)
+
+- Quantity is fixed-point or rational with an explicit UOM conversion; `Double` is forbidden for authoritative quantity or cost math.
+- Every stock receipt creates an immutable valuation layer. FIFO issues consume oldest eligible layers; weighted average computes from exact aggregate quantity/value and assigns residual paise deterministically.
+- Stock-out cost is computed by the valuation engine, never supplied as authoritative input by the UI.
+- Backdated insert/edit/reversal/cancellation invalidates and recomputes every affected downstream layer and COGS posting with progress and atomic publication.
+- Stock-ageing buckets are derived from surviving layer quantities, so their sum equals on-hand quantity and value.
+- All arithmetic is checked and throwing. Divide-by-zero, `Int64.min`, overflow, underflow, and unrepresentable UOM conversions produce typed errors rather than traps or defaults.
+
+#### Financial-year and persistence invariants (`AVL-P0-024`–`AVL-P0-031`)
+
+- Trial-balance rows show one net debit or credit balance per account; grand-total equality is a second invariant, not a substitute.
+- Financial years for a company cannot overlap. A date resolves to exactly one FY or a typed error.
+- Locking freezes every dated financial mutation, including vouchers, lines, opening balances, stock, payroll, and banking. Controlled restore/repair uses a separately audited maintenance capability.
+- Required dates, enums, columns, IDs, and booleans decode strictly. Corruption never becomes epoch, zero, empty, Journal, Debit, FIFO, or another valid-looking default.
+- Same-company ownership is enforced in schema constraints where possible and revalidated by repositories/services.
+- Schema-version reads throw. Migration does not start if version or integrity cannot be established.
+- Company creation has commit/compensation semantics across Keychain, file creation, migration, seed data, and registry.
+
+### 8.1.4 Repair and audit contracts (`AVL-P0-012`, `AVL-P1-032`, `AVL-P1-039`)
+
+- Audit events are immutable and hash-linked, with a keyed signature or externally anchored checkpoint that prevents an attacker from rewriting the entire chain undetected.
+- Every financially meaningful mutation and dispatch action is audited, including FY unlock, bank import/match/clear, inventory orders, master changes, repair, export, print, DSC signing, and email.
+- Books repair first produces a read-only diagnosis and proposed operation list. Execution requires a verified backup, progress UI, exclusive maintenance access, post-repair integrity/reconciliation checks, and an audit event.
+- Failure or cancellation leaves the original database usable and does not publish a partially repaired state.
+
+### 8.1.5 Automation and reporting contracts
+
+#### Voucher Classes (`AVL-P1-034`)
+
+- A versioned Voucher Class expands item/party inputs into explainable ledger, GST, freight, and charge lines.
+- Expansion is deterministic, balanced, previewable, and records the class version used. User overrides remain explicit and audited.
+
+#### Ledger interest (`AVL-P1-035`)
+
+- Interest policy stores rate-effective periods, simple/advanced method, day-count convention, grace, compounding/posting policy, and rounding rule.
+- Interest schedules remain linked to bills/payments and can be previewed before a journal is posted.
+
+#### Comparative periods (`AVL-P1-036`)
+
+- Reports accept an ordered set of named periods. Each column reconciles independently to the same authoritative ledger query and exposes the exact date/FY filters used.
+
+### 8.1.6 Print, signing, email, and export contracts (`AVL-P0-022`, `AVL-P1-042`, `AVL-P1-043`, `AVL-P2-005`, `AVL-P2-016`, `AVL-P2-017`)
+
+```swift
+protocol PrintProfileProviding: Sendable { /* resolve company/printer/voucher profile */ }
+protocol PDFSigning: Sendable { /* enumerate certificate, preview, sign, verify */ }
+protocol MailDispatching: Sendable { /* compose, confirm, send once, return receipt */ }
+protocol StructuredExporting: Sendable { /* validate and export a declared format/version */ }
+```
+
+- Print profiles are versioned and scoped by company, voucher type, printer/paper, and effective date. Mandatory statutory fields cannot be disabled.
+- Batch print is a stable snapshot of the selected party/date/filter set and cannot omit or duplicate vouchers if live data changes during rendering.
+- DSC signing shows certificate identity, document digest, and preview before explicit confirmation. Token/certificate failure never emits a file represented as signed.
+- Email first generates and verifies the attachment, then presents recipients/subject/body for explicit confirmation. Retries are idempotent and never send twice silently.
+- XML is the P1 structured interchange format and declares schema/version. ASCII/SDF/HTML are P2 compatibility adapters. Every export escapes spreadsheet/formula and encoding hazards appropriate to its format.
+- Regional-script PDFs embed the required fonts and pass both visual rendering and text-extraction checks.
+
 ### 8.2 Date format
 
 - Storage: `yyyy-MM-dd` (ISO 8601 date only).

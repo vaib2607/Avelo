@@ -1,17 +1,18 @@
 # AVELO Master Execution Checklist
 
 ## Summary
-This is the final master list for this thread. It is the only list we use going forward. We will strike items only when the item itself is complete, its proof-of-done check passes, and any dependency re-check required by that item also passes.
+This document controls execution order. The normalized readiness catalogue, stable IDs, severity, dependencies, status, and proof-of-done gates live in `Docs/Avelo_Release_Board.md` under **Canonical Readiness Backlog**. No parallel readiness list may be created. We will strike items only when the catalogue item itself is complete, its automated proof and manual accountant acceptance pass, and every dependency re-check required by that item also passes.
 
 Release intent for the current thread:
 - `v1.1` is the performance, accuracy, and reliability release.
 - The release evidence must include repeatable local benchmark runs for core voucher/report paths and a million-voucher stress path, measured on the same machine with visible progress and comparable modes.
+- The application must not be called **Ready** while any `AVL-P0-*` item is open. Earlier RC completion records remain useful evidence but do not waive the reset readiness gates.
 
 Execution rule:
 - Work only from `Active Now`.
 - When an item is done, strike it.
 - When a dependency changes, re-check dependent completed items before moving forward.
-- If scope changes, edit this list only. No side scope.
+- If readiness scope changes, update the canonical release-board catalogue first, then update execution ordering here. No side lists.
 - Apply the release split in `Docs/Avelo_Release_Board.md`: `V1` for day-one correctness/open-save reliability, `V2` for post-launch merge/security/scale and benchmark tooling work, `V3` for later hardening and rare-edge-case resilience.
 
 Status keys:
@@ -19,7 +20,49 @@ Status keys:
 - `Depends`: prerequisite items that must be green first
 - `Proof`: what must be true before striking the item
 
-## Release Cleanup Checklist
+## Readiness Reset — Execution Order
+
+The prior RC queue proved useful happy paths, but it also counted explicit feature stubs and incomplete accounting engines as acceptable deferrals. The canonical board now records 32 P0, 44 P1, and 20 P2 requirements. These counts are generated from the normalized IDs and replace the inaccurate “29 P0” label from the source notes.
+
+### Gate 1 — Accounting and inventory correctness
+
+- Execute `AVL-P0-001` through `AVL-P0-011`, then `AVL-P0-019`, `AVL-P0-024`, and `AVL-P0-032` in dependency order.
+- Do not build reports or compliance exports on placeholder inventory costing. `AVL-P0-010` owns FIFO/weighted-average stock layers, while `AVL-P0-019` owns backdated cascading recalculation.
+- Trial-balance acceptance is per-account netting plus grand-total equality. A balanced grand total alone is insufficient.
+
+### Gate 2 — Storage, migration, isolation, and fiscal locks
+
+- Execute `AVL-P0-012` through `AVL-P0-018`, then `AVL-P0-025` through `AVL-P0-031`.
+- Fault-injection coverage is mandatory for registry collisions, company-creation rollback, schema-version read failure, locked-period writes, corrupt rows, cross-company references, and statement finalization.
+- Hash chaining without a keyed or external anchor does not satisfy tamper-evidence proof.
+
+### Gate 3 — Keyboard entry and legal documents
+
+- Execute `AVL-P0-020` through `AVL-P0-023` and the P1 dependencies required by `AVL-P0-022`.
+- Tally chords are contextual aliases. Existing macOS bindings remain valid. Text entry wins unless the active editor explicitly owns a command.
+- PDF proof requires rendered inspection and a mandatory-field matrix, not merely `%PDF` output.
+
+### Gate 4 — Broad rollout
+
+- Start `AVL-P1-*` only when its P0 dependencies are green. Compliance, reconciliation, cost allocation, inventory logistics, printing/signing, and continuous-flow entry must complete before broad accountant rollout.
+- Models, routes, fields, or tests expecting `featureUnavailable` do not count as workflow implementation.
+
+### Gate 5 — Post-launch polish
+
+- `AVL-P2-*` remains deferrable unless a P0/P1 proof depends on it.
+- XML interoperability remains P1; ASCII/SDF/HTML compatibility remains P2.
+
+### Evidence policy
+
+- Every catalogue item needs automated unit/integration proof and a manual accountant acceptance result recorded against the same ID.
+- Golden fixtures must cover FIFO, weighted average, trial-balance netting, stock ageing, bill allocation, bank matching, GST returns, and cross-period notes.
+- Adversarial fixtures must cover overflow, malformed persistence, FY overlap, locked writes, company isolation, duplicate imports, registry collisions, partial company creation, and migration failures.
+- Shortcut tests must cover every supported context and both Tally/macOS aliases, including collision behavior.
+- The historical run of 209 passing tests with 8 skipped benchmarks is baseline evidence only. Skipped stress paths and tests that accept deferred stubs cannot close readiness items.
+
+## Historical Release Cleanup Checklist
+
+This section records the earlier RC cleanup pass. Its `done` and `deferred` labels are historical and do not close or override any `AVL-*` readiness item.
 
 Use this ordered list for the current RC cleanup pass. For each item:
 - Check whether it already exists.
@@ -76,7 +119,9 @@ Use this ordered list for the current RC cleanup pass. For each item:
 - Status: documented
 - The bundle remains ad-hoc signed; release notes now call out the local distribution expectation.
 
-## RC Queue
+## Historical RC Queue
+
+This queue records earlier RC evidence and is not the active readiness queue.
 
 - ~~Prove promoted shell routes for inventory, payroll, and banking behave as shipped features~~  
   Owner: `Test`  
@@ -136,6 +181,27 @@ Use this ordered list for the current RC cleanup pass. For each item:
   Current task: hand off to final ARCH go/no-go after the last RC queue items are struck through.
 
 ## Active Now
+
+### Readiness P0 Queue
+
+Execute only after the prior item's dependencies are satisfied; status and proof are updated on the canonical release board.
+
+1. `AVL-P0-011` — checked financial arithmetic across every money/quantity path.
+2. `AVL-P0-008` — exact alternate-UOM quantity representation.
+3. `AVL-P0-010` — authoritative FIFO and weighted-average valuation layers.
+4. `AVL-P0-024` — per-account trial-balance netting.
+5. `AVL-P0-025` — non-overlapping financial years and deterministic date lookup.
+6. `AVL-P0-026` — comprehensive fiscal-lock enforcement.
+7. `AVL-P0-030` — database/service company-ownership enforcement.
+8. `AVL-P0-027` — strict fail-closed persistence decoding.
+9. `AVL-P0-002` — gap-free voucher numbering under contention and rollback.
+10. `AVL-P0-012` — anchored tamper evidence.
+
+Next after these prerequisites: `AVL-P0-019`, `AVL-P0-001`, `AVL-P0-005`, and `AVL-P0-032`.
+
+### Historical Completed Lanes
+
+The struck items below preserve earlier implementation history and are not the active readiness queue.
 
 ### A. Release Control
 - ~~Create repo-tracked `P0/P1/P2` execution board~~  

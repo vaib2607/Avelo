@@ -786,6 +786,35 @@ Recovered shortcut patterns from the source notes:
 - `Esc` back out or cancel
 - `Cmd+Enter` save in Avelo-style macOS mapping
 
+### 5.1 Daily-use compatibility matrix
+
+The release requirement is action parity through contextual aliases, not replacement of macOS conventions. Stable backlog ownership is recorded in `Docs/Avelo_Release_Board.md`.
+
+| Workflow | Tally chord | Avelo requirement | ID |
+| --- | --- | --- | --- |
+| Contra / Payment / Receipt / Journal / Sales / Purchase | F4–F9 | Already opens sheets; must switch type safely inside the active editor. | AVL-P1-044 |
+| Sales Order / Purchase Order | Alt+F8 / Alt+F9 | Separate order lifecycle and fulfilment linkage. | AVL-P1-040 |
+| Credit Note / Debit Note | Ctrl+F8 / Ctrl+F9 | Add aliases while retaining current F10/F11 bindings; preserve GST linkage. | AVL-P1-040, AVL-P1-016 |
+| Stock Journal / Physical Stock | Alt+F7 | Dedicated costed transfer/count workflows. | AVL-P1-040 |
+| Receipt/Delivery/Rejection logistics | Alt+F5 / Alt+F6 | Contextual goods-movement voucher family. | AVL-P1-040 |
+| Voucher / invoice mode | Ctrl+V | Persisted mode with safe in-editor conversion. | AVL-P1-041 |
+| Create master mid-entry | Alt+C | Create/select/return focus without losing draft. | AVL-P1-026 |
+| Duplicate voucher | Alt+2 | Fresh IDs/number with source lineage. | AVL-P2-011 |
+| Recall narration | Ctrl+R | Scoped history; do not collide with reverse. | AVL-P2-012 |
+| Insert while browsing | Ctrl+I | Preserve browser filters/position; do not collide with narration focus. | AVL-P2-013 |
+| Audit-safe cancel | Alt+X | Preserve number, history, status, and reason. | AVL-P0-032 |
+| Repair/reindex books | Ctrl+Alt+R | Backup-gated dry run and verified repair. | AVL-P1-039 |
+| Inline calculator | Ctrl+N | Checked fixed-point result inserted into amount field. | AVL-P2-014 |
+| Previous/next voucher | PgUp / PgDn | Continuous browsing with unsaved-state protection. | AVL-P2-013 |
+| Cost centre/category/budget | Alt+F6 family | Contextual allocation editor and parallel dimensions. | AVL-P1-010, AVL-P1-011 |
+| Report zoom | Alt+Z | Drill and return without losing report context. | AVL-P2-015 |
+| Structured export | Alt+E | XML at P1; ASCII/SDF/HTML compatibility at P2. | AVL-P1-043, AVL-P2-017 |
+| Email report/voucher | Alt+M | Verified PDF attachment and explicit send confirmation. | AVL-P2-016 |
+| Post-date voucher | Alt+S / Ctrl+T | Audited lifecycle distinct from cheque/PDC status. | AVL-P1-041 |
+| Comparative columns | Alt+N | Reconciled multi-period report columns. | AVL-P1-036 |
+
+Aliases resolve by active context. Plain text input wins unless the active editor explicitly owns the chord. Shortcut help must disclose collisions and both Tally/macOS bindings.
+
 ## 6. Tally Windows UX vs Avelo macOS UX
 
 Tally is historically Windows-first and keyboard-heavy. Avelo is macOS-first and uses SwiftUI conventions, so the doc should not expect a literal clone.
@@ -830,42 +859,50 @@ But render it with Avelo-native conventions:
 - create/open/backup/restore flows
 - dashboard shell
 - accounts module with groups and ledgers
-- vouchers module with all common voucher types
-- reports module with trial balance, P&L, balance sheet, GST summary, day book, ledger, outstanding, and stock valuation
+- voucher routes and basic entry for the current common voucher types
+- report routes for trial balance, P&L, balance sheet, GST summary, day book, ledger, outstanding, and stock valuation
 - inventory module
 - payroll module
 - banking module
 - audit module
 - settings module
-- function-key and navigation shortcut support
+- F4–F11 sheet-opening and macOS navigation shortcuts
 - drill-down from reports to source voucher or ledger
-- fiscal-year support and lock behavior
+- basic financial-year records and voucher/ledger lock triggers
+
+These surfaces are implementation evidence, not a Ready claim. The canonical release board identifies accounting engines and invariants that remain open behind several of these screens.
 
 ### 7.2 Partially implemented
 
 - Tally-style gateway/menu bar is mapped into a macOS sidebar rather than a classic Gateway of Tally screen
 - classic menu-bar dropdown depth is not mirrored one-for-one
 - some Tally screen chrome such as footer function strips are represented through toolbar, shortcut help, and sheets instead
-- inventory and voucher flows exist, but not every Tally edge-case prompt or legacy submenu is present as a separate surface
-- GST and statutory reporting exist, but the broader Tally statutory menu ecology is simplified
+- F4–F9 open voucher sheets, but the editor suppresses function-key switching instead of converting the active voucher flow
+- inventory screens and valuation labels exist, but authoritative FIFO/weighted-average layers, residual allocation, ageing consumption, and backdated recalculation remain open (`AVL-P0-010`, `AVL-P0-019`, `AVL-P1-029`)
+- trial balance exists, but per-account netting remains a release blocker (`AVL-P0-024`)
+- Day Book and report drill-down exist, but the universal browse/edit/cancel/return flow is incomplete (`AVL-P1-037`)
+- F11/F12 concepts exist in documentation/shell affordances, but company capabilities and per-screen behavior are not yet consistently separated contextually
+- GST summary/invoice export surfaces exist, but e-invoice, monthly return, IMS, annual reconciliation, and full filing contracts remain open (`AVL-P1-001`, `AVL-P1-007`, `AVL-P1-008`)
 
 ### 7.3 Missing or not yet equivalent
 
-- classic Tally gateway look and feel
-- full Windows-style Alt-menu hierarchy
-- Tally's exact submenu density and every historical branch label
-- every legacy inventory voucher variant and every stock-analysis report family
-- exact Tally report formatting, column spacing, and screen chrome
-- invoice/order ecosystem breadth beyond the shipped Avelo slice
-- some advanced stock workflows such as ageing, reorder analysis, and broader order-tracking surfaces if you want a full ERP-like clone
+- continuous Gateway-style access to company context, key reports, and the menu tree without extra navigation (`AVL-P2-019`)
+- contextual F11 company features versus F12 per-screen configuration (`AVL-P2-020`)
+- universal Day Book browse/edit/cancel flow (`AVL-P1-037`)
+- comparative report columns (`AVL-P1-036`)
+- full order, stock journal, physical stock, rejection, delivery, and receipt-note family (`AVL-P1-040`)
+- voucher classes and automated ledger interest (`AVL-P1-034`, `AVL-P1-035`)
+- cost categories in addition to cost centres (`AVL-P1-011`)
+- multi-voucher printing, saved voucher/printer profiles, DSC signing, confirmed email, and structured interchange (`AVL-P1-042`, `AVL-P1-043`, `AVL-P2-016`, `AVL-P2-017`)
+- daily-use shortcut aliases listed in section 5.1, with macOS bindings retained
 
 ### 7.4 Intentionally out of scope or deferred
 
 - cloud sync
 - remote login and networked workflows
-- cross-company consolidation
-- order-tracking expansion beyond the shipped shell if not yet in the active release board
-- advanced GST export paths beyond the current summary/report set if not already shipped
+- cross-company consolidation until `AVL-P2-008`
+- legacy ASCII/SDF/HTML export until `AVL-P2-017`; XML interoperability remains a P1 requirement
+- expansion from the daily-use shortcut matrix toward the full historical catalogue until `AVL-P2-018`
 - any direct Windows clone behavior that would fight macOS conventions
 
 ### 7.5 UI / navigation mismatches to keep in mind
@@ -882,9 +919,10 @@ Based on the current repo:
 - `SidebarDestination` exposes dashboard, vouchers, accounts, reports, inventory, payroll, banking, audit, and settings.
 - `RootView` wires those destinations into the app shell and exposes sheets for company, vouchers, masters, FY, inventory, payroll, backup, restore, preferences, and help-style utilities.
 - `ReportsView` already provides drill-down-capable report families for trial balance, P&L, balance sheet, GST summary, day book, ledger, outstanding, and stock valuation.
-- The rules and module checklist confirm the core offline accounting, inventory, payroll, banking, audit, backup, and FY-locking scope.
+- The rules and module checklist confirm routes and happy-path coverage, but several tests currently accept explicit feature deferrals as success.
+- The historical baseline is 209 passing tests with 8 skipped benchmark/stress paths. That evidence does not close a readiness item unless the matching `AVL-*` proof gate passes.
 
-That means the biggest gaps versus the full Tally checklist are not the accounting engine itself, but the exact Windows-style navigation density, every legacy submenu branch, and the total breadth of Tally's historical report/menu chrome.
+The largest gaps are accounting-engine correctness and fiscal/data invariants first, then continuous-flow accountant UX. Visual imitation of Windows-era Tally chrome is secondary and must not displace the P0 catalogue.
 
 ## 9. Beginner path
 
