@@ -116,13 +116,14 @@ extension ReportRepository {
     // MARK: - Balance Sheet
 
     public func balanceSheet(asOfDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.BalanceSheet {
+        let openingContext = try financialYearOpeningContext(filter: filter)
         let groups = try AccountGroupRepository(db: db).listForCompany(filter.companyId)
         let groupById: [UUID: AccountGroup] = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
 
         let assetCodes = ["FIXED_ASSETS", "INVESTMENTS", "CURRENT_ASSETS", "STOCK_IN_HAND", "BANK_ACCOUNTS"]
         let liabilityCodes = ["CAPITAL", "LOANS", "CURRENT_LIAB", "DUTIES_TAXES"]
-        let assetSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .assets, rootCodes: assetCodes, groupById: groupById)
-        let liabSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .liabilities, rootCodes: liabilityCodes, groupById: groupById)
+        let assetSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .assets, rootCodes: assetCodes, groupById: groupById, openingContext: openingContext)
+        let liabSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .liabilities, rootCodes: liabilityCodes, groupById: groupById, openingContext: openingContext)
         let totalAssets = try CheckedMath.sum(assetSections.map(\.totalPaise), context: "summing balance sheet assets")
         let totalLiab = try CheckedMath.sum(liabSections.map(\.totalPaise), context: "summing balance sheet liabilities")
         let equity = try CheckedMath.subtract(totalAssets, totalLiab, context: "calculating balance sheet equity")
@@ -142,7 +143,8 @@ extension ReportRepository {
                             asOfDate: Date,
                             nature: AccountNature,
                             rootCodes: [String],
-                            groupById: [AccountGroup.ID: AccountGroup]) throws -> [ReportResult.BalanceSheetSection] {
+                            groupById: [AccountGroup.ID: AccountGroup],
+                            openingContext: FinancialYearOpeningContext?) throws -> [ReportResult.BalanceSheetSection] {
         let groupIds = groupsWithNature(nature: nature, rootCodes: rootCodes, allGroups: Array(groupById.values))
         let placeholders = Array(repeating: "?", count: groupIds.count).joined(separator: ",")
         var sql = """
@@ -171,6 +173,7 @@ extension ReportRepository {
         let totalsByAccount = try movementTotals(
             for: raws.map { $0.0 },
             companyId: filter.companyId,
+            fromDate: openingContext?.financialYear.startDate,
             toDate: asOfDate
         )
         var byGname: [String: [ReportResult.TrialBalanceRow]] = [:]
@@ -179,7 +182,20 @@ extension ReportRepository {
             let move = totalsByAccount[id]
             let dr = move?.debitPaise ?? 0
             let cr = move?.creditPaise ?? 0
-            let signedOpening: Int64 = obs == "debit" ? ob : -ob
+            let account = Account(
+                id: id,
+                companyId: filter.companyId,
+                groupId: groupIds.first ?? UUID(),
+                code: code,
+                name: name,
+                openingBalancePaise: ob,
+                openingBalanceSide: obs == "debit" ? .debit : .credit
+            )
+            let signedOpening: Int64 = try signedOpeningBalance(
+                for: account,
+                filter: filter,
+                openingContext: openingContext
+            )
             let net: Int64
             if nature == .assets {
                 net = try CheckedMath.add(

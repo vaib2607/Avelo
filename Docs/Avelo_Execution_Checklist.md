@@ -67,7 +67,7 @@ Execute in this order after Wave P0-A is green enough to avoid rework.
 
 | ID | State | Dependency gate | Next concrete action | Proof still missing |
 | --- | --- | --- | --- | --- |
-| AVL-P0-005 | Implementation remaining | AVL-P0-025 and AVL-P0-026 | Implement locked-FY close carry-forward with exact-once opening propagation and reopen/idempotency rules. | Golden close/reopen/idempotency fixtures, full `swift test`, and accountant year-close acceptance. |
+| AVL-P0-005 | Manual acceptance remaining | AVL-P0-025 and AVL-P0-026 | Execute the accountant year-close acceptance script against the shipped exact-once carry-forward, reopen cleanup, and idempotent close behavior. | Accountant year-close acceptance is still pending; automated proof is complete on `FinancialYearCloseCarryForwardTests`, `FinancialYearServiceTests`, `ReportBehaviorTests`, `AccountTreeReconciliationTests`, `SchemaDriftTests`, and full `swift test`. |
 | AVL-P0-006 | Implementation remaining | AVL-P0-026 | Implement reversal-only correction flow for locked-FY edits across service and UI. | UI/service rejection-and-reversal tests, full `swift test`, and accountant locked-period correction acceptance. |
 | AVL-P0-007 | Implementation remaining | AVL-P0-002 | Implement one-shot submit protection for rapid Enter/default-action activation without duplicate audit events. | Repeated-key/concurrent-submit fixtures, full `swift test`, and keyboard-entry acceptance. |
 | AVL-P0-003 | Implementation remaining | None | Replace bill-allocation stub behavior with real FIFO settlement for receipts, payments, advances, and on-account amounts. | Golden bill-allocation fixtures, full `swift test`, and accountant outstanding reconciliation acceptance. |
@@ -335,3 +335,24 @@ These items stay open here because proof closure is still incomplete even though
   4. If a concurrent-entry screen is available, submit two valid vouchers near-simultaneously from separate windows or rapid user actions.
   5. Expected result: only successful vouchers consume numbers; failed attempts leave no gaps; cancellation keeps the original voucher number in history and the next new voucher gets a new sequential number; concurrent successes remain gap-free and unique.
 - Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-002 closure evidence.
+
+## Wave P0-B evidence log
+
+### AVL-P0-005
+
+- Implemented: [Avelo/Core/Services/FinancialYearService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/FinancialYearService.swift), [Avelo/Core/Repositories/FinancialYearOpeningBalanceRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/FinancialYearOpeningBalanceRepository.swift), [Avelo/Core/Repositories/FinancialYearRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/FinancialYearRepository.swift), [Avelo/Core/Repositories/ReportRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/ReportRepository.swift), [Avelo/Core/Repositories/ReportRepository+FinancialStatements.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/ReportRepository+FinancialStatements.swift), [Avelo/Core/Cache/AccountTree.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Cache/AccountTree.swift), [Avelo/Core/Cache/AccountTreeCache.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Cache/AccountTreeCache.swift), [Avelo/Core/Database/Migrations/MigrationV014.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV014.swift), [Avelo/Core/Database/MigrationRunner.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/MigrationRunner.swift), and [Avelo/Core/Database/SchemaVersion.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/SchemaVersion.swift). Invariant: closing an FY publishes one exact carry-forward opening snapshot into the next FY, repeating close is idempotent, reopening removes the published carry-forward rows, and later-FY reports/account trees resolve opening balances from the authoritative carry-forward snapshot or deterministic fallback math rather than mutating historical ledger masters.
+- Automated proof:
+  - `swift test --filter FinancialYearCloseCarryForwardTests` — pass
+  - `swift test --filter FinancialYearServiceTests` — pass
+  - `swift test --filter ReportBehaviorTests` — pass
+  - `swift test --filter AccountTreeReconciliationTests` — pass
+  - `swift test --filter SchemaDriftTests` — pass
+  - `swift test` — pass (`283` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create two adjacent financial years for one company, with the earlier FY still open and the later FY empty.
+  2. Post representative asset, liability, income, and expense activity in the earlier FY so at least one ledger closes debit and one closes credit.
+  3. Close the earlier FY once, open the later FY reports, and verify ledger report, trial balance, balance sheet, and account tree starting balances all match the prior FY closing balances exactly.
+  4. Attempt to close the same FY again and verify no second carry-forward layer or duplicate opening snapshot is created.
+  5. Reopen the earlier FY through the maintenance/test flow, confirm the later FY carry-forward snapshot is removed, then close it again and confirm the regenerated opening snapshot still matches the revised prior-year closing balances exactly.
+  6. Expected result: close publishes one exact opening snapshot into the next FY, repeated close is a no-op, reopen removes the published carry-forward state cleanly, re-close republishes the correct balances, and no historical ledger master opening balance is overwritten.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-005 closure evidence.

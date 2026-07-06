@@ -531,6 +531,7 @@ Normative rules:
 
 - Trial-balance rows show one net debit or credit balance per account; grand-total equality is a second invariant, not a substitute.
 - Financial years for a company cannot overlap on create, update, import, or restore. A date resolves to exactly one FY through a deterministic ordering rule or the lookup fails closed with a typed error.
+- Closing an FY publishes one exact signed opening snapshot into the next FY for every ledger; repeating close is idempotent, reopening removes the published snapshot, and later-FY reports resolve opening balances from the carried snapshot or deterministic fallback math rather than rewriting historical ledger master openings.
 - Locking freezes every dated financial mutation, including voucher inserts and date updates, lines, opening balances, stock, payroll, bank statement imports/clearance, and banking. Controlled restore/repair uses a separately audited maintenance capability with explicit trigger recreation on migrated databases.
 - Required dates, enums, columns, IDs, and booleans decode strictly. Corruption never becomes epoch, zero, empty, Journal, Debit, FIFO, or another valid-looking default.
 - Same-company ownership is enforced in schema constraints where possible and revalidated by repositories/services.

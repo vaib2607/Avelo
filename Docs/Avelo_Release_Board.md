@@ -84,7 +84,8 @@ Execution queue alignment:
   - `Proof remaining`
   - `Manual acceptance remaining`
 - The current Wave `P0-A` proof-closure queue is: `AVL-P0-012`, `AVL-P0-011`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-030`, `AVL-P0-027`, and `AVL-P0-002`.
-- The current Wave `P0-B` implementation queue begins with: `AVL-P0-005`, `AVL-P0-006`, `AVL-P0-007`, `AVL-P0-003`, `AVL-P0-004`, and `AVL-P0-009`.
+- The current Wave `P0-B` remaining implementation queue begins with: `AVL-P0-006`, `AVL-P0-007`, `AVL-P0-003`, `AVL-P0-004`, and `AVL-P0-009`.
+- `AVL-P0-005` implementation and automated proof are landed; it remains open only until accountant year-close acceptance is executed and recorded.
 
 ## Release-Risk Split
 
@@ -106,7 +107,7 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P0-002 | Open | None | Gap-free voucher numbering under concurrent saves and failed transactions. | Contention and rollback tests prove committed numbers are unique, ordered, and never reused. |
 | AVL-P0-003 | Open | None | Bill-wise FIFO allocation for partial receipts, payments, advances, and on-account amounts. | Golden bill-settlement fixtures reconcile every allocation and outstanding balance. |
 | AVL-P0-004 | Open | AVL-P0-003 | Non-destructive bounced-cheque workflow using linked reversals. | Original cheque/voucher remains immutable; reversal and re-presentation are fully audited. |
-| AVL-P0-005 | Open | AVL-P0-025, AVL-P0-026 | Carry locked-FY closing balances into the next FY exactly once. | Close/reopen/idempotency fixtures reconcile every ledger to the prior closing balance. |
+| AVL-P0-005 | Open | AVL-P0-025, AVL-P0-026 | Carry locked-FY closing balances into the next FY exactly once, without mutating historical ledger masters, and remove/regenerate that published opening snapshot cleanly on reopen/re-close. | Close/reopen/idempotency fixtures reconcile every ledger to the prior closing balance, later-FY reports use the carried snapshot, and accountant year-close acceptance confirms the workflow. |
 | AVL-P0-006 | Open | AVL-P0-026 | Graceful reversal-only correction for locked-FY records. | UI and service tests reject edits without crashing and create linked current-period reversals. |
 | AVL-P0-007 | Open | AVL-P0-002 | Prevent duplicate vouchers from rapid Enter/default-action activation. | Repeated-key and concurrent-submit tests produce one durable voucher and one audit event. |
 | AVL-P0-008 | Open | AVL-P0-011 | Alternate-UOM conversion using rational/fixed-point quantities, never floating truncation. | Round-trip fixtures cover fractional conversions, residual units, and extreme quantities. |

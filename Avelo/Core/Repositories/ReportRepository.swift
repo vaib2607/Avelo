@@ -13,6 +13,11 @@ public struct ReportRepository: Sendable {
         let creditPaise: Int64
     }
 
+    struct FinancialYearOpeningContext: Sendable {
+        let financialYear: FinancialYear
+        let signedOpeningByAccount: [Account.ID: Int64]
+    }
+
     func movementTotals(
         for accountIds: [Account.ID],
         companyId: Company.ID,
@@ -57,8 +62,12 @@ public struct ReportRepository: Sendable {
                              accountId: Account.ID) throws -> ReportResult.LedgerReport {
         let account = try AccountRepository(db: db).findById(accountId)
         let accountName = account?.name ?? "Unknown"
-        let groupNature = (try account.flatMap { try AccountGroupRepository(db: db).findById($0.groupId) })?.nature ?? .assets
-        let signedOpening: Int64 = try account?.signedOpeningBalancePaise() ?? 0
+        let openingContext = try financialYearOpeningContext(filter: filter)
+        let signedOpening: Int64 = try signedOpeningBalance(
+            for: account,
+            filter: filter,
+            openingContext: openingContext
+        )
 
         var sql = """
             SELECT v.id AS vid, v.date AS vdate, v.number AS vnum, v.voucher_type_code AS vtype,
@@ -132,6 +141,8 @@ public struct ReportRepository: Sendable {
     // MARK: - Trial Balance
 
     public func trialBalance(asOfDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.TrialBalance {
+        let openingContext = try financialYearOpeningContext(filter: filter)
+        let movementFromDate = openingContext?.financialYear.startDate
         let asOfStr = DateFormatters.formatIsoDate(asOfDate)
         let sql = """
             WITH movements AS (
@@ -180,6 +191,7 @@ public struct ReportRepository: Sendable {
         let totalsByAccount = try movementTotals(
             for: raws.map(\.id),
             companyId: filter.companyId,
+            fromDate: movementFromDate,
             toDate: asOfDate
         )
 
@@ -190,7 +202,8 @@ public struct ReportRepository: Sendable {
             let movement = totalsByAccount[raw.id]
             let moveDr = movement?.debitPaise ?? 0
             let moveCr = movement?.creditPaise ?? 0
-            let signedOpening: Int64 = raw.obs == "debit" ? raw.ob : -raw.ob
+            let signedOpening: Int64 = openingContext?.signedOpeningByAccount[raw.id]
+                ?? (raw.obs == "debit" ? raw.ob : -raw.ob)
             let openingDebit = signedOpening > 0 ? signedOpening : 0
             let openingCredit = signedOpening < 0 ? try CheckedMath.abs(signedOpening, context: "calculating trial balance opening credit") : 0
             let grossDebit = try CheckedMath.add(openingDebit, moveDr, context: "calculating trial balance gross debit")
@@ -216,6 +229,47 @@ public struct ReportRepository: Sendable {
             totalDebitPaise: totalDr,
             totalCreditPaise: totalCr
         )
+    }
+
+    func financialYearOpeningContext(filter: ReportResult.ReportFilter) throws -> FinancialYearOpeningContext? {
+        guard let financialYearId = filter.financialYearId,
+              let financialYear = try FinancialYearRepository(db: db).findById(financialYearId) else {
+            return nil
+        }
+        let rows = try FinancialYearOpeningBalanceRepository(db: db).listForFinancialYear(financialYearId)
+        guard !rows.isEmpty else {
+            return FinancialYearOpeningContext(financialYear: financialYear, signedOpeningByAccount: [:])
+        }
+        let signed = try Dictionary(uniqueKeysWithValues: rows.map { row in
+            (row.accountId, try row.signedOpeningBalancePaise())
+        })
+        return FinancialYearOpeningContext(financialYear: financialYear, signedOpeningByAccount: signed)
+    }
+
+    func signedOpeningBalance(for account: Account?,
+                              filter: ReportResult.ReportFilter,
+                              openingContext: FinancialYearOpeningContext?) throws -> Int64 {
+        guard let account else { return 0 }
+        if let carried = openingContext?.signedOpeningByAccount[account.id] {
+            return carried
+        }
+        if let financialYear = openingContext?.financialYear {
+            let priorMovements = try movementTotals(
+                for: [account.id],
+                companyId: filter.companyId,
+                toDate: Calendar(identifier: .gregorian).date(byAdding: .day, value: -1, to: financialYear.startDate)
+            )[account.id]
+            return try CheckedMath.subtract(
+                try CheckedMath.add(
+                    try account.signedOpeningBalancePaise(),
+                    priorMovements?.debitPaise ?? 0,
+                    context: "calculating fallback financial year opening debit"
+                ),
+                priorMovements?.creditPaise ?? 0,
+                context: "calculating fallback financial year opening balance"
+            )
+        }
+        return try account.signedOpeningBalancePaise()
     }
 
     private func groupPathText(for groupCode: String, groups: [AccountGroup.ID: AccountGroup]) -> String {

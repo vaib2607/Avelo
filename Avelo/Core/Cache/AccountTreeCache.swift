@@ -46,11 +46,30 @@ public final class AccountTreeCache {
                     probe?(Thread.isMainThread)
                     let groups = try AccountGroupRepository(db: tx).listForCompany(companyId)
                     let ledgers = try AccountRepository(db: tx).listForCompany(companyId)
-                    let balances = try Self.loadLedgerBalances(db: tx, financialYearId: financialYearId, ledgers: ledgers)
+                    let reportRepository = ReportRepository(db: tx)
+                    let filter = ReportResult.ReportFilter(companyId: companyId, financialYearId: financialYearId)
+                    let openingContext = try reportRepository.financialYearOpeningContext(filter: filter)
+                    let balances = try Self.loadLedgerBalances(
+                        db: tx,
+                        financialYearId: financialYearId,
+                        fromDate: openingContext?.financialYear.startDate,
+                        ledgers: ledgers
+                    )
+                    let openingOverrides = try Dictionary(uniqueKeysWithValues: ledgers.map { ledger in
+                        (
+                            ledger.id,
+                            try reportRepository.signedOpeningBalance(
+                                for: ledger,
+                                filter: filter,
+                                openingContext: openingContext
+                            )
+                        )
+                    })
                     return try AccountTree(companyId: companyId,
                                            groups: groups,
                                            ledgers: ledgers,
-                                           ledgerBalances: balances)
+                                           ledgerBalances: balances,
+                                           openingBalanceOverrides: openingOverrides)
                 }
             }.value
             self.tree = tree
@@ -86,6 +105,7 @@ public final class AccountTreeCache {
 
     nonisolated private static func loadLedgerBalances(db: SQLiteDatabase,
                                                        financialYearId: FinancialYear.ID?,
+                                                       fromDate: Date?,
                                                        ledgers: [Account]) throws -> [Account.ID: LedgerBalance] {
         guard !ledgers.isEmpty else { return [:] }
         var out: [Account.ID: LedgerBalance] = [:]
@@ -117,6 +137,10 @@ public final class AccountTreeCache {
             if let to = fyEnd {
                 sql += " AND v.date <= ?"
                 binds.append(.date(to))
+            }
+            if let fromDate {
+                sql += " AND v.date >= ?"
+                binds.append(.date(fromDate))
             }
             sql += " GROUP BY l.account_id"
             _ = try db.query(sql, bind: binds) { row in

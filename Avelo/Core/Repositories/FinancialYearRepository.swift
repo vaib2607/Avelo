@@ -36,6 +36,23 @@ public struct FinancialYearRepository: Sendable {
         ) { try Self.rowToFinancialYear($0) }
     }
 
+    public func findNext(after financialYear: FinancialYear) throws -> FinancialYear? {
+        try db.queryOne(
+            """
+            SELECT id, company_id, label, start_date, end_date, books_begin_date, is_locked, is_closed, created_at
+            FROM avelo_financial_years
+            WHERE company_id = ?
+              AND start_date > ?
+            ORDER BY start_date ASC, created_at ASC, id ASC
+            LIMIT 1
+            """,
+            bind: [
+                .text(financialYear.companyId.uuidString),
+                .date(financialYear.endDate)
+            ]
+        ) { try Self.rowToFinancialYear($0) }
+    }
+
     public func overlaps(companyId: Company.ID,
                          startDate: Date,
                          endDate: Date,
@@ -113,6 +130,13 @@ public struct FinancialYearRepository: Sendable {
     public func markClosed(_ id: FinancialYear.ID) throws {
         try db.execute(
             "UPDATE avelo_financial_years SET is_closed = 1, is_locked = 1 WHERE id = ?",
+            [.text(id.uuidString)]
+        )
+    }
+
+    public func reopen(_ id: FinancialYear.ID) throws {
+        try db.execute(
+            "UPDATE avelo_financial_years SET is_closed = 0, is_locked = 0 WHERE id = ?",
             [.text(id.uuidString)]
         )
     }

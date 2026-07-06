@@ -20,7 +20,8 @@ public struct AccountTree: Sendable {
     public init(companyId: Company.ID,
                 groups: [AccountGroup],
                 ledgers: [Account],
-                ledgerBalances: [Account.ID: LedgerBalance]) throws {
+                ledgerBalances: [Account.ID: LedgerBalance],
+                openingBalanceOverrides: [Account.ID: Int64] = [:]) throws {
         self.companyId = companyId
         self.builtAt = Date()
 
@@ -33,7 +34,7 @@ public struct AccountTree: Sendable {
                 groupId: ledger.groupId,
                 code: ledger.code,
                 name: ledger.name,
-                openingBalancePaise: try ledger.signedOpeningBalancePaise(),
+                openingBalancePaise: try openingBalanceOverrides[ledger.id] ?? ledger.signedOpeningBalancePaise(),
                 movementDebitPaise: bal.debitPaise,
                 movementCreditPaise: bal.creditPaise,
                 isActive: ledger.isActive,
