@@ -113,6 +113,13 @@ final class BankReconciliationServiceTests: XCTestCase {
         XCTAssertEqual(result.bankBalancePaise, Int64.min)
     }
 
+    func testDateToleranceHelperDoesNotTrapOnIntMinDelta() {
+        XCTAssertFalse(BankReconciliationService.isDeltaWithinTolerance(deltaDays: Int.min, allowedDays: 3))
+        XCTAssertTrue(BankReconciliationService.isDeltaWithinTolerance(deltaDays: -3, allowedDays: 3))
+        XCTAssertTrue(BankReconciliationService.isDeltaWithinTolerance(deltaDays: 3, allowedDays: 3))
+        XCTAssertFalse(BankReconciliationService.isDeltaWithinTolerance(deltaDays: -4, allowedDays: 3))
+    }
+
     func testClearStatementLineMarksImportedLineCleared() throws {
         let tc = try TestCompany.make()
         let repo = BankReconciliationRepository(db: tc.db)

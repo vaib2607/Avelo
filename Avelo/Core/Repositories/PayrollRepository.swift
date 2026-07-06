@@ -187,44 +187,44 @@ public struct PayrollRepository: Sendable {
     }
 
     static func rowToEmployee(_ r: Row) throws -> PayrollEmployee {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_payroll_employees.id")
-        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_payroll_employees.company_id")
-        let bank = try UUIDParsing.optional(r.optionalText("bank_account_id"), field: "avelo_payroll_employees.bank_account_id")
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_payroll_employees.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_payroll_employees.company_id")
+        let bank = try UUIDParsing.optional(try r.checkedOptionalText("bank_account_id"), field: "avelo_payroll_employees.bank_account_id")
         return PayrollEmployee(
             id: id,
             companyId: companyId,
-            employeeCode: r.text("code"),
-            name: r.text("name"),
-            designation: r.optionalText("designation"),
-            pan: r.optionalText("pan"),
+            employeeCode: try r.requiredText("code"),
+            name: try r.requiredText("name"),
+            designation: try r.checkedOptionalText("designation"),
+            pan: try r.checkedOptionalText("pan"),
             bankAccountId: bank,
-            baseSalaryPaise: r.int("base_salary_paise"),
-            isActive: r.bool("is_active"),
-            joinedOn: r.date("joined_on"),
-            endDate: r.optionalDate("end_date"),
+            baseSalaryPaise: try r.requiredInt("base_salary_paise"),
+            isActive: try r.requiredBool("is_active"),
+            joinedOn: try r.requiredDate("joined_on"),
+            endDate: try r.checkedOptionalDate("end_date"),
             createdAt: try r.timestamp("created_at")
         )
     }
 
     static func rowToEntry(_ r: Row) throws -> PayrollEntry {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_payroll_entries.id")
-        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_payroll_entries.company_id")
-        let employeeId = try UUIDParsing.required(r.text("employee_id"), field: "avelo_payroll_entries.employee_id")
-        let fyId = try UUIDParsing.required(r.text("financial_year_id"), field: "avelo_payroll_entries.financial_year_id")
-        let voucherId = try UUIDParsing.optional(r.optionalText("voucher_id"), field: "avelo_payroll_entries.voucher_id")
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_payroll_entries.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_payroll_entries.company_id")
+        let employeeId = try UUIDParsing.required(r.requiredText("employee_id"), field: "avelo_payroll_entries.employee_id")
+        let fyId = try UUIDParsing.required(r.requiredText("financial_year_id"), field: "avelo_payroll_entries.financial_year_id")
+        let voucherId = try UUIDParsing.optional(try r.checkedOptionalText("voucher_id"), field: "avelo_payroll_entries.voucher_id")
         return PayrollEntry(
             id: id,
             companyId: companyId,
             employeeId: employeeId,
             financialYearId: fyId,
             voucherId: voucherId,
-            month: Int(r.int("month")),
-            year: Int(r.int("year")),
-            grossPaise: r.int("gross_paise"),
-            deductionsPaise: r.int("deductions_paise"),
-            netPaise: r.int("net_paise"),
-            employeeCode: r.optionalText("employee_code") ?? "",
-            employeeName: r.optionalText("employee_name") ?? "",
+            month: Int(try r.requiredInt("month")),
+            year: Int(try r.requiredInt("year")),
+            grossPaise: try r.requiredInt("gross_paise"),
+            deductionsPaise: try r.requiredInt("deductions_paise"),
+            netPaise: try r.requiredInt("net_paise"),
+            employeeCode: try r.requiredText("employee_code"),
+            employeeName: try r.requiredText("employee_name"),
             postedAt: try r.timestamp("posted_at")
         )
     }

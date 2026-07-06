@@ -8,8 +8,8 @@ public struct InventoryRepository: Sendable {
         self.db = db
     }
 
-    private static let itemColumns = "id, company_id, code, name, unit, valuation_method, is_active, created_at"
-    private static let movementColumns = "id, company_id, item_id, voucher_id, date, movement_type, quantity, unit_cost_paise, total_value_paise, reference_voucher_number, reason, created_at"
+    private static let itemColumns = "id, company_id, code, name, unit, alternate_unit, alt_unit_base_numerator, alt_unit_base_denominator, valuation_method, is_active, created_at"
+    private static let movementColumns = "id, company_id, item_id, voucher_id, date, movement_type, quantity, quantity_numerator, quantity_denominator, entered_unit, unit_cost_paise, total_value_paise, reversed_movement_id, reference_voucher_number, reason, created_at"
 
     public struct ItemFilter: Sendable {
         public var companyId: Company.ID
@@ -104,8 +104,8 @@ public struct InventoryRepository: Sendable {
         try db.execute(
             """
             INSERT INTO avelo_inventory_items
-            (id, company_id, code, name, unit, valuation_method, is_active, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (id, company_id, code, name, unit, alternate_unit, alt_unit_base_numerator, alt_unit_base_denominator, valuation_method, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(item.id.uuidString),
@@ -113,6 +113,9 @@ public struct InventoryRepository: Sendable {
                 .text(item.code),
                 .text(item.name),
                 .text(item.unit),
+                .optionalText(item.alternateUnit),
+                .optionalInteger(item.baseUnitsPerAlternateUnit?.numerator),
+                .optionalInteger(item.baseUnitsPerAlternateUnit?.denominator),
                 .text(item.valuationMethod.rawValue),
                 .bool(item.isActive),
                 .timestamp(item.createdAt)
@@ -124,13 +127,16 @@ public struct InventoryRepository: Sendable {
         try db.execute(
             """
             UPDATE avelo_inventory_items SET
-                code = ?, name = ?, unit = ?, valuation_method = ?, is_active = ?
+                code = ?, name = ?, unit = ?, alternate_unit = ?, alt_unit_base_numerator = ?, alt_unit_base_denominator = ?, valuation_method = ?, is_active = ?
             WHERE id = ?
             """,
             [
                 .text(item.code),
                 .text(item.name),
                 .text(item.unit),
+                .optionalText(item.alternateUnit),
+                .optionalInteger(item.baseUnitsPerAlternateUnit?.numerator),
+                .optionalInteger(item.baseUnitsPerAlternateUnit?.denominator),
                 .text(item.valuationMethod.rawValue),
                 .bool(item.isActive),
                 .text(item.id.uuidString)
@@ -150,8 +156,9 @@ public struct InventoryRepository: Sendable {
             """
             INSERT INTO avelo_stock_movements
             (id, company_id, item_id, voucher_id, date, movement_type, quantity,
-             unit_cost_paise, total_value_paise, reference_voucher_number, reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             quantity_numerator, quantity_denominator, entered_unit,
+             unit_cost_paise, total_value_paise, reversed_movement_id, reference_voucher_number, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(m.id.uuidString),
@@ -160,13 +167,60 @@ public struct InventoryRepository: Sendable {
                 .optionalText(m.voucherId?.uuidString),
                 .date(m.date),
                 .text(m.movementType.rawValue),
-                .integer(m.quantity),
+                .integer(m.quantity.wholeValue ?? m.quantity.numerator),
+                .integer(m.quantity.numerator),
+                .integer(m.quantity.denominator),
+                .optionalText(m.enteredUnit),
                 .integer(m.unitCostPaise),
                 .integer(m.totalValuePaise),
+                .optionalText(m.reversedMovementId?.uuidString),
                 .optionalText(m.referenceVoucherNumber),
                 .optionalText(m.reason),
                 .timestamp(m.createdAt)
             ]
+        )
+    }
+
+    public func findMovement(id: StockMovement.ID) throws -> StockMovement? {
+        try db.queryOne(
+            "SELECT \(Self.movementColumns) FROM avelo_stock_movements WHERE id = ?",
+            bind: [.text(id.uuidString)]
+        ) { try Self.rowToMovement($0) }
+    }
+
+    public func updateMovement(_ movement: StockMovement) throws {
+        try db.execute(
+            """
+            UPDATE avelo_stock_movements SET
+                item_id = ?, voucher_id = ?, date = ?, movement_type = ?, quantity = ?,
+                quantity_numerator = ?, quantity_denominator = ?, entered_unit = ?,
+                unit_cost_paise = ?, total_value_paise = ?, reversed_movement_id = ?, reference_voucher_number = ?, reason = ?
+            WHERE id = ? AND company_id = ?
+            """,
+            [
+                .text(movement.itemId.uuidString),
+                .optionalText(movement.voucherId?.uuidString),
+                .date(movement.date),
+                .text(movement.movementType.rawValue),
+                .integer(movement.quantity.wholeValue ?? movement.quantity.numerator),
+                .integer(movement.quantity.numerator),
+                .integer(movement.quantity.denominator),
+                .optionalText(movement.enteredUnit),
+                .integer(movement.unitCostPaise),
+                .integer(movement.totalValuePaise),
+                .optionalText(movement.reversedMovementId?.uuidString),
+                .optionalText(movement.referenceVoucherNumber),
+                .optionalText(movement.reason),
+                .text(movement.id.uuidString),
+                .text(movement.companyId.uuidString)
+            ]
+        )
+    }
+
+    public func updateMovementTotalValue(id: StockMovement.ID, companyId: Company.ID, totalValuePaise: Int64) throws {
+        try db.execute(
+            "UPDATE avelo_stock_movements SET total_value_paise = ? WHERE id = ? AND company_id = ?",
+            [.integer(totalValuePaise), .text(id.uuidString), .text(companyId.uuidString)]
         )
     }
 
@@ -227,88 +281,101 @@ public struct InventoryRepository: Sendable {
 
     public struct ItemBalance: Sendable {
         public let itemId: InventoryItem.ID
-        public let inQty: Int64
-        public let outQty: Int64
-        public let adjustmentQty: Int64
+        public let inQuantity: ExactQuantity
+        public let outQuantity: ExactQuantity
+        public let adjustmentQuantity: ExactQuantity
         public let inValuePaise: Int64
         public let outValuePaise: Int64
-        public let onHandQty: Int64
+        public let onHandQuantity: SignedExactQuantity
         public let onHandValuePaise: Int64
+
+        public var inQty: Int64 { inQuantity.wholeValue ?? 0 }
+        public var outQty: Int64 { outQuantity.wholeValue ?? 0 }
+        public var adjustmentQty: Int64 { adjustmentQuantity.wholeValue ?? 0 }
+        public var onHandQty: Int64 { onHandQuantity.numerator >= 0 ? (onHandQuantity.magnitude.wholeValue ?? 0) : 0 }
     }
 
     public func runningBalance(itemId: InventoryItem.ID, asOf: Date) throws -> ItemBalance {
-        let row: (Int64, Int64, Int64, Int64, Int64, Int64)? = try db.queryOne(
-            """
-            SELECT
-                COALESCE(SUM(CASE WHEN movement_type = 'in' THEN quantity ELSE 0 END), 0) AS in_q,
-                COALESCE(SUM(CASE WHEN movement_type = 'out' THEN quantity ELSE 0 END), 0) AS out_q,
-                COALESCE(SUM(CASE WHEN movement_type = 'adjustment' THEN quantity ELSE 0 END), 0) AS adj_q,
-                COALESCE(SUM(CASE WHEN movement_type = 'in' THEN total_value_paise ELSE 0 END), 0) AS in_v,
-                COALESCE(SUM(CASE WHEN movement_type = 'out' THEN total_value_paise ELSE 0 END), 0) AS out_v,
-                COALESCE(SUM(CASE
-                    WHEN movement_type = 'in' THEN quantity
-                    WHEN movement_type = 'out' THEN -quantity
-                    WHEN movement_type = 'adjustment' THEN quantity
-                    ELSE 0 END), 0) AS on_hand
-            FROM avelo_stock_movements
-            WHERE item_id = ? AND date <= ?
-            """,
-            bind: [.text(itemId.uuidString), .date(asOf)]
-        ) { r in (r.int(0), r.int(1), r.int(2), r.int(3), r.int(4), r.int(5)) }
-        let inQty = row?.0 ?? 0
-        let outQty = row?.1 ?? 0
-        let adjQty = row?.2 ?? 0
-        let inVal = row?.3 ?? 0
-        let outVal = row?.4 ?? 0
-        let onHand = row?.5 ?? 0
-        let onHandVal = try CheckedMath.subtract(inVal, outVal, context: "calculating inventory on-hand value")
+        let companyId = try findCompanyId(for: itemId)
+        let item = try findItemById(itemId)
+        let movements = try listMovementsChronologically(companyId: companyId, itemId: itemId, asOf: asOf)
+        let snapshot = try InventoryValuationEngine().replay(movements: movements, valuationMethod: item?.valuationMethod ?? .fifo)
         return ItemBalance(
             itemId: itemId,
-            inQty: inQty,
-            outQty: outQty,
-            adjustmentQty: adjQty,
-            inValuePaise: inVal,
-            outValuePaise: outVal,
-            onHandQty: onHand,
-            onHandValuePaise: onHandVal
+            inQuantity: snapshot.inboundQuantity,
+            outQuantity: snapshot.outboundQuantity,
+            adjustmentQuantity: snapshot.adjustmentQuantity,
+            inValuePaise: snapshot.inboundValuePaise,
+            outValuePaise: snapshot.outboundValuePaise,
+            onHandQuantity: snapshot.onHandQuantity,
+            onHandValuePaise: snapshot.onHandValuePaise
         )
     }
 
+    public func listMovementsChronologically(companyId: Company.ID, itemId: InventoryItem.ID, asOf: Date? = nil) throws -> [StockMovement] {
+        let movements = try listMovements(filter: .init(companyId: companyId, itemId: itemId, toDate: asOf, limit: Int.max, offset: 0))
+        return movements.sorted { lhs, rhs in
+            if lhs.date != rhs.date { return lhs.date < rhs.date }
+            if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
     static func rowToItem(_ r: Row) throws -> InventoryItem {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_inventory_items.id")
-        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_inventory_items.company_id")
-        let vm = ValuationMethod(rawValue: r.text("valuation_method")) ?? .fifo
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_inventory_items.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_inventory_items.company_id")
+        let vm: ValuationMethod = try r.enumValue("valuation_method")
+        let altUnit = try r.checkedOptionalText("alternate_unit")
+        let altBaseNumerator = try r.checkedOptionalInt("alt_unit_base_numerator")
+        let altBaseDenominator = try r.checkedOptionalInt("alt_unit_base_denominator")
         return InventoryItem(
             id: id,
             companyId: companyId,
-            code: r.text("code"),
-            name: r.text("name"),
-            unit: r.text("unit"),
+            code: try r.requiredText("code"),
+            name: try r.requiredText("name"),
+            unit: try r.requiredText("unit"),
+            alternateUnit: altUnit,
+            baseUnitsPerAlternateUnit: try {
+                guard let altBaseNumerator, let altBaseDenominator else { return nil }
+                return try ExactQuantity(numerator: altBaseNumerator, denominator: altBaseDenominator)
+            }(),
             valuationMethod: vm,
-            isActive: r.bool("is_active"),
+            isActive: try r.requiredBool("is_active"),
             createdAt: try r.timestamp("created_at")
         )
     }
 
     static func rowToMovement(_ r: Row) throws -> StockMovement {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_stock_movements.id")
-        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_stock_movements.company_id")
-        let itemId = try UUIDParsing.required(r.text("item_id"), field: "avelo_stock_movements.item_id")
-        let voucherId = try UUIDParsing.optional(r.optionalText("voucher_id"), field: "avelo_stock_movements.voucher_id")
-        let mt = MovementType(rawValue: r.text("movement_type")) ?? .adjustment
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_stock_movements.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_stock_movements.company_id")
+        let itemId = try UUIDParsing.required(r.requiredText("item_id"), field: "avelo_stock_movements.item_id")
+        let voucherId = try UUIDParsing.optional(try r.checkedOptionalText("voucher_id"), field: "avelo_stock_movements.voucher_id")
+        let reversedMovementId = try UUIDParsing.optional(try r.checkedOptionalText("reversed_movement_id"), field: "avelo_stock_movements.reversed_movement_id")
+        let mt: MovementType = try r.enumValue("movement_type")
+        let quantityNumerator = try r.checkedOptionalInt("quantity_numerator") ?? r.int("quantity")
+        let quantityDenominator = try r.checkedOptionalInt("quantity_denominator") ?? 1
         return StockMovement(
             id: id,
             companyId: companyId,
             itemId: itemId,
-            date: r.date("date"),
+            date: try r.requiredDate("date"),
             movementType: mt,
-            quantity: r.int("quantity"),
-            unitCostPaise: r.int("unit_cost_paise"),
-            totalValuePaise: r.int("total_value_paise"),
+            quantity: try ExactQuantity(numerator: quantityNumerator, denominator: quantityDenominator),
+            unitCostPaise: try r.requiredInt("unit_cost_paise"),
+            totalValuePaise: try r.requiredInt("total_value_paise"),
             voucherId: voucherId,
-            referenceVoucherNumber: r.optionalText("reference_voucher_number"),
-            reason: r.optionalText("reason"),
+            enteredUnit: try r.checkedOptionalText("entered_unit"),
+            reversedMovementId: reversedMovementId,
+            referenceVoucherNumber: try r.checkedOptionalText("reference_voucher_number"),
+            reason: try r.checkedOptionalText("reason"),
             createdAt: try r.timestamp("created_at")
         )
+    }
+
+    private func findCompanyId(for itemId: InventoryItem.ID) throws -> Company.ID {
+        guard let item = try findItemById(itemId) else {
+            throw AppError.notFound("Inventory item")
+        }
+        return item.companyId
     }
 }

@@ -256,23 +256,22 @@ public struct AccountRepository: Sendable {
     }
 
     static func rowToAccount(_ r: Row) throws -> Account {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_accounts.id")
-        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_accounts.company_id")
-        let groupId = try UUIDParsing.required(r.text("group_id"), field: "avelo_accounts.group_id")
-        let sideRaw = r.text("opening_balance_side")
-        let side = OpeningBalanceSide(rawValue: sideRaw) ?? .debit
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_accounts.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_accounts.company_id")
+        let groupId = try UUIDParsing.required(r.requiredText("group_id"), field: "avelo_accounts.group_id")
+        let side: OpeningBalanceSide = try r.enumValue("opening_balance_side")
         return Account(
             id: id,
             companyId: companyId,
             groupId: groupId,
-            code: r.text("code"),
-            name: r.text("name"),
-            openingBalancePaise: r.int("opening_balance_paise"),
+            code: try r.requiredText("code"),
+            name: try r.requiredText("name"),
+            openingBalancePaise: try r.requiredInt("opening_balance_paise"),
             openingBalanceSide: side,
-            isActive: r.bool("is_active"),
-            isBankAccount: r.bool("is_bank_account"),
-            gstin: r.optionalText("gstin"),
-            lastUsedAt: r.optionalText("last_used_at").flatMap { DateFormatters.parseTimestamp($0) },
+            isActive: try r.requiredBool("is_active"),
+            isBankAccount: try r.requiredBool("is_bank_account"),
+            gstin: try r.checkedOptionalText("gstin"),
+            lastUsedAt: try r.optionalTimestamp("last_used_at"),
             createdAt: try r.timestamp("created_at"),
             updatedAt: try r.timestamp("updated_at")
         )

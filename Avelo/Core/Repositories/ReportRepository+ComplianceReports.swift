@@ -65,14 +65,14 @@ extension ReportRepository {
         """
         return try db.query(sql, bind: [.text(filter.companyId.uuidString), .date(fromDate), .date(toDate)]) { r in
             return ReportResult.DayBookRow(
-                id: try UUIDParsing.required(r.text("id"), field: "report.day_book.voucher_id"),
+                id: try UUIDParsing.required(r.requiredText("id"), field: "report.day_book.voucher_id"),
                 timestamp: try r.timestamp("created_at"),
-                voucherNumber: r.text("number"),
-                voucherTypeCode: VoucherType.Code(rawValue: r.text("voucher_type_code")) ?? .journal,
-                partyName: r.optionalText("party_name") ?? "",
-                narration: r.text("narration"),
-                totalDebitPaise: r.int("total_debit"),
-                totalCreditPaise: r.int("total_credit")
+                voucherNumber: try r.requiredText("number"),
+                voucherTypeCode: try r.enumValue("voucher_type_code"),
+                partyName: try r.checkedOptionalText("party_name") ?? "",
+                narration: try r.requiredText("narration"),
+                totalDebitPaise: try r.requiredInt("total_debit"),
+                totalCreditPaise: try r.requiredInt("total_credit")
             )
         }
     }
@@ -133,78 +133,39 @@ extension ReportRepository {
     // MARK: - Stock Valuation
 
     public func stockValuation(asOfDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.StockValuationReport {
-        let items = try InventoryRepository(db: db).listItemsForCompany(filter.companyId, includeInactive: false)
+        let inventory = InventoryRepository(db: db)
+        let items = try inventory.listItemsForCompany(filter.companyId, includeInactive: false)
         guard !items.isEmpty else {
             return ReportResult.StockValuationReport(asOfDate: asOfDate, rows: [])
         }
-        let placeholders = Array(repeating: "?", count: items.count).joined(separator: ",")
-        var bind: [SQLValue] = items.map { .text($0.id.uuidString) }
-        bind.append(.date(asOfDate))
-        struct StockTotals: Sendable {
-            let inQty: Int64
-            let outQty: Int64
-            let inValuePaise: Int64
-            let outValuePaise: Int64
-            let onHandQty: Int64
-        }
-        let sql = """
-            SELECT item_id,
-                   COALESCE(SUM(CASE WHEN movement_type = 'in'
-                                      THEN quantity ELSE 0 END), 0) AS in_q,
-                   COALESCE(SUM(CASE WHEN movement_type = 'out'
-                                      THEN quantity ELSE 0 END), 0) AS out_q,
-                   COALESCE(SUM(CASE WHEN movement_type = 'in'
-                                      THEN total_value_paise ELSE 0 END), 0) AS in_v,
-                   COALESCE(SUM(CASE WHEN movement_type = 'out'
-                                      THEN total_value_paise ELSE 0 END), 0) AS out_v,
-                   COALESCE(SUM(CASE
-                       WHEN movement_type = 'in' THEN quantity
-                       WHEN movement_type = 'out' THEN -quantity
-                       WHEN movement_type = 'adjustment' THEN quantity
-                       ELSE 0 END), 0) AS on_hand
-            FROM avelo_stock_movements
-            WHERE item_id IN (\(placeholders)) AND date <= ?
-            GROUP BY item_id
-        """
-        var totalsByItem: [InventoryItem.ID: StockTotals] = [:]
-        _ = try db.query(sql, bind: bind) { row in
-            let itemId = try UUIDParsing.required(row.text("item_id"), field: "report.stock_valuation.item_id")
-            totalsByItem[itemId] = StockTotals(
-                inQty: row.int("in_q"),
-                outQty: row.int("out_q"),
-                inValuePaise: row.int("in_v"),
-                outValuePaise: row.int("out_v"),
-                onHandQty: row.int("on_hand")
-            )
-        }
         let rows = try items.map { item in
-            let totals = totalsByItem[item.id] ?? StockTotals(inQty: 0, outQty: 0, inValuePaise: 0, outValuePaise: 0, onHandQty: 0)
-            let onHandValuePaise = try CheckedMath.subtract(
-                totals.inValuePaise,
-                totals.outValuePaise,
-                context: "calculating stock valuation on-hand value"
-            )
-            let avg = totals.onHandQty > 0 ? onHandValuePaise / totals.onHandQty : 0
+            let totals = try inventory.runningBalance(itemId: item.id, asOf: asOfDate)
+            let onHandValuePaise = totals.onHandValuePaise
+            let onHandWholeQty = totals.onHandQuantity.magnitude.wholeValue ?? 0
+            let avg = onHandWholeQty > 0 ? onHandValuePaise / onHandWholeQty : 0
+            let zeroQuantity = try ExactQuantity.whole(0)
+            let closingQuantity = totals.onHandQuantity.isZero ? zeroQuantity : totals.onHandQuantity.magnitude
             return ReportResult.StockValuationRow(
                 id: item.id,
                 itemCode: item.code,
                 itemName: item.name,
                 unit: item.unit,
-                quantity: Double(totals.onHandQty),
+                quantity: closingQuantity,
                 ratePaise: avg,
                 valuePaise: onHandValuePaise,
-                openingQty: 0,
+                openingQty: zeroQuantity,
                 openingValuePaise: 0,
-                inQty: totals.inQty,
+                inQty: totals.inQuantity,
                 inValuePaise: totals.inValuePaise,
-                outQty: totals.outQty,
+                outQty: totals.outQuantity,
                 outValuePaise: totals.outValuePaise,
-                closingQty: totals.onHandQty,
+                closingQty: closingQuantity,
                 closingValuePaise: onHandValuePaise,
                 averageCostPaise: avg
             )
         }
-        return ReportResult.StockValuationReport(asOfDate: asOfDate, rows: rows)
+        let total = try CheckedMath.sum(rows.map { $0.valuePaise }, context: "summing stock valuation report total")
+        return ReportResult.StockValuationReport(asOfDate: asOfDate, rows: rows, totalPaise: total)
     }
 
 

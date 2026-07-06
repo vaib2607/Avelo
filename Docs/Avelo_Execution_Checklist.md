@@ -1,915 +1,205 @@
 # AVELO Master Execution Checklist
 
 ## Summary
-This document controls execution order. The normalized readiness catalogue, stable IDs, severity, dependencies, status, and proof-of-done gates live in `Docs/Avelo_Release_Board.md` under **Canonical Readiness Backlog**. No parallel readiness list may be created. We will strike items only when the catalogue item itself is complete, its automated proof and manual accountant acceptance pass, and every dependency re-check required by that item also passes.
 
-Release intent for the current thread:
-- `v1.1` is the performance, accuracy, and reliability release.
-- The release evidence must include repeatable local benchmark runs for core voucher/report paths and a million-voucher stress path, measured on the same machine with visible progress and comparable modes.
-- The application must not be called **Ready** while any `AVL-P0-*` item is open. Earlier RC completion records remain useful evidence but do not waive the reset readiness gates.
+This file is the remaining-work execution queue. It tracks only unfinished `AVL-*` backlog items from `Docs/Avelo_Release_Board.md`, grouped into dependency-ordered waves through P2.
 
-Execution rule:
-- Work only from `Active Now`.
-- When an item is done, strike it.
-- When a dependency changes, re-check dependent completed items before moving forward.
-- If readiness scope changes, update the canonical release-board catalogue first, then update execution ordering here. No side lists.
-- Apply the release split in `Docs/Avelo_Release_Board.md`: `V1` for day-one correctness/open-save reliability, `V2` for post-launch merge/security/scale and benchmark tooling work, `V3` for later hardening and rare-edge-case resilience.
+Rules:
 
-Status keys:
-- `Owner`: `Code`, `Review`, `Test`, `Manual QA`, `Decision`
-- `Depends`: prerequisite items that must be green first
-- `Proof`: what must be true before striking the item
+- `Docs/Avelo_Release_Board.md` remains the canonical source of truth for backlog scope, dependencies, and proof-of-done.
+- Historical `RB-*` work is evidence only and does not appear in the active queue here.
+- An item stays in this checklist until its implementation, automated proof, relevant full-suite proof, and manual accountant acceptance are all recorded.
+- Release verdict remains `NOT READY` while any `AVL-P0-*` row is still open on the board.
 
-## Readiness Reset — Execution Order
+Execution states:
 
-The prior RC queue proved useful happy paths, but it also counted explicit feature stubs and incomplete accounting engines as acceptable deferrals. The canonical board now records 32 P0, 44 P1, and 20 P2 requirements. These counts are generated from the normalized IDs and replace the inaccurate “29 P0” label from the source notes.
+- `Implementation remaining` — code, schema, workflow, or UI behavior is still missing.
+- `Proof remaining` — implementation has landed substantially, but targeted/full-suite/manual proof is still incomplete.
+- `Manual acceptance remaining` — automated proof is complete enough to stop coding, but accountant QA is still pending.
 
-### Gate 1 — Accounting and inventory correctness
-
-- Execute `AVL-P0-001` through `AVL-P0-011`, then `AVL-P0-019`, `AVL-P0-024`, and `AVL-P0-032` in dependency order.
-- Do not build reports or compliance exports on placeholder inventory costing. `AVL-P0-010` owns FIFO/weighted-average stock layers, while `AVL-P0-019` owns backdated cascading recalculation.
-- Trial-balance acceptance is per-account netting plus grand-total equality. A balanced grand total alone is insufficient.
-
-### Gate 2 — Storage, migration, isolation, and fiscal locks
-
-- Execute `AVL-P0-012` through `AVL-P0-018`, then `AVL-P0-025` through `AVL-P0-031`.
-- Fault-injection coverage is mandatory for registry collisions, company-creation rollback, schema-version read failure, locked-period writes, corrupt rows, cross-company references, and statement finalization.
-- Hash chaining without a keyed or external anchor does not satisfy tamper-evidence proof.
-
-### Gate 3 — Keyboard entry and legal documents
-
-- Execute `AVL-P0-020` through `AVL-P0-023` and the P1 dependencies required by `AVL-P0-022`.
-- Tally chords are contextual aliases. Existing macOS bindings remain valid. Text entry wins unless the active editor explicitly owns a command.
-- PDF proof requires rendered inspection and a mandatory-field matrix, not merely `%PDF` output.
-
-### Gate 4 — Broad rollout
-
-- Start `AVL-P1-*` only when its P0 dependencies are green. Compliance, reconciliation, cost allocation, inventory logistics, printing/signing, and continuous-flow entry must complete before broad accountant rollout.
-- Models, routes, fields, or tests expecting `featureUnavailable` do not count as workflow implementation.
-
-### Gate 5 — Post-launch polish
-
-- `AVL-P2-*` remains deferrable unless a P0/P1 proof depends on it.
-- XML interoperability remains P1; ASCII/SDF/HTML compatibility remains P2.
-
-### Evidence policy
-
-- Every catalogue item needs automated unit/integration proof and a manual accountant acceptance result recorded against the same ID.
-- Golden fixtures must cover FIFO, weighted average, trial-balance netting, stock ageing, bill allocation, bank matching, GST returns, and cross-period notes.
-- Adversarial fixtures must cover overflow, malformed persistence, FY overlap, locked writes, company isolation, duplicate imports, registry collisions, partial company creation, and migration failures.
-- Shortcut tests must cover every supported context and both Tally/macOS aliases, including collision behavior.
-- The historical run of 209 passing tests with 8 skipped benchmarks is baseline evidence only. Skipped stress paths and tests that accept deferred stubs cannot close readiness items.
-
-## Historical Release Cleanup Checklist
-
-This section records the earlier RC cleanup pass. Its `done` and `deferred` labels are historical and do not close or override any `AVL-*` readiness item.
-
-Use this ordered list for the current RC cleanup pass. For each item:
-- Check whether it already exists.
-- If yes, verify it with the smallest relevant test and mark it done.
-- If no, either implement the minimal viable version or explicitly mark it deferred with a reason.
-- Re-run the targeted test or validation step.
-- Only then move to the next item.
-
-1. Version / release metadata consistency
-- Status: done
-- `Scripts/bundle.sh`, `dist/Avelo.app`, and About screen version text now agree on the current RC label.
-
-2. Rule-audit / release-board reconciliation
-- Status: done
-- `make rule-audit` passes clean; the release board and checklist now separate shipped work from deferred scope.
-
-3. Invoice / PDF printing
-- Status: done
-- `InvoicePDFService` generates a PDF tax invoice for Sales/Purchase vouchers and the test suite verifies a real PDF render from a seeded voucher.
-
-4. GSTR-1 export correctness
-- Status: done
-- The service is now labeled as a GST summary CSV; invoice-wise portal upload is still deferred and documented elsewhere.
-
-5. Bill-wise ageing with interest
-- Status: done
-- `Outstanding` now derives bill-wise ageing buckets from `BillAllocation`, and the report test covers partial settlement and bucket placement. Interest-on-overdue remains out of scope for this RC.
-
-6. TDS / TCS / cheque / bill-allocation UI
-- Status: done
-- The voucher editor now surfaces bill reference, cheque, TDS, and TCS workflow fields and forwards them into the posted voucher records.
-
-7. Purchase Order / Sales Order workflow
-- Status: deferred
-- Voucher types exist, but the full order-tracking model would add new open-order state, line-level fulfilment, and partial receipt/delivery reconciliation beyond the RC scope.
-
-8. Cash flow statement
-- Status: deferred
-- The report can be derived, but shipping it now would need another report family, cash/bank classification rules, and reconciliation coverage that are larger than the current RC can absorb.
-
-9. Stock ageing / reorder levels
-- Status: deferred
-- Inventory has reorder data, but useful ageing/reorder output still needs movement history, threshold policy design, and alert surfacing beyond this release.
-
-10. Group-company consolidation
-- Status: deferred
-- Multi-company storage remains isolated by design; adding consolidation would require a cross-file aggregation layer and new trust rules that conflict with the current per-file RC boundary.
-
-11. Search consistency pass
-- Status: documented
-- Search remains present in core flows; Reports and Settings do not add redundant search surfaces in this RC.
-
-12. Gatekeeper / distribution note
-- Status: documented
-- The bundle remains ad-hoc signed; release notes now call out the local distribution expectation.
-
-## Historical RC Queue
-
-This queue records earlier RC evidence and is not the active readiness queue.
-
-- ~~Prove promoted shell routes for inventory, payroll, and banking behave as shipped features~~  
-  Owner: `Test`  
-  Depends: bundled app launch validation complete  
-  Proof: sidebar, menu, keyboard, and command-palette navigation all resolve to the intended screens
-
-- ~~Add a reproducible local `.app` bundle path~~  
-  Owner: `Code`  
-  Depends: release build green  
-  Proof: `make bundle` produces `dist/Avelo.app`
-
-- ~~Validate the bundled app launches cleanly for local RC~~  
-  Owner: `Test`  
-  Depends: local `.app` bundle path exists  
-  Proof: the built app launches without an immediate startup crash
-
-- ~~Re-run accountant-style QA on the built RC artifact~~  
-  Owner: `Manual QA`  
-  Depends: promoted shell routes validated  
-  Proof: no shipped-path blocker found in the built artifact
-
-- ~~Run RC stress, soak, and deployment validation~~  
-  Owner: `Test`  
-  Depends: built-artifact QA complete  
-  Proof: no crash, corruption, or packaging blocker remains in local RC scope
-
-## Worker Lane Status
-
-- `ARCH`  
-  What it is supposed to do: verify current release-path structure, module boundaries, deferred gating, and shipped-shell integrity for the built RC path.  
-  Proof of done: structural report tied to current bundle/script surface and hidden/deferred entry-point state.  
-  Current blocker: none proven; built RC path validated with bundle, self-test, launch smoke, and shipped-shell routing evidence.  
-  Current task: verify the built RC path remains structurally sound after the last RC queue items are struck through.
-
-- `FLOW`  
-  What it is supposed to do: verify end-to-end shipped journeys on the built RC artifact.  
-  Proof of done: built-artifact flow matrix for company setup, company switching, accounts, vouchers, FY lock, reports, backup, and restore.  
-  Current blocker: none proven; built-artifact QA now has direct RC-flow and bundle/self-test evidence.  
-  Current task: re-run accountant-style QA on `dist/Avelo.app`, using self-test coverage as baseline and manually confirming any journey not already proven.
-
-- `QA`  
-  What it is supposed to do: validate the shipped app surface as an accountant-style RC pass on the built artifact.  
-  Proof of done: manual proof for launch, promoted shell routes, and accountant-critical bundled-app flows.  
-  Current blocker: none proven; built-artifact QA now has direct RC-flow and bundle/self-test evidence.  
-  Current task: hand off to RC stress, soak, and deployment validation completion.
-
-- `TEST`  
-  What it is supposed to do: classify automated RC evidence into already proven, re-run required, and still missing.  
-  Proof of done: a green automated suite or a minimal failing set, plus an explicit RC evidence map for stress/soak/failure handling.  
-  Current blocker: none proven; automated RC evidence now covers bundle validation, self-test, stress, and smoke.
-  Current task: keep the RC evidence map in sync with the built artifact and release board.
-
-- `DEPLOY`  
-  What it is supposed to do: prove release build, bundle, launch, and local packaging readiness from current repo evidence.  
-  Proof of done: release build, bundle validation, launch smoke, and self-test evidence reconciled against the current built artifact.  
-  Current blocker: none proven; `swift build -c release`, `dist/Avelo.app`, `Scripts/validate_bundle.sh`, `Scripts/launch_smoke.sh`, and `Scripts/bundle_selftest.sh` now reconcile against the RC queue.  
-  Current task: hand off to final ARCH go/no-go after the last RC queue items are struck through.
-
-## Active Now
-
-### Readiness P0 Queue
-
-Execute only after the prior item's dependencies are satisfied; status and proof are updated on the canonical release board.
-
-1. `AVL-P0-011` — checked financial arithmetic across every money/quantity path.
-2. `AVL-P0-008` — exact alternate-UOM quantity representation.
-3. `AVL-P0-010` — authoritative FIFO and weighted-average valuation layers.
-4. `AVL-P0-024` — per-account trial-balance netting.
-5. `AVL-P0-025` — non-overlapping financial years and deterministic date lookup.
-6. `AVL-P0-026` — comprehensive fiscal-lock enforcement.
-7. `AVL-P0-030` — database/service company-ownership enforcement.
-8. `AVL-P0-027` — strict fail-closed persistence decoding.
-9. `AVL-P0-002` — gap-free voucher numbering under contention and rollback.
-10. `AVL-P0-012` — anchored tamper evidence.
-
-Next after these prerequisites: `AVL-P0-019`, `AVL-P0-001`, `AVL-P0-005`, and `AVL-P0-032`.
-
-### Latest Evidence
-
-- `2026-07-06 14:51 IST` — `AVL-P0-011` automated proof advanced but is still `Open` pending manual accountant acceptance. Landed shared checked arithmetic, overflow-safe currency conversion/percentage math, `Int64.min` formatting coverage, overflow-safe stock movement posting/validation, and overflow-safe ledger/trial-balance verification. Evidence: `swift test --filter CurrencyTests`, `swift test --filter InventoryServiceTests`, `swift test --filter Phase6MathRoundingTests`, `swift test --filter Phase6HardeningTests`, and `swift test`.
-
-- `2026-07-06 14:51 IST` — `AVL-P0-024` automated proof advanced but is still `Open` pending manual accountant acceptance. Trial-balance rows now net opening and movement into exactly one closing side, and reconciliation fixtures were updated to assert normalized totals instead of the historical gross-per-side bug. Evidence: `swift test --filter TrialBalanceNettingTests`, `swift test --filter AccountTreeReconciliationTests`, and `swift test`.
-
-- `2026-07-06 14:58 IST` — `AVL-P0-011` automated proof advanced further but is still `Open` pending full-path completion and manual accountant acceptance. Added checked voucher-draft totals, overflow-safe voucher mismatch reporting, overflow-safe profit/loss, balance sheet, cash-flow, GST summary, outstanding, ledger-running-balance, bank-reconciliation, and RC-flow arithmetic; replaced remaining `abs(Int64)` UI/status hotspots with magnitude-safe formatting; added adversarial overflow fixtures for voucher drafts and `Int64.min` bank statement matching. Evidence: `swift test --filter VoucherDraftTests`, `swift test --filter VoucherServiceTests`, `swift test --filter ReportBehaviorTests`, `swift test --filter BankReconciliationServiceTests`, and `swift test`.
-
-- `2026-07-06 15:02 IST` — `AVL-P0-011` automated proof advanced again but is still `Open` pending remaining-path completion and manual accountant acceptance. Converted `AccountTree`, `AccountTreeCache`, dashboard live-trial-balance totals, and dashboard bank/stock aggregations to checked arithmetic with fail-closed overflow behavior; added a cache-level adversarial overflow fixture proving tree reload reports a business-rule error instead of wrapping. Evidence: `swift test --filter AccountTreeReconciliationTests` and `swift test`.
-
-- `2026-07-06 15:13 IST` — `AVL-P0-011` automated proof advanced again but is still `Open` pending remaining-path completion and manual accountant acceptance. Added checked payroll net validation/posting, checked outstanding-balance subtraction, checked invoice-PDF visible-line total validation, fail-closed voucher-draft non-throwing helpers, checked dashboard cash/net displays, checked banking/report display deltas, and throwing signed account/ledger amount helpers to remove remaining direct negation traps. Added adversarial fixtures proving payroll net overflow is reported as validation failure and invoice-PDF total overflow aborts export instead of wrapping. Evidence: `swift test --filter VoucherDraftTests`, `swift test --filter Phase6HardeningTests`, `swift test --filter InvoicePDFServiceTests`, `swift test --filter ReportBehaviorTests`, and `swift test`.
-
-- `2026-07-06 15:16 IST` — `AVL-P0-011` automated proof advanced again but is still `Open` pending any remaining-path audit plus manual accountant acceptance. Converted bank-statement CSV negative-amount parsing and pending inventory-order quantity derivation to checked fail-closed arithmetic, then added adversarial fixtures proving the parser safely preserves the largest negative importable `Int64` amount and corrupt fulfilled-quantity rows collapse to zero pending quantity instead of overflowing. Evidence: `swift test --filter BankReconciliationServiceTests`, `swift test --filter InventoryServiceTests`, and `swift test`.
-
-### Historical Completed Lanes
-
-The struck items below preserve earlier implementation history and are not the active readiness queue.
-
-### A. Release Control
-- ~~Create repo-tracked `P0/P1/P2` execution board~~  
-  Owner: `Decision`  
-  Depends: none  
-  Proof: every known issue is listed once with a severity
-
-- ~~Record top 10 blockers in execution order~~  
-  Owner: `Decision`  
-  Depends: execution board exists  
-  Proof: top 10 blockers are numbered in order and map to checklist areas
-
-- ~~Mark deferred modules and hidden entry points explicitly~~  
-  Owner: `Review`  
-  Depends: execution board exists  
-  Proof: inventory, payroll, banking, advanced GST are marked `ship`, `defer`, or `conditional`
-
-### B. Observation / Shell Completion
-- ~~Migrate `AppEnvironment`, `AppRouter`, and `WindowState` to `@Observable`~~  
-  Owner: `Code`  
-  Proof: build green and no regression in app root flow
-
-- ~~Move app composition root from `environmentObject` to typed environment injection~~  
-  Owner: `Code`  
-  Proof: root injection works and build green
-
-- ~~Migrate shell views to typed environment access~~  
-  Owner: `Code`  
-  Proof: sidebar, company picker, banners, routing still work
-
-- ~~Migrate `KeyboardBridge` and `KeyboardRouter`~~  
-  Owner: `Code`  
-  Proof: keyboard flow still works in shipped shell
-
-- ~~Migrate `AccountTreeCache`~~  
-  Owner: `Code`  
-  Proof: cache-backed flows still load correctly
-
-- ~~Remove `EnvironmentObject` usage from shipped shell and main feature entry screens~~  
-  Owner: `Code`  
-  Proof: no shipped core screen requires `@EnvironmentObject`
-
-- ~~Migrate `OnboardingViewModel`~~  
-  Owner: `Code`  
-  Proof: onboarding flow still works end to end
-
-- ~~Migrate `DashboardViewModel`~~  
-  Owner: `Code`  
-  Proof: dashboard loads and values are sane
-
-- ~~Migrate `AccountsViewModel`~~  
-  Owner: `Code`  
-  Depends: shell migration base complete  
-  Proof: accounts screen loads, filters work, build green, tests green
-
-- ~~Remove `AccountsViewModelHolder`~~  
-  Owner: `Code`  
-  Depends: `AccountsViewModel` migrated  
-  Proof: accounts screen no longer relies on holder wrapper
-
-- ~~Migrate `ReportsViewModel`~~  
-  Owner: `Code`  
-  Depends: shell migration base complete  
-  Proof: reports screen loads, selection/date changes work, build green, tests green
-
-- ~~Remove `ReportsViewModelHolder`~~  
-  Owner: `Code`  
-  Depends: `ReportsViewModel` migrated  
-  Proof: reports screen no longer relies on holder wrapper
-
-- ~~Migrate `VouchersViewModel`~~  
-  Owner: `Code`  
-  Depends: shell migration base complete  
-  Proof: voucher list loads, filters work, build green, tests green
-
-- ~~Remove `VouchersViewModelHolder`~~  
-  Owner: `Code`  
-  Depends: `VouchersViewModel` migrated  
-  Proof: vouchers list no longer relies on holder wrapper
-
-- ~~Migrate `VoucherEditViewModel`~~  
-  Owner: `Code`  
-  Depends: shell migration base complete  
-  Proof: voucher edit sheet loads, line edits work, validation still updates correctly
-
-- ~~Remove `VoucherEditHolder`~~  
-  Owner: `Code`  
-  Depends: `VoucherEditViewModel` migrated  
-  Proof: voucher sheet no longer relies on holder wrapper
-
-- ~~Migrate `SettingsViewModel`~~  
-  Owner: `Code`  
-  Depends: shell migration base complete  
-  Proof: settings/FY screen loads and actions still work
-
-- ~~Migrate `AuditViewModel`~~  
-  Owner: `Code`  
-  Depends: shell migration base complete  
-  Proof: audit screen loads, filters still work
-
-- ~~Remove `AuditViewModelHolder`~~  
-  Owner: `Code`  
-  Depends: `AuditViewModel` migrated  
-  Proof: audit screen no longer relies on holder wrapper
-
-- ~~Confirm no shipped workflow mixes old and new observation systems~~  
-  Owner: `Review`  
-  Depends: all shipped release-path migrations above complete  
-  Proof: no release-path `ObservableObject`, `@Published`, or `@EnvironmentObject` remains in shipped core path
-
-## Unlocked Next
-
-### C. Schema Source Of Truth
-- ~~Remove silent-delete schema violation on `avelo_ledger_lines.voucher_id`~~  
-  Owner: `Code`  
-  Proof: delete path no longer cascades silently
-
-- ~~Reconcile company table in migration against frozen schema~~  
-  Owner: `Review`  
-  Depends: release board exists  
-  Proof: migration matches frozen schema for touched fields
-
-- ~~Reconcile financial year table in migration against frozen schema~~  
-  Owner: `Review`  
-  Depends: release board exists  
-  Proof: migration matches frozen schema for touched fields
-
-- ~~Reconcile account-group table in migration against frozen schema~~  
-  Owner: `Review`  
-  Depends: release board exists  
-  Proof: migration matches frozen schema for touched fields
-
-- ~~Reconcile account table in migration against frozen schema~~  
-  Owner: `Review`  
-  Depends: release board exists  
-  Proof: migration matches frozen schema for touched fields
-
-- ~~Reconcile voucher table in migration against frozen schema~~  
-  Owner: `Review`  
-  Depends: release board exists  
-  Proof: migration matches frozen schema for touched fields
-
-- ~~Reconcile ledger-lines table in migration against frozen schema~~  
-  Owner: `Review`  
-  Depends: release board exists  
-  Proof: migration matches frozen schema for touched fields
-
-- ~~Reconcile audit tables in migration against frozen schema~~  
-  Owner: `Review`  
-  Depends: release board exists  
-  Proof: migration matches frozen schema for touched fields
-
-- ~~Reconcile same tables in `schema_v1.sql` against frozen schema~~  
-  Owner: `Review`  
-  Depends: migration table reconciliations complete  
-  Proof: SQL source matches frozen schema for the same touched tables
-
-- ~~Confirm `MigrationV001.swift` and `schema_v1.sql` match each other~~  
-  Owner: `Review`  
-  Depends: both schema sources reconciled  
-  Proof: no meaningful drift remains between the two schema sources
-
-### D. Repository / Service Correctness
-- ~~Ensure voucher post no longer swallows account-usage update failures~~  
-  Owner: `Code`  
-  Proof: failure path is no longer silently ignored
-
-- ~~Reconcile `CompanyRepository` against frozen schema and rules~~  
-  Owner: `Review`  
-  Depends: schema reconciliation for company/FY tables  
-  Proof: reads/writes use only valid fields and constraints
-
-- ~~Reconcile `FinancialYearRepository` against frozen schema and rules~~  
-  Owner: `Review`  
-  Depends: schema reconciliation for FY tables  
-  Proof: create/list/lock behavior matches rules
-
-- ~~Reconcile `AccountRepository` against frozen schema and rules~~  
-  Owner: `Review`  
-  Depends: schema reconciliation for account/account-group tables  
-  Proof: disable/use/group behavior matches rules
-
-- ~~Reconcile `VoucherRepository` against frozen schema and rules~~  
-  Owner: `Review`  
-  Depends: schema reconciliation for voucher/ledger tables  
-  Proof: write/read/filter behavior matches rules
-
-- ~~Reconcile `AuditRepository` against frozen schema and rules~~  
-  Owner: `Review`  
-  Depends: schema reconciliation for audit tables  
-  Proof: event writes and query behavior match rules
-
-- ~~Reconcile `BackupService` and restore path against frozen rules~~  
-  Owner: `Review`  
-  Depends: schema reconciliation complete  
-  Proof: backup/restore assumptions match actual schema and rules
-
-- ~~Harden voucher posting against known `P0` defects~~  
-  Owner: `Code`  
-  Depends: voucher repository review  
-  Proof: post path handles validation, balancing, lock rules, company scope correctly
-
-- ~~Harden voucher edit against known `P0` defects~~  
-  Owner: `Code`  
-  Depends: voucher posting hardening  
-  Proof: edit path preserves integrity and audit expectations
-
-- ~~Harden voucher reversal against known `P0` defects~~  
-  Owner: `Code`  
-  Depends: voucher posting hardening  
-  Proof: reversal nets correctly and follows rule set
-
-- ~~Verify FY lock enforcement across all voucher and ledger write paths~~  
-  Owner: `Test`  
-  Depends: voucher hardening complete  
-  Proof: locked FY rejects every shipped write path
-
-- ~~Verify audit logging for all financially meaningful actions~~  
-  Owner: `Test`  
-  Depends: voucher hardening and repository review complete  
-  Proof: create/edit/reverse/lock-critical actions emit audit entries
-
-- ~~Verify company isolation~~  
-  Owner: `Test`  
-  Depends: repository review complete  
-  Proof: no cross-company reads or writes occur in shipped flows
-
-- ~~Verify restore integrity~~  
-  Owner: `Test`  
-  Depends: backup/restore review complete  
-  Proof: restored data matches source and loads cleanly
-
-## Blocked By Dependency
-
-### E. Core User Flows
-- ~~Return app to clean build after shell migration~~  
-  Owner: `Code`  
-  Proof: build passes
-
-- ~~Keep automated suite green after shell migration~~  
-  Owner: `Test`  
-  Proof: tests pass
-
-- ~~Keep company setup flow green after onboarding migration~~  
-  Owner: `Test`  
-  Proof: onboarding still reaches usable company
-
-- ~~Review company setup flow from first launch to usable company~~  
-  Owner: `Manual QA`  
-  Depends: observation migration complete  
-  Proof: create company, active FY set, dashboard opens
-
-- ~~Review company switching flow~~  
-  Owner: `Manual QA`  
-  Depends: observation migration complete, company isolation verified  
-  Proof: switch updates all visible context correctly
-
-- ~~Review accounts flow~~  
-  Owner: `Manual QA`  
-  Depends: `AccountsViewModel` migration, account repository review  
-  Proof: create/edit/disable/filter works correctly
-
-- ~~Review voucher list flow~~  
-  Owner: `Manual QA`  
-  Depends: `VouchersViewModel` migration, voucher repository review  
-  Proof: list/filter/search behaves correctly
-
-- ~~Review voucher create flow~~  
-  Owner: `Manual QA`  
-  Depends: `VoucherEditViewModel` migration, voucher posting hardening  
-  Proof: valid voucher saves, invalid voucher blocks
-
-- ~~Review voucher edit flow~~  
-  Owner: `Manual QA`  
-  Depends: voucher edit hardening  
-  Proof: edits persist correctly and totals remain valid
-
-- ~~Review voucher reverse flow~~  
-  Owner: `Manual QA`  
-  Depends: voucher reversal hardening  
-  Proof: reversal result is correct and visible in reports/list
-
-- ~~Review settings and FY-management flow~~  
-  Owner: `Manual QA`  
-  Depends: `SettingsViewModel` migration, FY repository review  
-  Proof: FY create/list/lock behavior is correct
-
-- ~~Review backup flow~~  
-  Owner: `Manual QA`  
-  Depends: backup service review  
-  Proof: backup artifact is produced successfully
-
-- ~~Review restore flow~~  
-  Owner: `Manual QA`  
-  Depends: restore integrity verified  
-  Proof: restore completes and reopened company is usable
-
-### F. Reports And Reconciliation
-- ~~Correct dashboard summary logic to use real account codes and report totals~~  
-  Owner: `Code`  
-  Proof: dashboard uses real report/account sources
-
-- ~~Validate trial balance totals against seeded SQL totals~~  
-  Owner: `Test`  
-  Depends: schema + voucher correctness complete  
-  Proof: totals tie to SQL fixture
-
-- ~~Validate trial balance totals against live data totals~~  
-  Owner: `Test`  
-  Depends: schema + voucher correctness complete  
-  Proof: totals tie to live computed SQL
-
-- ~~Validate P&L totals against seeded SQL totals~~  
-  Owner: `Test`  
-  Depends: account grouping + voucher correctness complete  
-  Proof: totals tie to SQL fixture
-
-- ~~Validate P&L totals against live data totals~~  
-  Owner: `Test`  
-  Depends: account grouping + voucher correctness complete  
-  Proof: totals tie to live computed SQL
-
-- ~~Validate balance sheet totals against seeded SQL totals~~  
-  Owner: `Test`  
-  Depends: account grouping + voucher correctness complete  
-  Proof: totals tie to SQL fixture
-
-- ~~Validate balance sheet totals against live data totals~~  
-  Owner: `Test`  
-  Depends: account grouping + voucher correctness complete  
-  Proof: totals tie to live computed SQL
-
-- ~~Validate ledger report behavior~~  
-  Owner: `Manual QA`  
-  Depends: voucher correctness complete  
-  Proof: ledger rows, balances, and date filters are correct
-
-- ~~Validate day book behavior~~  
-  Owner: `Manual QA`  
-  Depends: voucher correctness complete  
-  Proof: row ordering and visible totals are correct
-
-- ~~Validate GST summary behavior~~  
-  Owner: `Manual QA`  
-  Depends: voucher correctness complete  
-  Proof: GST totals and date boundaries are correct
-
-- ~~Validate outstanding behavior~~  
-  Owner: `Manual QA`  
-  Depends: voucher correctness complete  
-  Proof: receivable/payable balances are correct
-
-- ~~Verify report drill-down opens the correct source voucher~~  
-  Owner: `Manual QA`  
-  Depends: reports load correctly, voucher flows reviewed  
-  Proof: clicked row opens correct voucher every time
-
-- ~~Verify report date boundaries respect active FY and lock rules~~  
-  Owner: `Test`  
-  Depends: FY lock verification complete  
-  Proof: no out-of-range data leaks into reports
-
-### G. Regression Protection
-- ~~Run `swift build` after completed architecture batches~~  
-  Owner: `Test`  
-  Proof: build remains green after each batch
-
-- ~~Run `swift test` after completed architecture batches~~  
-  Owner: `Test`  
-  Proof: tests remain green after each batch
-
-- ~~Fail loudly on malformed UUIDs in shipped V1 row-decode and report paths~~  
-  Owner: `Code`  
-  Depends: core repository correctness complete  
-  Proof: shipped repositories and report decoders reject malformed UUIDs with explicit read failures, and build/tests are green
-
-- ~~Add regression test for silent-delete schema fix~~  
-  Owner: `Test`  
-  Depends: schema reconciliation for ledger lines complete  
-  Proof: test fails if cascade behavior returns
-
-- ~~Add regression test for account-usage update failure handling~~  
-  Owner: `Test`  
-  Depends: voucher service path stable  
-  Proof: test fails if failure becomes silent again
-
-- ~~Add regression tests for validator failure-mode handling~~  
-  Owner: `Test`  
-  Depends: validation paths complete  
-  Proof: validation returns internal errors instead of silently accepting database failures
-
-- ~~Add regression tests for malformed UUID handling in shipped V1 paths~~  
-  Owner: `Test`  
-  Depends: malformed UUID fail-loud work complete  
-  Proof: malformed ID reads fail in tests for core repositories, registry path, and shipped report decoding
-
-- ~~Add regression test for company file delete cleanup~~  
-  Owner: `Test`  
-  Depends: company file resolution hardening complete  
-  Proof: delete path removes registered and legacy company files without swallowing removal failures
-
-- ~~Add regression test for backup export failure handling~~  
-  Owner: `Test`  
-  Depends: backup export failure handling complete  
-  Proof: backup export reports a clean file-system error when the destination path is invalid
-
-- ~~Add regression test for report drill-down routing~~  
-  Owner: `Test`  
-  Depends: report drill-down path complete  
-  Proof: report row drill-down routes to the edit-voucher sheet for the tapped voucher
-
-- ~~Add regression tests for voucher posting `P0` fixes~~  
-  Owner: `Test`  
-  Depends: posting hardening complete  
-  Proof: each fixed posting defect has at least one protecting test
-
-- ~~Add regression tests for voucher edit `P0` fixes~~  
-  Owner: `Test`  
-  Depends: edit hardening complete  
-  Proof: each fixed edit defect has at least one protecting test
-
-- ~~Add regression tests for voucher reversal `P0` fixes~~  
-  Owner: `Test`  
-  Depends: reversal hardening complete  
-  Proof: each fixed reversal defect has at least one protecting test
-
-- ~~Add repository tests for schema-sensitive paths~~  
-  Owner: `Test`  
-  Depends: repository reviews complete  
-  Proof: repository assumptions are covered in tests
-
-- ~~Add service tests for FY lock enforcement~~  
-  Owner: `Test`  
-  Depends: FY verification complete  
-  Proof: lock bypasses fail in tests
-
-- ~~Add service tests for audit writes~~  
-  Owner: `Test`  
-  Depends: audit verification complete  
-  Proof: missing audit write causes test failure
-
-- ~~Add tests for company isolation~~  
-  Owner: `Test`  
-  Depends: company isolation verification complete  
-  Proof: cross-company leakage causes test failure
-
-- ~~Add tests for backup/restore roundtrip~~  
-  Owner: `Test`  
-  Depends: restore integrity verification complete  
-  Proof: restore mismatch causes test failure
-
-- ~~Add targeted report reconciliation tests~~  
-  Owner: `Test`  
-  Depends: report validation complete  
-  Proof: report mismatch causes test failure
-
-## Deferred / Conditional
-
-### H. Conditional Modules
-- ~~Audit inventory and decide `ship` or `defer`~~  
-  Owner: `Decision`  
-  Depends: core release path substantially green  
-  Proof: module is explicitly kept or removed from `v1` and hidden from V1 shell entry points
-
-- ~~Audit payroll and decide `ship` or `defer`~~  
-  Owner: `Decision`  
-  Depends: core release path substantially green  
-  Proof: module is explicitly kept or removed from `v1` and hidden from V1 shell entry points
-
-- ~~Audit banking and decide `ship` or `defer`~~  
-  Owner: `Decision`  
-  Depends: core release path substantially green  
-  Proof: module is explicitly kept or removed from `v1` and hidden from V1 shell entry points
-
-- ~~Audit advanced GST export and decide `ship` or `defer`~~  
-  Owner: `Decision`  
-  Depends: core release path substantially green  
-  Proof: module is explicitly kept or removed from `v1` and hidden from V1 shell entry points
-
-## Final Release Path
-
-### I. Manual QA And Release Gates
-- ~~Run accountant-style QA for company setup~~  
-  Owner: `Manual QA`  
-  Depends: user-flow review complete  
-  Proof: no blocker found in setup path
-
-- ~~Run accountant-style QA for accounts~~  
-  Owner: `Manual QA`  
-  Depends: accounts flow review complete  
-  Proof: no blocker found in account path
-
-- ~~Run accountant-style QA for voucher posting, edit, reversal~~  
-  Owner: `Manual QA`  
-  Depends: voucher flow reviews complete  
-  Proof: no blocker found in voucher path
-
-- ~~Run accountant-style QA for FY lock behavior~~  
-  Owner: `Manual QA`  
-  Depends: FY lock verification complete  
-  Proof: no blocker found in FY lock path
-
-- ~~Run accountant-style QA for reports~~  
-  Owner: `Manual QA`  
-  Depends: report validation complete  
-  Proof: no blocker found in report path
-
-- ~~Run accountant-style QA for backup/restore~~  
-  Owner: `Manual QA`  
-  Depends: backup/restore flow review complete  
-  Proof: no blocker found in backup/restore path
-
-- ~~Confirm zero known `P0` bugs in shipped scope~~  
-  Owner: `Decision`  
-  Depends: all core tracks green  
-  Proof: execution board has zero open `P0` in shipped path
-
-- ~~Confirm zero known silent data-loss or silent deletion paths~~  
-  Owner: `Decision`  
-  Depends: schema and restore checks green  
-  Proof: no open issue remains in this class
-
-- ~~Confirm zero known FY lock bypasses~~  
-  Owner: `Decision`  
-  Depends: FY verification and tests green  
-  Proof: no open lock-bypass issue remains
-
-- ~~Confirm zero network behavior in shipped app~~  
-  Owner: `Review`  
-  Depends: final shipped scope fixed  
-  Proof: no shipped network stack usage remains
-
-- ~~Confirm core reports reconcile on validation data~~  
-  Owner: `Decision`  
-  Depends: report validations and tests green  
-  Proof: validation runs are green
-
-### J. Stress, Soak, RC, Deployment
-- ~~Run voucher-volume stress checks~~  
-  Owner: `Test`  
-  Depends: core release gates nearly green  
-  Proof: no crash or corruption under volume
-
-- ~~Run repeated report-generation stress checks~~  
-  Owner: `Test`  
-  Depends: report validations green  
-  Proof: repeated generation stays stable and correct
-
-- ~~Run company-switching soak checks~~  
-  Owner: `Test`  
-  Depends: company switching flow reviewed  
-  Proof: repeated switching remains stable
-
-- ~~Run restore/reopen soak checks~~  
-  Owner: `Test`  
-  Depends: restore flow reviewed  
-  Proof: repeated restore/reopen remains stable
-
-- ~~Run repeatable benchmark harness and 500k stress validation~~  
-  Owner: `Test`  
-  Depends: benchmark suite and cleanup fixes complete  
-  Proof: before/after benchmark JSON captured, 500k stress run passes, and post-cleanup memory growth stays within limit
-
-- ~~Freeze features for release candidate~~  
-  Owner: `Decision`  
-  Depends: all core functional work complete  
-  Proof: only release blockers may change after this point
-
-- ~~Re-run full verification on release candidate~~  
-  Owner: `Test`  
-  Depends: RC freeze complete  
-  Proof: build, tests, flow checks, and release gates still pass
-
-- ~~Validate deployment package~~  
-  Owner: `Test`  
-  Depends: RC verification green  
-  Proof: deployment artifact is valid for chosen distribution path
-
-- ~~Final go / no-go decision~~  
-  Owner: `Decision`  
-  Depends: all release gates green  
-  Proof: explicit ship decision recorded
-
-## Parallel Work Rules
-- Safe parallel work in `B`: independent view-model migrations, but remove each holder only after its paired migration is green.
-- Safe parallel work in `C`: schema table reconciliation can run in parallel by table family, but `schema_v1.sql` must not be finalized before migration review is complete.
-- Safe parallel work in `D`: company/accounts/settings-backup reviews can run together; voucher create/edit/reverse should stay grouped.
-- Safe parallel work in `F`: repository tests, service tests, and report tests can be added in parallel if they do not share fixtures or business-rule edits.
-- No parallel work is allowed across items that mutate the same write-path, the same schema contract, or the same report contract.
-
-## Re-Check Rules
-- If schema changes after a repository item is struck through, re-check that repository item.
-- If voucher write logic changes after a report item is struck through, re-check affected reports.
-- If FY logic changes after a flow or report item is struck through, re-check those items.
-- If restore logic changes after company or report items are struck through, re-check those items.
-- If shell observation changes after a flow item is struck through, re-check the affected UI flow.
-
-## Done Right Now
-- ~~Freeze `v1` scope around core accounting, reports, audit, backup/restore, and offline shell~~
-- ~~Treat inventory, payroll, banking, and advanced GST as conditional ship only~~
-- ~~Create repo-tracked `P0/P1/P2` execution board~~
-- ~~Record top 10 blockers in execution order~~
-- ~~Mark deferred modules and hidden entry points explicitly~~
-- ~~Migrate `AppEnvironment`, `AppRouter`, and `WindowState` to `@Observable`~~
-- ~~Move app composition root from `environmentObject` to typed environment injection~~
-- ~~Migrate shell views to typed environment access~~
-- ~~Migrate `KeyboardBridge` and `KeyboardRouter`~~
-- ~~Migrate `AccountTreeCache`~~
-- ~~Remove `EnvironmentObject` usage from shipped shell and main feature entry screens~~
-- ~~Migrate `OnboardingViewModel`~~
-- ~~Migrate `DashboardViewModel`~~
-- ~~Migrate `AccountsViewModel`~~
-- ~~Remove `AccountsViewModelHolder`~~
-- ~~Migrate `ReportsViewModel`~~
-- ~~Remove `ReportsViewModelHolder`~~
-- ~~Migrate `VouchersViewModel`~~
-- ~~Remove `VouchersViewModelHolder`~~
-- ~~Migrate `VoucherEditViewModel`~~
-- ~~Remove `VoucherEditHolder`~~
-- ~~Migrate `SettingsViewModel`~~
-- ~~Migrate `AuditViewModel`~~
-- ~~Remove `AuditViewModelHolder`~~
-- ~~Confirm no shipped workflow mixes old and new observation systems~~
-- ~~Remove silent-delete schema violation on `avelo_ledger_lines.voucher_id`~~
-- ~~Reconcile company table in migration against frozen schema~~
-- ~~Reconcile financial year table in migration against frozen schema~~
-- ~~Reconcile account-group table in migration against frozen schema~~
-- ~~Reconcile account table in migration against frozen schema~~
-- ~~Reconcile voucher table in migration against frozen schema~~
-- ~~Reconcile ledger-lines table in migration against frozen schema~~
-- ~~Reconcile audit tables in migration against frozen schema~~
-- ~~Reconcile same tables in `schema_v1.sql` against frozen schema~~
-- ~~Confirm `MigrationV001.swift` and `schema_v1.sql` match each other~~
-- ~~Reconcile `CompanyRepository` against frozen schema and rules~~
-- ~~Reconcile `FinancialYearRepository` against frozen schema and rules~~
-- ~~Reconcile `AccountRepository` against frozen schema and rules~~
-- ~~Reconcile `VoucherRepository` against frozen schema and rules~~
-- ~~Reconcile `AuditRepository` against frozen schema and rules~~
-- ~~Reconcile `BackupService` and restore path against frozen rules~~
-- ~~Ensure voucher post no longer swallows account-usage update failures~~
-- ~~Harden voucher posting against known `P0` defects~~
-- ~~Harden voucher edit against known `P0` defects~~
-- ~~Harden voucher reversal against known `P0` defects~~
-- ~~Verify FY lock enforcement across all voucher and ledger write paths~~
-- ~~Verify audit logging for all financially meaningful actions~~
-- ~~Verify company isolation~~
-- ~~Verify restore integrity~~
-- ~~Fail loudly on malformed UUIDs in shipped V1 row-decode and report paths~~
-- ~~Add regression tests for malformed UUID handling in shipped V1 paths~~
-- ~~Add regression test for silent-delete schema fix~~
-- ~~Add regression test for account-usage update failure handling~~
-- ~~Add regression tests for voucher posting `P0` fixes~~
-- ~~Add regression tests for voucher edit `P0` fixes~~
-- ~~Add regression tests for voucher reversal `P0` fixes~~
-- ~~Add service tests for FY lock enforcement~~
-- ~~Add service tests for audit writes~~
-- ~~Add tests for company isolation~~
-- ~~Add tests for backup/restore roundtrip~~
-- ~~Validate day book behavior~~
-- ~~Validate GST summary behavior~~
-- ~~Validate outstanding behavior~~
-- ~~Verify report date boundaries respect active FY and lock rules~~
-- ~~Add targeted report reconciliation tests~~
-- ~~Correct dashboard summary logic to use real account codes and report totals~~
-- ~~Return app to clean build after shell migration~~
-- ~~Keep automated suite green after shell migration~~
-- ~~Keep company setup flow green after onboarding migration~~
-- ~~Run `swift build` after completed architecture batches~~
-- ~~Run `swift test` after completed architecture batches~~
-- ~~Run repeatable benchmark harness and 500k stress validation~~
-
-## Immediate Next Sequence
-1. Finish `B. Observation / Shell Completion`.
-2. Finish `C. Schema Source Of Truth`.
-3. Finish `D. Repository / Service Correctness`.
-4. Run `E. Core User Flows`.
-5. Run `F. Reports And Reconciliation`.
-6. Close `G. Regression Protection`.
-7. Decide `H. Conditional Modules`.
-8. Run `I. Manual QA And Release Gates`.
-9. Run `J. Stress, Soak, RC, Deployment`.
-
-## Definition Of Done
-Strike an item only when:
-- the work is complete
-- its `Proof` is satisfied
-- `swift build` and `swift test` are green for code-changing work
-- required dependency re-checks are green
-- no known blocker remains for that item
-
-## Future Split Candidates
-- `Core/Repositories/ReportRepository.swift`
-- `Features/Reports/ReportsView.swift`
-
-## Benchmark Note
-- At 500k vouchers, `million_report_pass` has been observed in the ~14.4s to ~16.6s band on this machine, and `million_voucher_post_batched` has ranged roughly ~516s to ~606s depending on background load.
-- Treat single-sample benchmark deltas as suggestive only; compare multiple runs and the load average at the start of each run before drawing conclusions.
+Evidence template required before striking an item:
+
+- `Implemented`: code path and invariant now exist.
+- `Automated proof`: exact targeted test commands.
+- `Manual proof`: accountant scenario, steps, and expected output/result.
+- `Residual risk`: blank if closed; explicit if reopened or partially blocked.
+
+## Release gate policy
+
+### P0 gate
+
+Before calling Avelo release-ready:
+
+- no `AVL-P0-*` remains open on the board
+- every P0 item has targeted automated proof
+- relevant `swift test` full-suite proof is recorded
+- every P0 item has a written manual accountant acceptance script and completed result
+
+### P1 gate
+
+Before broad rollout:
+
+- no accountant-critical workflow still relies on `featureUnavailable`
+- legal and compliance exports validate against fixtures
+- supported Tally-replacement daily flows are keyboard-complete
+
+### P2 gate
+
+P2 remains real work but must not block the P0 release verdict unless a P0 or P1 proof explicitly depends on it.
+
+## Wave P0-A — foundational proof closure
+
+Close proof gaps first for already-advanced items that unblock later work.
+
+| ID | State | Dependency gate | Next concrete action | Proof still missing |
+| --- | --- | --- | --- | --- |
+| AVL-P0-012 | Proof remaining | None | Keep keyed audit chain implementation; run targeted tamper suites plus full `swift test`; write accountant verification script for tamper rejection on company open/repair paths. | Full-suite proof and manual accountant acceptance. Targeted proof now includes `swift test --filter AuditTamperEvidenceTests`, `swift test --filter DatabaseManagerFileResolutionTests`, `swift test --filter AuditRepositoryTests`, and `swift test --filter SchemaDriftTests`. |
+| AVL-P0-011 | Proof remaining | None | Complete any remaining arithmetic-path audit, then rerun the overflow suites and full `swift test`; write accountant overflow acceptance scenarios for voucher, payroll, reports, and banking. | Confirm no uncovered money/quantity path remains, plus full-suite proof and manual acceptance. |
+| AVL-P0-025 | Proof remaining | AVL-P0-023 behavior must stay consistent | Rerun FY overlap, restore, and schema tests after any date-semantics changes; write accountant script for overlapping-FY rejection and deterministic date resolution. | Full-suite proof and manual acceptance. |
+| AVL-P0-026 | Proof remaining | AVL-P0-025 | Reconfirm all locked-period write paths after any follow-on FY work; write accountant script for voucher, stock, payroll, banking, and opening-balance lock rejection. | Full-suite proof and manual acceptance. |
+| AVL-P0-030 | Proof remaining | None | Reconfirm cross-company guards after company-create and registry work; write accountant script for company-isolation rejection at service/UI level. | Full-suite proof and manual acceptance. |
+| AVL-P0-027 | Proof remaining | None | Re-run strict-decoding suites after any repository/schema edits; write accountant corruption-handling script for fail-closed open/read behavior. | Full-suite proof and manual acceptance. |
+| AVL-P0-002 | Proof remaining | None | Re-run contention/rollback numbering tests after duplicate-submit and cancellation work; write accountant script for contiguous numbering under failure/retry. | Full-suite proof and manual acceptance. |
+
+## Wave P0-B — remaining accounting and fiscal blockers
+
+Execute in this order after Wave P0-A is green enough to avoid rework.
+
+| ID | State | Dependency gate | Next concrete action | Proof still missing |
+| --- | --- | --- | --- | --- |
+| AVL-P0-005 | Implementation remaining | AVL-P0-025 and AVL-P0-026 | Implement locked-FY close carry-forward with exact-once opening propagation and reopen/idempotency rules. | Golden close/reopen/idempotency fixtures, full `swift test`, and accountant year-close acceptance. |
+| AVL-P0-006 | Implementation remaining | AVL-P0-026 | Implement reversal-only correction flow for locked-FY edits across service and UI. | UI/service rejection-and-reversal tests, full `swift test`, and accountant locked-period correction acceptance. |
+| AVL-P0-007 | Implementation remaining | AVL-P0-002 | Implement one-shot submit protection for rapid Enter/default-action activation without duplicate audit events. | Repeated-key/concurrent-submit fixtures, full `swift test`, and keyboard-entry acceptance. |
+| AVL-P0-003 | Implementation remaining | None | Replace bill-allocation stub behavior with real FIFO settlement for receipts, payments, advances, and on-account amounts. | Golden bill-allocation fixtures, full `swift test`, and accountant outstanding reconciliation acceptance. |
+| AVL-P0-004 | Implementation remaining | AVL-P0-003 | Implement non-destructive bounced-cheque workflow using linked reversals and re-presentation state. | Golden cheque lifecycle fixtures, full `swift test`, and accountant cheque reversal acceptance. |
+| AVL-P0-009 | Implementation remaining | AVL-P0-011 | Implement direct and indirect BOM cycle detection before expansion/costing. | Cycle fixtures, full `swift test`, and manufacturing validation acceptance. |
+| AVL-P0-008 | Proof remaining | AVL-P0-011 | Reconfirm rational alternate-UOM behavior after valuation, stock ageing, and logistics workflows settle; write accountant unit-conversion script. | Full-suite proof and manual acceptance. |
+| AVL-P0-010 | Proof remaining | AVL-P0-008 and AVL-P0-011 | Reconfirm FIFO/weighted-average valuation against the final stock workflow set; write accountant valuation verification script. | Full-suite proof and manual acceptance. |
+| AVL-P0-024 | Proof remaining | AVL-P0-011 | Reconfirm per-account trial-balance netting after bill allocation, cancellation, and FY close work; write accountant TB verification script. | Full-suite proof and manual acceptance. |
+| AVL-P0-019 | Proof remaining | AVL-P0-010 | After `AVL-P0-003`/`AVL-P0-004`/`AVL-P0-009`, rerun downstream recalculation proofs and write accountant backdated-stock correction script. | Full-suite proof and manual acceptance. |
+| AVL-P0-001 | Proof remaining | None | Reconfirm deterministic `ROUND_OFF` behavior after later voucher-class, GST, and print changes; write accountant invoice-rounding script. | Full-suite proof and manual acceptance. |
+| AVL-P0-032 | Proof remaining | AVL-P0-002 and AVL-P0-012 | Reconfirm cancel/reversal/history behavior after numbering and tamper finalization; write accountant voucher-cancel acceptance script. | Full-suite proof and manual acceptance. |
+
+Exit criteria for this wave:
+
+- every ledger-impacting path has golden fixtures
+- every workflow has an explicit accountant acceptance script
+- no bill-wise, cheque, or BOM stub is still treated as acceptable readiness evidence
+
+## Wave P0-C — storage, UI, and legal blockers
+
+| ID | State | Dependency gate | Next concrete action | Proof still missing |
+| --- | --- | --- | --- | --- |
+| AVL-P0-028 | Implementation remaining | None | Replace registry `INSERT OR REPLACE` with collision-safe insert/update semantics that preserve every company row and file. | Collision fixtures, full `swift test`, and accountant company-picker preservation acceptance. |
+| AVL-P0-031 | Implementation remaining | None | Make schema-version reads throwing so unreadable DBs never fall back to version zero. | Corrupt/locked/wrong-key/I/O fixtures, full `swift test`, and operator recovery acceptance. |
+| AVL-P0-029 | Implementation remaining | AVL-P0-028 and AVL-P0-031 | Make company creation transactional across DB file, Keychain, seed data, and registry with compensating cleanup and honored `seedDefaults`. | Failure-at-each-stage fixtures, full `swift test`, and accountant company-create rollback acceptance. |
+| AVL-P0-013 | Implementation remaining | None | Exclude registry, DB, WAL, SHM, and recovery artifacts from iCloud sync. | Metadata fixture, clean-device verification, and operator storage acceptance. |
+| AVL-P0-014 | Implementation remaining | None | Hold and release `ProcessInfo` activity assertions around migrations, restore, backup, repair, and recalculation. | Cancellation/error-release tests, full `swift test`, and sleep/App Nap QA. |
+| AVL-P0-015 | Implementation remaining | AVL-P0-031 | Move migrations off the main thread with progress, interruption policy, and recovery UI. | Large-migration responsiveness/interruption fixtures, full `swift test`, and operator migration acceptance. |
+| AVL-P0-016 | Implementation remaining | None | Consolidate company/router/editor state into one source of truth and remove stale pointer paths. | Company-switch/window/sheet stress tests, full `swift test`, and accountant shell-flow acceptance. |
+| AVL-P0-017 | Implementation remaining | None | Guarantee `sqlite3_finalize`/reset/clear on every statement lifecycle path. | Fault-injection/leak fixtures, full `swift test`, and operational leak-free acceptance. |
+| AVL-P0-018 | Implementation remaining | None | Add draft autosave and crash recovery without automatic posting or duplicate posting. | Kill/relaunch recovery fixtures, full `swift test`, and accountant draft-recovery acceptance. |
+| AVL-P0-020 | Implementation remaining | None | Make voucher-grid `@FocusState` navigation reliable for Tab/Shift-Tab/Enter and row mutations. | Full keyboard matrix tests, full `swift test`, and keyboard-entry acceptance. |
+| AVL-P0-021 | Implementation remaining | None | Add locale-aware decimal parsing with unambiguous paise storage and paste handling. | Locale round-trip fixtures, full `swift test`, and accountant locale-entry acceptance. |
+| AVL-P0-023 | Implementation remaining | None | Force IST accounting calendar semantics regardless of device timezone. | Boundary/date-zone fixtures, full `swift test`, and accountant FY/GST period acceptance. |
+| AVL-P0-022 | Implementation remaining | AVL-P1-008 | Finish GST-compliant PDF/invoice output, including mandatory fields and applicable signed QR behavior after e-invoice support lands. | Field-matrix and rendered-PDF fixtures, full `swift test`, and accountant legal-document acceptance. |
+
+## Wave P1-A — accountant workflow core
+
+Daily bookkeeping and Tally-replacement core before filing breadth.
+
+| ID | State | Dependency gate | Next concrete action | Proof still missing |
+| --- | --- | --- | --- | --- |
+| AVL-P1-028 | Implementation remaining | AVL-P0-010 | Rebuild bank reconciliation to match selected bank ledger legs, signed direction, persisted matches, import fingerprints, and idempotency. | Match/clear/unmatch/import-duplication fixtures, full `swift test`, and accountant bank-reco acceptance. |
+| AVL-P1-029 | Implementation remaining | AVL-P0-010 | Build consumable stock-ageing layers that reconcile buckets to on-hand quantity and value. | FIFO-ageing fixtures, full `swift test`, and accountant stock-ageing acceptance. |
+| AVL-P1-030 | Implementation remaining | AVL-P0-030 | Block account-group cycles, cross-company parents, and nature conflicts on create/import/update. | Hierarchy-cycle fixtures, full `swift test`, and accountant chart-integrity acceptance. |
+| AVL-P1-031 | Implementation remaining | None | Add checksummed recovery keys with typo-specific errors and versioning. | Single-character mutation fixtures, full `swift test`, and operator recovery-key acceptance. |
+| AVL-P1-033 | Implementation remaining | AVL-P0-009 and AVL-P0-010 | Replace BOM, bill allocation, cheque, TDS/TCS, and cost-centre readiness stubs with real guarded workflows. | No-`featureUnavailable` shipped-path proof, full `swift test`, and accountant workflow acceptance. |
+| AVL-P1-010 | Implementation remaining | AVL-P0-030 | Add cost-centre per-line allocation with report reconciliation and keyboard selection context. | Split-allocation fixtures, full `swift test`, and accountant allocation acceptance. |
+| AVL-P1-011 | Implementation remaining | AVL-P1-010 | Add cost categories for parallel allocation dimensions. | Parallel-dimension fixtures, full `swift test`, and accountant category acceptance. |
+| AVL-P1-034 | Implementation remaining | AVL-P1-010 | Implement Voucher Classes for deterministic ledger/tax/freight expansion. | Class-version fixtures, full `swift test`, and accountant fast-entry acceptance. |
+| AVL-P1-035 | Implementation remaining | AVL-P0-003 | Implement simple/advanced ledger interest policies with posting rules. | Interest-schedule fixtures, full `swift test`, and accountant overdue-interest acceptance. |
+| AVL-P1-036 | Implementation remaining | None | Add comparative report columns and period-selection model. | Multi-period reconciliation fixtures, full `swift test`, and accountant comparative-report acceptance. |
+| AVL-P1-037 | Implementation remaining | AVL-P0-032 | Build editable universal Day Book with inline drill-down, cancel, and date navigation. | Browse-to-correction fixtures, full `swift test`, and accountant Day Book acceptance. |
+| AVL-P1-038 | Implementation remaining | AVL-P0-020 and AVL-P1-010 | Build continuous multi-account voucher entry with inline cost allocation and no submodal dependency. | Complex keyboard-only voucher fixtures, full `swift test`, and accountant continuous-entry acceptance. |
+| AVL-P1-040 | Implementation remaining | AVL-P0-022 baseline invoice behavior | Implement orders and logistics vouchers with fulfillment linkage. | Partial fulfillment/rejection/count fixtures, full `swift test`, and accountant stock-flow acceptance. |
+| AVL-P1-041 | Implementation remaining | AVL-P0-032 | Implement voucher/invoice mode split and post-dated voucher lifecycle distinct from cheque state. | Mode/post-date lifecycle fixtures, full `swift test`, and accountant post-dated acceptance. |
+| AVL-P1-044 | Implementation remaining | AVL-P0-020 | Implement context-aware Tally/macOS shortcut engine without breaking text entry. | Full shortcut matrix, full `swift test`, and accountant keyboard-flow acceptance. |
+
+## Wave P1-B — compliance and filing
+
+| ID | State | Dependency gate | Next concrete action | Proof still missing |
+| --- | --- | --- | --- | --- |
+| AVL-P1-004 | Implementation remaining | None | Implement PF, ESI, Professional Tax, and payroll effective-rate rounding. | Golden payroll fixtures, full `swift test`, and payroll-operator acceptance. |
+| AVL-P1-005 | Implementation remaining | None | Build Form 16 and 24Q/26Q exports with schema validation. | Export-schema fixtures, full `swift test`, and payroll filing acceptance. |
+| AVL-P1-006 | Implementation remaining | AVL-P1-005 | Add 27Q/27EQ and correction/export workflows. | Validation fixtures, full `swift test`, and filing acceptance. |
+| AVL-P1-008 | Implementation remaining | AVL-P0-022 legal print dependency | Implement e-invoice IRN lifecycle, reporting-window rules, signed JSON/QR storage, verification, and cancellation. | IRN lifecycle fixtures, full `swift test`, and accountant e-invoice acceptance. |
+| AVL-P1-002 | Implementation remaining | AVL-P0-022 baseline document path | Implement RCM self-invoicing and linked postings. | Inward-supply fixtures, full `swift test`, and accountant RCM acceptance. |
+| AVL-P1-007 | Implementation remaining | AVL-P0-022 baseline document path | Build GSTR-1/1A/IFF, 3B, 2B, and IMS reconciliation with accept/reject/pending states. | Portal-format fixtures, full `swift test`, and GST-filing acceptance. |
+| AVL-P1-016 | Implementation remaining | AVL-P1-007 | Implement debit/credit-note linkage across GST periods. | Cross-period note fixtures, full `swift test`, and accountant amendment acceptance. |
+| AVL-P1-001 | Implementation remaining | None | Implement GSTR-9/9C reconciliation with traceable difference reporting. | Annual reconciliation fixtures, full `swift test`, and accountant annual-return acceptance. |
+| AVL-P1-003 | Implementation remaining | None | Implement e-way bill Part-B lifecycle with audit visibility. | Transition/state fixtures, full `swift test`, and operator logistics acceptance. |
+
+## Wave P1-C — reliability, printing, signing, interchange, and Tally flow
+
+| ID | State | Dependency gate | Next concrete action | Proof still missing |
+| --- | --- | --- | --- | --- |
+| AVL-P1-017 | Implementation remaining | AVL-P0-016 | Add multi-window company/editor isolation and restoration. | Two-window stress fixtures, full `swift test`, and operator multi-window acceptance. |
+| AVL-P1-018 | Implementation remaining | AVL-P0-030 | Add optimistic locking/conflict handling for concurrent edits. | Stale-write conflict fixtures, full `swift test`, and operator concurrent-edit acceptance. |
+| AVL-P1-019 | Implementation remaining | AVL-P0-013 | Detect symlinks, external/network drives, and unsupported filesystems. | File-placement matrix, full `swift test`, and operator storage-policy acceptance. |
+| AVL-P1-020 | Implementation remaining | AVL-P0-017 | Add WAL checkpoint management with bounded growth and surfaced failures. | Long-session/crash fixtures, full `swift test`, and operator durability acceptance. |
+| AVL-P1-021 | Implementation remaining | AVL-P0-013 | Add Time Machine registry/company consistency checks and guidance. | Snapshot-skew fixtures, full `swift test`, and operator recovery acceptance. |
+| AVL-P1-022 | Implementation remaining | None | Strip CSV BOM safely. | UTF BOM fixtures, full `swift test`, and import acceptance. |
+| AVL-P1-023 | Implementation remaining | None | Support nested quotes and embedded delimiters in CSV imports. | RFC-style CSV fixtures, full `swift test`, and import acceptance. |
+| AVL-P1-024 | Implementation remaining | None | Support quoted/embedded line breaks in TSV. | Multiline TSV fixtures, full `swift test`, and import acceptance. |
+| AVL-P1-025 | Implementation remaining | AVL-P0-016 | Fix undo/redo model-view resync in voucher grids. | Undo/redo stress fixtures, full `swift test`, and keyboard-edit acceptance. |
+| AVL-P1-026 | Implementation remaining | AVL-P0-020 | Add mid-voucher master creation flow with focus return and audit. | Alt+C keyboard fixtures, full `swift test`, and accountant draft-preservation acceptance. |
+| AVL-P1-027 | Implementation remaining | None | Build Tally importer with dry run, mapping, resumability, and reconciliation report. | Representative import fixtures, full `swift test`, and accountant import acceptance. |
+| AVL-P1-032 | Implementation remaining | AVL-P0-012 | Complete audit coverage for FY unlocks, bank ops, inventory orders, repair, exports, printing, signing, and email. | Mutation-inventory fixtures, full `swift test`, and audit review acceptance. |
+| AVL-P1-039 | Implementation remaining | AVL-P0-012 and AVL-P0-031 | Build repair/reindex with dry run, backup requirement, progress, verification, and audit. | Corrupt-index repair fixtures, full `swift test`, and operator repair acceptance. |
+| AVL-P1-042 | Implementation remaining | AVL-P0-022 | Add batch printing and company/printer/voucher-type print profiles. | Batch/profile render fixtures, full `swift test`, and accountant print-run acceptance. |
+| AVL-P1-043 | Implementation remaining | AVL-P1-042 | Add DSC PDF signing and structured XML interchange with explicit confirmation. | Certificate/token/XML fixtures, full `swift test`, and operator export/sign acceptance. |
+| AVL-P1-009 | Implementation remaining | AVL-P0-011 | Add multi-currency books, rates, revaluation, and forex journals. | Multi-period FX fixtures, full `swift test`, and accountant forex acceptance. |
+| AVL-P1-012 | Implementation remaining | AVL-P0-010 | Add godown/transit ledger with transfer ownership and in-transit valuation. | Dispatch/receipt fixtures, full `swift test`, and stock-transfer acceptance. |
+| AVL-P1-013 | Implementation remaining | AVL-P0-010 | Add expired-batch enforcement with override policy and audit. | Expiry fixtures, full `swift test`, and stock-control acceptance. |
+| AVL-P1-014 | Implementation remaining | AVL-P0-009 and AVL-P0-010 | Add by-product and scrap lines to manufacturing vouchers. | BOM production fixtures, full `swift test`, and manufacturing acceptance. |
+| AVL-P1-015 | Implementation remaining | AVL-P0-010 | Add configurable negative-stock valuation and later-receipt adjustment. | Negative-stock timeline fixtures, full `swift test`, and stock-valuation acceptance. |
+
+## Wave P2 — post-launch polish
+
+Execute only after P0 release readiness is real and P1 rollout blockers are closed.
+
+| ID | State | Dependency gate | Next concrete action | Proof still missing |
+| --- | --- | --- | --- | --- |
+| AVL-P2-011 | Implementation remaining | AVL-P0-032 | Add duplicate voucher flow with lineage and fresh numbering. | Duplicate/edit/save fixtures, full `swift test`, and accountant copy-flow acceptance. |
+| AVL-P2-012 | Implementation remaining | AVL-P0-018 | Add narration recall with privacy-aware history rules. | Recall fixtures, full `swift test`, and keyboard acceptance. |
+| AVL-P2-013 | Implementation remaining | AVL-P1-037 | Add insert-while-browsing and PgUp/PgDn voucher navigation. | Browse/insert navigation fixtures, full `swift test`, and accountant browse-flow acceptance. |
+| AVL-P2-014 | Implementation remaining | AVL-P0-011 | Add inline calculator in amount fields without float drift. | Expression fixtures, full `swift test`, and keyboard acceptance. |
+| AVL-P2-015 | Implementation remaining | AVL-P1-036 | Add report-line zoom and restore prior context. | Drill-return fixtures, full `swift test`, and report-usage acceptance. |
+| AVL-P2-016 | Implementation remaining | AVL-P0-022 | Add explicit-confirmation email dispatch with PDF attachment. | Cancel/auth/retry fixtures, full `swift test`, and operator send-flow acceptance. |
+| AVL-P2-019 | Implementation remaining | None | Add Gateway-style dashboard with dense company/report quick access. | Navigation/accessibility fixtures, full `swift test`, and accountant dashboard acceptance. |
+| AVL-P2-020 | Implementation remaining | None | Split company capabilities from per-screen configuration in F11/F12 style. | Screen/config context fixtures, full `swift test`, and accountant settings acceptance. |
+| AVL-P2-001 | Implementation remaining | AVL-P1-042 | Add cheque-printing template designer. | Template render fixtures, full `swift test`, and print acceptance. |
+| AVL-P2-002 | Implementation remaining | AVL-P1-010 | Add budget-versus-actual variance reports. | Budget reconciliation fixtures, full `swift test`, and reporting acceptance. |
+| AVL-P2-003 | Implementation remaining | AVL-P0-010 | Add orphaned-batch detection and resolution. | Repair fixtures, full `swift test`, and stock-control acceptance. |
+| AVL-P2-004 | Implementation remaining | AVL-P1-004 | Cover leap-year payroll edge cases. | Leap-year fixtures, full `swift test`, and payroll acceptance. |
+| AVL-P2-005 | Implementation remaining | AVL-P0-022 | Add regional-script PDF font embedding. | Render/extraction fixtures, full `swift test`, and document acceptance. |
+| AVL-P2-006 | Implementation remaining | AVL-P1-028 | Add MT940 and CAMT.053 bank imports. | Bank-format fixtures, full `swift test`, and import acceptance. |
+| AVL-P2-007 | Implementation remaining | AVL-P1-028 | Add explainable fuzzy reconciliation. | Confidence fixtures, full `swift test`, and bank-reco acceptance. |
+| AVL-P2-008 | Implementation remaining | AVL-P0-030 | Add multi-company consolidation and elimination entries. | Intercompany fixtures, full `swift test`, and finance acceptance. |
+| AVL-P2-009 | Implementation remaining | None | Improve XLSX export formatting fidelity. | Workbook fixtures, full `swift test`, and export acceptance. |
+| AVL-P2-010 | Implementation remaining | None | Add hardware-independent licensing and recovery. | Device-replacement fixtures, full `swift test`, and operator acceptance. |
+| AVL-P2-017 | Implementation remaining | AVL-P1-043 | Add legacy ASCII/SDF/HTML export compatibility. | Encoding/schema fixtures, full `swift test`, and export acceptance. |
+| AVL-P2-018 | Implementation remaining | None | Expand discoverable shortcut catalogue beyond the daily-use matrix. | Conflict-audit fixtures, full `swift test`, and help/discovery acceptance. |
+
+## Current proof notes for already-advanced P0 items
+
+These items stay open here because proof closure is still incomplete even though implementation has advanced substantially:
+
+- `AVL-P0-001`, `AVL-P0-002`, `AVL-P0-008`, `AVL-P0-010`, `AVL-P0-011`, `AVL-P0-019`, `AVL-P0-024`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-027`, `AVL-P0-030`, and `AVL-P0-032` remain `Proof remaining`.
+- `AVL-P0-012` is also `Proof remaining`; targeted tamper evidence is green on:
+  - `swift test --filter AuditTamperEvidenceTests`
+  - `swift test --filter DatabaseManagerFileResolutionTests`
+  - `swift test --filter AuditRepositoryTests`
+  - `swift test --filter SchemaDriftTests`
+- None of those items may move to `Manual acceptance remaining` until relevant full-suite proof is rerun from the current worktree after any dependent changes.

@@ -98,15 +98,15 @@ public struct BankReconciliationRepository: Sendable {
             bind: [.text(bankAccountId.uuidString)]
         ) { r in
             Entry(
-                id: try UUIDParsing.required(r.text("id"), field: "avelo_bank_reconciliations.id"),
-                companyId: try UUIDParsing.required(r.text("company_id"), field: "avelo_bank_reconciliations.company_id"),
-                bankAccountId: try UUIDParsing.required(r.text("bank_account_id"), field: "avelo_bank_reconciliations.bank_account_id"),
-                voucherId: try UUIDParsing.required(r.text("voucher_id"), field: "avelo_bank_reconciliations.voucher_id"),
-                statementDate: r.date("statement_date"),
-                statementAmountPaise: r.int("statement_amount_paise"),
-                isCleared: r.bool("is_cleared"),
-                clearedAt: r.optionalText("cleared_at").flatMap { DateFormatters.parseTimestamp($0) },
-                note: r.optionalText("note")
+                id: try UUIDParsing.required(r.requiredText("id"), field: "avelo_bank_reconciliations.id"),
+                companyId: try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_bank_reconciliations.company_id"),
+                bankAccountId: try UUIDParsing.required(r.requiredText("bank_account_id"), field: "avelo_bank_reconciliations.bank_account_id"),
+                voucherId: try UUIDParsing.required(r.requiredText("voucher_id"), field: "avelo_bank_reconciliations.voucher_id"),
+                statementDate: try r.requiredDate("statement_date"),
+                statementAmountPaise: try r.requiredInt("statement_amount_paise"),
+                isCleared: try r.requiredBool("is_cleared"),
+                clearedAt: try r.optionalTimestamp("cleared_at"),
+                note: try r.checkedOptionalText("note")
             )
         }
     }
@@ -149,16 +149,16 @@ public struct BankReconciliationRepository: Sendable {
             bind: [.text(accountId.uuidString), .date(asOf)]
         ) { r in
             StatementLine(
-                id: try UUIDParsing.required(r.text("id"), field: "avelo_bank_statement_lines.id"),
-                companyId: try UUIDParsing.required(r.text("company_id"), field: "avelo_bank_statement_lines.company_id"),
-                accountId: try UUIDParsing.required(r.text("bank_account_id"), field: "avelo_bank_statement_lines.bank_account_id"),
-                date: r.date("statement_date"),
-                amountPaise: r.int("amount_paise"),
-                narration: r.text("narration"),
-                matchedVoucherId: try r.optionalText("matched_voucher_id").map {
+                id: try UUIDParsing.required(r.requiredText("id"), field: "avelo_bank_statement_lines.id"),
+                companyId: try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_bank_statement_lines.company_id"),
+                accountId: try UUIDParsing.required(r.requiredText("bank_account_id"), field: "avelo_bank_statement_lines.bank_account_id"),
+                date: try r.requiredDate("statement_date"),
+                amountPaise: try r.requiredInt("amount_paise"),
+                narration: try r.requiredText("narration"),
+                matchedVoucherId: try r.checkedOptionalText("matched_voucher_id").map {
                     try UUIDParsing.required($0, field: "avelo_bank_statement_lines.matched_voucher_id")
                 },
-                isCleared: r.bool("is_cleared")
+                isCleared: try r.requiredBool("is_cleared")
             )
         }
     }
@@ -176,10 +176,10 @@ public struct BankReconciliationRepository: Sendable {
             bind: [.text(accountId.uuidString), .date(asOf)]
         ) { r in
             VoucherCandidate(
-                id: try UUIDParsing.required(r.text("id"), field: "banking.candidate_vouchers.id"),
-                number: r.text("number"),
-                date: r.date("date"),
-                amountPaise: r.int("total_paise")
+                id: try UUIDParsing.required(r.requiredText("id"), field: "banking.candidate_vouchers.id"),
+                number: try r.requiredText("number"),
+                date: try r.requiredDate("date"),
+                amountPaise: try r.requiredInt("total_paise")
             )
         }
     }

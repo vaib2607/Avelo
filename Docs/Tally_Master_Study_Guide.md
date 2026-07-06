@@ -878,6 +878,7 @@ These surfaces are implementation evidence, not a Ready claim. The canonical rel
 - classic menu-bar dropdown depth is not mirrored one-for-one
 - some Tally screen chrome such as footer function strips are represented through toolbar, shortcut help, and sheets instead
 - F4–F9 open voucher sheets, but the editor suppresses function-key switching instead of converting the active voucher flow
+- invoice-style GST posting now inserts a deterministic `ROUND_OFF` ledger line for bounded paise mismatches, but legal PDF field completeness and signed-QR/IRN workflows remain open (`AVL-P0-001`, `AVL-P0-022`, `AVL-P1-008`)
 - inventory screens and valuation labels exist, but authoritative FIFO/weighted-average layers, residual allocation, ageing consumption, and backdated recalculation remain open (`AVL-P0-010`, `AVL-P0-019`, `AVL-P1-029`)
 - trial balance exists, but per-account netting remains a release blocker (`AVL-P0-024`)
 - Day Book and report drill-down exist, but the universal browse/edit/cancel/return flow is incomplete (`AVL-P1-037`)

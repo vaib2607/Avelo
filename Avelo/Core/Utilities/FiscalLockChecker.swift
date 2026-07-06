@@ -26,12 +26,32 @@ public struct FiscalLockChecker: Sendable {
 
     public func financialYear(containing date: Date,
                               companyId: Company.ID) throws -> FinancialYear.ID? {
-        let dateStr = DateFormatters.formatIsoDate(date)
-        let id: String? = try db.queryOne(
-            "SELECT id FROM avelo_financial_years WHERE company_id = ? AND ? BETWEEN start_date AND end_date LIMIT 1",
-            bind: [.text(companyId.uuidString), .text(dateStr)]
-        ) { r in r.text("id") }
-        return try UUIDParsing.optional(id, field: "avelo_financial_years.id")
+        let matches = try FinancialYearRepository(db: db).containing(date: date, companyId: companyId, limit: 2)
+        if matches.count > 1 {
+            let labels = matches.map(\.label).joined(separator: ", ")
+            throw AppError.businessRule("Overlapping financial years make date lookup ambiguous: \(labels)")
+        }
+        return matches.first?.id
+    }
+
+    public func assertDateOpen(_ date: Date,
+                               companyId: Company.ID,
+                               mutationLabel: String = "Transaction date") throws -> FinancialYear.ID {
+        guard let financialYearId = try financialYear(containing: date, companyId: companyId) else {
+            throw AppError.businessRule("\(mutationLabel) is not within any financial year.")
+        }
+        if try isLocked(financialYearId: financialYearId) {
+            throw AppError.businessRule("Financial year is locked")
+        }
+        return financialYearId
+    }
+
+    public func hasAnyLockedYear(companyId: Company.ID) throws -> Bool {
+        let count: Int64? = try db.queryOne(
+            "SELECT COUNT(*) FROM avelo_financial_years WHERE company_id = ? AND is_locked = 1",
+            bind: [.text(companyId.uuidString)]
+        ) { $0.int(0) }
+        return (count ?? 0) > 0
     }
 
     public func assertOpen(financialYearId: FinancialYear.ID) throws {

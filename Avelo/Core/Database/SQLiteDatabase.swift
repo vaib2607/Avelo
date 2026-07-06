@@ -57,6 +57,94 @@ public struct Row {
 
     private func index(_ i: Int32) -> Int32 { i }
 
+    private func requireColumnIndex(_ name: String) throws -> Int32 {
+        let i = index(of: name)
+        guard i >= 0, box != nil else {
+            throw AppError.database(.rowReadFailed("missing required column \(name)"))
+        }
+        return i
+    }
+
+    public func requiredText(_ name: String) throws -> String {
+        let i = try requireColumnIndex(name)
+        guard let box else {
+            throw AppError.database(.rowReadFailed("missing row data for column \(name)"))
+        }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL {
+            throw AppError.database(.rowReadFailed("null value for required column \(name)"))
+        }
+        guard let cStr = sqlite3_column_text(box.stmt, i) else {
+            throw AppError.database(.rowReadFailed("invalid text value for column \(name)"))
+        }
+        return String(cString: cStr)
+    }
+
+    public func checkedOptionalText(_ name: String) throws -> String? {
+        let i = try requireColumnIndex(name)
+        guard let box else {
+            throw AppError.database(.rowReadFailed("missing row data for column \(name)"))
+        }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
+        guard let cStr = sqlite3_column_text(box.stmt, i) else {
+            throw AppError.database(.rowReadFailed("invalid text value for column \(name)"))
+        }
+        return String(cString: cStr)
+    }
+
+    public func requiredInt(_ name: String) throws -> Int64 {
+        let i = try requireColumnIndex(name)
+        guard let box else {
+            throw AppError.database(.rowReadFailed("missing row data for column \(name)"))
+        }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL {
+            throw AppError.database(.rowReadFailed("null value for required column \(name)"))
+        }
+        return sqlite3_column_int64(box.stmt, i)
+    }
+
+    public func checkedOptionalInt(_ name: String) throws -> Int64? {
+        let i = try requireColumnIndex(name)
+        guard let box else {
+            throw AppError.database(.rowReadFailed("missing row data for column \(name)"))
+        }
+        if sqlite3_column_type(box.stmt, i) == SQLITE_NULL { return nil }
+        return sqlite3_column_int64(box.stmt, i)
+    }
+
+    public func requiredBool(_ name: String) throws -> Bool {
+        let raw = try requiredInt(name)
+        switch raw {
+        case 0: return false
+        case 1: return true
+        default:
+            throw AppError.database(.rowReadFailed("invalid boolean value for column \(name): \(raw)"))
+        }
+    }
+
+    public func requiredDate(_ name: String) throws -> Date {
+        let s = try requiredText(name)
+        guard let date = DateFormatters.parseDate(s) else {
+            throw AppError.database(.rowReadFailed("invalid date value for column \(name)"))
+        }
+        return date
+    }
+
+    public func checkedOptionalDate(_ name: String) throws -> Date? {
+        guard let s = try checkedOptionalText(name) else { return nil }
+        guard let date = DateFormatters.parseDate(s) else {
+            throw AppError.database(.rowReadFailed("invalid date value for column \(name)"))
+        }
+        return date
+    }
+
+    public func enumValue<T: RawRepresentable>(_ name: String, as type: T.Type = T.self) throws -> T where T.RawValue == String {
+        let raw = try requiredText(name)
+        guard let value = T(rawValue: raw) else {
+            throw AppError.database(.rowReadFailed("invalid \(String(describing: T.self)) value for column \(name): \(raw)"))
+        }
+        return value
+    }
+
     public func int(_ name: String) -> Int64 {
         let i = index(of: name)
         guard i >= 0, let box else { return 0 }
@@ -104,7 +192,7 @@ public struct Row {
     }
 
     public func timestamp(_ name: String) throws -> Date {
-        let s = text(name)
+        let s = try requiredText(name)
         guard let date = DateFormatters.parseTimestamp(s) else {
             throw AppError.database(.rowReadFailed("invalid timestamp value for column \(name)"))
         }
@@ -134,6 +222,14 @@ public struct Row {
         guard let cStr = sqlite3_column_text(box.stmt, i) else { return nil }
         let s = String(cString: cStr)
         return DateFormatters.parseDate(s)
+    }
+
+    public func optionalTimestamp(_ name: String) throws -> Date? {
+        guard let s = try checkedOptionalText(name) else { return nil }
+        guard let date = DateFormatters.parseTimestamp(s) else {
+            throw AppError.database(.rowReadFailed("invalid timestamp value for column \(name)"))
+        }
+        return date
     }
 
     public func bool(_ name: String) -> Bool {

@@ -8,10 +8,12 @@ public struct StockMovementSheet: View {
 
     @State private var type: InventoryItem.MovementType = .stockIn
     @State private var quantity: String = "0"
+    @State private var selectedUnit: String = ""
     @State private var rate: String = "0.00"
     @State private var date: Date = Date()
     @State private var notes: String = ""
     @State private var canSave: Bool = false
+    @State private var item: InventoryItem?
 
     public init(itemId: InventoryItem.ID) {
         self.itemId = itemId
@@ -34,14 +36,24 @@ public struct StockMovementSheet: View {
                     }
                 }
                 DatePicker("Date", selection: $date, displayedComponents: .date)
+                if let item {
+                    Picker("Unit", selection: $selectedUnit) {
+                        Text(item.unit).tag(item.unit)
+                        if let alternateUnit = item.alternateUnit {
+                            Text(alternateUnit).tag(alternateUnit)
+                        }
+                    }
+                }
                 TextField("Quantity", text: $quantity)
                 MoneyTextField(label: "Rate (₹)", text: $rate)
                 TextField("Notes (optional)", text: $notes, axis: .vertical)
                     .lineLimit(2...4)
             }
             .formStyle(.grouped)
+            .onAppear { loadItem() }
             .onChange(of: quantity) { _, _ in refresh() }
             .onChange(of: rate) { _, _ in refresh() }
+            .onChange(of: selectedUnit) { _, _ in refresh() }
             Divider()
             HStack {
                 Spacer()
@@ -57,18 +69,30 @@ public struct StockMovementSheet: View {
     }
 
     private func refresh() {
-        let q = Int64(quantity) ?? 0
+        let q = try? ExactQuantity.parse(decimal: quantity)
         let r = Currency.parseRupeeInput(rate) ?? 0
-        canSave = q > 0 && r >= 0
+        canSave = q != nil && !(q?.isZero ?? true) && r >= 0
+    }
+
+    private func loadItem() {
+        guard let ctx = env.companyContext else { return }
+        item = try? InventoryService(db: ctx.database, companyId: ctx.companyId).findItem(itemId)
+        selectedUnit = item?.unit ?? ""
+        refresh()
     }
 
     private func save() {
         guard let ctx = env.companyContext else { return }
+        guard let parsedQuantity = try? ExactQuantity.parse(decimal: quantity) else {
+            env.showError(.validation(.init(code: .stockMovementQuantityZero, field: "quantity", message: "Enter a valid quantity.")))
+            return
+        }
         do {
             try InventoryService(db: ctx.database, companyId: ctx.companyId).recordMovement(
                 itemId: itemId, date: date, type: type,
-                quantity: Int64(quantity) ?? 0,
+                quantity: parsedQuantity,
                 ratePaise: Currency.parseRupeeInput(rate) ?? 0,
+                enteredUnit: selectedUnit.isEmpty ? nil : selectedUnit,
                 notes: notes.isEmpty ? nil : notes
             )
             env.showSuccess("Movement recorded.")

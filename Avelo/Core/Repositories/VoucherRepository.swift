@@ -25,6 +25,7 @@ public struct VoucherRepository: Sendable {
         public var searchText: String?
         public var onlyReversed: Bool
         public var onlyUnreversed: Bool
+        public var includeCancelled: Bool
         public var limit: Int
         public var offset: Int
 
@@ -38,6 +39,7 @@ public struct VoucherRepository: Sendable {
                     searchText: String? = nil,
                     onlyReversed: Bool = false,
                     onlyUnreversed: Bool = false,
+                    includeCancelled: Bool = true,
                     limit: Int = 200,
                     offset: Int = 0) {
             self.companyId = companyId
@@ -50,6 +52,7 @@ public struct VoucherRepository: Sendable {
             self.searchText = searchText
             self.onlyReversed = onlyReversed
             self.onlyUnreversed = onlyUnreversed
+            self.includeCancelled = includeCancelled
             self.limit = limit
             self.offset = offset
         }
@@ -120,6 +123,9 @@ public struct VoucherRepository: Sendable {
         if filter.onlyUnreversed {
             sql += " AND v.is_reversal = 0"
         }
+        if !filter.includeCancelled {
+            sql += " AND v.status != 'cancelled'"
+        }
         return (sql, bind)
     }
 
@@ -128,8 +134,9 @@ public struct VoucherRepository: Sendable {
             """
             INSERT INTO avelo_vouchers
             (id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
-             narration, is_reversal, reversal_of_id, is_posted, total_paise, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             narration, status, is_reversal, reversal_of_id, cancelled_at, cancelled_by, cancellation_reason,
+             cancellation_voucher_id, is_posted, total_paise, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(voucher.id.uuidString),
@@ -140,8 +147,13 @@ public struct VoucherRepository: Sendable {
                 .date(voucher.date),
                 .optionalText(voucher.partyAccountId?.uuidString),
                 .text(voucher.narration),
+                .text(voucher.status.rawValue),
                 .bool(voucher.isReversal),
                 .optionalText(voucher.reversalOfId?.uuidString),
+                .optionalTimestamp(voucher.cancelledAt),
+                .optionalText(voucher.cancelledBy),
+                .optionalText(voucher.cancellationReason),
+                .optionalText(voucher.cancellationVoucherId?.uuidString),
                 .bool(voucher.isPosted),
                 .integer(voucher.totalPaise),
                 .timestamp(voucher.createdAt),
@@ -168,6 +180,26 @@ public struct VoucherRepository: Sendable {
         )
     }
 
+    public func markCancelled(_ voucher: Voucher) throws {
+        try db.execute(
+            """
+            UPDATE avelo_vouchers SET
+                status = ?, cancelled_at = ?, cancelled_by = ?, cancellation_reason = ?,
+                cancellation_voucher_id = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            [
+                .text(voucher.status.rawValue),
+                .optionalTimestamp(voucher.cancelledAt),
+                .optionalText(voucher.cancelledBy),
+                .optionalText(voucher.cancellationReason),
+                .optionalText(voucher.cancellationVoucherId?.uuidString),
+                .timestamp(voucher.updatedAt),
+                .text(voucher.id.uuidString)
+            ]
+        )
+    }
+
     public func markReversal(originalId: Voucher.ID, reversalId: Voucher.ID) throws {
         try db.execute(
             "UPDATE avelo_vouchers SET reversal_of_id = ? WHERE id = ?",
@@ -185,32 +217,38 @@ public struct VoucherRepository: Sendable {
 
     static let selectAllSQL: String = """
         SELECT v.id, v.company_id, v.financial_year_id, v.voucher_type_code, v.number, v.date, v.party_account_id,
-               v.narration, v.is_reversal, v.reversal_of_id, v.is_posted, v.total_paise, v.created_at, v.updated_at
+               v.narration, v.status, v.is_reversal, v.reversal_of_id, v.cancelled_at, v.cancelled_by,
+               v.cancellation_reason, v.cancellation_voucher_id, v.is_posted, v.total_paise, v.created_at, v.updated_at
         FROM avelo_vouchers v
         LEFT JOIN avelo_accounts a ON a.id = v.party_account_id
     """
 
     static func rowToVoucher(_ r: Row) throws -> Voucher {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_vouchers.id")
-        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_vouchers.company_id")
-        let fyId = try UUIDParsing.required(r.text("financial_year_id"), field: "avelo_vouchers.financial_year_id")
-        let codeRaw = r.text("voucher_type_code")
-        let code = VoucherType.Code(rawValue: codeRaw) ?? .journal
-        let party = try UUIDParsing.optional(r.optionalText("party_account_id"), field: "avelo_vouchers.party_account_id")
-        let reversalOf = try UUIDParsing.optional(r.optionalText("reversal_of_id"), field: "avelo_vouchers.reversal_of_id")
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_vouchers.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_vouchers.company_id")
+        let fyId = try UUIDParsing.required(r.requiredText("financial_year_id"), field: "avelo_vouchers.financial_year_id")
+        let code: VoucherType.Code = try r.enumValue("voucher_type_code")
+        let party = try UUIDParsing.optional(try r.checkedOptionalText("party_account_id"), field: "avelo_vouchers.party_account_id")
+        let reversalOf = try UUIDParsing.optional(try r.checkedOptionalText("reversal_of_id"), field: "avelo_vouchers.reversal_of_id")
+        let cancellationVoucherId = try UUIDParsing.optional(try r.checkedOptionalText("cancellation_voucher_id"), field: "avelo_vouchers.cancellation_voucher_id")
         return Voucher(
             id: id,
             companyId: companyId,
             financialYearId: fyId,
             voucherTypeCode: code,
-            number: r.text("number"),
-            date: r.date("date"),
+            number: try r.requiredText("number"),
+            date: try r.requiredDate("date"),
             partyAccountId: party,
-            narration: r.text("narration"),
-            isReversal: r.bool("is_reversal"),
+            narration: try r.requiredText("narration"),
+            status: try r.enumValue("status"),
+            isReversal: try r.requiredBool("is_reversal"),
             reversalOfId: reversalOf,
-            isPosted: r.bool("is_posted"),
-            totalPaise: r.int("total_paise"),
+            cancelledAt: try r.optionalTimestamp("cancelled_at"),
+            cancelledBy: try r.checkedOptionalText("cancelled_by"),
+            cancellationReason: try r.checkedOptionalText("cancellation_reason"),
+            cancellationVoucherId: cancellationVoucherId,
+            isPosted: try r.requiredBool("is_posted"),
+            totalPaise: try r.requiredInt("total_paise"),
             createdAt: try r.timestamp("created_at"),
             updatedAt: try r.timestamp("updated_at")
         )

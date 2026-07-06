@@ -49,6 +49,14 @@ public final class BankReconciliationService: Sendable {
 
     public func importStatement(accountId: Account.ID,
                                 entries: [StatementEntry]) throws {
+        let bankAccount = try requireReconcilableAccount(accountId)
+        let fiscalLockChecker = FiscalLockChecker(db: db)
+        for entry in entries where entry.companyId != companyId || entry.accountId != bankAccount.id {
+            throw AppError.validation(.init(code: .voucherAccountInactive, field: "accountId", message: "Imported bank statement lines must belong to the active company and selected bank account."))
+        }
+        for entry in entries {
+            _ = try fiscalLockChecker.assertDateOpen(entry.date, companyId: companyId, mutationLabel: "Bank statement date")
+        }
         try db.write { tx in
             let repo = BankReconciliationRepository(db: tx)
             let importBatchId = UUID()
@@ -69,6 +77,7 @@ public final class BankReconciliationService: Sendable {
                           asOf: Date,
                           tolerancePaise: Int64 = 0,
                           dateToleranceDays: Int = 3) throws -> ReconciliationResult {
+        _ = try requireReconcilableAccount(accountId)
         let bookBalance: Int64
         let statement: [StatementEntry]
         let vouchers: [BankReconciliationRepository.VoucherCandidate]
@@ -122,10 +131,32 @@ public final class BankReconciliationService: Sendable {
     }
 
     public func clearStatementLine(id: UUID) throws {
+        let line: (companyId: Company.ID, statementDate: Date)? = try db.queryOne(
+            "SELECT company_id, statement_date FROM avelo_bank_statement_lines WHERE id = ?",
+            bind: [.text(id.uuidString)]
+        ) {
+            (
+                companyId: try UUIDParsing.required($0.text("company_id"), field: "avelo_bank_statement_lines.company_id"),
+                statementDate: $0.date("statement_date")
+            )
+        }
+        guard let line, line.companyId == companyId else {
+            throw AppError.notFound("Bank statement line")
+        }
+        _ = try FiscalLockChecker(db: db).assertDateOpen(line.statementDate, companyId: companyId, mutationLabel: "Bank statement date")
         try db.write { tx in
             let repo = BankReconciliationRepository(db: tx)
             try repo.clearStatementLine(id: id)
         }
+    }
+
+    private func requireReconcilableAccount(_ accountId: Account.ID) throws -> Account {
+        guard let account = try AccountRepository(db: db).findById(accountId),
+              account.companyId == companyId,
+              account.isActive else {
+            throw AppError.notFound("Account")
+        }
+        return account
     }
 
     private static func isWithinDateTolerance(_ lhs: Date, _ rhs: Date, days: Int) -> Bool {
@@ -134,6 +165,14 @@ public final class BankReconciliationService: Sendable {
         let start = calendar.startOfDay(for: lhs)
         let end = calendar.startOfDay(for: rhs)
         let delta = calendar.dateComponents([.day], from: start, to: end).day ?? Int.max
-        return abs(delta) <= allowedDays
+        return isDeltaWithinTolerance(deltaDays: delta, allowedDays: allowedDays)
+    }
+
+    static func isDeltaWithinTolerance(deltaDays: Int, allowedDays: Int) -> Bool {
+        let clampedTolerance = max(0, allowedDays)
+        if deltaDays >= 0 {
+            return deltaDays <= clampedTolerance
+        }
+        return deltaDays >= -clampedTolerance
     }
 }

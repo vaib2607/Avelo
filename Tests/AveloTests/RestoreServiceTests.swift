@@ -204,7 +204,7 @@ final class RestoreServiceTests: XCTestCase {
             "SELECT COUNT(*) FROM avelo_accounts WHERE company_id = ?",
             bind: [.text(targetCompanyId.uuidString)]
         ) { $0.int(0) }
-        XCTAssertEqual(accountCount, 4)
+        XCTAssertEqual(accountCount, 7)
 
         let auditEvents = try AuditRepository(db: tc.db).list(filter: .init(companyId: targetCompanyId))
         XCTAssertEqual(auditEvents.count, 1)
@@ -299,6 +299,62 @@ final class RestoreServiceTests: XCTestCase {
             filter: .init(companyId: restored.id, action: .backupImported)
         )
         XCTAssertEqual(restoreAudit.count, 1)
+    }
+
+    func testRestoreRejectsBackupWithOverlappingFinancialYears() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let backedUp = try await makeBackedUpCompany(root: sourceRoot, name: "Overlap Backup Co")
+        let sourceEntries = try await backedUp.manager.listCompanies()
+        let sourceEntry = try XCTUnwrap(sourceEntries.first)
+        let sourceURL = await backedUp.manager.companiesDirectory.appendingPathComponent(sourceEntry.sqliteFileName)
+        let sourceDb = try SQLiteDatabase(path: sourceURL.path, key: try RecoveryKeyCodec.decode(backedUp.recoveryKey))
+        defer { sourceDb.close() }
+
+        try sourceDb.execute("DROP TRIGGER IF EXISTS trg_avelo_fy_no_overlap")
+        try sourceDb.execute("DROP TRIGGER IF EXISTS trg_avelo_fy_no_overlap_update")
+        try sourceDb.execute(
+            """
+            INSERT INTO avelo_financial_years
+            (id, company_id, label, start_date, end_date, books_begin_date, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                .text(UUID().uuidString),
+                .text(backedUp.company.id.uuidString),
+                .text("Corrupt Overlap"),
+                .date(DateFormatters.parseDate("2024-10-01")!),
+                .date(DateFormatters.parseDate("2025-09-30")!),
+                .date(DateFormatters.parseDate("2024-10-01")!),
+                .timestamp(Date())
+            ]
+        )
+
+        _ = try await BackupService(manager: backedUp.manager).export(
+            companyId: backedUp.company.id,
+            companyName: backedUp.company.name,
+            to: backedUp.backupURL
+        )
+
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
+        do {
+            _ = try await RestoreService(manager: targetManager).restore(from: backedUp.backupURL, recoveryKey: backedUp.recoveryKey)
+            XCTFail("Expected overlapping financial years restore to fail")
+        } catch {
+            guard case AppError.database(.schemaMismatch(let message)) = AppError.wrap(error) else {
+                return XCTFail("Expected schemaMismatch, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("overlapping financial years"))
+            let companies = try await targetManager.listCompanies()
+            XCTAssertTrue(companies.isEmpty)
+        }
     }
 
     func testRestoreReopenSoakPreservesCompanyDataAcrossRepeatedCycles() async throws {

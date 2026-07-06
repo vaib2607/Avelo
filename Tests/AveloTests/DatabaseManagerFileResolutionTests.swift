@@ -125,6 +125,44 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         }
     }
 
+    func testOpenCompanyRejectsTamperedAuditChain() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let keyStore = InMemoryCompanyKeyStore()
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: keyStore)
+        let companyId = UUID()
+        let companyURL = try await manager.createCompanyFile(companyId: companyId)
+
+        let companyKey = try XCTUnwrap(try keyStore.retrieve(companyId: companyId))
+        let db = try SQLiteDatabase(path: companyURL.path, key: companyKey)
+        _ = try TestCompany.seed(into: db, companyId: companyId, companyName: "Tampered Audit Co")
+        let audit = AuditService(db: db, companyId: companyId)
+        try audit.record(action: .accountCreated, entityType: "account", entityId: "A-1", reason: "before tamper")
+        db.close()
+
+        try await manager.registerCompany(
+            CompanyRegistryEntry(id: companyId, name: "Tampered Audit Co", sqliteFileName: companyURL.lastPathComponent)
+        )
+
+        let tamperDB = try SQLiteDatabase(path: companyURL.path, key: companyKey)
+        try tamperDB.execute("DROP TRIGGER IF EXISTS trg_avelo_audit_no_update")
+        try tamperDB.execute("DROP TRIGGER IF EXISTS trg_avelo_audit_no_delete")
+        try tamperDB.execute("UPDATE avelo_audit_events SET reason = 'tampered' WHERE company_id = ?", [.text(companyId.uuidString)])
+        tamperDB.close()
+
+        do {
+            _ = try await manager.openCompany(id: companyId)
+            XCTFail("Expected tampered audit chain to block openCompany")
+        } catch {
+            guard case AppError.businessRule(let message) = AppError.wrap(error) else {
+                return XCTFail("Expected businessRule tamper error, got \(error)")
+            }
+            XCTAssertTrue(message.contains("Audit chain verification failed"))
+        }
+    }
+
     func testBackupExportUsesRegisteredSQLiteFileName() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

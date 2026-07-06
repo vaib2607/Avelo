@@ -33,6 +33,7 @@ public final actor DatabaseManager {
         self.appSupportDirectory = appSupportDirectory
         self.keyStore = keyStore
         self.databaseOpener = databaseOpener
+        AuditChainKeyProvider.registerStore(keyStore)
         let companiesURL = appSupportDirectory.appendingPathComponent("Companies", isDirectory: true)
         self.companiesDirectory = companiesURL
         let registryURL = appSupportDirectory.appendingPathComponent("avelo_registry.sqlite")
@@ -70,11 +71,11 @@ public final actor DatabaseManager {
     public func listCompanies() throws -> [CompanyRegistryEntry] {
         guard let reg = registryDb else { return [] }
         return try reg.query("SELECT id, name, sqlite_file_name, last_opened_at, created_at FROM avelo_registry_companies ORDER BY name COLLATE NOCASE") { row in
-            let lastOpened: Date? = row.optionalText("last_opened_at").flatMap { DateFormatters.parseTimestamp($0) }
+            let lastOpened = try row.optionalTimestamp("last_opened_at")
             return CompanyRegistryEntry(
-                id: try UUIDParsing.required(row.text("id"), field: "avelo_registry_companies.id"),
-                name: row.text("name"),
-                sqliteFileName: row.text("sqlite_file_name"),
+                id: try UUIDParsing.required(row.requiredText("id"), field: "avelo_registry_companies.id"),
+                name: try row.requiredText("name"),
+                sqliteFileName: try row.requiredText("sqlite_file_name"),
                 lastOpenedAt: lastOpened,
                 createdAt: try row.timestamp("created_at")
             )
@@ -146,6 +147,7 @@ public final actor DatabaseManager {
         guard let entry = try RegistryRepository(db: reg).findById(id) else {
             throw AppError.notFound("Registry entry missing for company \(id.uuidString)")
         }
+        try AuditRepository(db: db).verifyIntegrity(companyId: id)
         let handle = CompanyHandle(companyId: id, companyName: entry.name, db: db)
         openHandles[id] = handle
         try touchLastOpened(id: id)

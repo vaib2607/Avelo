@@ -201,6 +201,7 @@ enum DefaultChartOfDefaults {
             .init(code: "INTEREST_RECEIVED",name: "Interest Received",    under: "INDIRECT_INCOME",openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
             .init(code: "PURCHASE",         name: "Purchase",             under: "DIRECT_EXPENSE", openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "DIRECT_EXPENSES",  name: "Direct Expenses",      under: "DIRECT_EXPENSE", openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
+            .init(code: "ROUND_OFF",        name: "Round Off",            under: "INDIRECT_EXPENSE",openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "SALARY_EXPENSE",   name: "Salary Expense",       under: "INDIRECT_EXPENSE",openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "RENT_EXPENSE",     name: "Rent Expense",         under: "INDIRECT_EXPENSE",openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "ELECTRICITY_EXPENSE",name:"Electricity Expense",  under: "INDIRECT_EXPENSE",openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),

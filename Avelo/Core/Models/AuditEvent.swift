@@ -12,6 +12,7 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
     case voucherPosted
     case voucherEdited
     case voucherReversed
+    case voucherCancelled
     case openingBalancePosted
     case stockItemCreated
     case stockItemUpdated
@@ -42,6 +43,7 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
         case .voucherPosted:            return "Voucher posted"
         case .voucherEdited:            return "Voucher edited"
         case .voucherReversed:          return "Voucher reversed"
+        case .voucherCancelled:         return "Voucher cancelled"
         case .openingBalancePosted:     return "Opening balances posted"
         case .stockItemCreated:         return "Stock item created"
         case .stockItemUpdated:         return "Stock item updated"

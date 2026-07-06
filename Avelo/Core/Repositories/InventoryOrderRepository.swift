@@ -74,17 +74,17 @@ public struct InventoryOrderRepository: Sendable {
         sql += " ORDER BY o.expected_date IS NULL, o.expected_date, o.order_date, o.number"
         return try db.query(sql, bind: bind) { row in
             PendingInventoryOrderLine(
-                id: try UUIDParsing.required(row.text("id"), field: "avelo_inventory_order_lines.id"),
-                orderId: try UUIDParsing.required(row.text("order_id"), field: "avelo_inventory_orders.id"),
-                orderType: InventoryOrderType(rawValue: row.text("order_type")) ?? .purchaseOrder,
-                orderNumber: row.text("number"),
-                partyAccountName: row.text("party_name"),
-                itemId: try UUIDParsing.required(row.text("item_id"), field: "avelo_inventory_items.id"),
-                itemName: row.text("item_name"),
-                quantity: row.int("quantity"),
-                fulfilledQuantity: row.int("fulfilled_quantity"),
-                pendingQuantity: row.int("pending_quantity"),
-                expectedDate: row.optionalDate("expected_date")
+                id: try UUIDParsing.required(row.requiredText("id"), field: "avelo_inventory_order_lines.id"),
+                orderId: try UUIDParsing.required(row.requiredText("order_id"), field: "avelo_inventory_orders.id"),
+                orderType: try row.enumValue("order_type"),
+                orderNumber: try row.requiredText("number"),
+                partyAccountName: try row.requiredText("party_name"),
+                itemId: try UUIDParsing.required(row.requiredText("item_id"), field: "avelo_inventory_items.id"),
+                itemName: try row.requiredText("item_name"),
+                quantity: try row.requiredInt("quantity"),
+                fulfilledQuantity: try row.requiredInt("fulfilled_quantity"),
+                pendingQuantity: try row.requiredInt("pending_quantity"),
+                expectedDate: try row.checkedOptionalDate("expected_date")
             )
         }
     }

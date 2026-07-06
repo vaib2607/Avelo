@@ -343,6 +343,27 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertTrue(report.rows.isEmpty)
     }
 
+    func testStockValuationUsesAuthoritativeFifoCostingNotCallerStockOutRate() throws {
+        let tc = try TestCompany.make()
+        let inventory = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try inventory.createItem(code: "FIFO-RPT", name: "FIFO Report Item", unit: "NOS", valuationMethod: .fifo)
+
+        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!, type: .stockIn, quantity: 10, ratePaise: 100)
+        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-02")!, type: .stockIn, quantity: 10, ratePaise: 200)
+        try inventory.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-03")!, type: .stockOut, quantity: 15, ratePaise: 999)
+
+        let report = try ReportService(db: tc.db, companyId: tc.companyId).stockValuation(
+            asOfDate: DateFormatters.parseDate("2024-06-30")!
+        )
+
+        let row = try XCTUnwrap(report.rows.first(where: { $0.itemCode == "FIFO-RPT" }))
+        XCTAssertEqual(row.closingQty.numerator, 5)
+        XCTAssertEqual(row.closingQty.denominator, 1)
+        XCTAssertEqual(row.outValuePaise, 2000)
+        XCTAssertEqual(row.closingValuePaise, 1000)
+        XCTAssertEqual(row.averageCostPaise, 200)
+    }
+
     func testReportDateBoundariesExcludeLaterActivity() throws {
         let tc = try makeSeededCompany()
         try seedActivity(tc)

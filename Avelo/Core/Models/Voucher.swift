@@ -1,5 +1,10 @@
 import Foundation
 
+public enum VoucherStatus: String, Sendable, Codable, Hashable, CaseIterable {
+    case open
+    case cancelled
+}
+
 public struct Voucher: Identifiable, Hashable, Sendable, Codable {
     public typealias ID = UUID
 
@@ -11,8 +16,13 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
     public var date: Date
     public var partyAccountId: Account.ID?
     public var narration: String
+    public var status: VoucherStatus
     public var isReversal: Bool
     public var reversalOfId: ID?
+    public var cancelledAt: Date?
+    public var cancelledBy: String?
+    public var cancellationReason: String?
+    public var cancellationVoucherId: ID?
     public var isPosted: Bool
     public var totalPaise: Int64
     public let createdAt: Date
@@ -26,8 +36,13 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
                 date: Date,
                 partyAccountId: Account.ID? = nil,
                 narration: String = "",
+                status: VoucherStatus = .open,
                 isReversal: Bool = false,
                 reversalOfId: ID? = nil,
+                cancelledAt: Date? = nil,
+                cancelledBy: String? = nil,
+                cancellationReason: String? = nil,
+                cancellationVoucherId: ID? = nil,
                 isPosted: Bool = true,
                 totalPaise: Int64 = 0,
                 createdAt: Date = Date(),
@@ -40,8 +55,13 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
         self.date = date
         self.partyAccountId = partyAccountId
         self.narration = narration
+        self.status = status
         self.isReversal = isReversal
         self.reversalOfId = reversalOfId
+        self.cancelledAt = cancelledAt
+        self.cancelledBy = cancelledBy
+        self.cancellationReason = cancellationReason
+        self.cancellationVoucherId = cancellationVoucherId
         self.isPosted = isPosted
         self.totalPaise = totalPaise
         self.createdAt = createdAt

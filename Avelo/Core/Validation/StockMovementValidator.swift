@@ -6,18 +6,20 @@ public struct StockMovementValidator: Sendable {
         public var itemId: InventoryItem.ID
         public var date: Date
         public var movementType: MovementType
-        public var quantity: Int64
+        public var quantity: ExactQuantity
         public var unitCostPaise: Int64
         public var totalValuePaise: Int64
-        public var currentOnHandQty: Int64
+        public var currentOnHandQty: ExactQuantity
+        public var allowAuthoritativeTotalOverride: Bool
 
         public init(itemId: InventoryItem.ID,
                     date: Date,
                     movementType: MovementType,
-                    quantity: Int64,
+                    quantity: ExactQuantity,
                     unitCostPaise: Int64,
                     totalValuePaise: Int64,
-                    currentOnHandQty: Int64) {
+                    currentOnHandQty: ExactQuantity,
+                    allowAuthoritativeTotalOverride: Bool = false) {
             self.itemId = itemId
             self.date = date
             self.movementType = movementType
@@ -25,6 +27,27 @@ public struct StockMovementValidator: Sendable {
             self.unitCostPaise = unitCostPaise
             self.totalValuePaise = totalValuePaise
             self.currentOnHandQty = currentOnHandQty
+            self.allowAuthoritativeTotalOverride = allowAuthoritativeTotalOverride
+        }
+
+        public init(itemId: InventoryItem.ID,
+                    date: Date,
+                    movementType: MovementType,
+                    quantity: Int64,
+                    unitCostPaise: Int64,
+                    totalValuePaise: Int64,
+                    currentOnHandQty: Int64,
+                    allowAuthoritativeTotalOverride: Bool = false) {
+            self.init(
+                itemId: itemId,
+                date: date,
+                movementType: movementType,
+                quantity: try! ExactQuantity.whole(quantity),
+                unitCostPaise: unitCostPaise,
+                totalValuePaise: totalValuePaise,
+                currentOnHandQty: try! ExactQuantity.whole(currentOnHandQty),
+                allowAuthoritativeTotalOverride: allowAuthoritativeTotalOverride
+            )
         }
     }
 
@@ -33,7 +56,7 @@ public struct StockMovementValidator: Sendable {
     public func validate(_ input: Input) -> ValidationResult {
         var errors: [ValidationError] = []
 
-        if input.quantity <= 0 {
+        if input.quantity.isZero {
             errors.append(ValidationError(
                 code: .stockMovementQuantityZero,
                 field: "quantity",
@@ -51,21 +74,20 @@ public struct StockMovementValidator: Sendable {
 
         let expectedTotal: Int64?
         do {
-            expectedTotal = try CheckedMath.multiply(
-                input.quantity,
-                input.unitCostPaise,
-                context: "validating stock movement total value"
-            )
+            expectedTotal = try input.quantity.multiplied(byUnitCostPaise: input.unitCostPaise, context: "validating stock movement total value")
         } catch {
             expectedTotal = nil
             errors.append(ValidationError(
                 code: .arithmeticOverflow,
                 field: "totalValue",
-                message: "Quantity and unit cost overflow Int64 when multiplied."
+                message: "Quantity and unit cost cannot be represented exactly in paise."
             ))
         }
 
-        if let expectedTotal, expectedTotal != input.totalValuePaise {
+        if input.movementType != .stockOut,
+           !input.allowAuthoritativeTotalOverride,
+           let expectedTotal,
+           expectedTotal != input.totalValuePaise {
             errors.append(ValidationError(
                 code: .stockMovementCostMismatch,
                 field: "totalValue",
@@ -73,11 +95,11 @@ public struct StockMovementValidator: Sendable {
             ))
         }
 
-        if input.movementType == .stockOut && input.quantity > input.currentOnHandQty {
+        if input.movementType == .stockOut && (try? ExactQuantity.compare(input.quantity, input.currentOnHandQty)) == .orderedDescending {
             errors.append(ValidationError(
                 code: .quantityExceedsStock,
                 field: "quantity",
-                message: "Out quantity (\(input.quantity)) exceeds current stock (\(input.currentOnHandQty))."
+                message: "Out quantity (\(input.quantity.displayString)) exceeds current stock (\(input.currentOnHandQty.displayString))."
             ))
         }
 

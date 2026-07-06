@@ -76,7 +76,15 @@ Hidden entry-point rule:
 9. `AVL-P0-002` — make voucher numbering gap-free under contention and rollback.
 10. `AVL-P0-012` — establish anchored tamper evidence required by cancellation and repair.
 
-Next after these prerequisites: `AVL-P0-019`, `AVL-P0-001`, `AVL-P0-005`, and `AVL-P0-032`.
+Execution queue alignment:
+
+- `Docs/Avelo_Execution_Checklist.md` is the remaining-work queue and groups only open `AVL-*` items into dependency waves.
+- Checklist state meanings are:
+  - `Implementation remaining`
+  - `Proof remaining`
+  - `Manual acceptance remaining`
+- The current Wave `P0-A` proof-closure queue is: `AVL-P0-012`, `AVL-P0-011`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-030`, `AVL-P0-027`, and `AVL-P0-002`.
+- The current Wave `P0-B` implementation queue begins with: `AVL-P0-005`, `AVL-P0-006`, `AVL-P0-007`, `AVL-P0-003`, `AVL-P0-004`, and `AVL-P0-009`.
 
 ## Release-Risk Split
 
@@ -94,7 +102,7 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 
 | ID | Status | Depends | Requirement | Proof of done |
 | --- | --- | --- | --- | --- |
-| AVL-P0-001 | Open | None | Deterministic GST round-off ledger for invoice/tax rounding differences. | Golden invoices prove balanced postings and deterministic paise allocation; accountant verifies printed totals. |
+| AVL-P0-001 | Open | None | Deterministic GST round-off ledger for invoice/tax rounding differences, with one authoritative `ROUND_OFF` line derived during posting/edit instead of caller-supplied balancing. | Golden invoices prove balanced postings, deterministic paise allocation, and seeded/migrated `ROUND_OFF` ledger availability; accountant verifies printed totals. |
 | AVL-P0-002 | Open | None | Gap-free voucher numbering under concurrent saves and failed transactions. | Contention and rollback tests prove committed numbers are unique, ordered, and never reused. |
 | AVL-P0-003 | Open | None | Bill-wise FIFO allocation for partial receipts, payments, advances, and on-account amounts. | Golden bill-settlement fixtures reconcile every allocation and outstanding balance. |
 | AVL-P0-004 | Open | AVL-P0-003 | Non-destructive bounced-cheque workflow using linked reversals. | Original cheque/voucher remains immutable; reversal and re-presentation are fully audited. |
@@ -118,14 +126,14 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P0-022 | Open | AVL-P1-008 | GST-compliant invoice/PDF containing every mandatory field and applicable signed QR. | Field matrix and rendered-PDF inspection pass for B2B, B2C, export, note, and RCM cases. |
 | AVL-P0-023 | Open | None | Force Indian accounting calendar semantics in IST regardless of device timezone. | Boundary tests cover midnight, DST device zones, leap days, GST periods, and FY transitions. |
 | AVL-P0-024 | Open | AVL-P0-011 | Net each trial-balance account to one debit or credit closing side. | ₹100 Dr opening plus ₹40 Cr movement reports ₹60 Dr; authoritative fixtures pass per account. |
-| AVL-P0-025 | Open | AVL-P0-023 | Reject overlapping or ambiguous financial years and use deterministic date lookup. | Create/import/restore tests reject overlap and return exactly one FY for every accepted date. |
-| AVL-P0-026 | Open | AVL-P0-025 | Fiscal lock enforcement for vouchers, lines, opening balances, stock, payroll, banking, and every dated mutation, including update-date validation. | Direct SQL, repository, service, restore, and UI attempts all fail closed outside controlled maintenance. |
+| AVL-P0-025 | Open | AVL-P0-023 | Reject overlapping or ambiguous financial years, enforce the rule on FY updates, and use deterministic containing-date lookup that fails closed on corrupt ambiguity. | Create/import/restore tests reject overlap, adjacent accepted years resolve exactly one containing FY, corrupt overlap fixtures fail closed instead of returning `LIMIT 1`, and migrated databases carry both insert/update overlap guards. |
+| AVL-P0-026 | Open | AVL-P0-025 | Fiscal lock enforcement for vouchers, lines, opening balances, stock, payroll, banking, and every dated mutation, including update-date validation and restore-installed trigger coverage for migrated databases. | Direct SQL, repository, service, restore, and UI attempts all fail closed outside controlled maintenance, including stock, payroll, bank, opening-balance, and voucher-date mutation fixtures. |
 | AVL-P0-027 | Open | None | Fail closed on malformed dates, timestamps, enums, missing columns, invalid booleans, and corrupt persisted values. | Corrupt-row fixtures never become epoch dates, Journal, Debit, FIFO, zero, or empty text. |
 | AVL-P0-028 | Open | None | Replace registry `INSERT OR REPLACE` with collision-safe insert/update semantics. | Duplicate name, ID, and filename tests preserve every existing registry row and company file. |
 | AVL-P0-029 | Open | AVL-P0-028, AVL-P0-031 | Atomic company creation across file, Keychain, schema, seed data, and registry with compensating cleanup. | Failure at every stage leaves either one usable company or no file/key/registry residue; `seedDefaults` is honored. |
-| AVL-P0-030 | Open | None | Enforce same-company ownership through composite constraints and service/repository validation. | Adversarial cross-company FY/account/item/employee/voucher references are rejected at every boundary. |
+| AVL-P0-030 | Open | None | Enforce same-company ownership through database constraints/triggers plus service/repository validation. | Adversarial cross-company FY/account/item/employee/voucher/bank/order references are rejected at every boundary. |
 | AVL-P0-031 | Open | None | Make schema-version reads throwing; never interpret an unreadable database as version zero. | Corrupt, locked, wrong-key, and I/O-failure tests stop before any migration mutation. |
-| AVL-P0-032 | Open | AVL-P0-002, AVL-P0-012 | Audit-safe voucher cancellation that preserves the voucher, number, reason, linkage, and history. | Cancelled vouchers remain visible, numbers are not reused, reports apply defined treatment, and deletion is unnecessary. |
+| AVL-P0-032 | Open | AVL-P0-002, AVL-P0-012 | Audit-safe voucher cancellation that preserves the voucher, number, persisted reason/actor/timestamp, linkage, and history. | Cancelled vouchers remain visible, numbers are not reused, reversal linkage and audit evidence persist, reports apply defined treatment, and deletion is unnecessary. |
 
 ### P1 — Fix Before Broad Rollout (44 open)
 

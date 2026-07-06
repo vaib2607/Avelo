@@ -35,13 +35,13 @@ public struct VoucherTemplateRepository: Sendable {
             bind: [.text(companyId.uuidString), .text(name)]
         ) { r in
             return VoucherTemplate(
-                id: try UUIDParsing.required(r.text("id"), field: "avelo_voucher_templates.id"),
-                companyId: try UUIDParsing.required(r.text("company_id"), field: "avelo_voucher_templates.company_id"),
-                name: r.text("name"),
-                voucherTypeCode: VoucherType.Code(rawValue: r.text("voucher_type_code")) ?? .journal,
-                description: r.optionalText("description"),
-                templateLinesJSON: r.text("template_lines_json"),
-                isActive: r.bool("is_active"),
+                id: try UUIDParsing.required(r.requiredText("id"), field: "avelo_voucher_templates.id"),
+                companyId: try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_voucher_templates.company_id"),
+                name: try r.requiredText("name"),
+                voucherTypeCode: try r.enumValue("voucher_type_code"),
+                description: try r.checkedOptionalText("description"),
+                templateLinesJSON: try r.requiredText("template_lines_json"),
+                isActive: try r.requiredBool("is_active"),
                 createdAt: try r.timestamp("created_at")
             )
         }

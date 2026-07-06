@@ -256,7 +256,7 @@ extension ReportRepository {
                 .text(filter.companyId.uuidString)
             ]
         ) { row in
-            let nature = AccountNature(rawValue: row.text("nature")) ?? .expense
+            let nature: AccountNature = try row.enumValue("nature")
             let section: ReportResult.CashFlowRow.Section
             switch nature {
             case .assets:

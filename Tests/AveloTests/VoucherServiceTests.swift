@@ -3,6 +3,14 @@ import XCTest
 
 final class VoucherServiceTests: XCTestCase {
 
+    private func voucherSequenceValue(_ number: String, file: StaticString = #filePath, line: UInt = #line) throws -> Int {
+        guard let suffix = number.split(separator: "/").last, let value = Int(suffix) else {
+            XCTFail("Expected voucher number suffix in \(number)", file: file, line: line)
+            return -1
+        }
+        return value
+    }
+
     private func movement(_ db: SQLiteDatabase, account: Account.ID) throws -> (dr: Int64, cr: Int64) {
         let r = try db.queryOne(
             """
@@ -131,6 +139,111 @@ final class VoucherServiceTests: XCTestCase {
         }
     }
 
+    func testSalesVoucherAutoAddsDebitRoundOffForSmallGSTRoundingDifference() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.cashId,
+                narration: "GST rounded invoice",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 11_799, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208"),
+                    .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
+                    .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit)
+                ]
+            ),
+            in: tc.fy
+        ).voucher
+
+        XCTAssertEqual(posted.totalPaise, 11_800)
+        let lines = try svc.lines(for: posted.id)
+        XCTAssertEqual(lines.count, 5)
+        let roundOffLine = try XCTUnwrap(lines.first(where: { $0.accountId == tc.roundOffId }))
+        XCTAssertEqual(roundOffLine.amountPaise, 1)
+        XCTAssertEqual(roundOffLine.side, .debit)
+    }
+
+    func testInvoiceEditRecomputesRoundOffDeterministically() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.cashId,
+                narration: "Rounded invoice",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 11_801, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208"),
+                    .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
+                    .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit),
+                    .init(accountId: tc.roundOffId, amountPaise: 99, side: .debit)
+                ]
+            ),
+            in: tc.fy
+        ).voucher
+
+        let edited = try svc.edit(
+            posted.id,
+            with: VoucherDraft(
+                mode: .edit(originalVoucherId: posted.id),
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-02")!,
+                partyAccountId: tc.cashId,
+                narration: "Rounded invoice edited",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 11_798, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208"),
+                    .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
+                    .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit),
+                    .init(accountId: tc.roundOffId, amountPaise: 77, side: .credit)
+                ]
+            ),
+            in: tc.fy
+        )
+
+        XCTAssertEqual(edited.totalPaise, 11_800)
+        let lines = try svc.lines(for: edited.id)
+        let roundOffLines = lines.filter { $0.accountId == tc.roundOffId }
+        XCTAssertEqual(roundOffLines.count, 1)
+        XCTAssertEqual(roundOffLines.first?.amountPaise, 2)
+        XCTAssertEqual(roundOffLines.first?.side, .debit)
+    }
+
+    func testNonGSTVoucherMismatchStillThrowsWithoutRoundOff() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        XCTAssertThrowsError(
+            try svc.post(
+                draft: VoucherDraft(
+                    mode: .create,
+                    voucherTypeCode: .sales,
+                    date: DateFormatters.parseDate("2024-06-01")!,
+                    partyAccountId: tc.cashId,
+                    narration: "No GST lines",
+                    lines: [
+                        .init(accountId: tc.cashId, amountPaise: 10_001, side: .debit),
+                        .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208")
+                    ]
+                ),
+                in: tc.fy
+            )
+        ) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected validation error, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .voucherDebitCreditMismatch)
+        }
+    }
+
     func testReverseNetsAccountsToZeroMovement() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -175,6 +288,145 @@ final class VoucherServiceTests: XCTestCase {
         ]), in: tc.fy).voucher.number
 
         XCTAssertNotEqual(first, second)
+    }
+
+    func testFailedPostDoesNotConsumeVoucherNumber() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let first = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy).voucher.number
+
+        XCTAssertThrowsError(try svc.post(draft: tc.draft(on: "2024-06-02", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 40000, .credit)
+        ]), in: tc.fy))
+
+        let second = try svc.post(draft: tc.draft(on: "2024-06-03", lines: [
+            tc.line(tc.cashId, 60000, .debit),
+            tc.line(tc.salesId, 60000, .credit)
+        ]), in: tc.fy).voucher.number
+
+        XCTAssertEqual(try voucherSequenceValue(first), 1)
+        XCTAssertEqual(try voucherSequenceValue(second), 2)
+    }
+
+    func testFailedBatchChunkDoesNotAdvanceVoucherNumbers() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        var drafts = (0..<500).map { i in
+            tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1000 + Int64(i), .debit),
+                tc.line(tc.salesId, 1000 + Int64(i), .credit)
+            ])
+        }
+        drafts.append(contentsOf: (0..<499).map { i in
+            tc.draft(on: "2024-06-02", lines: [
+                tc.line(tc.cashId, 2000 + Int64(i), .debit),
+                tc.line(tc.salesId, 2000 + Int64(i), .credit)
+            ])
+        })
+        drafts.append(
+            tc.draft(on: "2024-06-03", lines: [
+                tc.line(tc.cashId, 1000, .debit),
+                tc.line(tc.salesId, 900, .credit)
+            ])
+        )
+
+        XCTAssertThrowsError(try svc.postBatch(drafts, in: tc.fy))
+
+        let next = try svc.post(draft: tc.draft(on: "2024-06-04", lines: [
+            tc.line(tc.cashId, 70000, .debit),
+            tc.line(tc.salesId, 70000, .credit)
+        ]), in: tc.fy).voucher.number
+
+        XCTAssertEqual(try voucherSequenceValue(next), 501)
+    }
+
+    func testConcurrentPostsAllocateGapFreeSequentialVoucherNumbers() throws {
+        let fixture = try TestCompany.makeOnDisk()
+        defer {
+            fixture.fixture.db.close()
+            try? FileManager.default.removeItem(at: fixture.cleanupURL)
+        }
+
+        let dbURL = fixture.cleanupURL.appendingPathComponent("company.sqlite")
+        let extraDbs = try (0..<3).map { _ in try SQLiteDatabase(path: dbURL.path) }
+        defer { extraDbs.forEach { $0.close() } }
+
+        let services = [VoucherService(db: fixture.fixture.db, companyId: fixture.fixture.companyId)] +
+            extraDbs.map { VoucherService(db: $0, companyId: fixture.fixture.companyId) }
+
+        let lock = NSLock()
+        var numbers: [String] = []
+        var errors: [Error] = []
+        let group = DispatchGroup()
+        let queue = DispatchQueue(label: "voucher-number-concurrency", attributes: .concurrent)
+
+        for i in 0..<20 {
+            group.enter()
+            queue.async {
+                defer { group.leave() }
+                do {
+                    let service = services[i % services.count]
+                    let number = try service.post(
+                        draft: fixture.fixture.draft(on: "2024-06-01", narration: "Concurrent \(i)", lines: [
+                            fixture.fixture.line(fixture.fixture.cashId, 10_000 + Int64(i), .debit),
+                            fixture.fixture.line(fixture.fixture.salesId, 10_000 + Int64(i), .credit)
+                        ]),
+                        in: fixture.fixture.fy
+                    ).voucher.number
+                    lock.lock()
+                    numbers.append(number)
+                    lock.unlock()
+                } catch {
+                    lock.lock()
+                    errors.append(error)
+                    lock.unlock()
+                }
+            }
+        }
+
+        group.wait()
+        XCTAssertTrue(errors.isEmpty, "Concurrent post errors: \(errors)")
+
+        let sequenceValues = try numbers.map { try voucherSequenceValue($0) }.sorted()
+        XCTAssertEqual(sequenceValues, Array(1...20))
+    }
+
+    func testSeededChartIncludesRoundOffLedger() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        try MigrationRunner().runMigrations(on: db)
+
+        let companyId = UUID()
+        let timestamp = DateFormatters.formatIsoTimestamp(Date())
+        try db.execute(
+            "INSERT INTO avelo_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            [.text(companyId.uuidString), .text("Seed Test"), .text(timestamp), .text(timestamp)]
+        )
+        let fyId = UUID()
+        let start = DateFormatters.parseDate("2024-04-01")!
+        let end = DateFormatters.parseDate("2025-03-31")!
+        try db.execute(
+            """
+            INSERT INTO avelo_financial_years
+            (id, company_id, label, start_date, end_date, books_begin_date, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [.text(fyId.uuidString), .text(companyId.uuidString), .text("2024-25"), .date(start), .date(end), .date(start), .text(timestamp)]
+        )
+
+        try SeedLoader().loadDefaults(
+            into: db,
+            companyId: companyId,
+            financialYearId: fyId
+        )
+
+        let roundOff = try AccountRepository(db: db).findByCode("ROUND_OFF", companyId: companyId)
+        XCTAssertNotNil(roundOff)
     }
 
     func testWorkflowInputsAreDeferredByFrozenSchema() throws {
@@ -353,6 +605,81 @@ final class VoucherServiceTests: XCTestCase {
             }
             XCTAssertTrue(message.contains("already been reversed"))
         }
+    }
+
+    func testCancelMarksVoucherCancelledAndCreatesLinkedReversal() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy)
+
+        let cancelled = try svc.cancel(posted.voucher.id, reason: "duplicate entry", actor: "tester")
+        XCTAssertEqual(cancelled.status, .cancelled)
+        XCTAssertEqual(cancelled.cancellationReason, "duplicate entry")
+        XCTAssertEqual(cancelled.cancelledBy, "tester")
+        XCTAssertNotNil(cancelled.cancelledAt)
+        XCTAssertNotNil(cancelled.cancellationVoucherId)
+
+        let persisted = try XCTUnwrap(svc.findById(posted.voucher.id))
+        XCTAssertEqual(persisted.status, .cancelled)
+        XCTAssertEqual(persisted.number, posted.voucher.number)
+        XCTAssertEqual(persisted.cancellationVoucherId, cancelled.cancellationVoucherId)
+
+        let reversal = try XCTUnwrap(svc.findById(XCTUnwrap(cancelled.cancellationVoucherId)))
+        XCTAssertTrue(reversal.isReversal)
+        XCTAssertEqual(reversal.reversalOfId, posted.voucher.id)
+
+        let cash = try movement(tc.db, account: tc.cashId)
+        let sales = try movement(tc.db, account: tc.salesId)
+        XCTAssertEqual(cash.dr - cash.cr, 0)
+        XCTAssertEqual(sales.dr - sales.cr, 0)
+    }
+
+    func testCancelledVoucherCannotBeEditedOrCancelledAgain() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy)
+
+        _ = try svc.cancel(posted.voucher.id, reason: "void")
+
+        XCTAssertThrowsError(try svc.edit(posted.voucher.id, with: tc.draft(on: "2024-06-02", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy)) { error in
+            guard case AppError.businessRule(let message) = error else {
+                return XCTFail("Expected businessRule, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("cancelled"))
+        }
+
+        XCTAssertThrowsError(try svc.cancel(posted.voucher.id, reason: "again")) { error in
+            guard case AppError.businessRule(let message) = error else {
+                return XCTFail("Expected businessRule, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("already been cancelled"))
+        }
+    }
+
+    func testCancelledVoucherNumberIsNotReusedByNextPost() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let first = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy)
+        _ = try svc.cancel(first.voucher.id, reason: "void")
+
+        let second = try svc.post(draft: tc.draft(on: "2024-06-02", lines: [
+            tc.line(tc.cashId, 60000, .debit),
+            tc.line(tc.salesId, 60000, .credit)
+        ]), in: tc.fy)
+
+        XCTAssertNotEqual(first.voucher.number, second.voucher.number)
     }
 
     func testVoucherDeleteDoesNotCascadeLedgerLinesSilently() throws {

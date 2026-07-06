@@ -18,7 +18,15 @@ public struct MigrationRunner: Sendable {
         MigrationV001(),
         MigrationV002(),
         MigrationV003(),
-        MigrationV004()
+        MigrationV004(),
+        MigrationV005(),
+        MigrationV006(),
+        MigrationV007(),
+        MigrationV008(),
+        MigrationV009(),
+        MigrationV010(),
+        MigrationV011(),
+        MigrationV012()
     ]
 
     public func runMigrations(on db: SQLiteDatabase) throws {

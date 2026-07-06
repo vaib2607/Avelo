@@ -8,6 +8,8 @@ public struct NewItemSheet: View {
     @State private var code: String = ""
     @State private var name: String = ""
     @State private var unit: String = "NOS"
+    @State private var alternateUnit: String = ""
+    @State private var baseUnitsPerAlternateUnit: String = ""
     @State private var valuationMethod: ValuationMethod = .fifo
     @State private var canSave: Bool = false
 
@@ -26,7 +28,9 @@ public struct NewItemSheet: View {
             Form {
                 TextField("Code *", text: $code)
                 TextField("Name *", text: $name)
-                TextField("Unit", text: $unit)
+                TextField("Base Unit", text: $unit)
+                TextField("Alternate Unit (optional)", text: $alternateUnit)
+                TextField("Base Units Per Alternate Unit", text: $baseUnitsPerAlternateUnit)
                 Picker("Valuation", selection: $valuationMethod) {
                     ForEach(ValuationMethod.allCases) { method in
                         Text(method.displayName).tag(method)
@@ -36,6 +40,8 @@ public struct NewItemSheet: View {
             .formStyle(.grouped)
             .onChange(of: code) { _, _ in refresh() }
             .onChange(of: name) { _, _ in refresh() }
+            .onChange(of: alternateUnit) { _, _ in refresh() }
+            .onChange(of: baseUnitsPerAlternateUnit) { _, _ in refresh() }
             Divider()
             HStack {
                 Spacer()
@@ -53,13 +59,29 @@ public struct NewItemSheet: View {
     private func refresh() {
         canSave = !code.trimmingCharacters(in: .whitespaces).isEmpty
             && !name.trimmingCharacters(in: .whitespaces).isEmpty
+            && alternateUomFieldsAreConsistent
+    }
+
+    private var alternateUomFieldsAreConsistent: Bool {
+        let alt = alternateUnit.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ratio = baseUnitsPerAlternateUnit.trimmingCharacters(in: .whitespacesAndNewlines)
+        if alt.isEmpty && ratio.isEmpty { return true }
+        if alt.isEmpty || ratio.isEmpty { return false }
+        return (try? ExactQuantity.parse(decimal: ratio)) != nil
     }
 
     private func save() {
         guard let ctx = env.companyContext else { return }
         do {
+            let alt = alternateUnit.trimmingCharacters(in: .whitespacesAndNewlines)
+            let ratio = baseUnitsPerAlternateUnit.trimmingCharacters(in: .whitespacesAndNewlines)
             _ = try InventoryService(db: ctx.database, companyId: ctx.companyId).createItem(
-                code: code, name: name, unit: unit, valuationMethod: valuationMethod
+                code: code,
+                name: name,
+                unit: unit,
+                alternateUnit: alt.isEmpty ? nil : alt,
+                baseUnitsPerAlternateUnit: ratio.isEmpty ? nil : try ExactQuantity.parse(decimal: ratio),
+                valuationMethod: valuationMethod
             )
             env.showSuccess("Item created.")
             router.presentedSheet = nil

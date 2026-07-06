@@ -43,9 +43,24 @@ public struct RestoreService: Sendable {
         "trg_avelo_voucher_fy_locked_insert",
         "trg_avelo_voucher_fy_locked_update",
         "trg_avelo_voucher_fy_locked_delete",
+        "trg_avelo_voucher_date_in_fy_update",
         "trg_avelo_lines_fy_locked_insert",
         "trg_avelo_lines_fy_locked_update",
-        "trg_avelo_lines_fy_locked_delete"
+        "trg_avelo_lines_fy_locked_delete",
+        "trg_avelo_stock_movements_fy_locked_insert",
+        "trg_avelo_stock_movements_fy_locked_update",
+        "trg_avelo_stock_movements_fy_locked_delete",
+        "trg_avelo_payroll_entries_fy_locked_insert",
+        "trg_avelo_payroll_entries_fy_locked_update",
+        "trg_avelo_payroll_entries_fy_locked_delete",
+        "trg_avelo_bank_statement_lines_fy_locked_insert",
+        "trg_avelo_bank_statement_lines_fy_locked_update",
+        "trg_avelo_bank_statement_lines_fy_locked_delete",
+        "trg_avelo_bank_reconciliations_fy_locked_insert",
+        "trg_avelo_bank_reconciliations_fy_locked_update",
+        "trg_avelo_bank_reconciliations_fy_locked_delete",
+        "trg_avelo_accounts_locked_opening_insert",
+        "trg_avelo_accounts_locked_opening_update"
     ]
     private static let lockedFinancialYearTriggerSQL: [String] = [
         """
@@ -60,8 +75,23 @@ public struct RestoreService: Sendable {
         CREATE TRIGGER trg_avelo_voucher_fy_locked_update
         BEFORE UPDATE ON avelo_vouchers
         WHEN (SELECT is_locked FROM avelo_financial_years WHERE id = OLD.financial_year_id) = 1
+          OR (SELECT is_locked FROM avelo_financial_years WHERE id = NEW.financial_year_id) = 1
         BEGIN
             SELECT RAISE(ABORT, 'Financial year is locked; voucher edits are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_voucher_date_in_fy_update
+        BEFORE UPDATE ON avelo_vouchers
+        FOR EACH ROW
+        BEGIN
+            SELECT RAISE(ABORT, 'Voucher date is outside its financial year')
+            WHERE NOT EXISTS (
+                SELECT 1 FROM avelo_financial_years fy
+                WHERE fy.id = NEW.financial_year_id
+                  AND fy.company_id = NEW.company_id
+                  AND NEW.date BETWEEN fy.start_date AND fy.end_date
+            );
         END;
         """,
         """
@@ -104,8 +134,195 @@ public struct RestoreService: Sendable {
         BEGIN
             SELECT RAISE(ABORT, 'Financial year is locked');
         END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_stock_movements_fy_locked_insert
+        BEFORE INSERT ON avelo_stock_movements
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.is_locked = 1
+              AND NEW.date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; stock movements are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_stock_movements_fy_locked_update
+        BEFORE UPDATE ON avelo_stock_movements
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = OLD.company_id
+              AND fy.is_locked = 1
+              AND OLD.date BETWEEN fy.start_date AND fy.end_date
+        ) OR EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.is_locked = 1
+              AND NEW.date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; stock movement edits are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_stock_movements_fy_locked_delete
+        BEFORE DELETE ON avelo_stock_movements
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = OLD.company_id
+              AND fy.is_locked = 1
+              AND OLD.date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; stock movement deletes are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_payroll_entries_fy_locked_insert
+        BEFORE INSERT ON avelo_payroll_entries
+        WHEN (SELECT is_locked FROM avelo_financial_years WHERE id = NEW.financial_year_id) = 1
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; payroll entries are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_payroll_entries_fy_locked_update
+        BEFORE UPDATE ON avelo_payroll_entries
+        WHEN (SELECT is_locked FROM avelo_financial_years WHERE id = OLD.financial_year_id) = 1
+          OR (SELECT is_locked FROM avelo_financial_years WHERE id = NEW.financial_year_id) = 1
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; payroll entry edits are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_payroll_entries_fy_locked_delete
+        BEFORE DELETE ON avelo_payroll_entries
+        WHEN (SELECT is_locked FROM avelo_financial_years WHERE id = OLD.financial_year_id) = 1
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; payroll entry deletes are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_bank_statement_lines_fy_locked_insert
+        BEFORE INSERT ON avelo_bank_statement_lines
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.is_locked = 1
+              AND NEW.statement_date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; bank statement changes are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_bank_statement_lines_fy_locked_update
+        BEFORE UPDATE ON avelo_bank_statement_lines
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = OLD.company_id
+              AND fy.is_locked = 1
+              AND OLD.statement_date BETWEEN fy.start_date AND fy.end_date
+        ) OR EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.is_locked = 1
+              AND NEW.statement_date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; bank statement edits are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_bank_statement_lines_fy_locked_delete
+        BEFORE DELETE ON avelo_bank_statement_lines
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = OLD.company_id
+              AND fy.is_locked = 1
+              AND OLD.statement_date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; bank statement deletes are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_bank_reconciliations_fy_locked_insert
+        BEFORE INSERT ON avelo_bank_reconciliations
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.is_locked = 1
+              AND NEW.statement_date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; bank reconciliation changes are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_bank_reconciliations_fy_locked_update
+        BEFORE UPDATE ON avelo_bank_reconciliations
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = OLD.company_id
+              AND fy.is_locked = 1
+              AND OLD.statement_date BETWEEN fy.start_date AND fy.end_date
+        ) OR EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.is_locked = 1
+              AND NEW.statement_date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; bank reconciliation edits are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_bank_reconciliations_fy_locked_delete
+        BEFORE DELETE ON avelo_bank_reconciliations
+        WHEN EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = OLD.company_id
+              AND fy.is_locked = 1
+              AND OLD.statement_date BETWEEN fy.start_date AND fy.end_date
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; bank reconciliation deletes are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_accounts_locked_opening_insert
+        BEFORE INSERT ON avelo_accounts
+        WHEN NEW.opening_balance_paise <> 0
+          AND EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.is_locked = 1
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; opening balance changes are not allowed');
+        END;
+        """,
+        """
+        CREATE TRIGGER trg_avelo_accounts_locked_opening_update
+        BEFORE UPDATE ON avelo_accounts
+        WHEN (NEW.opening_balance_paise <> OLD.opening_balance_paise
+              OR NEW.opening_balance_side <> OLD.opening_balance_side)
+          AND EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.is_locked = 1
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Financial year is locked; opening balance changes are not allowed');
+        END;
         """
     ]
+
+    static var lockedFinancialYearTriggerNamesForMigration: [String] { lockedFinancialYearTriggerNames }
+    static var lockedFinancialYearTriggerSQLForMigration: [String] { lockedFinancialYearTriggerSQL }
 
     public init(manager: DatabaseManager) {
         self.manager = manager
@@ -377,6 +594,22 @@ public struct RestoreService: Sendable {
         let foreignKeyIssues = try db.query("PRAGMA foreign_key_check") { _ in true }
         guard foreignKeyIssues.isEmpty else {
             throw AppError.database(.schemaMismatch("Restore validation found foreign-key violations."))
+        }
+        let overlappingYears: [String] = try db.query(
+            """
+            SELECT DISTINCT fy1.label
+            FROM avelo_financial_years fy1
+            JOIN avelo_financial_years fy2
+              ON fy1.company_id = fy2.company_id
+             AND fy1.id <> fy2.id
+             AND NOT (fy1.end_date < fy2.start_date OR fy1.start_date > fy2.end_date)
+            WHERE fy1.company_id = ?
+            ORDER BY fy1.start_date ASC, fy1.created_at ASC, fy1.id ASC
+            """,
+            bind: [.text(companyId.uuidString)]
+        ) { $0.text(0) }
+        guard overlappingYears.isEmpty else {
+            throw AppError.database(.schemaMismatch("Restore validation found overlapping financial years: \(overlappingYears.joined(separator: ", "))."))
         }
     }
 

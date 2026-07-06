@@ -12,11 +12,11 @@ public struct RegistryRepository: Sendable {
         try db.query(
             "SELECT id, name, sqlite_file_name, last_opened_at, created_at FROM avelo_registry_companies ORDER BY name COLLATE NOCASE"
         ) { r in
-            let last = r.optionalText("last_opened_at").flatMap { DateFormatters.parseTimestamp($0) }
+            let last = try r.optionalTimestamp("last_opened_at")
             return CompanyRegistryEntry(
-                id: try UUIDParsing.required(r.text("id"), field: "avelo_registry_companies.id"),
-                name: r.text("name"),
-                sqliteFileName: r.text("sqlite_file_name"),
+                id: try UUIDParsing.required(r.requiredText("id"), field: "avelo_registry_companies.id"),
+                name: try r.requiredText("name"),
+                sqliteFileName: try r.requiredText("sqlite_file_name"),
                 lastOpenedAt: last,
                 createdAt: try r.timestamp("created_at")
             )

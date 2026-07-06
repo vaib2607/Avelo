@@ -309,12 +309,19 @@ CREATE TABLE avelo_audit_events (
     snapshot_before_json TEXT,
     snapshot_after_json TEXT,
     reason TEXT,
+    sequence_number INTEGER NOT NULL,
+    previous_chain_hmac TEXT,
+    chain_hmac TEXT NOT NULL,
     CHECK(length(trim(action)) > 0),
     CHECK(length(trim(entity_type)) > 0),
-    CHECK(length(trim(entity_id)) > 0)
+    CHECK(length(trim(entity_id)) > 0),
+    CHECK(sequence_number > 0),
+    CHECK(previous_chain_hmac IS NULL OR length(previous_chain_hmac) = 64),
+    CHECK(length(chain_hmac) = 64)
 );
 CREATE INDEX idx_avelo_audit_entity ON avelo_audit_events(company_id, entity_type, entity_id);
 CREATE INDEX idx_avelo_audit_time ON avelo_audit_events(company_id, timestamp);
+CREATE UNIQUE INDEX idx_avelo_audit_sequence ON avelo_audit_events(company_id, sequence_number);
 
 CREATE TRIGGER trg_avelo_audit_no_update
 BEFORE UPDATE ON avelo_audit_events

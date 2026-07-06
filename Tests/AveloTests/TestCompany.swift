@@ -4,6 +4,8 @@ import Foundation
 /// Builds a fully-migrated in-memory company database seeded with a small,
 /// balanced chart of accounts for service- and tree-level tests.
 struct TestCompany {
+    static let auditKeyStore = InMemoryCompanyKeyStore()
+
     let db: SQLiteDatabase
     let companyId: Company.ID
     let fy: FinancialYear
@@ -13,12 +15,16 @@ struct TestCompany {
     let incomeGroupId: AccountGroup.ID
     let expenseGroupId: AccountGroup.ID
     let capitalGroupId: AccountGroup.ID
+    let liabilityGroupId: AccountGroup.ID
 
     // Ledgers
     let cashId: Account.ID
     let salesId: Account.ID
     let rentId: Account.ID
     let capitalId: Account.ID
+    let roundOffId: Account.ID
+    let cgstOutputId: Account.ID
+    let sgstOutputId: Account.ID
 
     static func make() throws -> TestCompany {
         let db = try SQLiteDatabase(path: ":memory:")
@@ -40,6 +46,8 @@ struct TestCompany {
     static func seed(into db: SQLiteDatabase,
                      companyId: Company.ID,
                      companyName: String = "Test Co") throws -> TestCompany {
+        AuditChainKeyProvider.registerStore(auditKeyStore)
+        try auditKeyStore.store(key: try auditKeyStore.generateKey(), companyId: companyId)
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO avelo_companies (id, name, is_inventory_enabled, inventory_link_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -100,18 +108,22 @@ struct TestCompany {
 
         let assets = try insertGroup("1000", "Current Assets", "assets", sort: 0)
         let capital = try insertGroup("3000", "Capital Account", "liabilities", sort: 1)
-        let income = try insertGroup("4000", "Sales Accounts", "income", sort: 2)
-        let expense = try insertGroup("5000", "Indirect Expenses", "expense", sort: 3)
+        let liability = try insertGroup("3500", "Duties & Taxes", "liabilities", sort: 2)
+        let income = try insertGroup("4000", "Sales Accounts", "income", sort: 3)
+        let expense = try insertGroup("5000", "Indirect Expenses", "expense", sort: 4)
 
         let cash = try insertAccount("1001", "Cash", group: assets, openingPaise: 10000, side: "debit")
         let capitalAcc = try insertAccount("3001", "Capital", group: capital, openingPaise: 10000, side: "credit")
         let sales = try insertAccount("4001", "Sales", group: income, openingPaise: 0, side: "credit")
         let rent = try insertAccount("5001", "Rent", group: expense, openingPaise: 0, side: "debit")
+        let roundOff = try insertAccount("ROUND_OFF", "Round Off", group: expense, openingPaise: 0, side: "debit")
+        let cgstOutput = try insertAccount("CGST_OUTPUT", "CGST Output", group: liability, openingPaise: 0, side: "credit")
+        let sgstOutput = try insertAccount("SGST_OUTPUT", "SGST Output", group: liability, openingPaise: 0, side: "credit")
 
         return TestCompany(
             db: db, companyId: companyId, fy: fy,
-            assetsGroupId: assets, incomeGroupId: income, expenseGroupId: expense, capitalGroupId: capital,
-            cashId: cash, salesId: sales, rentId: rent, capitalId: capitalAcc
+            assetsGroupId: assets, incomeGroupId: income, expenseGroupId: expense, capitalGroupId: capital, liabilityGroupId: liability,
+            cashId: cash, salesId: sales, rentId: rent, capitalId: capitalAcc, roundOffId: roundOff, cgstOutputId: cgstOutput, sgstOutputId: sgstOutput
         )
     }
 

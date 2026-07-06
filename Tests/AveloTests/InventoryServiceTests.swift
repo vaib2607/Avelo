@@ -21,6 +21,23 @@ final class InventoryServiceTests: XCTestCase {
         XCTAssertTrue(loaded.isActive)
     }
 
+    func testInventoryMasterRoundTripsAlternateUnitDefinitionExactly() throws {
+        let tc = try TestCompany.make()
+        let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(
+            code: "ITEMALT",
+            name: "Tea Pack",
+            unit: "KG",
+            alternateUnit: "BAG",
+            baseUnitsPerAlternateUnit: try ExactQuantity.parse(decimal: "2.5"),
+            valuationMethod: .fifo
+        )
+
+        let loaded = try XCTUnwrap(InventoryRepository(db: tc.db).findItemById(item.id))
+        XCTAssertEqual(loaded.alternateUnit, "BAG")
+        XCTAssertEqual(loaded.baseUnitsPerAlternateUnit?.numerator, 5)
+        XCTAssertEqual(loaded.baseUnitsPerAlternateUnit?.denominator, 2)
+    }
+
     func testInventoryDisabledCompanyRejectsPublicOperations() throws {
         let tc = try TestCompany.make()
         try tc.db.execute(
@@ -82,6 +99,212 @@ final class InventoryServiceTests: XCTestCase {
         let movements = try InventoryRepository(db: tc.db)
             .listMovements(filter: .init(companyId: tc.companyId, itemId: item.id))
         XCTAssertEqual(movements.first?.totalValuePaise, 6666)
+    }
+
+    func testAlternateUnitMovementConvertsToAuthoritativeBaseQuantityExactly() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(
+            code: "BOX001",
+            name: "Bolts",
+            unit: "NOS",
+            alternateUnit: "BOX",
+            baseUnitsPerAlternateUnit: try ExactQuantity.parse(decimal: "12")
+        )
+
+        try service.recordMovement(
+            itemId: item.id,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            type: .stockIn,
+            quantity: try ExactQuantity.parse(decimal: "1.5"),
+            ratePaise: 100,
+            enteredUnit: "BOX"
+        )
+
+        let movement = try XCTUnwrap(
+            InventoryRepository(db: tc.db)
+                .listMovements(filter: .init(companyId: tc.companyId, itemId: item.id))
+                .first
+        )
+        XCTAssertEqual(movement.enteredUnit, "BOX")
+        XCTAssertEqual(movement.quantity.numerator, 18)
+        XCTAssertEqual(movement.quantity.denominator, 1)
+
+        let balance = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id, asOf: DateFormatters.parseDate("2024-06-01")!)
+        XCTAssertEqual(balance.onHandQuantity.numerator, 18)
+        XCTAssertEqual(balance.onHandQuantity.denominator, 1)
+    }
+
+    func testAlternateUnitFractionalConversionPreservesResidualBaseQuantity() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(
+            code: "BAG001",
+            name: "Tea Dust",
+            unit: "KG",
+            alternateUnit: "BAG",
+            baseUnitsPerAlternateUnit: try ExactQuantity.parse(decimal: "2.5")
+        )
+
+        try service.recordMovement(
+            itemId: item.id,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            type: .stockIn,
+            quantity: try ExactQuantity.parse(decimal: "1"),
+            ratePaise: 100,
+            enteredUnit: "BAG"
+        )
+
+        let balance = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id, asOf: DateFormatters.parseDate("2024-06-01")!)
+        XCTAssertEqual(balance.onHandQuantity.numerator, 5)
+        XCTAssertEqual(balance.onHandQuantity.denominator, 2)
+    }
+
+    func testFifoStockOutUsesOldestLayersInsteadOfCallerRate() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(code: "FIFO001", name: "FIFO Item", unit: "NOS", valuationMethod: .fifo)
+
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!, type: .stockIn, quantity: 10, ratePaise: 100)
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-02")!, type: .stockIn, quantity: 10, ratePaise: 200)
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-03")!, type: .stockOut, quantity: 15, ratePaise: 999)
+
+        let movements = try InventoryRepository(db: tc.db).listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+        XCTAssertEqual(movements.count, 3)
+        XCTAssertEqual(movements.last?.totalValuePaise, 2000)
+
+        let balance = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id, asOf: DateFormatters.parseDate("2024-06-03")!)
+        XCTAssertEqual(balance.onHandQuantity.numerator, 5)
+        XCTAssertEqual(balance.onHandValuePaise, 1000)
+    }
+
+    func testWeightedAverageStockOutUsesAggregateAverageInsteadOfCallerRate() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(code: "WA001", name: "WA Item", unit: "NOS", valuationMethod: .weightedAverage)
+
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!, type: .stockIn, quantity: 10, ratePaise: 100)
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-02")!, type: .stockIn, quantity: 10, ratePaise: 200)
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-03")!, type: .stockOut, quantity: 15, ratePaise: 999)
+
+        let movements = try InventoryRepository(db: tc.db).listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+        XCTAssertEqual(movements.last?.totalValuePaise, 2250)
+
+        let balance = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id, asOf: DateFormatters.parseDate("2024-06-03")!)
+        XCTAssertEqual(balance.onHandQuantity.numerator, 5)
+        XCTAssertEqual(balance.onHandValuePaise, 750)
+    }
+
+    func testWeightedAveragePreservesResidualPaiseDeterministically() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(code: "WA002", name: "WA Residual", unit: "NOS", valuationMethod: .weightedAverage)
+
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!, type: .stockIn, quantity: 3, ratePaise: 100)
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-02")!, type: .stockIn, quantity: 2, ratePaise: 101)
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-03")!, type: .stockOut, quantity: 2, ratePaise: 1)
+
+        let movements = try InventoryRepository(db: tc.db).listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+        XCTAssertEqual(movements.last?.totalValuePaise, 200)
+
+        let balance = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id, asOf: DateFormatters.parseDate("2024-06-03")!)
+        XCTAssertEqual(balance.onHandQuantity.numerator, 3)
+        XCTAssertEqual(balance.onHandValuePaise, 302)
+    }
+
+    func testBackdatedInsertRecalculatesDownstreamFifoStockOutPersistedValue() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(code: "FIFO-BD", name: "FIFO Backdated", unit: "NOS", valuationMethod: .fifo)
+
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-02")!, type: .stockIn, quantity: 10, ratePaise: 200)
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-03")!, type: .stockOut, quantity: 5, ratePaise: 999)
+
+        let publication = try service.recordMovement(
+            itemId: item.id,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            type: .stockIn,
+            quantity: 10,
+            ratePaise: 100
+        )
+
+        let movements = try InventoryRepository(db: tc.db).listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+        XCTAssertEqual(movements.count, 3)
+        XCTAssertEqual(movements[2].movementType, .stockOut)
+        XCTAssertEqual(movements[2].totalValuePaise, 500)
+        XCTAssertEqual(publication.affectedMovementIds, [movements[2].id])
+
+        let balance = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id, asOf: DateFormatters.parseDate("2024-06-03")!)
+        XCTAssertEqual(balance.onHandQuantity.numerator, 15)
+        XCTAssertEqual(balance.onHandValuePaise, 2500)
+    }
+
+    func testReverseMovementRepublishesAuthoritativeTotalsAndRestoresStock() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(code: "REV001", name: "Reverse Item", unit: "NOS", valuationMethod: .fifo)
+
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!, type: .stockIn, quantity: 10, ratePaise: 100)
+        _ = try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-02")!, type: .stockOut, quantity: 6, ratePaise: 999)
+        let original = try XCTUnwrap(
+            InventoryRepository(db: tc.db)
+                .listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+                .last
+        )
+
+        let reversal = try service.reverseMovement(original.id, reason: "undo issue")
+
+        XCTAssertEqual(reversal.originalMovement.id, original.id)
+        XCTAssertEqual(reversal.reversalMovement.movementType, .stockIn)
+        XCTAssertEqual(reversal.reversalMovement.totalValuePaise, 600)
+        XCTAssertEqual(reversal.publication.phase, .published)
+
+        let movements = try InventoryRepository(db: tc.db).listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+        XCTAssertEqual(movements.count, 3)
+        XCTAssertEqual(movements.last?.totalValuePaise, 600)
+
+        let balance = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id, asOf: DateFormatters.parseDate("2024-06-02")!)
+        XCTAssertEqual(balance.onHandQuantity.numerator, 10)
+        XCTAssertEqual(balance.onHandValuePaise, 1000)
+    }
+
+    func testReplaceMovementReversesOriginalAndRecalculatesDownstreamWeightedAverage() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(code: "REP001", name: "Replace Item", unit: "NOS", valuationMethod: .weightedAverage)
+
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!, type: .stockIn, quantity: 10, ratePaise: 100)
+        let originalSecondReceiptPublication = try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-02")!, type: .stockIn, quantity: 10, ratePaise: 200)
+        XCTAssertEqual(originalSecondReceiptPublication.affectedMovementIds.count, 0)
+        try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-03")!, type: .stockOut, quantity: 10, ratePaise: 999)
+
+        let originalSecondReceipt = try XCTUnwrap(
+            InventoryRepository(db: tc.db)
+                .listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+                .first(where: { $0.date == DateFormatters.parseDate("2024-06-02")! && $0.movementType == .stockIn })
+        )
+
+        let replacement = try service.replaceMovement(
+            originalSecondReceipt.id,
+            date: DateFormatters.parseDate("2024-06-02")!,
+            type: .stockIn,
+            quantity: try ExactQuantity.whole(10),
+            ratePaise: 300,
+            notes: "corrected rate",
+            reason: "rate correction"
+        )
+
+        XCTAssertEqual(replacement.reversalMovement.movementType, .stockOut)
+        XCTAssertEqual(replacement.replacementMovement.movementType, .stockIn)
+        XCTAssertTrue(replacement.publication.affectedMovementCount >= 1)
+
+        let movements = try InventoryRepository(db: tc.db).listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+        let downstreamOut = try XCTUnwrap(movements.first(where: { $0.date == DateFormatters.parseDate("2024-06-03")! && $0.movementType == .stockOut }))
+        XCTAssertEqual(downstreamOut.totalValuePaise, 2000)
+
+        let balance = try InventoryRepository(db: tc.db).runningBalance(itemId: item.id, asOf: DateFormatters.parseDate("2024-06-03")!)
+        XCTAssertEqual(balance.onHandQuantity.numerator, 10)
+        XCTAssertEqual(balance.onHandValuePaise, 2000)
     }
 
     func testZeroQuantityThrows() throws {

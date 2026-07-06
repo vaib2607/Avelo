@@ -43,4 +43,63 @@ final class AuditCoverageTests: XCTestCase {
         XCTAssertNotNil(reversedAudit.snapshotBeforeJson)
         XCTAssertNotNil(reversedAudit.snapshotAfterJson)
     }
+
+    func testStockMovementReversalWritesAuditEvent() throws {
+        let tc = try TestCompany.make()
+        let inventory = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try inventory.createItem(code: "AUD-STK", name: "Audit Stock", unit: "NOS", valuationMethod: .fifo)
+
+        _ = try inventory.recordMovement(
+            itemId: item.id,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            type: .stockIn,
+            quantity: 10,
+            ratePaise: 100
+        )
+        let issuePublication = try inventory.recordMovement(
+            itemId: item.id,
+            date: DateFormatters.parseDate("2024-06-02")!,
+            type: .stockOut,
+            quantity: 4,
+            ratePaise: 999
+        )
+        XCTAssertTrue(issuePublication.phase == .published)
+        let originalOut = try XCTUnwrap(
+            InventoryRepository(db: tc.db)
+                .listMovementsChronologically(companyId: tc.companyId, itemId: item.id)
+                .last
+        )
+
+        let reversal = try inventory.reverseMovement(originalOut.id, reason: "audit undo")
+        let reversedAudit = try XCTUnwrap(
+            AuditRepository(db: tc.db).list(
+                filter: .init(companyId: tc.companyId, action: .stockMovementReversed)
+            ).first
+        )
+        XCTAssertEqual(reversedAudit.entityId, reversal.reversalMovement.id.uuidString)
+        XCTAssertEqual(reversedAudit.reason, "audit undo")
+        XCTAssertNotNil(reversedAudit.snapshotBeforeJson)
+        XCTAssertNotNil(reversedAudit.snapshotAfterJson)
+    }
+
+    func testVoucherCancellationWritesAuditEvent() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let posted = try service.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 50000, .debit),
+            tc.line(tc.salesId, 50000, .credit)
+        ]), in: tc.fy)
+
+        let cancelled = try service.cancel(posted.voucher.id, reason: "entry voided")
+        let cancelledAudit = try XCTUnwrap(
+            AuditRepository(db: tc.db).list(
+                filter: .init(companyId: tc.companyId, action: .voucherCancelled)
+            ).first
+        )
+        XCTAssertEqual(cancelledAudit.entityId, cancelled.id.uuidString)
+        XCTAssertEqual(cancelledAudit.reason, "entry voided")
+        XCTAssertNotNil(cancelledAudit.snapshotBeforeJson)
+        XCTAssertNotNil(cancelledAudit.snapshotAfterJson)
+    }
 }

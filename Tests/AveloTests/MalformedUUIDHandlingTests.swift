@@ -230,10 +230,149 @@ final class MalformedUUIDHandlingTests: XCTestCase {
         }
     }
 
+    func testVoucherRowDecoderRejectsUnknownVoucherTypeCode() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+
+        XCTAssertThrowsError(try db.queryOne(
+            """
+            SELECT '\(UUID().uuidString)' AS id,
+                   '\(UUID().uuidString)' AS company_id,
+                   '\(UUID().uuidString)' AS financial_year_id,
+                   'not-a-voucher-type' AS voucher_type_code,
+                   'JV-0001' AS number,
+                   '2024-06-01' AS date,
+                   NULL AS party_account_id,
+                   'Test voucher' AS narration,
+                   'open' AS status,
+                   0 AS is_reversal,
+                   NULL AS reversal_of_id,
+                   NULL AS cancelled_at,
+                   NULL AS cancelled_by,
+                   NULL AS cancellation_reason,
+                   NULL AS cancellation_voucher_id,
+                   1 AS is_posted,
+                   50000 AS total_paise,
+                   '2024-06-01T00:00:00Z' AS created_at,
+                   '2024-06-01T00:00:00Z' AS updated_at
+            """
+        ) { try VoucherRepository.rowToVoucher($0) }) { error in
+            assertRowRead(error, equals: "invalid Code value for column voucher_type_code: not-a-voucher-type")
+        }
+    }
+
+    func testFinancialYearRowDecoderRejectsMalformedDateInsteadOfEpochFallback() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+
+        XCTAssertThrowsError(try db.queryOne(
+            """
+            SELECT '\(UUID().uuidString)' AS id,
+                   '\(UUID().uuidString)' AS company_id,
+                   '2024-25' AS label,
+                   'not-a-date' AS start_date,
+                   '2025-03-31' AS end_date,
+                   '2024-04-01' AS books_begin_date,
+                   0 AS is_locked,
+                   0 AS is_closed,
+                   '2024-04-01T00:00:00Z' AS created_at
+            """
+        ) { try FinancialYearRepository.rowToFinancialYear($0) }) { error in
+            assertRowRead(error, equals: "invalid date value for column start_date")
+        }
+    }
+
+    func testVoucherRowDecoderRejectsInvalidBooleanInsteadOfCoercingTruthy() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+
+        XCTAssertThrowsError(try db.queryOne(
+            """
+            SELECT '\(UUID().uuidString)' AS id,
+                   '\(UUID().uuidString)' AS company_id,
+                   '\(UUID().uuidString)' AS financial_year_id,
+                   'journal' AS voucher_type_code,
+                   'JV-0001' AS number,
+                   '2024-06-01' AS date,
+                   NULL AS party_account_id,
+                   'Test voucher' AS narration,
+                   'open' AS status,
+                   2 AS is_reversal,
+                   NULL AS reversal_of_id,
+                   NULL AS cancelled_at,
+                   NULL AS cancelled_by,
+                   NULL AS cancellation_reason,
+                   NULL AS cancellation_voucher_id,
+                   1 AS is_posted,
+                   50000 AS total_paise,
+                   '2024-06-01T00:00:00Z' AS created_at,
+                   '2024-06-01T00:00:00Z' AS updated_at
+            """
+        ) { try VoucherRepository.rowToVoucher($0) }) { error in
+            assertRowRead(error, equals: "invalid boolean value for column is_reversal: 2")
+        }
+    }
+
+    func testVoucherRowDecoderRejectsMissingRequiredColumn() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+
+        XCTAssertThrowsError(try db.queryOne(
+            """
+            SELECT '\(UUID().uuidString)' AS id,
+                   '\(UUID().uuidString)' AS company_id,
+                   '\(UUID().uuidString)' AS financial_year_id,
+                   'journal' AS voucher_type_code,
+                   'JV-0001' AS number,
+                   '2024-06-01' AS date,
+                   NULL AS party_account_id,
+                   'Test voucher' AS narration,
+                   0 AS is_reversal,
+                   NULL AS reversal_of_id,
+                   NULL AS cancelled_at,
+                   NULL AS cancelled_by,
+                   NULL AS cancellation_reason,
+                   NULL AS cancellation_voucher_id,
+                   1 AS is_posted,
+                   50000 AS total_paise,
+                   '2024-06-01T00:00:00Z' AS created_at,
+                   '2024-06-01T00:00:00Z' AS updated_at
+            """
+        ) { try VoucherRepository.rowToVoucher($0) }) { error in
+            assertRowRead(error, equals: "missing required column status")
+        }
+    }
+
+    func testRegistryRepositoryRejectsMalformedLastOpenedTimestamp() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        try db.execute(DatabaseManager.registrySchemaSQL)
+        try db.execute(
+            """
+            INSERT INTO avelo_registry_companies
+            (id, name, sqlite_file_name, last_opened_at, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                .text(UUID().uuidString),
+                .text("Broken Co"),
+                .text("broken.sqlite"),
+                .text("not-a-timestamp"),
+                .text("2024-06-01T00:00:00Z")
+            ]
+        )
+
+        XCTAssertThrowsError(try RegistryRepository(db: db).listCompanies()) { error in
+            assertRowRead(error, equals: "invalid timestamp value for column last_opened_at")
+        }
+    }
+
     private func assertInvalidUUID(_ error: Error, field: String, raw: String, file: StaticString = #filePath, line: UInt = #line) {
         guard case AppError.database(.rowReadFailed(let message)) = error else {
             return XCTFail("Expected rowReadFailed, got \(error)", file: file, line: line)
         }
         XCTAssertEqual(message, "Invalid UUID in \(field): \(raw)", file: file, line: line)
+    }
+
+    private func assertRowRead(_ error: Error, equals expected: String, file: StaticString = #filePath, line: UInt = #line) {
+        guard case AppError.database(.rowReadFailed(let message)) = error else {
+            return XCTFail("Expected rowReadFailed, got \(error)", file: file, line: line)
+        }
+        XCTAssertEqual(message, expected, file: file, line: line)
     }
 }

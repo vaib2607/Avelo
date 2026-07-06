@@ -36,6 +36,19 @@ public final class FinancialYearService: Sendable {
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
         }
+        let overlappingYears = try repository.overlaps(
+            companyId: audit.companyId,
+            startDate: startDate,
+            endDate: endDate
+        )
+        guard overlappingYears.isEmpty else {
+            let labels = overlappingYears.map(\.label).joined(separator: ", ")
+            throw AppError.validation(.init(
+                code: .financialYearOverlap,
+                field: "startDate",
+                message: "Financial year overlaps existing year(s): \(labels)."
+            ))
+        }
         let fy = FinancialYear(
             companyId: audit.companyId,
             label: label,

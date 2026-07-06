@@ -75,22 +75,21 @@ public struct CompanyRepository: Sendable {
     }
 
     static func rowToCompany(_ r: Row) throws -> Company {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_companies.id")
-        let modeRaw = r.text("inventory_link_mode")
-        let mode = InventoryLinkMode(rawValue: modeRaw) ?? .manual
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_companies.id")
+        let mode: InventoryLinkMode = try r.enumValue("inventory_link_mode")
         return Company(
             id: id,
-            name: r.text("name"),
-            addressLine1: r.optionalText("address_line1"),
-            addressLine2: r.optionalText("address_line2"),
-            city: r.optionalText("city"),
-            state: r.optionalText("state"),
-            pincode: r.optionalText("pincode"),
-            country: r.text("country"),
-            gstin: r.optionalText("gstin"),
-            pan: r.optionalText("pan"),
-            baseCurrency: r.text("base_currency"),
-            isInventoryEnabled: r.bool("is_inventory_enabled"),
+            name: try r.requiredText("name"),
+            addressLine1: try r.checkedOptionalText("address_line1"),
+            addressLine2: try r.checkedOptionalText("address_line2"),
+            city: try r.checkedOptionalText("city"),
+            state: try r.checkedOptionalText("state"),
+            pincode: try r.checkedOptionalText("pincode"),
+            country: try r.requiredText("country"),
+            gstin: try r.checkedOptionalText("gstin"),
+            pan: try r.checkedOptionalText("pan"),
+            baseCurrency: try r.requiredText("base_currency"),
+            isInventoryEnabled: try r.requiredBool("is_inventory_enabled"),
             inventoryLinkMode: mode,
             createdAt: try r.timestamp("created_at"),
             updatedAt: try r.timestamp("updated_at")

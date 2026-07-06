@@ -84,14 +84,14 @@ public struct ReportRepository: Sendable {
 
         let rawRows: [(Voucher.ID, Date, String, VoucherType.Code, String, Int64, EntrySide, Int)] = try db.query(sql, bind: bind) { r in
             (
-                try UUIDParsing.required(r.text("vid"), field: "report.ledger.voucher_id"),
-                r.date("vdate"),
-                r.text("vnum"),
-                VoucherType.Code(rawValue: r.text("vtype")) ?? .journal,
-                r.text("vnarration"),
-                r.int("amt"),
-                EntrySide(rawValue: r.text("lside")) ?? .debit,
-                Int(r.int("ord"))
+                try UUIDParsing.required(r.requiredText("vid"), field: "report.ledger.voucher_id"),
+                try r.requiredDate("vdate"),
+                try r.requiredText("vnum"),
+                try r.enumValue("vtype"),
+                try r.requiredText("vnarration"),
+                try r.requiredInt("amt"),
+                try r.enumValue("lside"),
+                Int(try r.requiredInt("ord"))
             )
         }
 

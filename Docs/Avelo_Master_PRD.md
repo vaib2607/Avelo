@@ -510,10 +510,18 @@ Normative rules:
 
 ### 8.1.3 Accounting-engine contracts
 
+#### GST round-off normalization (`AVL-P0-001`)
+
+- Invoice-style GST vouchers may auto-balance only bounded paise-level debit/credit mismatches, and only through a dedicated `ROUND_OFF` ledger owned by the company chart of accounts.
+- Normalization strips any draft-supplied round-off line, recomputes the one authoritative round-off line deterministically from the remaining GST-bearing lines, and appends it at a stable position.
+- Non-GST vouchers, GST vouchers without the dedicated ledger, and mismatches beyond the bounded paise threshold fail closed under the ordinary debit/credit validation path.
+- Printed invoice totals and persisted voucher totals must reflect the normalized posting, not an unbalanced draft or caller-supplied round-off amount.
+
 #### Inventory valuation layers (`AVL-P0-008`–`AVL-P0-011`, `AVL-P0-019`, `AVL-P1-029`)
 
 - Quantity is fixed-point or rational with an explicit UOM conversion; `Double` is forbidden for authoritative quantity or cost math.
 - Every stock receipt creates an immutable valuation layer. FIFO issues consume oldest eligible layers; weighted average computes from exact aggregate quantity/value and assigns residual paise deterministically.
+- Reversal/correction movements that cancel a prior receipt or adjustment carry an explicit reference to the original movement so replay removes the exact intended layer instead of approximating through later averages.
 - Stock-out cost is computed by the valuation engine, never supplied as authoritative input by the UI.
 - Backdated insert/edit/reversal/cancellation invalidates and recomputes every affected downstream layer and COGS posting with progress and atomic publication.
 - Stock-ageing buckets are derived from surviving layer quantities, so their sum equals on-hand quantity and value.
@@ -522,8 +530,8 @@ Normative rules:
 #### Financial-year and persistence invariants (`AVL-P0-024`–`AVL-P0-031`)
 
 - Trial-balance rows show one net debit or credit balance per account; grand-total equality is a second invariant, not a substitute.
-- Financial years for a company cannot overlap. A date resolves to exactly one FY or a typed error.
-- Locking freezes every dated financial mutation, including vouchers, lines, opening balances, stock, payroll, and banking. Controlled restore/repair uses a separately audited maintenance capability.
+- Financial years for a company cannot overlap on create, update, import, or restore. A date resolves to exactly one FY through a deterministic ordering rule or the lookup fails closed with a typed error.
+- Locking freezes every dated financial mutation, including voucher inserts and date updates, lines, opening balances, stock, payroll, bank statement imports/clearance, and banking. Controlled restore/repair uses a separately audited maintenance capability with explicit trigger recreation on migrated databases.
 - Required dates, enums, columns, IDs, and booleans decode strictly. Corruption never becomes epoch, zero, empty, Journal, Debit, FIFO, or another valid-looking default.
 - Same-company ownership is enforced in schema constraints where possible and revalidated by repositories/services.
 - Schema-version reads throw. Migration does not start if version or integrity cannot be established.

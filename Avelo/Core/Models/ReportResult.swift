@@ -337,16 +337,16 @@ public enum ReportResult {
         public let itemCode: String
         public let itemName: String
         public let unit: String
-        public let quantity: Double
+        public let quantity: ExactQuantity
         public let ratePaise: Int64
         public let valuePaise: Int64
-        public let openingQty: Int64
+        public let openingQty: ExactQuantity
         public let openingValuePaise: Int64
-        public let inQty: Int64
+        public let inQty: ExactQuantity
         public let inValuePaise: Int64
-        public let outQty: Int64
+        public let outQty: ExactQuantity
         public let outValuePaise: Int64
-        public let closingQty: Int64
+        public let closingQty: ExactQuantity
         public let closingValuePaise: Int64
         public let averageCostPaise: Int64
     }

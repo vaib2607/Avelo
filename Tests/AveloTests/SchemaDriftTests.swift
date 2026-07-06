@@ -72,7 +72,46 @@ final class SchemaDriftTests: XCTestCase {
             "unit",
             "valuation_method",
             "is_active",
-            "created_at"
+            "created_at",
+            "alternate_unit",
+            "alt_unit_base_numerator",
+            "alt_unit_base_denominator"
+        ])
+        XCTAssertEqual(try columns("avelo_vouchers", in: db), [
+            "id",
+            "company_id",
+            "financial_year_id",
+            "voucher_type_code",
+            "number",
+            "date",
+            "party_account_id",
+            "narration",
+            "status",
+            "is_reversal",
+            "reversal_of_id",
+            "cancelled_at",
+            "cancelled_by",
+            "cancellation_reason",
+            "cancellation_voucher_id",
+            "is_posted",
+            "total_paise",
+            "created_at",
+            "updated_at"
+        ])
+        XCTAssertEqual(try columns("avelo_audit_events", in: db), [
+            "id",
+            "company_id",
+            "timestamp",
+            "actor",
+            "action",
+            "entity_type",
+            "entity_id",
+            "snapshot_before_json",
+            "snapshot_after_json",
+            "reason",
+            "sequence_number",
+            "previous_chain_hmac",
+            "chain_hmac"
         ])
         XCTAssertEqual(try columns("avelo_stock_movements", in: db), [
             "id",
@@ -86,7 +125,11 @@ final class SchemaDriftTests: XCTestCase {
             "total_value_paise",
             "reference_voucher_number",
             "reason",
-            "created_at"
+            "created_at",
+            "quantity_numerator",
+            "quantity_denominator",
+            "entered_unit",
+            "reversed_movement_id"
         ])
         XCTAssertEqual(try columns("avelo_inventory_orders", in: db), [
             "id",
@@ -173,6 +216,7 @@ final class SchemaDriftTests: XCTestCase {
             "voucherPosted",
             "voucherEdited",
             "voucherReversed",
+            "voucherCancelled",
             "openingBalancePosted",
             "stockItemCreated",
             "stockItemUpdated",
@@ -212,5 +256,70 @@ final class SchemaDriftTests: XCTestCase {
         for action in nonFrozenActions {
             XCTAssertFalse(sql.contains("'\(action)'"), "Non-frozen audit action is present: \(action)")
         }
+        XCTAssertTrue(sql.contains("sequence_number INTEGER NOT NULL"), sql)
+        XCTAssertTrue(sql.contains("previous_chain_hmac TEXT"), sql)
+        XCTAssertTrue(sql.contains("chain_hmac TEXT NOT NULL"), sql)
+    }
+
+    func testMigrationV008BackfillsRoundOffLedgerOncePerCompany() throws {
+        let db = try migratedDB()
+        let companyId = UUID()
+        let now = DateFormatters.formatIsoTimestamp(Date())
+
+        try db.execute(
+            "INSERT INTO avelo_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            [.text(companyId.uuidString), .text("Round Off Co"), .text(now), .text(now)]
+        )
+        try db.execute(
+            """
+            INSERT INTO avelo_account_groups
+            (id, company_id, code, name, nature, sort_order, created_at)
+            VALUES (?, ?, 'INDIRECT_EXPENSE', 'Indirect Expenses', 'expense', 1, ?)
+            """,
+            [.text(UUID().uuidString), .text(companyId.uuidString), .text(now)]
+        )
+
+        try MigrationV008().up(db)
+        try MigrationV008().up(db)
+
+        let count = try db.queryOne(
+            "SELECT COUNT(*) FROM avelo_accounts WHERE company_id = ? AND code = 'ROUND_OFF'",
+            bind: [.text(companyId.uuidString)]
+        ) { $0.int(0) } ?? 0
+        XCTAssertEqual(count, 1)
+    }
+
+    func testMigrationV010AddsFinancialYearOverlapUpdateTrigger() throws {
+        let db = try migratedDB()
+        let triggerSQL = try XCTUnwrap(
+            db.queryOne(
+                "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_avelo_fy_no_overlap_update'"
+            ) { $0.text(0) }
+        )
+
+        XCTAssertTrue(triggerSQL.localizedCaseInsensitiveContains("before update on avelo_financial_years"))
+        XCTAssertTrue(triggerSQL.localizedCaseInsensitiveContains("financial year overlaps an existing year for this company"))
+    }
+
+    func testMigrationV011AddsExpandedFiscalLockTriggers() throws {
+        let db = try migratedDB()
+        let triggerNames = try db.query(
+            "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_avelo_%fy_locked%' OR name IN ('trg_avelo_voucher_date_in_fy_update', 'trg_avelo_accounts_locked_opening_insert', 'trg_avelo_accounts_locked_opening_update') ORDER BY name"
+        ) { $0.text(0) }
+
+        XCTAssertTrue(triggerNames.contains("trg_avelo_voucher_date_in_fy_update"))
+        XCTAssertTrue(triggerNames.contains("trg_avelo_stock_movements_fy_locked_insert"))
+        XCTAssertTrue(triggerNames.contains("trg_avelo_payroll_entries_fy_locked_insert"))
+        XCTAssertTrue(triggerNames.contains("trg_avelo_bank_statement_lines_fy_locked_insert"))
+        XCTAssertTrue(triggerNames.contains("trg_avelo_bank_reconciliations_fy_locked_insert"))
+        XCTAssertTrue(triggerNames.contains("trg_avelo_accounts_locked_opening_update"))
+    }
+
+    func testMigrationV012AddsAuditSequenceIndex() throws {
+        let db = try migratedDB()
+        let indexNames = try db.query(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'avelo_audit_events' ORDER BY name"
+        ) { $0.text(0) }
+        XCTAssertTrue(indexNames.contains("idx_avelo_audit_sequence"), "Missing idx_avelo_audit_sequence in \(indexNames)")
     }
 }

@@ -9,12 +9,13 @@ public struct AuditRepository: Sendable {
     }
 
     public func append(_ event: AuditEvent) throws {
+        let chain = try AuditChainIntegrity(db: db).nextState(for: event)
         try db.execute(
             """
             INSERT INTO avelo_audit_events
             (id, company_id, timestamp, actor, action, entity_type, entity_id,
-             snapshot_before_json, snapshot_after_json, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             snapshot_before_json, snapshot_after_json, reason, sequence_number, previous_chain_hmac, chain_hmac)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(event.id.uuidString),
@@ -26,9 +27,16 @@ public struct AuditRepository: Sendable {
                 .text(event.entityId),
                 .optionalText(event.snapshotBeforeJson),
                 .optionalText(event.snapshotAfterJson),
-                .optionalText(event.reason)
+                .optionalText(event.reason),
+                .integer(chain.sequenceNumber),
+                .optionalText(chain.previousChainHMAC),
+                .text(chain.chainHMAC)
             ]
         )
+    }
+
+    public func verifyIntegrity(companyId: Company.ID) throws {
+        try AuditChainIntegrity(db: db).verify(companyId: companyId)
     }
 
     public struct Filter: Sendable {

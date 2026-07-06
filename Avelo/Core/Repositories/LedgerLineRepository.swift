@@ -106,22 +106,21 @@ public struct LedgerLineRepository: Sendable {
     }
 
     static func rowToLine(_ r: Row) throws -> LedgerLine {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_ledger_lines.id")
-        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_ledger_lines.company_id")
-        let voucherId = try UUIDParsing.required(r.text("voucher_id"), field: "avelo_ledger_lines.voucher_id")
-        let accountId = try UUIDParsing.required(r.text("account_id"), field: "avelo_ledger_lines.account_id")
-        let sideRaw = r.text("side")
-        let side = EntrySide(rawValue: sideRaw) ?? .debit
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_ledger_lines.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_ledger_lines.company_id")
+        let voucherId = try UUIDParsing.required(r.requiredText("voucher_id"), field: "avelo_ledger_lines.voucher_id")
+        let accountId = try UUIDParsing.required(r.requiredText("account_id"), field: "avelo_ledger_lines.account_id")
+        let side: EntrySide = try r.enumValue("side")
         return LedgerLine(
             id: id,
             companyId: companyId,
             voucherId: voucherId,
             accountId: accountId,
-            amountPaise: r.int("amount_paise"),
+            amountPaise: try r.requiredInt("amount_paise"),
             side: side,
-            taxCode: r.optionalText("tax_code"),
-            costCenter: r.optionalText("cost_center"),
-            lineOrder: Int(r.int("line_order"))
+            taxCode: try r.checkedOptionalText("tax_code"),
+            costCenter: try r.checkedOptionalText("cost_center"),
+            lineOrder: Int(try r.requiredInt("line_order"))
         )
     }
 }

@@ -38,6 +38,10 @@ public final class AuditService: Sendable {
         try repository.list(filter: filter)
     }
 
+    public func verifyIntegrity() throws {
+        try repository.verifyIntegrity(companyId: companyId)
+    }
+
     private static func encode(_ value: Encodable, encoder: JSONEncoder) throws -> String? {
         let data = try encoder.encode(AnyEnc(value))
         return String(data: data, encoding: .utf8)

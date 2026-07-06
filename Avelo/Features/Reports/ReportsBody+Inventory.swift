@@ -24,7 +24,7 @@ extension ReportsBody {
                     }
                     TableColumn("Type", value: \.movementType.rawValue)
                     TableColumn("Qty") { row in
-                        Text(String(format: "%.3f", row.quantity))
+                        Text(row.quantityDisplayString)
                     }
                     TableColumn("Voucher") { row in
                         if let voucherId = row.voucherId {
@@ -60,7 +60,7 @@ extension ReportsBody {
                     }
                     TableColumn("Type", value: \.movement.movementType.rawValue)
                     TableColumn("Qty") { row in
-                        Text(String(format: "%.3f", row.movement.quantity))
+                        Text(row.movement.quantityDisplayString)
                     }
                     TableColumn("Voucher") { row in
                         if let voucherId = row.movement.voucherId {
@@ -84,7 +84,7 @@ extension ReportsBody {
                     TableColumn("Item", value: \.itemName)
                     TableColumn("Code", value: \.itemCode)
                     TableColumn("Quantity") { r in
-                        Text(String(format: "%.3f", r.quantity))
+                        Text(r.quantity.displayString)
                     }
                     TableColumn("Rate (₹)") { r in
                         Text(Currency.formatPaise(r.ratePaise)).monospacedDigit()

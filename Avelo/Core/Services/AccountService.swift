@@ -43,11 +43,17 @@ public final class AccountService: Sendable {
     }
 
     public func findAccount(_ id: Account.ID) throws -> Account? {
-        try repository.findById(id)
+        guard let account = try repository.findById(id), account.companyId == audit.companyId else {
+            return nil
+        }
+        return account
     }
 
     public func findGroup(_ id: AccountGroup.ID) throws -> AccountGroup? {
-        try groupRepository.findById(id)
+        guard let group = try groupRepository.findById(id), group.companyId == audit.companyId else {
+            return nil
+        }
+        return group
     }
 
     public func createAccount(_ input: AccountInputValidator.Input) throws -> Account {
@@ -59,6 +65,10 @@ public final class AccountService: Sendable {
             throw AppError.validation(ValidationError(
                 code: .accountGroupRequired, field: "group", message: "Group required."
             ))
+        }
+        if input.openingBalancePaise != 0,
+           try FiscalLockChecker(db: db).hasAnyLockedYear(companyId: audit.companyId) {
+            throw AppError.businessRule("Financial year is locked; opening balance changes are not allowed.")
         }
         let account = Account(
             companyId: audit.companyId,
@@ -83,7 +93,16 @@ public final class AccountService: Sendable {
     }
 
     public func updateAccount(_ account: Account) throws {
-        let before = try repository.findById(account.id)
+        guard account.companyId == audit.companyId else {
+            throw AppError.notFound("Account")
+        }
+        guard let before = try repository.findById(account.id), before.companyId == audit.companyId else {
+            throw AppError.notFound("Account")
+        }
+        if (before.openingBalancePaise != account.openingBalancePaise || before.openingBalanceSide != account.openingBalanceSide),
+           try FiscalLockChecker(db: db).hasAnyLockedYear(companyId: audit.companyId) {
+            throw AppError.businessRule("Financial year is locked; opening balance changes are not allowed.")
+        }
         try db.write { tx in
             let repo = AccountRepository(db: tx)
             try repo.update(account)
@@ -98,7 +117,7 @@ public final class AccountService: Sendable {
     }
 
     public func disableAccount(_ id: Account.ID) throws {
-        guard let before = try repository.findById(id) else { throw AppError.notFound("Account") }
+        guard let before = try repository.findById(id), before.companyId == audit.companyId else { throw AppError.notFound("Account") }
         try db.write { tx in
             let repo = AccountRepository(db: tx)
             try repo.disable(id)
@@ -119,6 +138,11 @@ public final class AccountService: Sendable {
                             name: String,
                             nature: AccountNature,
                             parentGroupId: AccountGroup.ID? = nil) throws -> AccountGroup {
+        if let parentGroupId {
+            guard let parent = try groupRepository.findById(parentGroupId), parent.companyId == audit.companyId else {
+                throw AppError.notFound("Account group")
+            }
+        }
         let group = AccountGroup(
             companyId: audit.companyId,
             parentGroupId: parentGroupId,

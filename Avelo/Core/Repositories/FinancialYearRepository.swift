@@ -36,6 +36,49 @@ public struct FinancialYearRepository: Sendable {
         ) { try Self.rowToFinancialYear($0) }
     }
 
+    public func overlaps(companyId: Company.ID,
+                         startDate: Date,
+                         endDate: Date,
+                         excluding existingFinancialYearId: FinancialYear.ID? = nil) throws -> [FinancialYear] {
+        var sql = """
+        SELECT id, company_id, label, start_date, end_date, books_begin_date, is_locked, is_closed, created_at
+        FROM avelo_financial_years
+        WHERE company_id = ?
+          AND NOT (? < start_date OR ? > end_date)
+        """
+        var bind: [SQLValue] = [
+            .text(companyId.uuidString),
+            .date(endDate),
+            .date(startDate)
+        ]
+        if let existingFinancialYearId {
+            sql += " AND id <> ?"
+            bind.append(.text(existingFinancialYearId.uuidString))
+        }
+        sql += " ORDER BY start_date ASC, created_at ASC, id ASC"
+        return try db.query(sql, bind: bind) { try Self.rowToFinancialYear($0) }
+    }
+
+    public func containing(date: Date,
+                           companyId: Company.ID,
+                           limit: Int = 2) throws -> [FinancialYear] {
+        try db.query(
+            """
+            SELECT id, company_id, label, start_date, end_date, books_begin_date, is_locked, is_closed, created_at
+            FROM avelo_financial_years
+            WHERE company_id = ?
+              AND ? BETWEEN start_date AND end_date
+            ORDER BY start_date DESC, end_date DESC, created_at ASC, id ASC
+            LIMIT ?
+            """,
+            bind: [
+                .text(companyId.uuidString),
+                .date(date),
+                .integer(Int64(limit))
+            ]
+        ) { try Self.rowToFinancialYear($0) }
+    }
+
     public func insert(_ fy: FinancialYear) throws {
         try db.execute(
             "INSERT INTO avelo_financial_years (id, company_id, label, start_date, end_date, books_begin_date, is_locked, is_closed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -75,17 +118,17 @@ public struct FinancialYearRepository: Sendable {
     }
 
     static func rowToFinancialYear(_ r: Row) throws -> FinancialYear {
-        let id = try UUIDParsing.required(r.text("id"), field: "avelo_financial_years.id")
-        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_financial_years.company_id")
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_financial_years.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_financial_years.company_id")
         return FinancialYear(
             id: id,
             companyId: companyId,
-            label: r.text("label"),
-            startDate: r.date("start_date"),
-            endDate: r.date("end_date"),
-            booksBeginDate: r.date("books_begin_date"),
-            isLocked: r.bool("is_locked"),
-            isClosed: r.bool("is_closed"),
+            label: try r.requiredText("label"),
+            startDate: try r.requiredDate("start_date"),
+            endDate: try r.requiredDate("end_date"),
+            booksBeginDate: try r.requiredDate("books_begin_date"),
+            isLocked: try r.requiredBool("is_locked"),
+            isClosed: try r.requiredBool("is_closed"),
             createdAt: try r.timestamp("created_at")
         )
     }

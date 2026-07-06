@@ -67,6 +67,19 @@ public struct MigrationV001: Migration {
         );
     END;
 
+    CREATE TRIGGER trg_avelo_fy_no_overlap_update
+    BEFORE UPDATE ON avelo_financial_years
+    FOR EACH ROW
+    BEGIN
+        SELECT RAISE(ABORT, 'Financial year overlaps an existing year for this company')
+        WHERE EXISTS (
+            SELECT 1 FROM avelo_financial_years fy
+            WHERE fy.company_id = NEW.company_id
+              AND fy.id <> OLD.id
+              AND NOT (NEW.end_date < fy.start_date OR NEW.start_date > fy.end_date)
+        );
+    END;
+
     CREATE TABLE avelo_account_groups (
         id TEXT NOT NULL PRIMARY KEY,
         company_id TEXT NOT NULL REFERENCES avelo_companies(id),
@@ -139,8 +152,13 @@ public struct MigrationV001: Migration {
         date TEXT NOT NULL,
         party_account_id TEXT REFERENCES avelo_accounts(id),
         narration TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','cancelled')),
         is_reversal INTEGER NOT NULL DEFAULT 0 CHECK(is_reversal IN (0,1)),
         reversal_of_id TEXT REFERENCES avelo_vouchers(id),
+        cancelled_at TEXT,
+        cancelled_by TEXT,
+        cancellation_reason TEXT,
+        cancellation_voucher_id TEXT REFERENCES avelo_vouchers(id),
         is_posted INTEGER NOT NULL DEFAULT 1 CHECK(is_posted IN (0,1)),
         total_paise INTEGER NOT NULL CHECK(total_paise > 0),
         created_at TEXT NOT NULL,
@@ -153,6 +171,8 @@ public struct MigrationV001: Migration {
     CREATE INDEX idx_avelo_vouchers_type ON avelo_vouchers(voucher_type_code, date);
     CREATE INDEX idx_avelo_vouchers_party ON avelo_vouchers(party_account_id);
     CREATE INDEX idx_avelo_vouchers_reversal ON avelo_vouchers(reversal_of_id);
+    CREATE INDEX idx_avelo_vouchers_status ON avelo_vouchers(status);
+    CREATE INDEX idx_avelo_vouchers_cancel_link ON avelo_vouchers(cancellation_voucher_id);
 
     CREATE TRIGGER trg_avelo_voucher_date_in_fy
     BEFORE INSERT ON avelo_vouchers
@@ -308,7 +328,7 @@ public struct MigrationV001: Migration {
             'companyCreated','companyUpdated',
             'financialYearCreated','financialYearLocked','financialYearClosed',
             'accountCreated','accountUpdated','accountDisabled',
-            'voucherPosted','voucherEdited','voucherReversed',
+            'voucherPosted','voucherEdited','voucherReversed','voucherCancelled',
             'openingBalancePosted',
             'stockItemCreated','stockItemUpdated','stockItemDisabled',
             'stockMovementPosted','stockMovementReversed',
@@ -322,12 +342,19 @@ public struct MigrationV001: Migration {
         snapshot_before_json TEXT,
         snapshot_after_json TEXT,
         reason TEXT,
+        sequence_number INTEGER NOT NULL,
+        previous_chain_hmac TEXT,
+        chain_hmac TEXT NOT NULL,
         CHECK(length(trim(action)) > 0),
         CHECK(length(trim(entity_type)) > 0),
-        CHECK(length(trim(entity_id)) > 0)
+        CHECK(length(trim(entity_id)) > 0),
+        CHECK(sequence_number > 0),
+        CHECK(previous_chain_hmac IS NULL OR length(previous_chain_hmac) = 64),
+        CHECK(length(chain_hmac) = 64)
     );
     CREATE INDEX idx_avelo_audit_entity ON avelo_audit_events(company_id, entity_type, entity_id);
     CREATE INDEX idx_avelo_audit_time ON avelo_audit_events(company_id, timestamp);
+    CREATE UNIQUE INDEX idx_avelo_audit_sequence ON avelo_audit_events(company_id, sequence_number);
 
     CREATE TRIGGER trg_avelo_audit_no_update
     BEFORE UPDATE ON avelo_audit_events

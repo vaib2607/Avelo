@@ -19,7 +19,10 @@ public final class PayrollService: Sendable {
     }
 
     public func findEmployee(_ id: PayrollEmployee.ID) throws -> PayrollEmployee? {
-        try repository.findEmployee(id: id)
+        guard let employee = try repository.findEmployee(id: id), employee.companyId == companyId else {
+            return nil
+        }
+        return employee
     }
 
     public func createEmployee(name: String,
@@ -28,6 +31,13 @@ public final class PayrollService: Sendable {
                                pan: String?,
                                bankAccountId: Account.ID? = nil,
                                baseSalaryPaise: Int64) throws -> PayrollEmployee {
+        if let bankAccountId {
+            guard let bankAccount = try AccountRepository(db: db).findById(bankAccountId),
+                  bankAccount.companyId == companyId,
+                  bankAccount.isActive else {
+                throw AppError.validation(.init(code: .voucherAccountInactive, field: "bankAccountId", message: "Employee bank account must belong to this company and be active."))
+            }
+        }
         let employee = PayrollEmployee(
             companyId: companyId,
             employeeCode: employeeCode,
@@ -53,6 +63,19 @@ public final class PayrollService: Sendable {
     }
 
     public func updateEmployee(_ employee: PayrollEmployee) throws {
+        guard employee.companyId == companyId else {
+            throw AppError.notFound("Employee")
+        }
+        guard let existing = try repository.findEmployee(id: employee.id), existing.companyId == companyId else {
+            throw AppError.notFound("Employee")
+        }
+        if let bankAccountId = employee.bankAccountId {
+            guard let bankAccount = try AccountRepository(db: db).findById(bankAccountId),
+                  bankAccount.companyId == companyId,
+                  bankAccount.isActive else {
+                throw AppError.validation(.init(code: .voucherAccountInactive, field: "bankAccountId", message: "Employee bank account must belong to this company and be active."))
+            }
+        }
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
             try repo.updateEmployee(employee)
@@ -66,6 +89,9 @@ public final class PayrollService: Sendable {
     }
 
     public func deactivateEmployee(_ id: PayrollEmployee.ID) throws {
+        guard let employee = try repository.findEmployee(id: id), employee.companyId == companyId else {
+            throw AppError.notFound("Employee")
+        }
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
             try repo.deactivateEmployee(id)
@@ -98,6 +124,13 @@ public final class PayrollService: Sendable {
                           paymentAccountId: Account.ID) throws -> PayrollEntry {
         let employee = try repository.findEmployee(id: employeeId)
         guard let employee = employee else { throw AppError.notFound("Employee") }
+        guard employee.companyId == companyId else {
+            throw AppError.notFound("Employee")
+        }
+        guard let financialYear = try FinancialYearRepository(db: db).findById(financialYearId),
+              financialYear.companyId == companyId else {
+            throw AppError.notFound("Financial year")
+        }
 
         let gross = employee.baseSalaryPaise
         let net = try CheckedMath.subtract(
@@ -120,7 +153,7 @@ public final class PayrollService: Sendable {
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
         }
-        try FiscalLockChecker(db: db).assertOpen(financialYearId: financialYearId)
+        try FiscalLockChecker(db: db).assertOpen(financialYearId: financialYear.id)
         guard let expenseAccount = try AccountRepository(db: db).findById(salaryExpenseAccountId),
               expenseAccount.companyId == companyId,
               expenseAccount.isActive else {
@@ -131,14 +164,14 @@ public final class PayrollService: Sendable {
               paymentAccount.isActive else {
             throw AppError.notFound("Payroll payment account")
         }
-        let voucherDate = try salaryVoucherDate(month: month, year: year, financialYearId: financialYearId)
+        let voucherDate = try salaryVoucherDate(month: month, year: year, financialYearId: financialYear.id)
         let voucherId = UUID()
         let now = Date()
         let entry = PayrollEntry(
             id: UUID(),
             companyId: companyId,
             employeeId: employeeId,
-            financialYearId: financialYearId,
+            financialYearId: financialYear.id,
             voucherId: voucherId,
             month: month,
             year: year,
@@ -170,19 +203,19 @@ public final class PayrollService: Sendable {
         ]
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
-            let existing = try repo.listEntries(filter: .init(companyId: companyId, employeeId: employeeId, financialYearId: financialYearId, monthYear: (year, month), limit: 1))
+            let existing = try repo.listEntries(filter: .init(companyId: companyId, employeeId: employeeId, financialYearId: financialYear.id, monthYear: (year, month), limit: 1))
             if !existing.isEmpty {
                 throw AppError.duplicateSalary("Payroll already posted for this employee and month.")
             }
             let number = try VoucherSequenceRepository(db: tx).nextNumber(
                 companyId: companyId,
-                financialYearId: financialYearId,
+                financialYearId: financialYear.id,
                 typeCode: .payroll
             )
             let payrollVoucher = Voucher(
                 id: voucherId,
                 companyId: companyId,
-                financialYearId: financialYearId,
+                financialYearId: financialYear.id,
                 voucherTypeCode: .payroll,
                 number: number,
                 date: voucherDate,
