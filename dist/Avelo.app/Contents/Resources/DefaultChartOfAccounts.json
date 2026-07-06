@@ -45,6 +45,7 @@
     { "code": "INTEREST_RECEIVED",  "name": "Interest Received",      "under": "INDIRECT_INCOME", "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
     { "code": "PURCHASE",           "name": "Purchase",               "under": "DIRECT_EXPENSE",  "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "DIRECT_EXPENSES",    "name": "Direct Expenses",        "under": "DIRECT_EXPENSE",  "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
+    { "code": "ROUND_OFF",          "name": "Round Off",              "under": "INDIRECT_EXPENSE","opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "SALARY_EXPENSE",     "name": "Salary Expense",         "under": "INDIRECT_EXPENSE","opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "RENT_EXPENSE",       "name": "Rent Expense",           "under": "INDIRECT_EXPENSE","opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "ELECTRICITY_EXPENSE","name": "Electricity Expense",     "under": "INDIRECT_EXPENSE","opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
