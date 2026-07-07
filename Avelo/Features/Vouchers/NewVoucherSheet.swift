@@ -3,6 +3,20 @@ import SwiftUI
 import AppKit
 #endif
 
+struct OneShotSubmitGate {
+    private(set) var isInFlight: Bool = false
+
+    mutating func begin() -> Bool {
+        guard !isInFlight else { return false }
+        isInFlight = true
+        return true
+    }
+
+    mutating func end() {
+        isInFlight = false
+    }
+}
+
 public struct NewVoucherSheet: View {
 
     @Environment(AppEnvironment.self) private var env
@@ -78,6 +92,7 @@ private struct NewVoucherBody: View {
     let onPost: (VoucherEditViewModel) -> Void
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
+    @State private var submitGate = OneShotSubmitGate()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -257,12 +272,18 @@ private struct NewVoucherBody: View {
             Spacer()
             Button("Cancel") { router.presentedSheet = nil }
                 .keyboardShortcut(.cancelAction)
-            Button("Post") { onPost(vm) }
+            Button("Post") { postOnce() }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .disabled(!vm.canPost)
+                .disabled(!vm.canPost || submitGate.isInFlight)
         }
         .padding(16)
+    }
+
+    private func postOnce() {
+        guard submitGate.begin() else { return }
+        defer { submitGate.end() }
+        onPost(vm)
     }
 
     private func pasteTSV() {

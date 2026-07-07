@@ -94,14 +94,19 @@ public final class VoucherService: Sendable {
 
     public func post(draft: VoucherDraft, in fy: FinancialYear) throws -> PostResult {
         defer { ReportService.invalidateCache(companyId: companyId) }
-        return try postWithoutCacheInvalidation(draft: draft, in: fy)
+        return try postWithoutCacheInvalidation(draft: draft, in: fy, workflow: nil)
     }
 
     public func post(draft: VoucherDraft, in fy: FinancialYear, workflow: WorkflowInputs) throws -> PostResult {
-        guard workflow.isEmpty else {
-            throw AppError.featureUnavailable("Bill, cheque, TDS, TCS, and post-dated voucher workflows are deferred outside the frozen schema.")
+        guard workflow.postDatedDate == nil,
+              workflow.tdsSectionCode == nil,
+              workflow.tdsTaxPaise == nil,
+              workflow.tcsSectionCode == nil,
+              workflow.tcsTaxPaise == nil else {
+            throw AppError.featureUnavailable("TDS, TCS, and post-dated voucher workflows are deferred outside the frozen schema.")
         }
-        return try post(draft: draft, in: fy)
+        defer { ReportService.invalidateCache(companyId: companyId) }
+        return try postWithoutCacheInvalidation(draft: draft, in: fy, workflow: workflow)
     }
 
     public func postBatch(_ drafts: [VoucherDraft], in fy: FinancialYear) throws -> [PostResult] {
@@ -195,7 +200,9 @@ public final class VoucherService: Sendable {
         return results
     }
 
-    private func postWithoutCacheInvalidation(draft: VoucherDraft, in fy: FinancialYear) throws -> PostResult {
+    private func postWithoutCacheInvalidation(draft: VoucherDraft,
+                                              in fy: FinancialYear,
+                                              workflow: WorkflowInputs?) throws -> PostResult {
         let normalizedDraft = try normalizedDraftForPosting(draft, accountRepo: AccountRepository(db: db))
         let result = try validate(draft: normalizedDraft, in: fy)
         if case .invalid(let errs) = result {
@@ -248,8 +255,26 @@ public final class VoucherService: Sendable {
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
             let accountRepo = AccountRepository(db: tx)
+            let workflowRepo = AccountingWorkflowsRepository(db: tx)
             try vRepo.insert(postedVoucher)
             try lRepo.insertBatch(lines)
+            if let billAllocation = try billAllocation(
+                for: postedVoucher,
+                draft: normalizedDraft,
+                lines: lines,
+                workflow: workflow,
+                createdAt: now
+            ) {
+                try workflowRepo.insert(billAllocation)
+            }
+            if let cheque = try cheque(
+                for: postedVoucher,
+                workflow: workflow,
+                representedFromChequeId: nil,
+                createdAt: now
+            ) {
+                try workflowRepo.insert(cheque)
+            }
             try AuditService(db: tx, companyId: companyId).record(
                 action: .voucherPosted,
                 entityType: "voucher",
@@ -280,6 +305,13 @@ public final class VoucherService: Sendable {
     }
 
     public func edit(_ voucherId: Voucher.ID, with newDraft: VoucherDraft, in fy: FinancialYear) throws -> Voucher {
+        try edit(voucherId, with: newDraft, in: fy, workflow: nil)
+    }
+
+    public func edit(_ voucherId: Voucher.ID,
+                     with newDraft: VoucherDraft,
+                     in fy: FinancialYear,
+                     workflow: WorkflowInputs?) throws -> Voucher {
         guard let existing = try repository.findById(voucherId) else {
             throw AppError.notFound("Voucher")
         }
@@ -333,9 +365,28 @@ public final class VoucherService: Sendable {
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
             let accountRepo = AccountRepository(db: tx)
+            let workflowRepo = AccountingWorkflowsRepository(db: tx)
             try vRepo.update(updated)
             try lRepo.deleteForVoucher(voucherId)
             try lRepo.insertBatch(newLines)
+            try workflowRepo.deleteForVoucher(voucherId)
+            if let billAllocation = try billAllocation(
+                for: updated,
+                draft: normalizedDraft,
+                lines: newLines,
+                workflow: workflow,
+                createdAt: updated.updatedAt
+            ) {
+                try workflowRepo.insert(billAllocation)
+            }
+            if let cheque = try cheque(
+                for: updated,
+                workflow: workflow,
+                representedFromChequeId: nil,
+                createdAt: updated.updatedAt
+            ) {
+                try workflowRepo.insert(cheque)
+            }
             try AuditService(db: tx, companyId: companyId).record(
                 action: .voucherEdited,
                 entityType: "voucher",
@@ -439,8 +490,15 @@ public final class VoucherService: Sendable {
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
             let accountRepo = AccountRepository(db: tx)
+            let workflowRepo = AccountingWorkflowsRepository(db: tx)
             try vRepo.insert(reversal)
             try lRepo.insertBatch(flippedLines)
+            try mirrorBillAllocation(
+                from: original,
+                to: reversal,
+                originalLines: originalLines,
+                workflowRepo: workflowRepo
+            )
             try AuditService(db: tx, companyId: companyId).record(
                 action: .voucherReversed,
                 entityType: "voucher",
@@ -453,6 +511,198 @@ public final class VoucherService: Sendable {
         }
         ReportService.invalidateCache(companyId: companyId)
         return reversal
+    }
+
+    public func bounceCheque(_ voucherId: Voucher.ID,
+                             reason: String,
+                             actor: String = "user") throws -> Voucher {
+        let trimmedReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedReason.isEmpty else {
+            throw AppError.validation(.init(code: .internal, field: "reason", message: "Bounce reason is required."))
+        }
+        guard let original = try repository.findById(voucherId) else {
+            throw AppError.notFound("Voucher")
+        }
+        guard original.companyId == companyId else {
+            throw AppError.notFound("Voucher")
+        }
+        guard original.status != .cancelled else {
+            throw AppError.businessRule("Cancelled vouchers cannot be bounced.")
+        }
+        guard !original.isReversal else {
+            throw AppError.businessRule("Reversal vouchers cannot be bounced.")
+        }
+        if try repository.hasReversal(for: voucherId) {
+            throw AppError.businessRule("This voucher has already been reversed and cannot be bounced again.")
+        }
+        let originalLines = try linesRepository.findForVoucher(voucherId)
+        let reversal = try createReversal(for: original, originalLines: originalLines, reason: "Cheque bounced: \(trimmedReason)")
+        let flippedLines = buildFlippedLines(from: originalLines, reversalId: reversal.id)
+
+        try db.write { tx in
+            let vRepo = VoucherRepository(db: tx)
+            let lRepo = LedgerLineRepository(db: tx)
+            let accountRepo = AccountRepository(db: tx)
+            let workflowRepo = AccountingWorkflowsRepository(db: tx)
+            guard var storedCheque = try workflowRepo.findCheque(for: voucherId) else {
+                throw AppError.businessRule("This voucher does not have a persisted cheque workflow to bounce.")
+            }
+            guard storedCheque.status != .bounced else {
+                throw AppError.businessRule("This cheque has already been marked as bounced.")
+            }
+            guard storedCheque.status != .cancelled else {
+                throw AppError.businessRule("Cancelled cheques cannot be bounced.")
+            }
+
+            try vRepo.insert(reversal)
+            try lRepo.insertBatch(flippedLines)
+            try mirrorBillAllocation(
+                from: original,
+                to: reversal,
+                originalLines: originalLines,
+                workflowRepo: workflowRepo
+            )
+            storedCheque.status = .bounced
+            storedCheque.bouncedReversalVoucherId = reversal.id
+            try workflowRepo.update(storedCheque)
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .voucherReversed,
+                entityType: "voucher",
+                entityId: reversal.id.uuidString,
+                snapshotBefore: VoucherAuditSnapshot(voucher: original, lines: originalLines),
+                snapshotAfter: VoucherAuditSnapshot(voucher: reversal, lines: flippedLines),
+                reason: "Cheque bounced: \(trimmedReason) [actor=\(actor)]"
+            )
+            try markAccountsUsed(accountRepo, lines: flippedLines)
+        }
+        ReportService.invalidateCache(companyId: companyId)
+        return reversal
+    }
+
+    public func representCheque(_ voucherId: Voucher.ID,
+                                on date: Date,
+                                reason: String? = nil) throws -> Voucher {
+        guard let original = try repository.findById(voucherId) else {
+            throw AppError.notFound("Voucher")
+        }
+        guard original.companyId == companyId else {
+            throw AppError.notFound("Voucher")
+        }
+        guard !original.isReversal else {
+            throw AppError.businessRule("Reversal vouchers cannot be re-presented.")
+        }
+        let originalLines = try linesRepository.findForVoucher(voucherId)
+        let workflowRepo = AccountingWorkflowsRepository(db: db)
+        guard let originalCheque = try workflowRepo.findCheque(for: voucherId) else {
+            throw AppError.businessRule("This voucher does not have a persisted cheque workflow to re-present.")
+        }
+        guard originalCheque.status == .bounced else {
+            throw AppError.businessRule("Only bounced cheques can be re-presented.")
+        }
+        if let represented = try workflowRepo.findRepresentedCheque(from: originalCheque.id),
+           represented.status != .bounced && represented.status != .cancelled {
+            throw AppError.businessRule("This bounced cheque has already been re-presented.")
+        }
+        let targetFinancialYearId = try fiscalLockChecker.assertDateOpen(date, companyId: companyId, mutationLabel: "Cheque re-presentation date")
+        guard let targetFY = try FinancialYearRepository(db: db).findById(targetFinancialYearId) else {
+            throw AppError.notFound("Financial year")
+        }
+
+        let number = try sequenceRepository.nextNumber(
+            companyId: companyId,
+            financialYearId: targetFY.id,
+            typeCode: original.voucherTypeCode
+        )
+        let representedId = UUID()
+        let now = Date()
+        let representedLines = originalLines.enumerated().map { (idx, line) in
+            LedgerLine(
+                id: UUID(),
+                companyId: companyId,
+                voucherId: representedId,
+                accountId: line.accountId,
+                amountPaise: line.amountPaise,
+                side: line.side,
+                taxCode: line.taxCode,
+                costCenter: line.costCenter,
+                lineOrder: idx
+            )
+        }
+        let representedDraft = VoucherDraft(
+            mode: .create,
+            voucherTypeCode: original.voucherTypeCode,
+            date: date,
+            partyAccountId: original.partyAccountId,
+            narration: "Re-presentation of \(original.number)" + (reason.map { ": \($0)" } ?? ""),
+            lines: representedLines.map { line in
+                VoucherDraft.Line(
+                    accountId: line.accountId,
+                    amountPaise: line.amountPaise,
+                    side: line.side,
+                    taxCode: line.taxCode,
+                    costCenter: line.costCenter,
+                    lineOrder: line.lineOrder
+                )
+            }
+        )
+        let validation = try validate(draft: representedDraft, in: targetFY)
+        if case .invalid(let errs) = validation, let first = errs.first {
+            throw AppError.validation(first)
+        }
+
+        let representedVoucher = Voucher(
+            id: representedId,
+            companyId: companyId,
+            financialYearId: targetFY.id,
+            voucherTypeCode: original.voucherTypeCode,
+            number: number,
+            date: date,
+            partyAccountId: original.partyAccountId,
+            narration: representedDraft.narration,
+            isReversal: false,
+            reversalOfId: nil,
+            isPosted: true,
+            totalPaise: original.totalPaise,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        try db.write { tx in
+            let vRepo = VoucherRepository(db: tx)
+            let lRepo = LedgerLineRepository(db: tx)
+            let accountRepo = AccountRepository(db: tx)
+            let workflowRepo = AccountingWorkflowsRepository(db: tx)
+            try vRepo.insert(representedVoucher)
+            try lRepo.insertBatch(representedLines)
+            try copyBillAllocation(
+                from: original,
+                to: representedVoucher,
+                targetLines: representedLines,
+                workflowRepo: workflowRepo
+            )
+            let representedCheque = Cheque(
+                companyId: companyId,
+                voucherId: representedVoucher.id,
+                chequeNumber: originalCheque.chequeNumber,
+                issueDate: date,
+                dueDate: originalCheque.dueDate,
+                status: .issued,
+                bouncedReversalVoucherId: nil,
+                representedFromChequeId: originalCheque.id,
+                createdAt: now
+            )
+            try workflowRepo.insert(representedCheque)
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .voucherPosted,
+                entityType: "voucher",
+                entityId: representedVoucher.id.uuidString,
+                snapshotAfter: VoucherAuditSnapshot(voucher: representedVoucher, lines: representedLines),
+                reason: "Cheque re-presented" + (reason.map { ": \($0)" } ?? "")
+            )
+            try markAccountsUsed(accountRepo, lines: representedLines)
+        }
+        ReportService.invalidateCache(companyId: companyId)
+        return representedVoucher
     }
 
     public func cancel(_ voucherId: Voucher.ID,
@@ -492,8 +742,15 @@ public final class VoucherService: Sendable {
             let vRepo = VoucherRepository(db: tx)
             let lRepo = LedgerLineRepository(db: tx)
             let accountRepo = AccountRepository(db: tx)
+            let workflowRepo = AccountingWorkflowsRepository(db: tx)
             try vRepo.insert(reversal)
             try lRepo.insertBatch(flippedLines)
+            try mirrorBillAllocation(
+                from: original,
+                to: reversal,
+                originalLines: originalLines,
+                workflowRepo: workflowRepo
+            )
             try vRepo.markCancelled(cancelled)
             let audit = AuditService(db: tx, companyId: companyId)
             try audit.record(
@@ -554,11 +811,21 @@ public final class VoucherService: Sendable {
             throw AppError.businessRule("Cancelled vouchers cannot be loaded for editing.")
         }
         let lines = try linesRepository.findForVoucher(voucherId)
+        let workflow = try AccountingWorkflowsRepository(db: db).workflowInputs(for: voucherId)
         return VoucherDraft(
             mode: .edit(originalVoucherId: voucherId),
             voucherTypeCode: voucher.voucherTypeCode,
             date: voucher.date,
             partyAccountId: voucher.partyAccountId,
+            billReferenceType: workflow.billAllocationKind.map {
+                switch $0 {
+                case .newRef: return .newRef
+                case .agstRef: return .agstRef
+                case .advance: return .advance
+                case .onAccount: return .onAccount
+                }
+            },
+            billReferenceNumber: workflow.billAllocationNumber,
             narration: voucher.narration,
             lines: lines.enumerated().map { (idx, line) in
                 VoucherDraft.Line(
@@ -570,6 +837,145 @@ public final class VoucherService: Sendable {
                     lineOrder: idx
                 )
             }
+        )
+    }
+
+    private func billAllocation(for voucher: Voucher,
+                                draft: VoucherDraft,
+                                lines: [LedgerLine],
+                                workflow: WorkflowInputs?,
+                                createdAt: Date) throws -> BillAllocation? {
+        guard let partyAccountId = voucher.partyAccountId else { return nil }
+        let explicitKind = workflow?.billAllocationKind
+        let kind = explicitKind ?? implicitBillAllocationKind(for: voucher)
+        guard let kind else { return nil }
+
+        let partyLines = lines.filter { $0.accountId == partyAccountId }
+        guard !partyLines.isEmpty else {
+            throw AppError.validation(.init(code: .voucherMissingParty, field: "party", message: "Bill allocation requires the party account to appear in voucher lines."))
+        }
+        let allocatedPaise = try CheckedMath.sum(
+            partyLines.map(\.amountPaise),
+            context: "summing bill allocation party-line amount"
+        )
+        let referenceNumber = normalizedBillReferenceNumber(
+            kind: kind,
+            supplied: workflow?.billAllocationNumber ?? draft.billReferenceNumber,
+            voucherNumber: voucher.number
+        )
+        return BillAllocation(
+            companyId: companyId,
+            voucherId: voucher.id,
+            partyAccountId: partyAccountId,
+            kind: kind,
+            referenceNumber: referenceNumber,
+            allocatedPaise: allocatedPaise,
+            createdAt: createdAt
+        )
+    }
+
+    private func cheque(for voucher: Voucher,
+                        workflow: WorkflowInputs?,
+                        representedFromChequeId: Cheque.ID?,
+                        createdAt: Date) throws -> Cheque? {
+        guard let workflow else { return nil }
+        let trimmedChequeNumber = workflow.chequeNumber?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedChequeNumber?.isEmpty == false || workflow.chequeDueDate != nil || workflow.chequeStatus != nil else {
+            return nil
+        }
+        guard let chequeNumber = trimmedChequeNumber, !chequeNumber.isEmpty else {
+            throw AppError.validation(.init(code: .internal, field: "chequeNumber", message: "Cheque number is required when cheque workflow fields are provided."))
+        }
+        return Cheque(
+            companyId: companyId,
+            voucherId: voucher.id,
+            chequeNumber: chequeNumber,
+            issueDate: voucher.date,
+            dueDate: workflow.chequeDueDate,
+            status: workflow.chequeStatus ?? .issued,
+            bouncedReversalVoucherId: nil,
+            representedFromChequeId: representedFromChequeId,
+            createdAt: createdAt
+        )
+    }
+
+    private func implicitBillAllocationKind(for voucher: Voucher) -> BillAllocationKind? {
+        switch voucher.voucherTypeCode {
+        case .sales, .purchase, .creditNote, .debitNote:
+            return voucher.partyAccountId == nil ? nil : .newRef
+        case .payment, .receipt:
+            return voucher.partyAccountId == nil ? nil : .onAccount
+        default:
+            return nil
+        }
+    }
+
+    private func normalizedBillReferenceNumber(kind: BillAllocationKind,
+                                               supplied: String?,
+                                               voucherNumber: String) -> String? {
+        let trimmed = supplied?.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch kind {
+        case .agstRef:
+            return trimmed
+        case .newRef, .advance:
+            return (trimmed?.isEmpty == false ? trimmed : voucherNumber)
+        case .onAccount:
+            return (trimmed?.isEmpty == false ? trimmed : voucherNumber)
+        }
+    }
+
+    private func copyBillAllocation(from original: Voucher,
+                                    to target: Voucher,
+                                    targetLines: [LedgerLine],
+                                    workflowRepo: AccountingWorkflowsRepository) throws {
+        guard let originalAllocation = try workflowRepo.findBillAllocation(for: original.id) else {
+            return
+        }
+        let copiedDraft = VoucherDraft(
+            mode: .create,
+            voucherTypeCode: target.voucherTypeCode,
+            date: target.date,
+            partyAccountId: target.partyAccountId,
+            billReferenceType: nil,
+            billReferenceNumber: originalAllocation.referenceNumber,
+            narration: target.narration,
+            lines: targetLines.map { line in
+                VoucherDraft.Line(
+                    accountId: line.accountId,
+                    amountPaise: line.amountPaise,
+                    side: line.side,
+                    taxCode: line.taxCode,
+                    costCenter: line.costCenter,
+                    lineOrder: line.lineOrder
+                )
+            }
+        )
+        let mirroredWorkflow = WorkflowInputs(
+            billAllocationKind: originalAllocation.kind,
+            billAllocationNumber: originalAllocation.referenceNumber
+        )
+        guard let copiedAllocation = try billAllocation(
+            for: target,
+            draft: copiedDraft,
+            lines: targetLines,
+            workflow: mirroredWorkflow,
+            createdAt: target.createdAt
+        ) else {
+            return
+        }
+        try workflowRepo.insert(copiedAllocation)
+    }
+
+    private func mirrorBillAllocation(from original: Voucher,
+                                      to reversal: Voucher,
+                                      originalLines: [LedgerLine],
+                                      workflowRepo: AccountingWorkflowsRepository) throws {
+        let mirroredLines = buildFlippedLines(from: originalLines, reversalId: reversal.id)
+        try copyBillAllocation(
+            from: original,
+            to: reversal,
+            targetLines: mirroredLines,
+            workflowRepo: workflowRepo
         )
     }
 

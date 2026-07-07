@@ -3,6 +3,10 @@ import XCTest
 
 final class RestoreServiceTests: XCTestCase {
 
+    private func excludedFromBackup(_ url: URL) throws -> Bool {
+        try XCTUnwrap(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup)
+    }
+
     private final class ThrowingFileManager: FileManager {
         override func removeItem(at URL: URL) throws {
             throw CocoaError(.fileWriteNoPermission)
@@ -143,6 +147,46 @@ final class RestoreServiceTests: XCTestCase {
         }
     }
 
+    func testRestoreExcludesRestoredCompanyFileFromBackup() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let sourceManager = try DatabaseManager(appSupportDirectory: sourceRoot, keyStore: InMemoryCompanyKeyStore())
+        let sourceCompany = try await CompanyService.create(
+            companyInput: .init(name: "Excluded Restore Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: sourceManager
+        )
+
+        let backupURL = sourceRoot.appendingPathComponent("excluded-restore.avelobackup")
+        _ = try await BackupService(manager: sourceManager).export(
+            companyId: sourceCompany.id,
+            companyName: sourceCompany.name,
+            to: backupURL
+        )
+
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
+        let restored = try await RestoreService(manager: targetManager).restore(
+            from: backupURL,
+            recoveryKey: try sourceManager.recoveryKey(for: sourceCompany.id)
+        )
+
+        let restoredURL = try await targetManager.companyFileURL(id: restored.id)
+        XCTAssertTrue(try excludedFromBackup(restoredURL))
+    }
+
     func testRestoreChecksChecksumBeforeOpeningOrRegisteringBackup() async throws {
         let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -261,13 +305,34 @@ final class RestoreServiceTests: XCTestCase {
         let source = try TestCompany.seed(into: db, companyId: companyId, companyName: "Roundtrip Co")
         let entry = CompanyRegistryEntry(id: companyId, name: "Roundtrip Co", sqliteFileName: "\(companyId.uuidString).sqlite")
         try await manager.registerCompany(entry)
-
+        let inventory = InventoryService(db: db, companyId: source.companyId)
+        let bomService = BOMService(db: db, companyId: source.companyId)
+        let assembly = try inventory.createItem(code: "FG-REST", name: "Restored FG", unit: "PCS")
+        let component = try inventory.createItem(code: "RM-REST", name: "Restored RM", unit: "PCS")
+        try bomService.saveBOM(
+            assemblyItemId: assembly.id,
+            outputQuantity: 1,
+            components: [
+                BOMComponent(companyId: source.companyId, bomId: UUID(), componentItemId: component.id, quantity: 2)
+            ]
+        )
         let posted = try VoucherService(db: db, companyId: source.companyId).post(
-            draft: source.draft(on: "2024-06-01", lines: [
-                source.line(source.cashId, 50000, .debit),
-                source.line(source.salesId, 50000, .credit)
-            ]),
-            in: source.fy
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .payment,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                narration: "Roundtrip cheque payment",
+                lines: [
+                    .init(accountId: source.rentId, amountPaise: 50000, side: .debit),
+                    .init(accountId: source.cashId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: source.fy,
+            workflow: VoucherService.WorkflowInputs(
+                chequeNumber: "REST-CHQ-001",
+                chequeDueDate: DateFormatters.parseDate("2024-06-15")!,
+                chequeStatus: .deposited
+            )
         )
 
         let backupURL = sourceRoot.appendingPathComponent("roundtrip.avelobackup")
@@ -296,6 +361,15 @@ final class RestoreServiceTests: XCTestCase {
         XCTAssertEqual(restoredVouchers.count, 1)
         XCTAssertEqual(restoredVouchers.first?.number, posted.voucher.number)
         XCTAssertEqual(restoredVouchers.first?.totalPaise, posted.voucher.totalPaise)
+        let restoredWorkflow = try AccountingWorkflowsRepository(db: restoredHandle.db).workflowInputs(for: try XCTUnwrap(restoredVouchers.first?.id))
+        XCTAssertEqual(restoredWorkflow.chequeNumber, "REST-CHQ-001")
+        XCTAssertEqual(restoredWorkflow.chequeStatus, .deposited)
+        let restoredBom = try XCTUnwrap(BOMService(db: restoredHandle.db, companyId: restored.id).loadBOM(for: assembly.id))
+        XCTAssertEqual(restoredBom.0.assemblyItemId, assembly.id)
+        XCTAssertEqual(restoredBom.0.outputQuantity, 1, accuracy: 0.000001)
+        XCTAssertEqual(restoredBom.1.count, 1)
+        XCTAssertEqual(restoredBom.1[0].componentItemId, component.id)
+        XCTAssertEqual(restoredBom.1[0].quantity, 2, accuracy: 0.000001)
 
         let restoreAudit = try AuditRepository(db: restoredHandle.db).list(
             filter: .init(companyId: restored.id, action: .backupImported)

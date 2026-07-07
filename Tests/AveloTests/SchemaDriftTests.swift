@@ -41,6 +41,10 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_audit_events",
             "avelo_bank_reconciliations",
             "avelo_bank_statement_lines",
+            "avelo_bill_allocations",
+            "avelo_bom_components",
+            "avelo_boms",
+            "avelo_cheques",
             "avelo_companies",
             "avelo_financial_year_opening_balances",
             "avelo_financial_years",
@@ -98,6 +102,44 @@ final class SchemaDriftTests: XCTestCase {
             "total_paise",
             "created_at",
             "updated_at"
+        ])
+        XCTAssertEqual(try columns("avelo_bill_allocations", in: db), [
+            "id",
+            "company_id",
+            "voucher_id",
+            "party_account_id",
+            "kind",
+            "reference_number",
+            "allocated_paise",
+            "created_at"
+        ])
+        XCTAssertEqual(try columns("avelo_cheques", in: db), [
+            "id",
+            "company_id",
+            "voucher_id",
+            "cheque_number",
+            "issue_date",
+            "due_date",
+            "status",
+            "bounced_reversal_voucher_id",
+            "represented_from_cheque_id",
+            "created_at"
+        ])
+        XCTAssertEqual(try columns("avelo_boms", in: db), [
+            "id",
+            "company_id",
+            "assembly_item_id",
+            "output_quantity",
+            "created_at",
+            "updated_at"
+        ])
+        XCTAssertEqual(try columns("avelo_bom_components", in: db), [
+            "id",
+            "company_id",
+            "bom_id",
+            "component_item_id",
+            "quantity",
+            "line_order"
         ])
         XCTAssertEqual(try columns("avelo_audit_events", in: db), [
             "id",

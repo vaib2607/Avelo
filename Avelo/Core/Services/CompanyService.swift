@@ -86,45 +86,52 @@ public final class CompanyService: Sendable {
             booksBeginDate: fyInput.booksBeginDate
         )
         let companyKey = try manager.keyStore.generateKey()
-        _ = try await manager.createCompanyFile(companyId: company.id, key: companyKey)
+        let companyURL = try await manager.createCompanyFile(companyId: company.id, key: companyKey)
+        let sqliteFileName = companyURL.lastPathComponent
 
-        let db = try SQLiteDatabase(path: manager.companiesDirectory
-                                            .appendingPathComponent("\(company.id.uuidString).sqlite")
-                                            .path,
-                                    key: companyKey)
-        defer { db.close() }
+        do {
+            let db = try SQLiteDatabase(path: companyURL.path, key: companyKey)
+            defer { db.close() }
 
-        try db.write { tx in
-            let companyRepo = CompanyRepository(db: tx)
-            let fyRepo = FinancialYearRepository(db: tx)
-            _ = try companyRepo.insert(company)
-            try fyRepo.insert(fy)
-            try SeedLoader().loadDefaults(into: tx,
-                                          companyId: company.id,
-                                          financialYearId: fy.id)
+            try db.write { tx in
+                let companyRepo = CompanyRepository(db: tx)
+                let fyRepo = FinancialYearRepository(db: tx)
+                _ = try companyRepo.insert(company)
+                try fyRepo.insert(fy)
+                if seedDefaults {
+                    try SeedLoader().loadDefaults(into: tx,
+                                                  companyId: company.id,
+                                                  financialYearId: fy.id)
+                }
 
-            let audit = AuditService(db: tx, companyId: company.id)
-            try audit.record(
-                action: .companyCreated,
-                entityType: "company",
-                entityId: company.id.uuidString,
-                snapshotAfter: company
-            )
-            try audit.record(
-                action: .financialYearCreated,
-                entityType: "financial_year",
-                entityId: fy.id.uuidString,
-                snapshotAfter: fy
-            )
+                let audit = AuditService(db: tx, companyId: company.id)
+                try audit.record(
+                    action: .companyCreated,
+                    entityType: "company",
+                    entityId: company.id.uuidString,
+                    snapshotAfter: company
+                )
+                try audit.record(
+                    action: .financialYearCreated,
+                    entityType: "financial_year",
+                    entityId: fy.id.uuidString,
+                    snapshotAfter: fy
+                )
+            }
+
+            let registryDatabase = try registryDb(manager: manager)
+            defer { registryDatabase.close() }
+            let registry = RegistryRepository(db: registryDatabase)
+            try registry.register(CompanyRegistryEntry(
+                id: company.id,
+                name: company.name,
+                sqliteFileName: sqliteFileName
+            ))
+            return company
+        } catch {
+            try? await manager.deleteCompanyFiles(id: company.id)
+            throw error
         }
-
-        let registry = RegistryRepository(db: try registryDb(manager: manager))
-        try registry.register(CompanyRegistryEntry(
-            id: company.id,
-            name: company.name,
-            sqliteFileName: "\(company.id.uuidString).sqlite"
-        ))
-        return company
     }
 
     static func registryDb(manager: DatabaseManager) throws -> SQLiteDatabase {

@@ -9,9 +9,12 @@ public protocol Migration: Sendable {
 public struct MigrationRunner: Sendable {
 
     public let migrations: [Migration]
+    private let activityController: any LongOperationActivityControlling
 
-    public init(migrations: [Migration] = MigrationRunner.defaultMigrations) {
+    public init(migrations: [Migration] = MigrationRunner.defaultMigrations,
+                activityController: any LongOperationActivityControlling = ProcessInfoLongOperationActivityController()) {
         self.migrations = migrations.sorted { $0.version.rawValue < $1.version.rawValue }
+        self.activityController = activityController
     }
 
     public static let defaultMigrations: [Migration] = [
@@ -28,24 +31,30 @@ public struct MigrationRunner: Sendable {
         MigrationV011(),
         MigrationV012(),
         MigrationV013(),
-        MigrationV014()
+        MigrationV014(),
+        MigrationV015(),
+        MigrationV016(),
+        MigrationV017()
     ]
 
     public func runMigrations(on db: SQLiteDatabase) throws {
-        let current = db.userVersion()
-        let applied = try fetchAppliedVersions(db)
-        for migration in migrations {
-            if applied.contains(migration.version) { continue }
-            if migration.version.rawValue < current { continue }
-            try db.write { tx in
-                try migration.up(tx)
-                try insertMigrationRecord(tx, version: migration.version, description: migration.description)
-                try tx.setUserVersion(migration.version.rawValue)
+        try activityController.perform(reason: "Avelo database migration") {
+            let current = try db.userVersion()
+            let applied = try fetchAppliedVersions(db)
+            for migration in migrations {
+                if applied.contains(migration.version) { continue }
+                if migration.version.rawValue < current { continue }
+                try db.write { tx in
+                    try migration.up(tx)
+                    try insertMigrationRecord(tx, version: migration.version, description: migration.description)
+                    try tx.setUserVersion(migration.version.rawValue)
+                }
             }
-        }
-        let recordedVersion = try fetchAppliedVersions(db).map(\.rawValue).max() ?? db.userVersion()
-        if db.userVersion() < recordedVersion {
-            try db.setUserVersion(recordedVersion)
+            let currentVersion = try db.userVersion()
+            let recordedVersion = try fetchAppliedVersions(db).map(\.rawValue).max() ?? currentVersion
+            if currentVersion < recordedVersion {
+                try db.setUserVersion(recordedVersion)
+            }
         }
     }
 

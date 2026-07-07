@@ -23,6 +23,37 @@ final class VoucherServiceTests: XCTestCase {
         return (r?.0 ?? 0, r?.1 ?? 0)
     }
 
+    private func billAllocation(_ db: SQLiteDatabase, for voucherId: Voucher.ID) throws -> (kind: String, reference: String?, amount: Int64)? {
+        try db.queryOne(
+            """
+            SELECT kind, reference_number, allocated_paise
+            FROM avelo_bill_allocations
+            WHERE voucher_id = ?
+            """,
+            bind: [.text(voucherId.uuidString)]
+        ) { ($0.text("kind"), try? $0.checkedOptionalText("reference_number"), $0.int("allocated_paise")) }
+    }
+
+    private func cheque(_ db: SQLiteDatabase, for voucherId: Voucher.ID) throws -> (id: String, number: String, dueDate: String?, status: String, bouncedReversalVoucherId: String?, representedFromChequeId: String?)? {
+        try db.queryOne(
+            """
+            SELECT id, cheque_number, due_date, status, bounced_reversal_voucher_id, represented_from_cheque_id
+            FROM avelo_cheques
+            WHERE voucher_id = ?
+            """,
+            bind: [.text(voucherId.uuidString)]
+        ) {
+            (
+                $0.text("id"),
+                $0.text("cheque_number"),
+                try? $0.checkedOptionalText("due_date"),
+                $0.text("status"),
+                try? $0.checkedOptionalText("bounced_reversal_voucher_id"),
+                try? $0.checkedOptionalText("represented_from_cheque_id")
+            )
+        }
+    }
+
     func testBalancedPostPersistsWithEqualDebitCredit() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -430,7 +461,47 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertNotNil(roundOff)
     }
 
-    func testWorkflowInputsAreDeferredByFrozenSchema() throws {
+    func testBillWorkflowInputsPersistAndRoundTripThroughLoadDraft() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let debtorsGroup = try AccountService(db: tc.db, companyId: tc.companyId)
+            .createGroup(code: "SD", name: "Sundry Debtors", nature: .assets)
+        let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
+            .createAccount(.init(code: "DEBTOR_A", name: "Debtor A", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
+
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: debtor.id,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-77",
+                narration: "Bill workflow test",
+                lines: [
+                    .init(accountId: debtor.id, amountPaise: 100000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 100000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                billAllocationKind: .newRef,
+                billAllocationNumber: "INV-77"
+            )
+        )
+
+        let allocation = try XCTUnwrap(billAllocation(tc.db, for: posted.voucher.id))
+        XCTAssertEqual(allocation.kind, BillAllocationKind.newRef.rawValue)
+        XCTAssertEqual(allocation.reference, "INV-77")
+        XCTAssertEqual(allocation.amount, 100000)
+
+        let loaded = try svc.loadDraft(from: posted.voucher.id)
+        XCTAssertEqual(loaded.billReferenceType, .newRef)
+        XCTAssertEqual(loaded.billReferenceNumber, "INV-77")
+    }
+
+    func testWorkflowInputsRejectDeferredFieldsWithoutPersistingVoucher() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
 
@@ -439,7 +510,7 @@ final class VoucherServiceTests: XCTestCase {
                 mode: .create,
                 voucherTypeCode: .sales,
                 date: DateFormatters.parseDate("2024-06-01")!,
-                partyAccountId: tc.salesId,
+                partyAccountId: tc.cashId,
                 billReferenceType: .newRef,
                 billReferenceNumber: "INV-77",
                 narration: "Deferred workflow test",
@@ -469,6 +540,138 @@ final class VoucherServiceTests: XCTestCase {
 
         let voucherCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_vouchers") { $0.int(0) } ?? 0
         XCTAssertEqual(voucherCount, 0)
+    }
+
+    func testChequeWorkflowPersistsAndLoadsForEdit() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .payment,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                narration: "Cheque payment",
+                lines: [
+                    .init(accountId: tc.rentId, amountPaise: 50000, side: .debit),
+                    .init(accountId: tc.cashId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                chequeNumber: "CHQ-001",
+                chequeDueDate: DateFormatters.parseDate("2024-06-15")!,
+                chequeStatus: .issued
+            )
+        )
+
+        let stored = try XCTUnwrap(cheque(tc.db, for: posted.voucher.id))
+        XCTAssertEqual(stored.number, "CHQ-001")
+        XCTAssertEqual(stored.status, ChequeStatus.issued.rawValue)
+
+        let workflow = try AccountingWorkflowsRepository(db: tc.db).workflowInputs(for: posted.voucher.id)
+        XCTAssertEqual(workflow.chequeNumber, "CHQ-001")
+        XCTAssertEqual(workflow.chequeStatus, .issued)
+        XCTAssertEqual(workflow.chequeDueDate, DateFormatters.parseDate("2024-06-15")!)
+    }
+
+    func testEditUpdatesPersistedChequeWorkflow() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .payment,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                narration: "Editable cheque",
+                lines: [
+                    .init(accountId: tc.rentId, amountPaise: 50000, side: .debit),
+                    .init(accountId: tc.cashId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                chequeNumber: "CHQ-OLD",
+                chequeDueDate: DateFormatters.parseDate("2024-06-10")!,
+                chequeStatus: .issued
+            )
+        )
+
+        _ = try svc.edit(
+            posted.voucher.id,
+            with: VoucherDraft(
+                mode: .edit(originalVoucherId: posted.voucher.id),
+                voucherTypeCode: .payment,
+                date: DateFormatters.parseDate("2024-06-02")!,
+                narration: "Edited cheque",
+                lines: [
+                    .init(accountId: tc.rentId, amountPaise: 50000, side: .debit),
+                    .init(accountId: tc.cashId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                chequeNumber: "CHQ-NEW",
+                chequeDueDate: DateFormatters.parseDate("2024-06-20")!,
+                chequeStatus: .deposited
+            )
+        )
+
+        let stored = try XCTUnwrap(cheque(tc.db, for: posted.voucher.id))
+        XCTAssertEqual(stored.number, "CHQ-NEW")
+        XCTAssertEqual(stored.status, ChequeStatus.deposited.rawValue)
+        XCTAssertEqual(stored.dueDate, "2024-06-20")
+    }
+
+    func testEditUpdatesPersistedBillAllocation() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let debtorsGroup = try AccountService(db: tc.db, companyId: tc.companyId)
+            .createGroup(code: "SD2", name: "Sundry Debtors 2", nature: .assets)
+        let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
+            .createAccount(.init(code: "DEBTOR_B", name: "Debtor B", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
+
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: debtor.id,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-OLD",
+                narration: "Original bill",
+                lines: [
+                    .init(accountId: debtor.id, amountPaise: 100000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 100000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .newRef, billAllocationNumber: "INV-OLD")
+        )
+
+        _ = try svc.edit(
+            posted.voucher.id,
+            with: VoucherDraft(
+                mode: .edit(originalVoucherId: posted.voucher.id),
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-02")!,
+                partyAccountId: debtor.id,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-NEW",
+                narration: "Edited bill",
+                lines: [
+                    .init(accountId: debtor.id, amountPaise: 120000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 120000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .newRef, billAllocationNumber: "INV-NEW")
+        )
+
+        let allocation = try XCTUnwrap(billAllocation(tc.db, for: posted.voucher.id))
+        XCTAssertEqual(allocation.kind, BillAllocationKind.newRef.rawValue)
+        XCTAssertEqual(allocation.reference, "INV-NEW")
+        XCTAssertEqual(allocation.amount, 120000)
     }
 
     func testEditInLockedFinancialYearThrows() throws {
@@ -572,6 +775,120 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(reversal.reversalOfId, posted.voucher.id)
     }
 
+    func testReverseMirrorsBillAllocationForSettlement() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let debtorsGroup = try AccountService(db: tc.db, companyId: tc.companyId)
+            .createGroup(code: "SD3", name: "Sundry Debtors 3", nature: .assets)
+        let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
+            .createAccount(.init(code: "DEBTOR_C", name: "Debtor C", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
+
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: debtor.id,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-REV",
+                narration: "Reversible bill",
+                lines: [
+                    .init(accountId: debtor.id, amountPaise: 50000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .newRef, billAllocationNumber: "INV-REV")
+        )
+
+        let reversal = try svc.reverse(posted.voucher.id, reason: "test reversal")
+        let mirrored = try XCTUnwrap(billAllocation(tc.db, for: reversal.id))
+        XCTAssertEqual(mirrored.kind, BillAllocationKind.newRef.rawValue)
+        XCTAssertEqual(mirrored.reference, "INV-REV")
+        XCTAssertEqual(mirrored.amount, 50000)
+
+        let outstanding = try ReportService(db: tc.db, companyId: tc.companyId).outstanding(
+            asOfDate: DateFormatters.parseDate("2025-03-31")!,
+            direction: .receivable
+        )
+        XCTAssertEqual(outstanding.rows.count, 0)
+        XCTAssertEqual(outstanding.totalPaise, 0)
+    }
+
+    func testBounceChequeCreatesLinkedReversalAndMarksChequeBounced() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .receipt,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                narration: "Cheque receipt",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 50000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                chequeNumber: "CHQ-BOUNCE",
+                chequeDueDate: DateFormatters.parseDate("2024-06-05")!,
+                chequeStatus: .deposited
+            )
+        )
+
+        let reversal = try svc.bounceCheque(posted.voucher.id, reason: "NSF")
+        XCTAssertTrue(reversal.isReversal)
+        XCTAssertEqual(reversal.reversalOfId, posted.voucher.id)
+
+        let stored = try XCTUnwrap(cheque(tc.db, for: posted.voucher.id))
+        XCTAssertEqual(stored.status, ChequeStatus.bounced.rawValue)
+        XCTAssertEqual(stored.bouncedReversalVoucherId, reversal.id.uuidString)
+    }
+
+    func testRepresentChequeCreatesFreshVoucherAndLinksToBouncedCheque() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .receipt,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                narration: "Representable cheque receipt",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 50000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(
+                chequeNumber: "CHQ-REP",
+                chequeDueDate: DateFormatters.parseDate("2024-06-05")!,
+                chequeStatus: .deposited
+            )
+        )
+        _ = try svc.bounceCheque(posted.voucher.id, reason: "return memo")
+
+        let represented = try svc.representCheque(
+            posted.voucher.id,
+            on: DateFormatters.parseDate("2024-06-10")!,
+            reason: "re-presented"
+        )
+
+        XCTAssertFalse(represented.isReversal)
+        XCTAssertNotEqual(represented.id, posted.voucher.id)
+        XCTAssertNotEqual(represented.number, posted.voucher.number)
+
+        let originalCheque = try XCTUnwrap(cheque(tc.db, for: posted.voucher.id))
+        let representedCheque = try XCTUnwrap(cheque(tc.db, for: represented.id))
+        XCTAssertEqual(representedCheque.number, "CHQ-REP")
+        XCTAssertEqual(representedCheque.status, ChequeStatus.issued.rawValue)
+        XCTAssertEqual(representedCheque.representedFromChequeId, originalCheque.id)
+        XCTAssertEqual(representedCheque.dueDate, "2024-06-05")
+    }
+
     func testReverseRejectsDisabledAccountsThroughValidation() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -611,10 +928,27 @@ final class VoucherServiceTests: XCTestCase {
     func testCancelMarksVoucherCancelledAndCreatesLinkedReversal() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
-        let posted = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
-            tc.line(tc.cashId, 50000, .debit),
-            tc.line(tc.salesId, 50000, .credit)
-        ]), in: tc.fy)
+        let debtorsGroup = try AccountService(db: tc.db, companyId: tc.companyId)
+            .createGroup(code: "SD4", name: "Sundry Debtors 4", nature: .assets)
+        let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
+            .createAccount(.init(code: "DEBTOR_D", name: "Debtor D", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
+        let posted = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: debtor.id,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-CANCEL",
+                narration: "Cancelable bill",
+                lines: [
+                    .init(accountId: debtor.id, amountPaise: 50000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 50000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .newRef, billAllocationNumber: "INV-CANCEL")
+        )
 
         let cancelled = try svc.cancel(posted.voucher.id, reason: "duplicate entry", actor: "tester")
         XCTAssertEqual(cancelled.status, .cancelled)
@@ -631,10 +965,14 @@ final class VoucherServiceTests: XCTestCase {
         let reversal = try XCTUnwrap(svc.findById(XCTUnwrap(cancelled.cancellationVoucherId)))
         XCTAssertTrue(reversal.isReversal)
         XCTAssertEqual(reversal.reversalOfId, posted.voucher.id)
+        let mirrored = try XCTUnwrap(billAllocation(tc.db, for: reversal.id))
+        XCTAssertEqual(mirrored.kind, BillAllocationKind.newRef.rawValue)
+        XCTAssertEqual(mirrored.reference, "INV-CANCEL")
+        XCTAssertEqual(mirrored.amount, 50000)
 
-        let cash = try movement(tc.db, account: tc.cashId)
+        let debtorMovement = try movement(tc.db, account: debtor.id)
         let sales = try movement(tc.db, account: tc.salesId)
-        XCTAssertEqual(cash.dr - cash.cr, 0)
+        XCTAssertEqual(debtorMovement.dr - debtorMovement.cr, 0)
         XCTAssertEqual(sales.dr - sales.cr, 0)
     }
 

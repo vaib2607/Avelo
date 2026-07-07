@@ -26,7 +26,7 @@ public struct ReverseVoucherSheet: View {
             Form {
                 TextField("Reason (optional)", text: $reason, axis: .vertical)
                     .lineLimit(2...4)
-                Text("A new voucher with flipped debit/credit lines will be created in the same financial year. The original is not deleted.")
+                Text("A new voucher with flipped debit/credit lines will be created in the same financial year when it is open, or in the latest open financial year when the original year is locked. The original is not deleted.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }

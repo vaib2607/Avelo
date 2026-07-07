@@ -80,54 +80,114 @@ extension ReportRepository {
     // MARK: - Outstanding
 
     public func outstanding(asOfDate: Date, direction: ReportResult.OutstandingReport.Direction, filter: ReportResult.ReportFilter) throws -> ReportResult.OutstandingReport {
-        let codes: [String]
-        switch direction {
-        case .receivable, .receivables: codes = ["SUNDRY_DEBTORS"]
-        case .payable, .payables:      codes = ["SUNDRY_CREDITORS"]
-        case .both:                    codes = ["SUNDRY_DEBTORS", "SUNDRY_CREDITORS"]
-        }
-        let placeholders = Array(repeating: "?", count: codes.count).joined(separator: ",")
-        let sql = """
-            SELECT a.id, a.name, a.code
-            FROM avelo_accounts a
-            WHERE a.company_id = ? AND a.code IN (\(placeholders)) AND a.is_active = 1
-            ORDER BY a.code
-        """
-        var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
-        for c in codes { bind.append(.text(c)) }
-        let accounts: [(Account.ID, String, String)] = try db.query(sql, bind: bind) { r in
-            (try UUIDParsing.required(r.text("id"), field: "report.outstanding.account_id"), r.text("name"), r.text("code"))
-        }
-        let accountIds = accounts.map { $0.0 }
-        guard !accountIds.isEmpty else {
+        let events = try outstandingEvents(asOfDate: asOfDate, filter: filter)
+        guard !events.isEmpty else {
             return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: [], direction: direction, totalPaise: 0)
         }
-        let legacyTotals = try movementTotals(
-            for: accountIds,
-            companyId: filter.companyId,
-            toDate: asOfDate
-        )
-
+        let settled = try BillAllocationEngine.settle(events: events, asOfDate: asOfDate)
         var rows: [ReportResult.OutstandingRow] = []
-        for account in accounts {
-            let totals = legacyTotals[account.0]
-            let total = try CheckedMath.subtract(
-                totals?.debitPaise ?? 0,
-                totals?.creditPaise ?? 0,
-                context: "calculating outstanding balance"
-            )
-            guard total != 0 else { continue }
+        for item in settled {
+            guard includeOutstanding(item.remainingPaise, for: direction) else { continue }
+            let ageInDays = max(0, Calendar(identifier: .gregorian).dateComponents([.day], from: item.originDate, to: asOfDate).day ?? 0)
+            let buckets = ageingBuckets(amountPaise: item.remainingPaise, ageInDays: ageInDays)
             rows.append(ReportResult.OutstandingRow(
-                id: account.0,
-                partyName: account.1,
+                id: item.id,
+                accountId: item.accountId,
+                partyName: item.partyName,
+                referenceNumber: item.referenceNumber,
                 asOf: asOfDate,
-                amountPaise: total,
-                age0to30Paise: total,
-                ageInDays: 0
+                amountPaise: item.remainingPaise,
+                age0to30Paise: buckets.age0to30Paise,
+                age31to60Paise: buckets.age31to60Paise,
+                age61to90Paise: buckets.age61to90Paise,
+                age90PlusPaise: buckets.age90PlusPaise,
+                ageInDays: ageInDays
             ))
         }
         let total = try CheckedMath.sum(rows.map(\.amountPaise), context: "summing outstanding total")
         return ReportResult.OutstandingReport(asOfDate: asOfDate, rows: rows, direction: direction, totalPaise: total)
+    }
+
+    private func outstandingEvents(asOfDate: Date,
+                                   filter: ReportResult.ReportFilter) throws -> [BillAllocationEvent] {
+        try db.query(
+            """
+            SELECT
+                ba.id,
+                ba.company_id,
+                ba.voucher_id,
+                ba.party_account_id,
+                ba.kind,
+                ba.reference_number,
+                ba.allocated_paise,
+                ba.created_at,
+                v.number AS voucher_number,
+                v.date AS voucher_date,
+                v.created_at AS voucher_created_at,
+                a.name AS party_name,
+                l.side AS party_side
+            FROM avelo_bill_allocations ba
+            JOIN avelo_vouchers v ON v.id = ba.voucher_id AND v.company_id = ba.company_id
+            JOIN avelo_accounts a ON a.id = ba.party_account_id AND a.company_id = ba.company_id
+            JOIN avelo_ledger_lines l ON l.voucher_id = ba.voucher_id
+                AND l.company_id = ba.company_id
+                AND l.account_id = ba.party_account_id
+            WHERE ba.company_id = ?
+              AND v.date <= ?
+            ORDER BY v.date ASC, v.created_at ASC, v.number ASC, ba.created_at ASC, ba.id ASC
+            """,
+            bind: [.text(filter.companyId.uuidString), .date(asOfDate)]
+        ) { row in
+            let allocation = try BillAllocation(
+                id: UUIDParsing.required(row.requiredText("id"), field: "report.outstanding.bill_allocation_id"),
+                companyId: UUIDParsing.required(row.requiredText("company_id"), field: "report.outstanding.company_id"),
+                voucherId: UUIDParsing.required(row.requiredText("voucher_id"), field: "report.outstanding.voucher_id"),
+                partyAccountId: UUIDParsing.required(row.requiredText("party_account_id"), field: "report.outstanding.party_account_id"),
+                kind: row.enumValue("kind"),
+                referenceNumber: row.checkedOptionalText("reference_number"),
+                allocatedPaise: row.requiredInt("allocated_paise"),
+                createdAt: row.timestamp("created_at")
+            )
+            let signedPaise = try row.requiredText("party_side") == EntrySide.debit.rawValue
+                ? allocation.allocatedPaise
+                : CheckedMath.multiply(allocation.allocatedPaise, -1, context: "signing bill allocation from party side")
+            return BillAllocationEvent(
+                allocation: allocation,
+                voucherId: allocation.voucherId,
+                accountId: allocation.partyAccountId,
+                partyName: try row.requiredText("party_name"),
+                voucherNumber: try row.requiredText("voucher_number"),
+                voucherDate: try row.requiredDate("voucher_date"),
+                voucherCreatedAt: try row.timestamp("voucher_created_at"),
+                signedPaise: signedPaise
+            )
+        }
+    }
+
+    private func includeOutstanding(_ amountPaise: Int64,
+                                    for direction: ReportResult.OutstandingReport.Direction) -> Bool {
+        switch direction {
+        case .receivable, .receivables:
+            return amountPaise > 0
+        case .payable, .payables:
+            return amountPaise < 0
+        case .both:
+            return amountPaise != 0
+        }
+    }
+
+    private func ageingBuckets(amountPaise: Int64,
+                               ageInDays: Int) -> (age0to30Paise: Int64, age31to60Paise: Int64, age61to90Paise: Int64, age90PlusPaise: Int64) {
+        switch ageInDays {
+        case 0...30:
+            return (amountPaise, 0, 0, 0)
+        case 31...60:
+            return (0, amountPaise, 0, 0)
+        case 61...90:
+            return (0, 0, amountPaise, 0)
+        default:
+            return (0, 0, 0, amountPaise)
+        }
     }
 
     // MARK: - Stock Valuation

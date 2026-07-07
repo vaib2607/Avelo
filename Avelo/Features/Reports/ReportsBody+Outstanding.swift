@@ -24,8 +24,11 @@ extension ReportsBody {
                 Text(title).font(.headline)
                 Table(o.rows) {
                     TableColumn("Account") { r in
-                        Button(r.partyName.capitalized) { openLedger(r.id) }
+                        Button(r.partyName.capitalized) { openLedger(r.accountId) }
                             .buttonStyle(.plain)
+                    }
+                    TableColumn("Reference") { r in
+                        Text(r.referenceNumber)
                     }
                     TableColumn("Amount (₹)") { r in
                         Text(Currency.formatPaise(r.amountPaise)).monospacedDigit()

@@ -38,9 +38,11 @@ public struct Cheque: Identifiable, Hashable, Sendable, Codable {
     public var issueDate: Date
     public var dueDate: Date?
     public var status: ChequeStatus
+    public var bouncedReversalVoucherId: Voucher.ID?
+    public var representedFromChequeId: ID?
     public let createdAt: Date
-    public init(id: ID = UUID(), companyId: Company.ID, voucherId: Voucher.ID, chequeNumber: String, bankAccountId: Account.ID? = nil, issueDate: Date, dueDate: Date? = nil, status: ChequeStatus = .issued, createdAt: Date = Date()) {
-        self.id = id; self.companyId = companyId; self.voucherId = voucherId; self.chequeNumber = chequeNumber; self.bankAccountId = bankAccountId; self.issueDate = issueDate; self.dueDate = dueDate; self.status = status; self.createdAt = createdAt
+    public init(id: ID = UUID(), companyId: Company.ID, voucherId: Voucher.ID, chequeNumber: String, bankAccountId: Account.ID? = nil, issueDate: Date, dueDate: Date? = nil, status: ChequeStatus = .issued, bouncedReversalVoucherId: Voucher.ID? = nil, representedFromChequeId: ID? = nil, createdAt: Date = Date()) {
+        self.id = id; self.companyId = companyId; self.voucherId = voucherId; self.chequeNumber = chequeNumber; self.bankAccountId = bankAccountId; self.issueDate = issueDate; self.dueDate = dueDate; self.status = status; self.bouncedReversalVoucherId = bouncedReversalVoucherId; self.representedFromChequeId = representedFromChequeId; self.createdAt = createdAt
     }
 }
 

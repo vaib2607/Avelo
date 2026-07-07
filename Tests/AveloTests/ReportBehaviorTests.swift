@@ -95,8 +95,11 @@ final class ReportBehaviorTests: XCTestCase {
 
         let debtorSale = try svc.post(draft: VoucherDraft(
             mode: .create,
-            voucherTypeCode: .journal,
+            voucherTypeCode: .sales,
             date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: tc.debtorsId,
+            billReferenceType: .newRef,
+            billReferenceNumber: "INV-001",
             narration: "Debtor sale",
             lines: [
                 .init(accountId: tc.debtorsId, amountPaise: 15000, side: .debit),
@@ -129,8 +132,11 @@ final class ReportBehaviorTests: XCTestCase {
 
         let supplierBill = try svc.post(draft: VoucherDraft(
             mode: .create,
-            voucherTypeCode: .journal,
+            voucherTypeCode: .purchase,
             date: DateFormatters.parseDate("2024-09-01")!,
+            partyAccountId: tc.creditorsId,
+            billReferenceType: .newRef,
+            billReferenceNumber: "BILL-001",
             narration: "Supplier bill",
             lines: [
                 .init(accountId: tc.purchaseId, amountPaise: 7000, side: .debit),
@@ -181,6 +187,7 @@ final class ReportBehaviorTests: XCTestCase {
         )
         XCTAssertEqual(receivablesAfterSale.rows.count, 1)
         XCTAssertEqual(receivablesAfterSale.rows.first?.partyName, "Sundry Debtors")
+        XCTAssertEqual(receivablesAfterSale.rows.first?.referenceNumber, "INV-001")
         XCTAssertEqual(receivablesAfterSale.rows.first?.amountPaise, 15000)
         XCTAssertEqual(receivablesAfterSale.totalPaise, 15000)
 
@@ -190,15 +197,16 @@ final class ReportBehaviorTests: XCTestCase {
         )
         XCTAssertEqual(payablesAfterBill.rows.count, 1)
         XCTAssertEqual(payablesAfterBill.rows.first?.partyName, "Sundry Creditors")
+        XCTAssertEqual(payablesAfterBill.rows.first?.referenceNumber, "BILL-001")
         XCTAssertEqual(payablesAfterBill.rows.first?.amountPaise, -7000)
         XCTAssertEqual(payablesAfterBill.totalPaise, -7000)
     }
 
-    func testBillWiseOutstandingIsDeferredByFrozenSchema() throws {
+    func testBillWiseOutstandingConsumesReceiptsFIFOAndHonorsAgainstReference() throws {
         let tc = try makeSeededCompany()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
 
-        XCTAssertThrowsError(try svc.post(
+        _ = try svc.post(
             draft: VoucherDraft(
                 mode: .create,
                 voucherTypeCode: .sales,
@@ -214,12 +222,68 @@ final class ReportBehaviorTests: XCTestCase {
             ),
             in: tc.fy,
             workflow: VoucherService.WorkflowInputs(billAllocationKind: .newRef, billAllocationNumber: "INV-001")
-        )) { error in
-            guard case AppError.featureUnavailable(let message) = error else {
-                return XCTFail("Expected featureUnavailable, got \(error)")
-            }
-            XCTAssertTrue(message.localizedCaseInsensitiveContains("deferred"))
-        }
+        )
+
+        _ = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-04-05")!,
+                partyAccountId: tc.debtorsId,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-002",
+                narration: "Bill two",
+                lines: [
+                    .init(accountId: tc.debtorsId, amountPaise: 30000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 30000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .newRef, billAllocationNumber: "INV-002")
+        )
+
+        _ = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .receipt,
+                date: DateFormatters.parseDate("2024-04-10")!,
+                partyAccountId: tc.debtorsId,
+                narration: "Receipt on account",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 60000, side: .debit),
+                    .init(accountId: tc.debtorsId, amountPaise: 60000, side: .credit)
+                ]
+            ),
+            in: tc.fy
+        )
+
+        _ = try svc.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .receipt,
+                date: DateFormatters.parseDate("2024-04-12")!,
+                partyAccountId: tc.debtorsId,
+                billReferenceType: .agstRef,
+                billReferenceNumber: "INV-002",
+                narration: "Receipt against bill two",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 10000, side: .debit),
+                    .init(accountId: tc.debtorsId, amountPaise: 10000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .agstRef, billAllocationNumber: "INV-002")
+        )
+
+        let report = try ReportService(db: tc.db, companyId: tc.companyId).outstanding(
+            asOfDate: DateFormatters.parseDate("2024-04-30")!,
+            direction: .receivable
+        )
+        XCTAssertEqual(report.rows.count, 1)
+        XCTAssertEqual(report.rows.first?.partyName, "Sundry Debtors")
+        XCTAssertEqual(report.rows.first?.referenceNumber, "INV-002")
+        XCTAssertEqual(report.rows.first?.amountPaise, 10000)
+        XCTAssertEqual(report.totalPaise, 10000)
     }
 
     func testGstSummaryRespectsDateRangeAndBucketTotals() throws {

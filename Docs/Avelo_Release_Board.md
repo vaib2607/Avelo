@@ -14,7 +14,7 @@ Severity rules:
 Module ship status:
 - `Exposed, not Ready`: company setup, company switching, FYs, accounts, vouchers, reports, inventory, payroll, banking, audit, backup/restore, and the offline shell remain available for development and accountant QA, but the open P0 catalogue below blocks a Ready designation.
 - `Conditional`: inventory valuation, payroll compliance, banking reconciliation, GST filing, and legal-document output must be labelled incomplete anywhere they remain visible.
-- `Deferred`: features whose underlying workflows are still explicit stubs, including BOM, bill-wise allocation, cheque, TDS/TCS, cost-centre/category, and advanced order/logistics flows, cannot be counted as shipped merely because models, fields, routes, or placeholder screens exist.
+- `Deferred`: features whose broader workflows are still explicit stubs, including BOM costing/production, TDS/TCS, cost-centre/category, and advanced order/logistics flows, cannot be counted as shipped merely because models, fields, routes, or placeholder screens exist. Core cheque bounce/re-presentation and BOM cycle-safe persistence now ship-path test, but broader adjacent workflows remain open until the canonical backlog closes them.
 
 Release split rule:
 - If it affects correctness, data loss, or the app's ability to open and save reliably on day one, it belongs in `V1`.
@@ -84,8 +84,22 @@ Execution queue alignment:
   - `Proof remaining`
   - `Manual acceptance remaining`
 - The current Wave `P0-A` proof-closure queue is: `AVL-P0-012`, `AVL-P0-011`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-030`, `AVL-P0-027`, and `AVL-P0-002`.
-- The current Wave `P0-B` remaining implementation queue begins with: `AVL-P0-006`, `AVL-P0-007`, `AVL-P0-003`, `AVL-P0-004`, and `AVL-P0-009`.
+- The current Wave `P0-B` remaining implementation queue is empty; the wave now contains only proof and manual-acceptance closure work.
+- `AVL-P0-003` implementation and automated proof are landed; it remains open only until accountant outstanding/bill-allocation acceptance is executed and recorded.
+- `AVL-P0-004` implementation and automated proof are landed; it remains open only until accountant bounced-cheque acceptance is executed and recorded.
+- `AVL-P0-009` implementation and automated proof are landed; it remains open only until manufacturing validation acceptance is executed and recorded.
+- `AVL-P0-008` implementation and automated proof are landed; it remains open only until accountant unit-conversion acceptance is executed and recorded.
+- `AVL-P0-010` implementation and automated proof are landed; it remains open only until accountant valuation acceptance is executed and recorded.
+- `AVL-P0-024` implementation and automated proof are landed; it remains open only until accountant trial-balance acceptance is executed and recorded.
+- `AVL-P0-019` implementation and automated proof are landed; it remains open only until accountant backdated-stock acceptance is executed and recorded.
+- `AVL-P0-001` implementation and automated proof are landed; it remains open only until accountant invoice-rounding acceptance is executed and recorded.
+- `AVL-P0-032` implementation and automated proof are landed; it remains open only until accountant voucher-cancel acceptance is executed and recorded.
 - `AVL-P0-005` implementation and automated proof are landed; it remains open only until accountant year-close acceptance is executed and recorded.
+- `AVL-P0-006` implementation and automated proof are landed; it remains open only until accountant locked-period correction acceptance is executed and recorded.
+- `AVL-P0-007` implementation and automated proof are landed; it remains open only until accountant keyboard-entry acceptance is executed and recorded.
+- `AVL-P0-028` implementation and automated proof are landed; it remains open only until accountant company-picker preservation acceptance is executed and recorded.
+- `AVL-P0-031` implementation and automated proof are landed; it remains open only until operator recovery acceptance is executed and recorded.
+- `AVL-P0-029` implementation and automated proof are landed; it remains open only until operator company-create rollback acceptance is executed and recorded.
 
 ## Release-Risk Split
 
@@ -105,17 +119,17 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | --- | --- | --- | --- | --- |
 | AVL-P0-001 | Open | None | Deterministic GST round-off ledger for invoice/tax rounding differences, with one authoritative `ROUND_OFF` line derived during posting/edit instead of caller-supplied balancing. | Golden invoices prove balanced postings, deterministic paise allocation, and seeded/migrated `ROUND_OFF` ledger availability; accountant verifies printed totals. |
 | AVL-P0-002 | Open | None | Gap-free voucher numbering under concurrent saves and failed transactions. | Contention and rollback tests prove committed numbers are unique, ordered, and never reused. |
-| AVL-P0-003 | Open | None | Bill-wise FIFO allocation for partial receipts, payments, advances, and on-account amounts. | Golden bill-settlement fixtures reconcile every allocation and outstanding balance. |
-| AVL-P0-004 | Open | AVL-P0-003 | Non-destructive bounced-cheque workflow using linked reversals. | Original cheque/voucher remains immutable; reversal and re-presentation are fully audited. |
+| AVL-P0-003 | Open | None | Bill-wise FIFO allocation for partial receipts, payments, advances, and on-account amounts. | Golden bill-settlement fixtures reconcile every allocation and outstanding balance; restore/remap preserves bill references and settlement state. |
+| AVL-P0-004 | Open | AVL-P0-003 | Non-destructive bounced-cheque workflow using linked reversals. | Original cheque/voucher remains immutable; persisted cheque metadata survives edit and restore, and linked bounce/re-presentation flows are fully audited. |
 | AVL-P0-005 | Open | AVL-P0-025, AVL-P0-026 | Carry locked-FY closing balances into the next FY exactly once, without mutating historical ledger masters, and remove/regenerate that published opening snapshot cleanly on reopen/re-close. | Close/reopen/idempotency fixtures reconcile every ledger to the prior closing balance, later-FY reports use the carried snapshot, and accountant year-close acceptance confirms the workflow. |
-| AVL-P0-006 | Open | AVL-P0-026 | Graceful reversal-only correction for locked-FY records. | UI and service tests reject edits without crashing and create linked current-period reversals. |
-| AVL-P0-007 | Open | AVL-P0-002 | Prevent duplicate vouchers from rapid Enter/default-action activation. | Repeated-key and concurrent-submit tests produce one durable voucher and one audit event. |
+| AVL-P0-006 | Open | AVL-P0-026 | Graceful reversal-only correction for locked-FY records, with read-only voucher inspection and an explicit linked reversal path instead of in-place edits. | UI and service tests reject edits without crashing, locked vouchers open read-only, and linked current-period reversals preserve history and numbering. |
+| AVL-P0-007 | Open | AVL-P0-002 | Prevent duplicate vouchers from rapid Enter/default-action activation by gating a visible posting attempt to one in-flight submission. | Repeated-key and concurrent-submit tests produce one durable voucher and one audit event, while deliberate later posts still work normally. |
 | AVL-P0-008 | Open | AVL-P0-011 | Alternate-UOM conversion using rational/fixed-point quantities, never floating truncation. | Round-trip fixtures cover fractional conversions, residual units, and extreme quantities. |
-| AVL-P0-009 | Open | AVL-P0-011 | Detect direct and indirect circular BOMs before costing or expansion. | Cycle fixtures terminate deterministically with an actionable validation error. |
+| AVL-P0-009 | Open | AVL-P0-011 | Detect direct and indirect circular BOMs before costing or expansion. | Persisted BOM definitions reject direct and indirect cycles before write, survive restore, and terminate with an actionable validation error. |
 | AVL-P0-010 | Open | AVL-P0-008, AVL-P0-011 | Real FIFO and weighted-average valuation with consumable layers, divide-by-zero handling, and deterministic residual paise. | Golden purchase/sale/return/backdate fixtures reconcile quantity, COGS, and closing value exactly. |
 | AVL-P0-011 | Open | None | Throw on overflow in every money/quantity calculation, including BOM, stock, payroll, reports, reconciliation, reductions, absolute values, and `Int64.min` formatting. | Boundary/property tests prove no trap, wrap, saturation, or silent precision loss. |
 | AVL-P0-012 | Open | None | Keyed or externally anchored tamper evidence for the audit chain. | Mutation, deletion, insertion, reordering, and whole-chain rewrite simulations are detected. |
-| AVL-P0-013 | Open | None | Exclude registry, company databases, WAL, SHM, and recovery artifacts from iCloud sync. | Filesystem metadata test and clean-device manual check prove exclusion. |
+| AVL-P0-013 | Open | None | Exclude registry, company databases, WAL, SHM, and recovery artifacts from iCloud sync. | Filesystem metadata checks now cover app-support roots, registry, company files, and restore outputs; clean-device manual storage-policy acceptance is still required before closure. |
 | AVL-P0-014 | Open | None | Hold `ProcessInfo` activity assertions during migrations, restore, backup, repair, and long recalculation. | Cancellation and error tests always release assertions; sleep/App Nap QA completes operations safely. |
 | AVL-P0-015 | Open | AVL-P0-031 | Run schema migrations off the main thread with progress, cancellation policy, and recovery UI. | Large migration keeps UI responsive and resumes or rolls back safely after interruption. |
 | AVL-P0-016 | Open | None | One source of truth for company/router/editor state; no stale UI pointers. | Company-switch, close-window, sheet, and delayed-task stress tests produce no stale writes or nil crashes. |

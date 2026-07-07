@@ -4,7 +4,7 @@ public struct EditVoucherSheet: View {
 
     @Environment(AppEnvironment.self) private var env
     let voucherId: Voucher.ID
-    @State private var voucher: Voucher?
+    @State private var payload: VoucherEditPayload?
 
     public init(voucherId: Voucher.ID) {
         self.voucherId = voucherId
@@ -12,8 +12,8 @@ public struct EditVoucherSheet: View {
 
     public var body: some View {
         Group {
-            if let voucher {
-                EditVoucherEditor(voucher: voucher)
+            if let payload {
+                EditVoucherEditor(payload: payload)
             } else {
                 ProgressView()
             }
@@ -24,16 +24,21 @@ public struct EditVoucherSheet: View {
 
     private func loadVoucher() {
         guard let ctx = env.companyContext else {
-            voucher = nil
+            payload = nil
             return
         }
         do {
-            guard let found = try VoucherService(db: ctx.database, companyId: ctx.companyId).findById(voucherId) else {
+            let service = VoucherService(db: ctx.database, companyId: ctx.companyId)
+            guard let found = try service.findById(voucherId) else {
                 throw AppError.notFound("Voucher")
             }
-            voucher = found
+            guard let financialYear = try FinancialYearRepository(db: ctx.database).findById(found.financialYearId) else {
+                throw AppError.notFound("Financial year")
+            }
+            let lines = try service.lines(for: voucherId)
+            payload = VoucherEditPayload(voucher: found, financialYear: financialYear, lines: lines)
         } catch {
-            voucher = nil
+            payload = nil
             env.showError(AppError.wrap(error))
         }
     }
@@ -43,10 +48,17 @@ private struct EditVoucherEditor: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @State private var vm: VoucherEditViewModel?
-    let voucher: Voucher
+    let payload: VoucherEditPayload
 
     var body: some View {
-        EditInner(vm: vm, voucherNumber: voucher.number, onSave: save(vm:))
+        Group {
+            switch VoucherCorrectionPolicy.mode(for: payload.voucher, financialYear: payload.financialYear) {
+            case .editInPlace:
+                EditInner(vm: vm, voucherNumber: payload.voucher.number, onSave: save(vm:))
+            case .reversalOnly:
+                LockedVoucherCorrectionView(payload: payload)
+            }
+        }
             .environment(router)
             .task(id: env.companyContext?.companyId) { setup() }
     }
@@ -60,10 +72,10 @@ private struct EditVoucherEditor: View {
         do {
             let model = VoucherEditViewModel(
                 companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id,
-                initialType: voucher.voucherTypeCode, existingId: voucher.id
+                initialType: payload.voucher.voucherTypeCode, existingId: payload.voucher.id
             )
             let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
-            model.load(accounts: accounts, initialDate: ctx.financialYear.startDate)
+            model.load(accounts: accounts, initialDate: payload.voucher.date)
             model.revalidate()
             vm = model
         } catch {
@@ -76,7 +88,12 @@ private struct EditVoucherEditor: View {
         guard let ctx = env.companyContext else { return }
         do {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
-            _ = try svc.edit(voucher.id, with: vm.buildDraft(), in: ctx.financialYear)
+            _ = try svc.edit(
+                payload.voucher.id,
+                with: vm.buildDraft(),
+                in: ctx.financialYear,
+                workflow: vm.buildWorkflowInputs()
+            )
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher updated.")
@@ -84,6 +101,26 @@ private struct EditVoucherEditor: View {
         } catch {
             env.showError(AppError.wrap(error))
         }
+    }
+}
+
+private struct VoucherEditPayload: Sendable {
+    let voucher: Voucher
+    let financialYear: FinancialYear
+    let lines: [LedgerLine]
+}
+
+enum VoucherCorrectionPolicy {
+    enum Mode: Equatable {
+        case editInPlace
+        case reversalOnly
+    }
+
+    static func mode(for voucher: Voucher, financialYear: FinancialYear) -> Mode {
+        if financialYear.isLocked || financialYear.isClosed {
+            return .reversalOnly
+        }
+        return .editInPlace
     }
 }
 
@@ -231,5 +268,97 @@ private struct EditVoucherBody: View {
                 .disabled(!vm.canPost)
         }
         .padding(16)
+    }
+}
+
+private struct LockedVoucherCorrectionView: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AppRouter.self) private var router
+    let payload: VoucherEditPayload
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ModuleChrome(
+                title: "Voucher \(payload.voucher.number)",
+                subtitle: "This voucher belongs to locked financial year \(payload.financialYear.label). It is read-only; corrections must be posted through a linked reversal in an open financial year.",
+                hints: [
+                    .init(title: "Reverse", key: "⌘R"),
+                    .init(title: "Close", key: "Esc")
+                ]
+            )
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    summarySection
+                    linesSection
+                    correctionNotice
+                }
+                .padding(16)
+            }
+            Divider()
+            HStack {
+                Spacer()
+                Button("Close") { router.presentedSheet = nil }
+                    .keyboardShortcut(.cancelAction)
+                Button("Reverse…") { router.present(.reverseVoucher(payload.voucher.id)) }
+                    .keyboardShortcut("r", modifiers: [.command])
+                    .buttonStyle(.borderedProminent)
+                    .disabled(payload.voucher.isReversal || payload.voucher.status == .cancelled)
+            }
+            .padding(16)
+        }
+    }
+
+    private var summarySection: some View {
+        GroupBox("Voucher") {
+            VStack(alignment: .leading, spacing: 8) {
+                summaryRow("Date", DateFormatters.userDate.string(from: payload.voucher.date))
+                summaryRow("Type", payload.voucher.voucherTypeCode.rawValue)
+                summaryRow("Party", payload.voucher.partyAccountId?.uuidString ?? "—")
+                summaryRow("Narration", payload.voucher.narration.isEmpty ? "—" : payload.voucher.narration)
+                summaryRow("Financial Year", payload.financialYear.label)
+                summaryRow("Total", Currency.formatPaise(payload.voucher.totalPaise))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+        }
+    }
+
+    private var linesSection: some View {
+        GroupBox("Lines") {
+            VStack(spacing: 8) {
+                ForEach(Array(payload.lines.enumerated()), id: \.element.id) { _, line in
+                    HStack {
+                        Text(line.accountId.uuidString)
+                            .font(.callout.monospaced())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(line.side == .debit ? "Debit" : "Credit")
+                            .frame(width: 80)
+                        Text(Currency.formatPaise(line.amountPaise))
+                            .monospacedDigit()
+                            .frame(width: 140, alignment: .trailing)
+                    }
+                }
+            }
+            .padding(8)
+        }
+    }
+
+    private var correctionNotice: some View {
+        GroupBox("Correction Path") {
+            Text("Use Reverse to create a linked opposite-entry voucher in the current open financial year. The locked-period voucher remains unchanged, preserving numbering and audit history.")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+        }
+    }
+
+    private func summaryRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(label)
+                .foregroundStyle(.secondary)
+                .frame(width: 120, alignment: .leading)
+            Text(value)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }

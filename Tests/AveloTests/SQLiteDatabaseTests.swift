@@ -151,4 +151,42 @@ final class SQLiteDatabaseTests: XCTestCase {
             XCTAssertFalse(message.isEmpty)
         }
     }
+
+    func testUserVersionThrowsWhenDatabaseHandleIsClosed() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        db.close()
+
+        XCTAssertThrowsError(try db.userVersion()) { error in
+            guard case AppError.database(let dbError) = error else {
+                return XCTFail("Expected database error, got \(error)")
+            }
+            switch dbError {
+            case .openFailed(let message), .prepareFailed(let message):
+                XCTAssertFalse(message.isEmpty)
+            default:
+                XCTFail("Expected openFailed or prepareFailed, got \(dbError)")
+            }
+        }
+    }
+
+    func testOpeningCorruptDatabaseBytesFailsClosedInsteadOfFallingBackToSchemaZero() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("avelo-sqlite-corrupt-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("corrupt.sqlite")
+        try Data("not-a-sqlite-database".utf8).write(to: url)
+
+        XCTAssertThrowsError(try SQLiteDatabase(path: url.path)) { error in
+            guard case AppError.database(let dbError) = error else {
+                return XCTFail("Expected database error, got \(error)")
+            }
+            switch dbError {
+            case .openFailed(let message), .prepareFailed(let message), .stepFailed(let message), .execFailed(let message):
+                XCTAssertFalse(message.isEmpty)
+            default:
+                XCTFail("Expected openFailed, prepareFailed, stepFailed, or execFailed, got \(dbError)")
+            }
+        }
+    }
 }

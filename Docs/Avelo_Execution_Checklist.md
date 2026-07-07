@@ -68,32 +68,32 @@ Execute in this order after Wave P0-A is green enough to avoid rework.
 | ID | State | Dependency gate | Next concrete action | Proof still missing |
 | --- | --- | --- | --- | --- |
 | AVL-P0-005 | Manual acceptance remaining | AVL-P0-025 and AVL-P0-026 | Execute the accountant year-close acceptance script against the shipped exact-once carry-forward, reopen cleanup, and idempotent close behavior. | Accountant year-close acceptance is still pending; automated proof is complete on `FinancialYearCloseCarryForwardTests`, `FinancialYearServiceTests`, `ReportBehaviorTests`, `AccountTreeReconciliationTests`, `SchemaDriftTests`, and full `swift test`. |
-| AVL-P0-006 | Implementation remaining | AVL-P0-026 | Implement reversal-only correction flow for locked-FY edits across service and UI. | UI/service rejection-and-reversal tests, full `swift test`, and accountant locked-period correction acceptance. |
-| AVL-P0-007 | Implementation remaining | AVL-P0-002 | Implement one-shot submit protection for rapid Enter/default-action activation without duplicate audit events. | Repeated-key/concurrent-submit fixtures, full `swift test`, and keyboard-entry acceptance. |
-| AVL-P0-003 | Implementation remaining | None | Replace bill-allocation stub behavior with real FIFO settlement for receipts, payments, advances, and on-account amounts. | Golden bill-allocation fixtures, full `swift test`, and accountant outstanding reconciliation acceptance. |
-| AVL-P0-004 | Implementation remaining | AVL-P0-003 | Implement non-destructive bounced-cheque workflow using linked reversals and re-presentation state. | Golden cheque lifecycle fixtures, full `swift test`, and accountant cheque reversal acceptance. |
-| AVL-P0-009 | Implementation remaining | AVL-P0-011 | Implement direct and indirect BOM cycle detection before expansion/costing. | Cycle fixtures, full `swift test`, and manufacturing validation acceptance. |
-| AVL-P0-008 | Proof remaining | AVL-P0-011 | Reconfirm rational alternate-UOM behavior after valuation, stock ageing, and logistics workflows settle; write accountant unit-conversion script. | Full-suite proof and manual acceptance. |
-| AVL-P0-010 | Proof remaining | AVL-P0-008 and AVL-P0-011 | Reconfirm FIFO/weighted-average valuation against the final stock workflow set; write accountant valuation verification script. | Full-suite proof and manual acceptance. |
-| AVL-P0-024 | Proof remaining | AVL-P0-011 | Reconfirm per-account trial-balance netting after bill allocation, cancellation, and FY close work; write accountant TB verification script. | Full-suite proof and manual acceptance. |
-| AVL-P0-019 | Proof remaining | AVL-P0-010 | After `AVL-P0-003`/`AVL-P0-004`/`AVL-P0-009`, rerun downstream recalculation proofs and write accountant backdated-stock correction script. | Full-suite proof and manual acceptance. |
-| AVL-P0-001 | Proof remaining | None | Reconfirm deterministic `ROUND_OFF` behavior after later voucher-class, GST, and print changes; write accountant invoice-rounding script. | Full-suite proof and manual acceptance. |
-| AVL-P0-032 | Proof remaining | AVL-P0-002 and AVL-P0-012 | Reconfirm cancel/reversal/history behavior after numbering and tamper finalization; write accountant voucher-cancel acceptance script. | Full-suite proof and manual acceptance. |
+| AVL-P0-006 | Manual acceptance remaining | AVL-P0-026 | Execute the accountant locked-period correction script against the shipped read-only locked-FY voucher workflow and linked reversal path into an open FY. | Accountant locked-period correction acceptance is still pending; automated proof is complete on `VouchersViewTests`, `VoucherServiceTests`, `FiscalLockEnforcementTests`, and full `swift test`. |
+| AVL-P0-007 | Manual acceptance remaining | AVL-P0-002 | Execute the keyboard-entry acceptance script against the shipped one-shot submit guard for voucher posting. | Accountant keyboard-entry acceptance is still pending; automated proof is complete on `VouchersViewTests`, `VoucherServiceTests`, `AccountantRCFlowTests`, and full `swift test`. |
+| AVL-P0-003 | Manual acceptance remaining | None | Execute the accountant outstanding-reconciliation script against the shipped bill-allocation engine, voucher persistence, reversal mirroring, and restore-safe remap behavior. | Accountant bill-wise outstanding acceptance is still pending; automated proof is complete on `VoucherServiceTests`, `ReportBehaviorTests`, `RestoreServiceTests`, `AccountantRCFlowTests`, `SchemaDriftTests`, and full `swift test`. |
+| AVL-P0-004 | Manual acceptance remaining | AVL-P0-003 | Execute the accountant bounced-cheque script against the shipped cheque persistence, linked reversal, re-presentation, restore remap, and edit round-trip behavior. | Accountant cheque reversal acceptance is still pending; automated proof is complete on `VoucherServiceTests`, `RestoreServiceTests`, `SchemaDriftTests`, and full `swift test`. |
+| AVL-P0-009 | Manual acceptance remaining | AVL-P0-011 | Execute the manufacturing validation script against the shipped BOM persistence path and direct/indirect cycle rejection before save/load. | Manufacturing validation acceptance is still pending; automated proof is complete on `BOMServiceTests`, `RestoreServiceTests`, `SchemaDriftTests`, and full `swift test`. |
+| AVL-P0-008 | Manual acceptance remaining | AVL-P0-011 | Execute the accountant unit-conversion script against the shipped rational alternate-UOM persistence and conversion paths across stock posting and valuation. | Accountant unit-conversion acceptance is still pending; automated proof is complete on `InventoryServiceTests` and full `swift test`. |
+| AVL-P0-010 | Manual acceptance remaining | AVL-P0-008 and AVL-P0-011 | Execute the accountant valuation-verification script against the shipped FIFO/weighted-average layer replay, authoritative stock-out costing, residual paise handling, and stock-valuation reporting paths. | Accountant valuation acceptance is still pending; automated proof is complete on `InventoryServiceTests`, `ReportBehaviorTests`, and full `swift test`. |
+| AVL-P0-024 | Manual acceptance remaining | AVL-P0-011 | Execute the accountant trial-balance verification script against the shipped per-account netting, seeded/live SQL reconciliation, and later-FY carry-forward report paths. | Accountant trial-balance acceptance is still pending; automated proof is complete on `TrialBalanceNettingTests`, `AccountTreeReconciliationTests`, `ReportBehaviorTests`, and full `swift test`. |
+| AVL-P0-019 | Manual acceptance remaining | AVL-P0-010 | Execute the accountant backdated-stock correction script against the shipped downstream recalculation and publication behavior for insert, reversal, and replacement flows. | Accountant backdated-stock acceptance is still pending; automated proof is complete on `InventoryServiceTests` and full `swift test`. |
+| AVL-P0-001 | Manual acceptance remaining | None | Execute the accountant invoice-rounding script against the shipped GST round-off normalization, edit recomputation, and seeded/migrated `ROUND_OFF` ledger behavior. | Accountant invoice-rounding acceptance is still pending; automated proof is complete on `VoucherServiceTests`, `SchemaDriftTests`, and full `swift test`. |
+| AVL-P0-032 | Manual acceptance remaining | AVL-P0-002 and AVL-P0-012 | Execute the accountant voucher-cancel acceptance script against the shipped status/reason/timestamp persistence, linked reversal, number preservation, and audit-history behavior. | Accountant voucher-cancel acceptance is still pending; automated proof is complete on `VoucherServiceTests`, `AuditCoverageTests`, and full `swift test`. |
 
 Exit criteria for this wave:
 
 - every ledger-impacting path has golden fixtures
 - every workflow has an explicit accountant acceptance script
-- no bill-wise, cheque, or BOM stub is still treated as acceptable readiness evidence
+- no bill-wise stub is still treated as acceptable readiness evidence; core BOM cycle-safe persistence and cheque bounce/re-presentation are ship-path proven, while broader manufacturing and cheque-adjacent workflows stay open until their remaining backlog items land
 
 ## Wave P0-C — storage, UI, and legal blockers
 
 | ID | State | Dependency gate | Next concrete action | Proof still missing |
 | --- | --- | --- | --- | --- |
-| AVL-P0-028 | Implementation remaining | None | Replace registry `INSERT OR REPLACE` with collision-safe insert/update semantics that preserve every company row and file. | Collision fixtures, full `swift test`, and accountant company-picker preservation acceptance. |
-| AVL-P0-031 | Implementation remaining | None | Make schema-version reads throwing so unreadable DBs never fall back to version zero. | Corrupt/locked/wrong-key/I/O fixtures, full `swift test`, and operator recovery acceptance. |
-| AVL-P0-029 | Implementation remaining | AVL-P0-028 and AVL-P0-031 | Make company creation transactional across DB file, Keychain, seed data, and registry with compensating cleanup and honored `seedDefaults`. | Failure-at-each-stage fixtures, full `swift test`, and accountant company-create rollback acceptance. |
-| AVL-P0-013 | Implementation remaining | None | Exclude registry, DB, WAL, SHM, and recovery artifacts from iCloud sync. | Metadata fixture, clean-device verification, and operator storage acceptance. |
+| AVL-P0-028 | Manual acceptance remaining | None | Execute the accountant company-picker preservation script against the shipped collision-safe registry insert/update path. | Accountant company-picker preservation acceptance is still pending; automated proof is complete on `RegistryRepositoryTests`, `DatabaseManagerFileResolutionTests`, and full `swift test`. |
+| AVL-P0-031 | Manual acceptance remaining | None | Execute the operator recovery script against the shipped throwing schema-version read path for unreadable/corrupt company databases and restore inputs. | Operator recovery acceptance is still pending; automated proof is complete on `SQLiteDatabaseTests`, `DatabaseManagerFileResolutionTests`, `BankReconciliationServiceTests`, and full `swift test`. |
+| AVL-P0-029 | Manual acceptance remaining | AVL-P0-028 and AVL-P0-031 | Execute the operator company-create rollback script against the shipped compensating cleanup path and honored `seedDefaults` behavior. | Operator company-create rollback acceptance is still pending; automated proof is complete on `CompanyServiceCreationTests`, `AppEnvironmentFlowTests`, `RestoreServiceTests`, and full `swift test`. |
+| AVL-P0-013 | Manual acceptance remaining | None | Execute the operator storage-policy script against the shipped backup-exclusion metadata on app support roots, registry, company databases, restore staging, and restored company files. | Clean-device/manual storage verification is still pending; automated proof is complete on `DatabaseManagerFileResolutionTests`, `RestoreServiceTests`, and full `swift test`. |
 | AVL-P0-014 | Implementation remaining | None | Hold and release `ProcessInfo` activity assertions around migrations, restore, backup, repair, and recalculation. | Cancellation/error-release tests, full `swift test`, and sleep/App Nap QA. |
 | AVL-P0-015 | Implementation remaining | AVL-P0-031 | Move migrations off the main thread with progress, interruption policy, and recovery UI. | Large-migration responsiveness/interruption fixtures, full `swift test`, and operator migration acceptance. |
 | AVL-P0-016 | Implementation remaining | None | Consolidate company/router/editor state into one source of truth and remove stale pointer paths. | Company-switch/window/sheet stress tests, full `swift test`, and accountant shell-flow acceptance. |
@@ -196,7 +196,7 @@ Execute only after P0 release readiness is real and P1 rollout blockers are clos
 
 These items stay open here because proof closure is still incomplete even though implementation has advanced substantially:
 
-- `AVL-P0-001`, `AVL-P0-002`, `AVL-P0-008`, `AVL-P0-010`, `AVL-P0-011`, `AVL-P0-019`, `AVL-P0-024`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-027`, `AVL-P0-030`, and `AVL-P0-032` remain `Proof remaining`.
+- `AVL-P0-002`, `AVL-P0-011`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-027`, and `AVL-P0-030` remain `Proof remaining`.
 - `AVL-P0-012` is also `Proof remaining`; targeted tamper evidence is green on:
   - `swift test --filter AuditTamperEvidenceTests`
   - `swift test --filter DatabaseManagerFileResolutionTests`
@@ -356,3 +356,163 @@ These items stay open here because proof closure is still incomplete even though
   5. Reopen the earlier FY through the maintenance/test flow, confirm the later FY carry-forward snapshot is removed, then close it again and confirm the regenerated opening snapshot still matches the revised prior-year closing balances exactly.
   6. Expected result: close publishes one exact opening snapshot into the next FY, repeated close is a no-op, reopen removes the published carry-forward state cleanly, re-close republishes the correct balances, and no historical ledger master opening balance is overwritten.
 - Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-005 closure evidence.
+
+### AVL-P0-006
+
+- Implemented: [Avelo/Features/Vouchers/EditVoucherSheet.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Features/Vouchers/EditVoucherSheet.swift) and [Avelo/Features/Vouchers/ReverseVoucherSheet.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Features/Vouchers/ReverseVoucherSheet.swift), on top of the existing locked-FY service enforcement in [Avelo/Core/Services/VoucherService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/VoucherService.swift) and validator/lock checks in [Avelo/Core/Validation/VoucherDraftValidator.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Validation/VoucherDraftValidator.swift). Invariant: a voucher belonging to a locked or closed FY is presented read-only, in-place edit remains blocked, and the correction path is an explicitly linked reversal that posts into the current open FY while preserving the original voucher and audit history.
+- Automated proof:
+  - `swift test --filter VouchersViewTests` — pass
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test --filter FiscalLockEnforcementTests` — pass
+  - `swift test` — pass (`285` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create a company with one voucher in an FY, then lock that FY and keep or create a later open FY.
+  2. Open the locked-period voucher from the voucher list or any report drill-down entry point.
+  3. Verify the sheet is read-only, clearly explains that the period is locked, and offers a reversal action instead of a save path.
+  4. Use the reversal workflow, enter an optional reason, and complete the reversal.
+  5. Verify the original voucher remains unchanged in the locked FY, the reversal voucher is linked to it, and the reversal lands in the latest open FY with opposite debit/credit lines.
+  6. Attempt a direct edit of the locked voucher through any remaining service/UI path and confirm it is rejected cleanly with no partial write and no crash.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-006 closure evidence.
+
+### AVL-P0-007
+
+- Implemented: [Avelo/Features/Vouchers/NewVoucherSheet.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Features/Vouchers/NewVoucherSheet.swift). Invariant: the new-voucher default action can start posting only once per in-flight attempt, so rapid repeated `Enter`/default-action dispatch cannot create duplicate vouchers or duplicate audit events from a single visible posting action.
+- Automated proof:
+  - `swift test --filter VouchersViewTests` — pass
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test --filter AccountantRCFlowTests` — pass
+  - `swift test` — pass (`287` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Open a new voucher sheet in an unlocked FY and enter one valid balanced voucher.
+  2. Trigger the post action repeatedly using rapid `Enter`/default-action activation and an immediate mouse click on Post while the sheet is still visible.
+  3. Reopen the voucher list and audit trail for the affected voucher type and date.
+  4. Repeat once more with a second valid voucher after the first post completes, confirming the guard resets for a new attempt.
+  5. Expected result: each intentional voucher post produces exactly one durable voucher number, one voucher row, and one audit event; no duplicate voucher is created from rapid repeated activation during the same in-flight post; after completion, a new deliberate post still succeeds normally.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-007 closure evidence.
+
+### AVL-P0-003
+
+- Implemented: [Avelo/Core/Database/Migrations/MigrationV015.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV015.swift), [Avelo/Core/Repositories/AccountingWorkflowsRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/AccountingWorkflowsRepository.swift), [Avelo/Core/Services/BillAllocationEngine.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/BillAllocationEngine.swift), [Avelo/Core/Services/VoucherService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/VoucherService.swift), [Avelo/Core/Repositories/ReportRepository+ComplianceReports.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/ReportRepository+ComplianceReports.swift), [Avelo/Core/Database/RestoreService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/RestoreService.swift), [Avelo/Features/Vouchers/EditVoucherSheet.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Features/Vouchers/EditVoucherSheet.swift), [Avelo/Core/Models/ReportResult.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Models/ReportResult.swift), and [Avelo/Features/Reports/ReportsBody+Outstanding.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Features/Reports/ReportsBody+Outstanding.swift). Invariant: bill allocations are persisted in-schema, receipts/payments/advances/on-account amounts settle FIFO by party with explicit `Agst Ref` support, outstanding is bill-wise rather than party-netted, edits update allocations, reversals/cancellations mirror allocations for net settlement, and restore/remap keeps the new table company-safe.
+- Automated proof:
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test --filter ReportBehaviorTests` — pass
+  - `swift test --filter RestoreServiceTests` — pass
+  - `swift test --filter AccountantRCFlowTests` — pass
+  - `swift test --filter SchemaDriftTests` — pass
+  - `swift test` — pass (`290` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create a debtor and a creditor party ledger, then post two bills for one party with distinct bill references.
+  2. Post one on-account receipt/payment smaller than the total outstanding and verify the oldest open bill is consumed first without manual reference selection.
+  3. Post one explicit `Against Ref` settlement against the remaining later bill and verify only that named bill is reduced.
+  4. Open Outstanding as of the settlement date and confirm rows are bill-wise, carry the correct reference numbers, and reconcile exactly to the party ledger balance.
+  5. Edit one still-open bill to change its amount/reference, then cancel or reverse another bill and verify outstanding updates correctly without reusing numbers or deleting history.
+  6. Export a backup, restore it into a new company, reopen the restored bill, and confirm the bill reference and outstanding result still match the source company.
+  7. Expected result: FIFO and explicit-reference settlement both reconcile exactly, outstanding never falls back to party-netted balances, reversals/cancellations net the original bill safely, and restore preserves the workflow state.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as P0-003 closure evidence.
+
+### AVL-P0-009
+
+- Implemented: [Avelo/Core/Database/Migrations/MigrationV017.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV017.swift), [Avelo/Core/Database/MigrationRunner.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/MigrationRunner.swift), [Avelo/Core/Database/SchemaVersion.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/SchemaVersion.swift), [Avelo/Core/Repositories/BOMRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/BOMRepository.swift), [Avelo/Core/Services/BOMService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/BOMService.swift), and [Avelo/Core/Database/RestoreService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/RestoreService.swift). Invariant: one persisted BOM per assembly item is stored under same-company constraints, component rows are replaced atomically for that BOM, and save fails closed before persistence whenever the proposed assembly graph introduces a direct or indirect cycle.
+- Automated proof:
+  - `swift test --filter 'BOMServiceTests|SchemaDriftTests|RestoreServiceTests'` — pass
+  - `swift test` — pass (`296` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Enable inventory for a test company and create at least three stock items intended to act as assemblies plus one raw component.
+  2. Save one simple BOM and reopen it to confirm output quantity, component quantities, and component order round-trip exactly.
+  3. Attempt a direct self-reference by adding the assembly item as its own component and save again.
+  4. Create an indirect chain `A -> B`, `B -> C`, then attempt to save `C -> A`.
+  5. Export and restore the company backup, reopen the restored company, and reload the previously valid BOM.
+  6. Expected result: valid BOMs persist and reload unchanged; direct and indirect cycles are rejected with an explicit circular-BOM error before any partial write; restored companies preserve valid BOM definitions without cross-company corruption.
+- Residual risk: Manual manufacturing acceptance is still pending; broader BOM costing and production workflows remain open in later backlog items and are not counted as AVL-P0-009 closure evidence.
+
+### AVL-P0-008
+
+- Implemented: [Avelo/Core/Utilities/ExactQuantity.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Utilities/ExactQuantity.swift), [Avelo/Core/Models/InventoryItem.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Models/InventoryItem.swift), [Avelo/Core/Repositories/InventoryRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/InventoryRepository.swift), [Avelo/Core/Services/InventoryService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/InventoryService.swift), and [Avelo/Core/Database/Migrations/MigrationV005.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV005.swift). Invariant: alternate-UOM definitions persist as exact numerator/denominator ratios, stock movements entered in the alternate unit convert to authoritative base quantity through checked integer math, and fractional residual base quantity is preserved without float truncation.
+- Automated proof:
+  - `swift test --filter InventoryServiceTests` — pass
+  - `swift test` — pass (`296` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Enable inventory for a test company and create one stock item with a base unit plus an alternate unit whose conversion is fractional, for example `1 BAG = 2.5 KG`.
+  2. Reopen the saved stock item and verify the alternate-unit definition still shows exactly the original ratio, not a rounded decimal approximation.
+  3. Post one stock-in movement entered as `1 BAG`, then inspect the stored/base quantity through stock ledger or movement detail.
+  4. Post another movement entered as a fractional alternate quantity such as `1.5 BOX` for an item with an exact whole conversion like `12 NOS per BOX`.
+  5. Expected result: the authoritative base quantities resolve exactly from the rational conversion (`1 BAG = 5/2 KG`, `1.5 BOX = 18 NOS`), no truncation or silent rounding occurs, and downstream stock balances/valuation use those exact converted quantities.
+- Residual risk: Manual accountant acceptance is still pending; broader valuation and ageing acceptance remain tracked under later dependent tickets and are not counted as AVL-P0-008 closure evidence.
+
+### AVL-P0-010
+
+- Implemented: [Avelo/Core/Services/InventoryValuationEngine.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/InventoryValuationEngine.swift), [Avelo/Core/Services/InventoryService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/InventoryService.swift), [Avelo/Core/Repositories/InventoryRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/InventoryRepository.swift), [Avelo/Core/Repositories/ReportRepository+ComplianceReports.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/ReportRepository+ComplianceReports.swift), and [Avelo/Core/Models/ReportResult.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Models/ReportResult.swift). Invariant: each replay derives authoritative stock-out value from persisted movements and surviving layers, FIFO consumes oldest layers, weighted average consumes exact aggregate quantity/value with deterministic residual paise allocation, and reports reflect replayed authoritative quantity/value rather than caller-supplied stock-out rates.
+- Automated proof:
+  - `swift test --filter InventoryServiceTests` — pass
+  - `swift test --filter ReportBehaviorTests` — pass
+  - `swift test` — pass (`296` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create one FIFO-valued item and one weighted-average-valued item in an inventory-enabled company.
+  2. For the FIFO item, post at least two receipts at different rates, then post one stock-out with an intentionally wrong caller rate and verify the persisted stock-out value follows oldest-layer cost, not the entered rate.
+  3. For the weighted-average item, post at least two receipts at different rates, then post one stock-out and verify the persisted stock-out value follows the exact aggregate average and leaves the expected closing value.
+  4. Use one quantity/value mix that produces residual paise and verify the remaining stock value is deterministic and repeatable after reload.
+  5. Open the stock valuation report for the same date range and confirm quantity, out value, closing value, and average cost reconcile to the replayed movements exactly.
+  6. Expected result: FIFO and weighted-average items both ignore caller-supplied stock-out rates, consumed value is authoritative and deterministic, residual paise allocation is stable, and the report ties exactly to persisted movements and closing stock.
+- Residual risk: Manual accountant acceptance is still pending; ageing and other downstream inventory workflows remain tracked under later dependent tickets and are not counted as AVL-P0-010 closure evidence.
+
+### AVL-P0-024
+
+- Implemented: [Avelo/Core/Repositories/ReportRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/ReportRepository.swift), [Avelo/Core/Services/ReportService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/ReportService.swift), [Avelo/Features/Reports/ReportsBody+FinancialStatements.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Features/Reports/ReportsBody+FinancialStatements.swift), and [Avelo/Features/Dashboard/DashboardView.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Features/Dashboard/DashboardView.swift). Invariant: every trial-balance row is netted to exactly one closing side by combining signed opening balance with movement debits/credits first, and only the resulting net amount is exposed as debit or credit for that account.
+- Automated proof:
+  - `swift test --filter TrialBalanceNettingTests` — pass
+  - `swift test --filter AccountTreeReconciliationTests` — pass
+  - `swift test --filter ReportBehaviorTests` — pass
+  - `swift test` — pass (`296` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create or use a company where one account has an opening balance on one side and later movement on the opposite side, for example opening cash `₹100 Dr` plus `₹40 Cr` movement.
+  2. Open Trial Balance as of the period end and inspect that account row directly.
+  3. Verify the same company through the account tree/dashboard trial-balance view and confirm the signed net agrees with the report row.
+  4. Repeat once after bill-allocation, cancellation/reversal, and FY carry-forward activity exists in the same company.
+  5. Expected result: each account appears on exactly one closing side, `₹100 Dr` plus `₹40 Cr` reports `₹60 Dr` rather than separate debit and credit columns, total debits equal total credits, and the report matches both seeded/live SQL reconciliation and later-FY carry-forward behavior.
+- Residual risk: Manual accountant acceptance is still pending; benchmark/stress skips remain historical and are not counted as AVL-P0-024 closure evidence.
+
+### AVL-P0-019
+
+- Implemented: [Avelo/Core/Services/InventoryService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/InventoryService.swift), [Avelo/Core/Services/InventoryValuationEngine.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/InventoryValuationEngine.swift), and [Avelo/Core/Repositories/InventoryRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/InventoryRepository.swift). Invariant: any stock movement added or corrected with an effective date at or before later movements triggers authoritative replay from the earliest affected date, republishes corrected downstream `total_value_paise` values atomically, and returns a publication payload listing every movement whose persisted valuation changed.
+- Automated proof:
+  - `swift test --filter InventoryServiceTests` — pass
+  - `swift test` — pass (`296` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create an item with at least one later stock-out already posted.
+  2. Insert a new earlier-dated receipt and verify the later stock-out value changes to the newly authoritative value and the closing stock value updates accordingly.
+  3. Reverse one existing stock-out and verify stock quantity/value return to the expected restored state with a published recalculation result.
+  4. Replace one earlier receipt or issue with a corrected movement and verify downstream later movements are republished with their corrected authoritative values.
+  5. Expected result: backdated insert, reversal, and replacement all update downstream persisted valuations deterministically; the affected movement list identifies changed downstream rows; no partial or silent stale valuation remains after the write commits.
+- Residual risk: Manual accountant acceptance is still pending; explicit inventory-voucher cancellation and broader downstream inventory workflows remain outside this shipped movement-lifecycle proof and are not counted as AVL-P0-019 closure evidence.
+
+### AVL-P0-001
+
+- Implemented: [Avelo/Core/Services/VoucherService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/VoucherService.swift), [Avelo/Core/Database/Migrations/MigrationV008.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV008.swift), [Avelo/Core/Database/SeedLoader.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/SeedLoader.swift), and [Avelo/Resources/Seed/DefaultChartOfAccounts.json](/Users/vaibhavkakar/Developer/Avelo/Avelo/Resources/Seed/DefaultChartOfAccounts.json). Invariant: invoice-style GST drafts strip any caller-supplied `ROUND_OFF` line, recompute one authoritative round-off line deterministically from the non-round-off GST-bearing lines, and append it at a stable position only when the bounded mismatch rule applies.
+- Automated proof:
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test --filter SchemaDriftTests` — pass
+  - `swift test` — pass (`296` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Create a GST-bearing sales voucher whose debit/credit mismatch is within the allowed paise-level auto-balance threshold.
+  2. Include no round-off line the first time, then reopen/edit the same invoice while deliberately entering an incorrect manual `ROUND_OFF` line.
+  3. Save the edit and inspect the persisted voucher lines.
+  4. Post one non-GST or no-tax-ledger voucher with a similar mismatch and confirm it still fails instead of auto-balancing.
+  5. Expected result: the GST invoice persists exactly one `ROUND_OFF` line with the deterministic side and paise amount, any caller-supplied round-off line is replaced rather than preserved, the voucher total reflects the normalized posting, and non-GST mismatches still fail closed.
+- Residual risk: Manual accountant acceptance is still pending; legal PDF completeness and signed-QR/e-invoice workflows remain separate later tickets and are not counted as AVL-P0-001 closure evidence.
+
+### AVL-P0-032
+
+- Implemented: [Avelo/Core/Services/VoucherService.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Services/VoucherService.swift), [Avelo/Core/Repositories/VoucherRepository.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Repositories/VoucherRepository.swift), [Avelo/Core/Models/Voucher.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Models/Voucher.swift), and [Avelo/Core/Database/Migrations/MigrationV007.swift](/Users/vaibhavkakar/Developer/Avelo/Avelo/Core/Database/Migrations/MigrationV007.swift). Invariant: cancellation preserves the original voucher row and number, records cancelled status plus reason/actor/timestamp/linkage metadata, creates an explicit linked reversal rather than deleting history, and writes both reversal and cancellation audit events.
+- Automated proof:
+  - `swift test --filter VoucherServiceTests` — pass
+  - `swift test --filter AuditCoverageTests` — pass
+  - `swift test` — pass (`296` passed, `8` skipped, `0` failed)
+- Manual proof:
+  1. Post one voucher, note its number, then cancel it through the supported cancellation flow with a reason and actor.
+  2. Reopen the original voucher and confirm it remains visible with cancelled status plus persisted reason, actor, timestamp, and linked cancellation voucher ID.
+  3. Open the linked reversal voucher and confirm it carries reversed lines and source linkage to the original voucher.
+  4. Post a new voucher of the same type and confirm the cancelled number is not reused.
+  5. Attempt to edit or cancel the already cancelled voucher again and confirm both actions fail cleanly.
+  6. Check the audit trail and confirm both `voucherReversed` and `voucherCancelled` events exist with snapshot data.
+  7. Expected result: cancellation never deletes the source voucher or its number, history remains intact, the linked reversal preserves accounting traceability, and repeated cancellation/edit attempts are blocked.
+- Residual risk: Manual accountant acceptance is still pending; broader Day Book and continuous-flow browse/cancel UX remains tracked in later dependent tickets and is not counted as AVL-P0-032 closure evidence.

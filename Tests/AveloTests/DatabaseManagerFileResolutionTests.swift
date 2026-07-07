@@ -3,6 +3,24 @@ import XCTest
 
 final class DatabaseManagerFileResolutionTests: XCTestCase {
 
+    private func excludedFromBackup(_ url: URL) throws -> Bool {
+        try XCTUnwrap(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup)
+    }
+
+    func testDatabaseManagerExcludesAppSupportDirectoriesAndRegistryFromBackup() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
+
+        XCTAssertTrue(try excludedFromBackup(root))
+        let companiesDirectory = await manager.companiesDirectory
+        XCTAssertTrue(try excludedFromBackup(companiesDirectory))
+        let registryURL = URL(fileURLWithPath: await manager.registryPath)
+        XCTAssertTrue(try excludedFromBackup(registryURL))
+    }
+
     func testConcurrentOpenCompanyCreatesOnlyOneDatabaseHandle() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -74,6 +92,18 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
         XCTAssertEqual(handle.companyName, companyName)
         let company = try XCTUnwrap(CompanyRepository(db: handle.db).findById(companyId))
         XCTAssertEqual(company.name, companyName)
+    }
+
+    func testCreateCompanyFileExcludesCompanyDatabaseFromBackup() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
+        let companyId = UUID()
+        let fileURL = try await manager.createCompanyFile(companyId: companyId)
+
+        XCTAssertTrue(try excludedFromBackup(fileURL))
     }
 
     func testOpenCompanyFailsClearlyWhenRegisteredFileIsMissing() async throws {
@@ -160,6 +190,46 @@ final class DatabaseManagerFileResolutionTests: XCTestCase {
                 return XCTFail("Expected businessRule tamper error, got \(error)")
             }
             XCTAssertTrue(message.contains("Audit chain verification failed"))
+        }
+    }
+
+    func testOpenCompanyFailsClosedWhenSchemaVersionReadFails() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let keyStore = InMemoryCompanyKeyStore()
+        let setupManager = try DatabaseManager(appSupportDirectory: root, keyStore: keyStore)
+        let companyId = UUID()
+        let fileURL = try await setupManager.createCompanyFile(companyId: companyId)
+        await setupManager.closeAll()
+
+        let manager = try DatabaseManager(
+            appSupportDirectory: root,
+            keyStore: keyStore,
+            databaseOpener: { _, _ in
+                let db = try SQLiteDatabase(path: ":memory:")
+                db.close()
+                return db
+            }
+        )
+        try await manager.registerCompany(
+            CompanyRegistryEntry(id: companyId, name: "Unreadable Version Co", sqliteFileName: fileURL.lastPathComponent)
+        )
+
+        do {
+            _ = try await manager.openCompany(id: companyId)
+            XCTFail("Expected openCompany to fail when schema version cannot be read")
+        } catch {
+            guard case AppError.database(let dbError) = AppError.wrap(error) else {
+                return XCTFail("Expected schema-version database failure, got \(error)")
+            }
+            switch dbError {
+            case .openFailed(let message), .prepareFailed(let message):
+                XCTAssertFalse(message.isEmpty)
+            default:
+                XCTFail("Expected openFailed or prepareFailed, got \(dbError)")
+            }
         }
     }
 

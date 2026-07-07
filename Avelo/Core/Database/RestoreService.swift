@@ -13,8 +13,12 @@ public struct RestoreService: Sendable {
         "avelo_accounts",
         "avelo_voucher_types",
         "avelo_vouchers",
+        "avelo_bill_allocations",
+        "avelo_cheques",
         "avelo_ledger_lines",
         "avelo_inventory_items",
+        "avelo_boms",
+        "avelo_bom_components",
         "avelo_inventory_order_lines",
         "avelo_inventory_orders",
         "avelo_inventory_reorder_levels",
@@ -372,6 +376,7 @@ public struct RestoreService: Sendable {
         }
         do {
             try fm.copyItem(at: sourceURL, to: stagingURL)
+            try BackupExclusion.apply(to: stagingURL)
         } catch {
             AveloRestoreLogger.error("restore staging copy failed to \(stagingURL.path, privacy: .public)")
             throw AppError.fileSystem("Unable to stage backup for restore at \(stagingURL.lastPathComponent): \(error.localizedDescription)")
@@ -383,7 +388,7 @@ public struct RestoreService: Sendable {
             let db = opened.db
             defer { db.close() }
             try Self.validateIntegrity(db: db)
-            let current = db.userVersion()
+            let current = try db.userVersion()
             guard current <= SchemaVersion.current.rawValue else {
                 throw AppError.database(.schemaMismatch("Backup schema version \(current) is newer than this app supports."))
             }
@@ -436,6 +441,9 @@ public struct RestoreService: Sendable {
             )
             db.close()
             try fm.moveItem(at: stagingURL, to: destURL)
+            try BackupExclusion.apply(to: destURL)
+            try Self.applyBackupExclusionIfPresent(to: URL(fileURLWithPath: destURL.path + "-wal"))
+            try Self.applyBackupExclusionIfPresent(to: URL(fileURLWithPath: destURL.path + "-shm"))
             try await manager.registerCompany(entry)
             return entry
         } catch {
@@ -468,6 +476,12 @@ public struct RestoreService: Sendable {
             } catch {
                 throw AppError.database(.missingEncryptionKey("This encrypted backup requires the company recovery key before it can be restored."))
             }
+        }
+    }
+
+    private static func applyBackupExclusionIfPresent(to url: URL) throws {
+        if FileManager.default.fileExists(atPath: url.path) {
+            try BackupExclusion.apply(to: url)
         }
     }
 

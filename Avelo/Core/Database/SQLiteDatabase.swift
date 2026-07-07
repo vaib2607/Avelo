@@ -641,15 +641,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
     }
 
-    public func userVersion() -> Int {
-        do {
-            let v: Int64? = try sync {
-                try queryOneNoLock("PRAGMA user_version", bind: [], row: { r in r.int(0) })
-            }
-            return Int(v ?? 0)
-        } catch {
-            return 0
+    public func userVersion() throws -> Int {
+        let v: Int64? = try sync {
+            try queryOneNoLock("PRAGMA user_version", bind: [], row: { r in r.int(0) })
         }
+        return Int(v ?? 0)
     }
 
     public func setUserVersion(_ version: Int) throws {

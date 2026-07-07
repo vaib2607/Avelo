@@ -282,9 +282,11 @@ public enum ReportResult {
     }
 
     public struct OutstandingRow: Identifiable, Hashable, Sendable {
-        public let id: Account.ID
+        public let id: String
+        public let accountId: Account.ID
         public let accountName: String
         public let partyName: String
+        public let referenceNumber: String
         public let asOf: Date
         public let totalPaise: Int64
         public let amountPaise: Int64
@@ -294,8 +296,10 @@ public enum ReportResult {
         public let age90PlusPaise: Int64
         public let ageInDays: Int
 
-        public init(id: Account.ID,
+        public init(id: String,
+                    accountId: Account.ID,
                     partyName: String,
+                    referenceNumber: String,
                     asOf: Date,
                     amountPaise: Int64,
                     age0to30Paise: Int64 = 0,
@@ -304,8 +308,10 @@ public enum ReportResult {
                     age90PlusPaise: Int64 = 0,
                     ageInDays: Int = 0) {
             self.id = id
+            self.accountId = accountId
             self.accountName = partyName
             self.partyName = partyName
+            self.referenceNumber = referenceNumber
             self.asOf = asOf
             self.totalPaise = amountPaise
             self.amountPaise = amountPaise

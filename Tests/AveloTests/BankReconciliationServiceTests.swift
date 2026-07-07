@@ -154,7 +154,7 @@ final class BankReconciliationServiceTests: XCTestCase {
         let restored = try await RestoreService(manager: manager).restore(from: backupURL)
         let handle = try await manager.openCompany(id: restored.id)
 
-        XCTAssertEqual(handle.db.userVersion(), SchemaVersion.current.rawValue)
+        XCTAssertEqual(try handle.db.userVersion(), SchemaVersion.current.rawValue)
         try BankReconciliationRepository(db: handle.db).insertStatementLine(
             companyId: restored.id,
             accountId: try firstAccountId(in: handle.db, companyId: restored.id),
@@ -182,7 +182,7 @@ final class BankReconciliationServiceTests: XCTestCase {
         try await manager.registerCompany(.init(id: companyId, name: "Encrypted V3 Co", sqliteFileName: fileURL.lastPathComponent))
 
         let handle = try await manager.openCompany(id: companyId)
-        XCTAssertEqual(handle.db.userVersion(), SchemaVersion.current.rawValue)
+        XCTAssertEqual(try handle.db.userVersion(), SchemaVersion.current.rawValue)
         try BankReconciliationRepository(db: handle.db).insertStatementLine(
             companyId: companyId,
             accountId: seeded.cashId,

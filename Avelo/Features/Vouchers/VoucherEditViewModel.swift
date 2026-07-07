@@ -82,11 +82,14 @@ public final class VoucherEditViewModel {
                 let svc = VoucherService(db: db, companyId: companyId)
                 if let existing = try svc.findById(vid) {
                     self.draft = try svc.loadDraft(from: vid)
+                    let workflow = try AccountingWorkflowsRepository(db: db).workflowInputs(for: vid)
                     self.narration = existing.narration
                     self.date = existing.date
                     self.partyAccountId = existing.partyAccountId
-                    self.billReferenceType = existing.partyAccountId != nil ? .agstRef : nil
-                    self.billReferenceNumber = existing.number
+                    self.billReferenceType = draft.billReferenceType
+                    self.billReferenceNumber = draft.billReferenceNumber ?? ""
+                    self.chequeNumber = workflow.chequeNumber ?? ""
+                    self.chequeDueDate = workflow.chequeDueDate
                     let lines = try svc.lines(for: vid)
                     self.lines = lines.enumerated().map { (idx, l) in
                         LineRow(
