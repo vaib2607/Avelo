@@ -33,12 +33,16 @@ public final class InventoryService: Sendable {
     public let repository: InventoryRepository
     public let audit: AuditService
     public let companyId: Company.ID
+    private let activityController: any LongOperationActivityControlling
 
-    public init(db: SQLiteDatabase, companyId: Company.ID) {
+    public init(db: SQLiteDatabase,
+                companyId: Company.ID,
+                activityController: any LongOperationActivityControlling = ProcessInfoLongOperationActivityController()) {
         self.db = db
         self.repository = InventoryRepository(db: db)
         self.audit = AuditService(db: db, companyId: companyId)
         self.companyId = companyId
+        self.activityController = activityController
     }
 
     public func listItems(includeArchived: Bool = false) throws -> [InventoryItem] {
@@ -455,26 +459,28 @@ public final class InventoryService: Sendable {
     private func republishAuthoritativeValuation(item: InventoryItem,
                                                  effectiveFromDate: Date,
                                                  repository: InventoryRepository) throws -> RecalculationPublication {
-        let movements = try repository.listMovementsChronologically(companyId: companyId, itemId: item.id)
-        let replay = try InventoryValuationEngine().replay(movements: movements, valuationMethod: item.valuationMethod)
-        var affectedMovementIds: [StockMovement.ID] = []
-        for valued in replay.valuedMovements where valued.movement.date >= effectiveFromDate {
-            if valued.movement.totalValuePaise != valued.authoritativeTotalValuePaise {
-                try repository.updateMovementTotalValue(
-                    id: valued.movement.id,
-                    companyId: companyId,
-                    totalValuePaise: valued.authoritativeTotalValuePaise
-                )
-                affectedMovementIds.append(valued.movement.id)
+        try activityController.perform(reason: "Avelo inventory valuation recalculation") {
+            let movements = try repository.listMovementsChronologically(companyId: companyId, itemId: item.id)
+            let replay = try InventoryValuationEngine().replay(movements: movements, valuationMethod: item.valuationMethod)
+            var affectedMovementIds: [StockMovement.ID] = []
+            for valued in replay.valuedMovements where valued.movement.date >= effectiveFromDate {
+                if valued.movement.totalValuePaise != valued.authoritativeTotalValuePaise {
+                    try repository.updateMovementTotalValue(
+                        id: valued.movement.id,
+                        companyId: companyId,
+                        totalValuePaise: valued.authoritativeTotalValuePaise
+                    )
+                    affectedMovementIds.append(valued.movement.id)
+                }
             }
+            return .init(
+                itemId: item.id,
+                effectiveFromDate: effectiveFromDate,
+                affectedMovementIds: affectedMovementIds,
+                phase: .published,
+                publishedAt: Date()
+            )
         }
-        return .init(
-            itemId: item.id,
-            effectiveFromDate: effectiveFromDate,
-            affectedMovementIds: affectedMovementIds,
-            phase: .published,
-            publishedAt: Date()
-        )
     }
 
     private func requireItem(id: InventoryItem.ID, repository: InventoryRepository) throws -> InventoryItem {

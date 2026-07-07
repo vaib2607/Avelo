@@ -7,6 +7,7 @@ private let AveloRestoreLogger = Logger(subsystem: "com.avelo.desktop", category
 public struct RestoreService: Sendable {
 
     public let manager: DatabaseManager
+    private let activityController: any LongOperationActivityControlling
     private static let companyScopedTables: [String] = [
         "avelo_financial_years",
         "avelo_account_groups",
@@ -328,130 +329,134 @@ public struct RestoreService: Sendable {
     static var lockedFinancialYearTriggerNamesForMigration: [String] { lockedFinancialYearTriggerNames }
     static var lockedFinancialYearTriggerSQLForMigration: [String] { lockedFinancialYearTriggerSQL }
 
-    public init(manager: DatabaseManager) {
+    public init(manager: DatabaseManager,
+                activityController: any LongOperationActivityControlling = ProcessInfoLongOperationActivityController()) {
         self.manager = manager
+        self.activityController = activityController
     }
 
     public func restore(from sourceURL: URL, recoveryKey: String? = nil) async throws -> CompanyRegistryEntry {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: sourceURL.path) else {
-            AveloRestoreLogger.error("restore source missing: \(sourceURL.path, privacy: .public)")
-            throw AppError.notFound("Backup file not found")
-        }
-
-        let manifestURL: URL = {
-            if sourceURL.pathExtension == "manifest.json" {
-                return sourceURL
+        try await activityController.perform(reason: "Avelo backup restore") {
+            let fm = FileManager.default
+            guard fm.fileExists(atPath: sourceURL.path) else {
+                AveloRestoreLogger.error("restore source missing: \(sourceURL.path, privacy: .public)")
+                throw AppError.notFound("Backup file not found")
             }
-            return sourceURL.appendingPathExtension("manifest.json")
-        }()
 
-        let manifest = try Self.loadManifest(
-            manifestURL: manifestURL,
-            sourceURL: sourceURL,
-            fileManager: fm
-        )
-        try Self.validateManifest(manifest, sourceURL: sourceURL)
+            let manifestURL: URL = {
+                if sourceURL.pathExtension == "manifest.json" {
+                    return sourceURL
+                }
+                return sourceURL.appendingPathExtension("manifest.json")
+            }()
 
-        let data = try Data(contentsOf: sourceURL)
-        try Self.validateBackupData(data, manifest: manifest, sourceURL: sourceURL)
-
-        let registryEntries = try await manager.listCompanies()
-        if registryEntries.contains(where: { $0.name.caseInsensitiveCompare(manifest.companyName) == .orderedSame }) {
-            AveloRestoreLogger.error("duplicate restore name rejected: \(manifest.companyName, privacy: .public)")
-            throw AppError.businessRule("A company named \"\(manifest.companyName)\" already exists. Rename or remove the existing company before restoring this backup.")
-        }
-
-        let newId = UUID()
-        let destURL = manager.companiesDirectory.appendingPathComponent("\(newId.uuidString).sqlite")
-        let stagingURL = manager.companiesDirectory.appendingPathComponent(".restore-\(newId.uuidString).sqlite")
-        Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm)
-        defer { Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm) }
-        if fm.fileExists(atPath: destURL.path) {
-            do {
-                try fm.removeItem(at: destURL)
-            } catch {
-                throw AppError.fileSystem("Unable to replace existing restored company file at \(destURL.lastPathComponent): \(error.localizedDescription)")
-            }
-        }
-        do {
-            try fm.copyItem(at: sourceURL, to: stagingURL)
-            try BackupExclusion.apply(to: stagingURL)
-        } catch {
-            AveloRestoreLogger.error("restore staging copy failed to \(stagingURL.path, privacy: .public)")
-            throw AppError.fileSystem("Unable to stage backup for restore at \(stagingURL.lastPathComponent): \(error.localizedDescription)")
-        }
-
-        do {
-            let decodedRecoveryKey = try recoveryKey.map { try RecoveryKeyCodec.decode($0) }
-            let opened = try Self.openStagedDatabase(stagingURL: stagingURL, key: decodedRecoveryKey)
-            let db = opened.db
-            defer { db.close() }
-            try Self.validateIntegrity(db: db)
-            let current = try db.userVersion()
-            guard current <= SchemaVersion.current.rawValue else {
-                throw AppError.database(.schemaMismatch("Backup schema version \(current) is newer than this app supports."))
-            }
-            if current < SchemaVersion.current.rawValue {
-                try MigrationRunner().runMigrations(on: db)
-                try Self.validateIntegrity(db: db)
-            }
-            let storedKey: Data = switch opened.source {
-            case .keyed(let key):
-                key
-            case .plaintext, .legacyPassphrase:
-                try manager.keyStore.generateKey()
-            }
-            try manager.keyStore.store(key: storedKey, companyId: newId)
-            try Self.prepareRestoredCompanyDatabase(
-                db: db,
-                restoredCompanyId: newId,
-                restoredCompanyName: manifest.companyName
+            let manifest = try Self.loadManifest(
+                manifestURL: manifestURL,
+                sourceURL: sourceURL,
+                fileManager: fm
             )
-            try Self.validateIntegrity(db: db)
-            try Self.validatePreparedCompany(db: db, companyId: newId, companyName: manifest.companyName)
+            try Self.validateManifest(manifest, sourceURL: sourceURL)
 
-            switch opened.source {
-            case .keyed(let key):
-                assert(key == storedKey)
-            case .plaintext:
-                db.close()
-                try LegacyKeyMigrationService(keyStore: manager.keyStore).migrate(
-                    companyId: newId,
-                    fileURL: stagingURL,
-                    source: .plaintext,
-                    newKey: storedKey
-                )
-            case .legacyPassphrase:
-                db.close()
-                try LegacyKeyMigrationService(keyStore: manager.keyStore).migrate(
-                    companyId: newId,
-                    fileURL: stagingURL,
-                    source: .hardcodedPassphrase,
-                    newKey: storedKey
-                )
+            let data = try Data(contentsOf: sourceURL)
+            try Self.validateBackupData(data, manifest: manifest, sourceURL: sourceURL)
+
+            let registryEntries = try await manager.listCompanies()
+            if registryEntries.contains(where: { $0.name.caseInsensitiveCompare(manifest.companyName) == .orderedSame }) {
+                AveloRestoreLogger.error("duplicate restore name rejected: \(manifest.companyName, privacy: .public)")
+                throw AppError.businessRule("A company named \"\(manifest.companyName)\" already exists. Rename or remove the existing company before restoring this backup.")
             }
 
-            let entry = CompanyRegistryEntry(
-                id: newId,
-                name: manifest.companyName,
-                sqliteFileName: destURL.lastPathComponent,
-                lastOpenedAt: nil,
-                createdAt: Date()
-            )
-            db.close()
-            try fm.moveItem(at: stagingURL, to: destURL)
-            try BackupExclusion.apply(to: destURL)
-            try Self.applyBackupExclusionIfPresent(to: URL(fileURLWithPath: destURL.path + "-wal"))
-            try Self.applyBackupExclusionIfPresent(to: URL(fileURLWithPath: destURL.path + "-shm"))
-            try await manager.registerCompany(entry)
-            return entry
-        } catch {
-            AveloRestoreLogger.error("restore failed, cleaning up \(stagingURL.path, privacy: .public)")
-            Self.cleanupRestoredCompanyFile(at: destURL, fileManager: fm)
+            let newId = UUID()
+            let destURL = manager.companiesDirectory.appendingPathComponent("\(newId.uuidString).sqlite")
+            let stagingURL = manager.companiesDirectory.appendingPathComponent(".restore-\(newId.uuidString).sqlite")
             Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm)
-            try? manager.keyStore.delete(companyId: newId)
-            throw error
+            defer { Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm) }
+            if fm.fileExists(atPath: destURL.path) {
+                do {
+                    try fm.removeItem(at: destURL)
+                } catch {
+                    throw AppError.fileSystem("Unable to replace existing restored company file at \(destURL.lastPathComponent): \(error.localizedDescription)")
+                }
+            }
+            do {
+                try fm.copyItem(at: sourceURL, to: stagingURL)
+                try BackupExclusion.apply(to: stagingURL)
+            } catch {
+                AveloRestoreLogger.error("restore staging copy failed to \(stagingURL.path, privacy: .public)")
+                throw AppError.fileSystem("Unable to stage backup for restore at \(stagingURL.lastPathComponent): \(error.localizedDescription)")
+            }
+
+            do {
+                let decodedRecoveryKey = try recoveryKey.map { try RecoveryKeyCodec.decode($0) }
+                let opened = try Self.openStagedDatabase(stagingURL: stagingURL, key: decodedRecoveryKey)
+                let db = opened.db
+                defer { db.close() }
+                try Self.validateIntegrity(db: db)
+                let current = try db.userVersion()
+                guard current <= SchemaVersion.current.rawValue else {
+                    throw AppError.database(.schemaMismatch("Backup schema version \(current) is newer than this app supports."))
+                }
+                if current < SchemaVersion.current.rawValue {
+                    try MigrationRunner().runMigrations(on: db)
+                    try Self.validateIntegrity(db: db)
+                }
+                let storedKey: Data = switch opened.source {
+                case .keyed(let key):
+                    key
+                case .plaintext, .legacyPassphrase:
+                    try manager.keyStore.generateKey()
+                }
+                try manager.keyStore.store(key: storedKey, companyId: newId)
+                try Self.prepareRestoredCompanyDatabase(
+                    db: db,
+                    restoredCompanyId: newId,
+                    restoredCompanyName: manifest.companyName
+                )
+                try Self.validateIntegrity(db: db)
+                try Self.validatePreparedCompany(db: db, companyId: newId, companyName: manifest.companyName)
+
+                switch opened.source {
+                case .keyed(let key):
+                    assert(key == storedKey)
+                case .plaintext:
+                    db.close()
+                    try LegacyKeyMigrationService(keyStore: manager.keyStore).migrate(
+                        companyId: newId,
+                        fileURL: stagingURL,
+                        source: .plaintext,
+                        newKey: storedKey
+                    )
+                case .legacyPassphrase:
+                    db.close()
+                    try LegacyKeyMigrationService(keyStore: manager.keyStore).migrate(
+                        companyId: newId,
+                        fileURL: stagingURL,
+                        source: .hardcodedPassphrase,
+                        newKey: storedKey
+                    )
+                }
+
+                let entry = CompanyRegistryEntry(
+                    id: newId,
+                    name: manifest.companyName,
+                    sqliteFileName: destURL.lastPathComponent,
+                    lastOpenedAt: nil,
+                    createdAt: Date()
+                )
+                db.close()
+                try fm.moveItem(at: stagingURL, to: destURL)
+                try BackupExclusion.apply(to: destURL)
+                try Self.applyBackupExclusionIfPresent(to: URL(fileURLWithPath: destURL.path + "-wal"))
+                try Self.applyBackupExclusionIfPresent(to: URL(fileURLWithPath: destURL.path + "-shm"))
+                try await manager.registerCompany(entry)
+                return entry
+            } catch {
+                AveloRestoreLogger.error("restore failed, cleaning up \(stagingURL.path, privacy: .public)")
+                Self.cleanupRestoredCompanyFile(at: destURL, fileManager: fm)
+                Self.cleanupRestoredCompanyFile(at: stagingURL, fileManager: fm)
+                try? manager.keyStore.delete(companyId: newId)
+                throw error
+            }
         }
     }
 
