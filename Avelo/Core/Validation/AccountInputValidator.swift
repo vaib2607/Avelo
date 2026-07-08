@@ -127,15 +127,19 @@ public struct AccountInputValidator: Sendable {
         let validDigits = "0123456789"
         func isLetter(_ c: Character) -> Bool { validLetters.contains(c) }
         func isDigit(_ c: Character) -> Bool { validDigits.contains(c) }
-        if !isLetter(chars[0]) { return false }
-        for i in 1...5 { if !isLetter(chars[i]) { return false } }
-        for i in 6...8 { if !isDigit(chars[i]) { return false } }
-        if !isLetter(chars[9]) { return false }
-        if !isDigit(chars[10]) { return false }
+        func isAlphanumeric(_ c: Character) -> Bool { isLetter(c) || isDigit(c) }
+        // 2-digit state code
+        for i in 0...1 { if !isDigit(chars[i]) { return false } }
+        // 10-char PAN: 5 letters, 4 digits, 1 letter
+        for i in 2...6 { if !isLetter(chars[i]) { return false } }
+        for i in 7...10 { if !isDigit(chars[i]) { return false } }
         if !isLetter(chars[11]) { return false }
+        // entity code (digit)
         if !isDigit(chars[12]) { return false }
+        // default 'Z'
         if !isLetter(chars[13]) { return false }
-        if !isDigit(chars[14]) { return false }
+        // checksum digit, alphanumeric
+        if !isAlphanumeric(chars[14]) { return false }
         return true
     }
 }
