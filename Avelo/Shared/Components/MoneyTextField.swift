@@ -5,6 +5,10 @@ public struct MoneyTextField: View {
     public var placeholder: String = "0.00"
     public var alignment: TextAlignment = .trailing
     public var isEditable: Bool = true
+    /// Called after a Return/Enter submit (not a plain blur) commits the
+    /// typed amount. Voucher-line grids use this to add a new line per the
+    /// PRD's "Enter on amount adds a new line" contract (AVL-P0-020).
+    public var onCommit: (() -> Void)? = nil
 
     @State private var text: String = ""
     @FocusState private var isFocused: Bool
@@ -12,11 +16,13 @@ public struct MoneyTextField: View {
     public init(paise: Binding<Int64>,
                 placeholder: String = "0.00",
                 alignment: TextAlignment = .trailing,
-                isEditable: Bool = true) {
+                isEditable: Bool = true,
+                onCommit: (() -> Void)? = nil) {
         self._paise = paise
         self.placeholder = placeholder
         self.alignment = alignment
         self.isEditable = isEditable
+        self.onCommit = onCommit
     }
 
     public var body: some View {
@@ -45,6 +51,7 @@ public struct MoneyTextField: View {
             }
             .onSubmit {
                 commitFromText()
+                onCommit?()
             }
             .frame(height: AppMetrics.fieldHeight)
     }
@@ -66,7 +73,7 @@ public struct MoneyTextField: View {
 }
 
 extension MoneyTextField {
-    public init(label: String, text: Binding<String>) {
+    public init(label: String, text: Binding<String>, onCommit: (() -> Void)? = nil) {
         let paiseBinding = Binding<Int64>(
             get: { Currency.parseRupeeInput(text.wrappedValue) ?? 0 },
             set: { newValue in
@@ -78,6 +85,6 @@ extension MoneyTextField {
                 }
             }
         )
-        self.init(paise: paiseBinding, placeholder: label)
+        self.init(paise: paiseBinding, placeholder: label, onCommit: onCommit)
     }
 }

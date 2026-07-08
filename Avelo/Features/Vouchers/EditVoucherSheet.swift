@@ -228,7 +228,7 @@ private struct EditVoucherBody: View {
             }
             .frame(width: 110)
             .labelsHidden()
-            MoneyTextField(label: "", text: line.amount).frame(width: 160)
+            MoneyTextField(label: "", text: line.amount, onCommit: { vm.addLine() }).frame(width: 160)
             Button { vm.removeLine(line.wrappedValue.id) } label: { Image(systemName: "minus.circle") }
                 .buttonStyle(.plain)
                 .disabled(vm.lines.count <= 2)

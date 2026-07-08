@@ -134,6 +134,41 @@ final class SQLiteDatabaseTests: XCTestCase {
         XCTAssertLessThanOrEqual(db.debugStatementCacheCount, 256)
     }
 
+    // AVL-P0-017: cache eviction must never finalize a statement that is
+    // still busy (mid-iteration) in an outer stack frame. A nested/recursive
+    // read using many distinct statements can push the cache well past its
+    // bound while an outer cursor is paused inside its row callback; the
+    // outer statement's `lastUsedAt` is the oldest in the cache at that
+    // point, so it is the naive LRU eviction candidate. Evicting it would
+    // finalize a statement `sqlite3_step` is still iterating.
+    func testStatementCacheEvictionNeverFinalizesABusyOuterStatement() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        defer { db.close() }
+
+        try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, value TEXT)")
+        for i in 0..<5 {
+            try db.execute("INSERT INTO t (id, value) VALUES (\(i + 1), 'row\(i + 1)')")
+        }
+
+        var outerRows: [String] = []
+        _ = try db.query("SELECT id, value FROM t ORDER BY id") { row in
+            // While this outer statement is busy (stepping mid-iteration),
+            // force eviction pressure with 300 distinct nested statements --
+            // more than `maxCachedStatements` -- so the outer statement would
+            // have been the oldest (and previously eligible) eviction victim.
+            if outerRows.isEmpty {
+                for i in 0..<300 {
+                    let sql = "SELECT value FROM t WHERE id = \((i % 5) + 1)"
+                    _ = try db.queryOne(sql) { $0.text(0) }
+                }
+            }
+            outerRows.append(row.text(1))
+        }
+
+        XCTAssertEqual(outerRows, ["row1", "row2", "row3", "row4", "row5"])
+        XCTAssertLessThanOrEqual(db.debugStatementCacheCount, 256)
+    }
+
     func testBindFailuresReportDatabaseHandleMessage() throws {
         let db = try SQLiteDatabase(path: ":memory:")
         defer { db.close() }

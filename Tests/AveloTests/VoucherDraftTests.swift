@@ -83,4 +83,36 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertEqual(vm.lines[0].amount, "100.00")
         XCTAssertEqual(vm.lines[1].side, .credit)
     }
+
+    // AVL-P0-020: `MoneyTextField`'s `onCommit` (fired on Return/Enter, not on
+    // a plain blur) drives `addLine()` in the voucher-line grid so pressing
+    // Enter on an amount field appends a new blank line per the PRD's
+    // "Enter on amount adds a new line" keyboard contract.
+    @MainActor
+    func testAddLineAppendsBlankRowPreservingExistingLines() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        let originalCount = vm.lines.count
+        let firstLineId = vm.lines[0].id
+
+        vm.addLine()
+
+        XCTAssertEqual(vm.lines.count, originalCount + 1)
+        XCTAssertEqual(vm.lines[0].id, firstLineId, "existing lines are preserved, not replaced")
+        XCTAssertNil(vm.lines.last?.accountId)
+    }
+
+    @MainActor
+    func testRemoveLineDropsOnlyTheTargetedRow() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.addLine()
+        vm.addLine()
+        let target = vm.lines[1].id
+        let remainingIds = vm.lines.filter { $0.id != target }.map(\.id)
+
+        vm.removeLine(target)
+
+        XCTAssertEqual(vm.lines.map(\.id), remainingIds)
+    }
 }
