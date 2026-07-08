@@ -64,9 +64,8 @@ private struct PayrollBody: View {
                     title: "Payroll",
                     subtitle: "Employee masters and salary postings with a clear month-by-month register.",
                     hints: [
-                        .init(title: "Employees", key: "⌘1"),
-                        .init(title: "Post salary", key: "⌘P"),
-                        .init(title: "New employee", key: "⇧⌘N")
+                        .init(title: "Payroll", key: "⌘7"),
+                        .init(title: "New employee", key: "⇧⌘E")
                     ],
                     primaryActionTitle: "New Employee",
                     primaryActionSystemImage: "plus",

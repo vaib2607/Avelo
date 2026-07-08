@@ -23,8 +23,8 @@ public struct ShortcutHelpSheet: View {
                         ("Return / Enter", "Drill down (open selected item)"),
                         ("R", "Reload current view"),
                         ("Cmd+1", "Open Dashboard"),
-                        ("Cmd+2", "Open Accounts"),
-                        ("Cmd+3", "Open Vouchers"),
+                        ("Cmd+2", "Open Vouchers"),
+                        ("Cmd+3", "Open Accounts"),
                         ("Cmd+4", "Open Reports"),
                         ("Cmd+5", "Open Inventory"),
                         ("Cmd+6", "Open GST"),
@@ -32,15 +32,6 @@ public struct ShortcutHelpSheet: View {
                         ("Cmd+8", "Open Banking"),
                         ("Cmd+9", "Open Audit log"),
                         ("Cmd+0", "Open Settings"),
-                    ])
-
-                    section("Modules menu", rows: [
-                        ("Cmd+Shift+5", "Inventory"),
-                        ("Cmd+Shift+6", "GST"),
-                        ("Cmd+Shift+7", "Payroll"),
-                        ("Cmd+Shift+8", "Banking"),
-                        ("Cmd+Shift+9", "Audit"),
-                        ("Cmd+Shift+0", "Settings"),
                     ])
 
                     section("Vouchers (function keys)", rows: [

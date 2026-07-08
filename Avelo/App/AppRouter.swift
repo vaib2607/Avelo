@@ -74,8 +74,6 @@ public enum RouterSheet: Identifiable, Sendable {
     case newItem
     case lockFinancialYear(FinancialYear.ID)
     case closeFinancialYear(FinancialYear.ID)
-    case manageInventory
-    case managePayroll
 
     public var id: String {
         switch self {
@@ -104,8 +102,6 @@ public enum RouterSheet: Identifiable, Sendable {
         case .newItem: return "newItem"
         case .lockFinancialYear(let id): return "lockFy-\(id.uuidString)"
         case .closeFinancialYear(let id): return "closeFy-\(id.uuidString)"
-        case .manageInventory: return "manageInventory"
-        case .managePayroll: return "managePayroll"
         }
     }
 }

@@ -20,7 +20,7 @@ public struct DashboardView: View {
                 monthlyPLSection
                 recentVouchersSection
                 ModuleFooterBar(items: [
-                    .init(title: "Next", detail: "Press ⌘N for a new voucher or switch to Reports for drill-down."),
+                    .init(title: "Next", detail: "Press F4–F11 for a new voucher, or ⌘4 to switch to Reports."),
                     .init(title: "Shortcut", detail: "F4-F11 map to the main voucher families."),
                     .init(title: "Context", detail: "Company, FY, and module are always shown above.")
                 ])
@@ -84,9 +84,9 @@ public struct DashboardView: View {
             title: "Dashboard",
             subtitle: "Your offline Tally-style control center for company context, quick entry, and live totals.",
             hints: [
-                .init(title: "Dashboard", key: "1"),
-                .init(title: "Reports", key: "4"),
-                .init(title: "New voucher", key: "⌘N")
+                .init(title: "Dashboard", key: "⌘1"),
+                .init(title: "Vouchers", key: "⌘2"),
+                .init(title: "Reports", key: "⌘4")
             ]
         )
     }

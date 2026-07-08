@@ -560,10 +560,19 @@ public final class SQLiteDatabase: @unchecked Sendable {
 
     private func evictIfNeededNoLock() {
         guard statementCache.count > maxCachedStatements else { return }
-        if let victim = statementCache.min(by: { $0.value.lastUsedAt < $1.value.lastUsedAt }) {
-            sqlite3_finalize(victim.value.stmt)
-            statementCache.removeValue(forKey: victim.key)
-        }
+        // A statement can still be mid-iteration in an outer stack frame
+        // during a recursive/nested read (the same reentrancy `preparedStatement`
+        // guards against by preferring a transient copy over a busy cached
+        // one). Finalizing a busy statement out from under that outer frame
+        // would invalidate its cursor. Evict the least-recently-used entry
+        // that is not currently busy; if every cached entry is busy, skip
+        // eviction for this cycle rather than finalize one that's in use.
+        let victim = statementCache
+            .filter { sqlite3_stmt_busy($0.value.stmt) == 0 }
+            .min { $0.value.lastUsedAt < $1.value.lastUsedAt }
+        guard let victim else { return }
+        sqlite3_finalize(victim.value.stmt)
+        statementCache.removeValue(forKey: victim.key)
     }
 
     internal var debugStatementCacheCount: Int {

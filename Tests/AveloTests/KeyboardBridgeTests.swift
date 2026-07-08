@@ -12,6 +12,9 @@ final class KeyboardBridgeTests: XCTestCase {
         bridge.dispatch(.openInventory)
         XCTAssertEqual(router.selection, .inventory)
 
+        bridge.dispatch(.openGST)
+        XCTAssertEqual(router.selection, .gst)
+
         bridge.dispatch(.openPayroll)
         XCTAssertEqual(router.selection, .payroll)
 

@@ -16,6 +16,7 @@ public struct BankingView: View {
                     Button { showImport = true } label: {
                         Label("Import statement", systemImage: "tray.and.arrow.down")
                     }
+                    .keyboardShortcut("i", modifiers: .command)
                 }
             }
             .onAppear { setup() }
@@ -78,6 +79,7 @@ private struct BankingBody: View {
                     .onChange(of: vm.asOf) { _, _ in vm.reconcile() }
                 Spacer()
                 Button("Reconcile") { vm.reconcile() }
+                    .keyboardShortcut("r", modifiers: .command)
             }
             .padding(12)
             Divider()

@@ -257,7 +257,7 @@ public struct ReportRepository: Sendable {
             let priorMovements = try movementTotals(
                 for: [account.id],
                 companyId: filter.companyId,
-                toDate: Calendar(identifier: .gregorian).date(byAdding: .day, value: -1, to: financialYear.startDate)
+                toDate: DateFormatters.utcCalendar.date(byAdding: .day, value: -1, to: financialYear.startDate)
             )[account.id]
             return try CheckedMath.subtract(
                 try CheckedMath.add(

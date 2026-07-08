@@ -34,7 +34,7 @@ public struct FinancialYear: Identifiable, Hashable, Sendable, Codable {
     }
 
     public func contains(date: Date) -> Bool {
-        let cal = Calendar(identifier: .gregorian)
+        let cal = DateFormatters.utcCalendar
         let day = cal.startOfDay(for: date)
         let s = cal.startOfDay(for: startDate)
         let e = cal.startOfDay(for: endDate)

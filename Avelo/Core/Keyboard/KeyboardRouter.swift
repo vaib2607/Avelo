@@ -8,6 +8,7 @@ public enum KeyboardCommand: Sendable, Equatable {
     case openVouchers
     case openReports
     case openInventory
+    case openGST
     case openPayroll
     case openBanking
     case openAudit

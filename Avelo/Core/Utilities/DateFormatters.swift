@@ -1,6 +1,19 @@
 import Foundation
 
 public enum DateFormatters {
+    /// Fixed reference calendar for accounting-day comparisons (financial-year
+    /// containment, employment windows, bank-reconciliation date tolerance,
+    /// ageing buckets). All date-only values are persisted through the
+    /// UTC-anchored `isoDateFormatter`, so day-boundary arithmetic must use
+    /// this same fixed UTC frame rather than `Calendar(identifier: .gregorian)`'s
+    /// ambient device timezone -- otherwise which accounting day a date falls
+    /// on could shift with the Mac's system timezone setting (AVL-P0-023).
+    public static let utcCalendar: Calendar = {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        return cal
+    }()
+
     public static let isoDateFormatter: DateFormatter = {
         let df = DateFormatter()
         df.calendar = Calendar(identifier: .gregorian)

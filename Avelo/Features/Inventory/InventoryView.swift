@@ -63,9 +63,8 @@ private struct InventoryBody: View {
                 title: "Inventory",
                 subtitle: "Stock masters, movement, and valuation in a Tally-style offline inventory workspace.",
                 hints: [
-                    .init(title: "Stock items", key: "⌘1"),
-                    .init(title: "Movements", key: "⌘M"),
-                    .init(title: "New item", key: "⇧⌘N")
+                    .init(title: "Inventory", key: "⌘5"),
+                    .init(title: "New item", key: "⇧⌘I")
                 ],
                 primaryActionTitle: "New Item",
                 primaryActionSystemImage: "plus",

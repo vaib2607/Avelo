@@ -70,14 +70,6 @@ struct AveloApp: App {
                     }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
 
-                    Button("Inventory Settings…") {
-                        environment.router.present(.manageInventory)
-                    }
-
-                    Button("Payroll Settings…") {
-                        environment.router.present(.managePayroll)
-                    }
-
                     Button("Lock Financial Year…") {
                         NotificationCenter.default.post(name: .aveloRequestLockFy, object: nil)
                     }
@@ -107,39 +99,29 @@ struct AveloApp: App {
                     }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
                 }
+                // Canonical module shortcut scheme lives in `SidebarDestination.shortcut`.
+                // Keep this menu, `KeyboardMonitor`, and the sidebar labels in sync.
                 CommandMenu("Go") {
                     Button("Dashboard") { environment.router.go(.dashboard) }
                         .keyboardShortcut("1", modifiers: .command)
-                    Button("Accounts")  { environment.router.go(.accounts) }
-                        .keyboardShortcut("2", modifiers: .command)
                     Button("Vouchers")  { environment.router.go(.vouchers) }
+                        .keyboardShortcut("2", modifiers: .command)
+                    Button("Accounts")  { environment.router.go(.accounts) }
                         .keyboardShortcut("3", modifiers: .command)
                     Button("Reports")   { environment.router.go(.reports) }
                         .keyboardShortcut("4", modifiers: .command)
                     Button("Inventory") { environment.router.go(.inventory) }
                         .keyboardShortcut("5", modifiers: .command)
-                    Button("Payroll")   { environment.router.go(.payroll) }
+                    Button("GST")       { environment.router.go(.gst) }
                         .keyboardShortcut("6", modifiers: .command)
-                    Button("Banking")   { environment.router.go(.banking) }
+                    Button("Payroll")   { environment.router.go(.payroll) }
                         .keyboardShortcut("7", modifiers: .command)
-                    Button("Audit")     { environment.router.go(.audit) }
+                    Button("Banking")   { environment.router.go(.banking) }
                         .keyboardShortcut("8", modifiers: .command)
-                    Button("Settings")  { environment.router.go(.settings) }
+                    Button("Audit")     { environment.router.go(.audit) }
                         .keyboardShortcut("9", modifiers: .command)
-                }
-                CommandMenu("Modules") {
-                    Button("Inventory") { environment.router.go(.inventory) }
-                        .keyboardShortcut("5", modifiers: [.command, .shift])
-                    Button("GST") { environment.router.go(.gst) }
-                        .keyboardShortcut("6", modifiers: [.command, .shift])
-                    Button("Payroll") { environment.router.go(.payroll) }
-                        .keyboardShortcut("7", modifiers: [.command, .shift])
-                    Button("Banking") { environment.router.go(.banking) }
-                        .keyboardShortcut("8", modifiers: [.command, .shift])
-                    Button("Audit") { environment.router.go(.audit) }
-                        .keyboardShortcut("9", modifiers: [.command, .shift])
-                    Button("Settings") { environment.router.go(.settings) }
-                        .keyboardShortcut("0", modifiers: [.command, .shift])
+                    Button("Settings")  { environment.router.go(.settings) }
+                        .keyboardShortcut("0", modifiers: .command)
                 }
                 CommandMenu("Masters") {
                     Button("New Account…") { environment.router.present(.newAccount) }

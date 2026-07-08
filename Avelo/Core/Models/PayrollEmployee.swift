@@ -45,7 +45,7 @@ public struct PayrollEmployee: Identifiable, Hashable, Sendable, Codable {
     }
 
     public func isEmployed(on date: Date) -> Bool {
-        let cal = Calendar(identifier: .gregorian)
+        let cal = DateFormatters.utcCalendar
         let day = cal.startOfDay(for: date)
         if day < cal.startOfDay(for: joinedOn) { return false }
         if let end = endDate, day > cal.startOfDay(for: end) { return false }

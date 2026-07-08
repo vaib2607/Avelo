@@ -182,17 +182,15 @@ private struct NewVoucherBody: View {
     }
 
     private var workflowSection: some View {
-        GroupBox("Workflow") {
+        // TDS/TCS and post-dated workflows are deferred (VoucherService rejects
+        // them outside the frozen schema), so only cheque details are exposed.
+        GroupBox("Cheque (optional)") {
             Form {
                 TextField("Cheque number", text: $vm.chequeNumber)
                 DatePicker("Cheque due date", selection: Binding(
                     get: { vm.chequeDueDate ?? vm.date },
                     set: { vm.chequeDueDate = $0 }
                 ), displayedComponents: .date)
-                TextField("TDS section code", text: $vm.tdsSectionCode)
-                TextField("TDS tax amount", text: $vm.tdsTaxAmount)
-                TextField("TCS section code", text: $vm.tcsSectionCode)
-                TextField("TCS tax amount", text: $vm.tcsTaxAmount)
             }
             .formStyle(.grouped)
         }

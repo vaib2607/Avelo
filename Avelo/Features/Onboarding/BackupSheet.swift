@@ -64,4 +64,17 @@ extension NSPanelBridge {
             panel.begin { resp in cont.resume(returning: resp) }
         }
     }
+
+    /// Prompts for a save location and writes `data` to the chosen file.
+    /// Returns the destination URL on success, or `nil` if the user cancelled.
+    @MainActor
+    static func saveData(_ data: Data, suggestedName: String) async throws -> URL? {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = suggestedName
+        panel.canCreateDirectories = true
+        let result = await runSave(panel)
+        guard result == .OK, let url = panel.url else { return nil }
+        try data.write(to: url, options: .atomic)
+        return url
+    }
 }

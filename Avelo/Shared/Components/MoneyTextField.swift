@@ -36,8 +36,11 @@ public struct MoneyTextField: View {
                     let focusedText = paise == 0 ? "" : Currency.formatPaise(paise, style: .plain)
                     if text != focusedText { text = focusedText }
                 } else {
-                    let formatted = format(paise)
-                    if text != formatted { text = formatted }
+                    // Commit whatever was typed. Tab/Shift-Tab and clicking
+                    // another field both blur without firing onSubmit, so
+                    // relying on onSubmit alone silently discarded the last
+                    // edit in a voucher-line grid.
+                    commitFromText()
                 }
             }
             .onSubmit {

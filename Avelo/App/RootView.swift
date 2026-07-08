@@ -164,8 +164,6 @@ public struct RootView: View {
         case .newItem:              NewItemSheet()
         case .lockFinancialYear(let id): LockFinancialYearSheet(fyId: id)
         case .closeFinancialYear(let id): CloseFinancialYearSheet(fyId: id)
-        case .manageInventory:      ManageInventorySheet()
-        case .managePayroll:        ManagePayrollSheet()
         }
     }
 

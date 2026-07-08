@@ -48,6 +48,7 @@ public final class KeyboardBridge {
         case .openVouchers:      router?.go(.vouchers)
         case .openReports:       router?.go(.reports)
         case .openInventory:     router?.go(.inventory)
+        case .openGST:           router?.go(.gst)
         case .openPayroll:       router?.go(.payroll)
         case .openBanking:       router?.go(.banking)
         case .openAudit:         router?.go(.audit)

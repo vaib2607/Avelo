@@ -88,7 +88,7 @@ extension ReportRepository {
         var rows: [ReportResult.OutstandingRow] = []
         for item in settled {
             guard includeOutstanding(item.remainingPaise, for: direction) else { continue }
-            let ageInDays = max(0, Calendar(identifier: .gregorian).dateComponents([.day], from: item.originDate, to: asOfDate).day ?? 0)
+            let ageInDays = max(0, DateFormatters.utcCalendar.dateComponents([.day], from: item.originDate, to: asOfDate).day ?? 0)
             let buckets = ageingBuckets(amountPaise: item.remainingPaise, ageInDays: ageInDays)
             rows.append(ReportResult.OutstandingRow(
                 id: item.id,

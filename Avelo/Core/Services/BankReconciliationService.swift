@@ -161,7 +161,7 @@ public final class BankReconciliationService: Sendable {
 
     private static func isWithinDateTolerance(_ lhs: Date, _ rhs: Date, days: Int) -> Bool {
         let allowedDays = max(0, days)
-        let calendar = Calendar(identifier: .gregorian)
+        let calendar = DateFormatters.utcCalendar
         let start = calendar.startOfDay(for: lhs)
         let end = calendar.startOfDay(for: rhs)
         let delta = calendar.dateComponents([.day], from: start, to: end).day ?? Int.max

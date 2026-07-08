@@ -82,16 +82,19 @@ public final class KeyboardMonitor {
         let ctrl = mods.contains(.control)
 
         if cmd && !shift && !opt && !ctrl {
+            // Canonical module shortcut scheme lives in `SidebarDestination.shortcut`.
+            // Keep this map, the `Go` menu in AveloApp, and the sidebar labels in sync.
             switch keyCode {
             case 18: router.handle(.openDashboard); return true   // Cmd+1
-            case 19: router.handle(.openAccounts); return true    // Cmd+2
-            case 20: router.handle(.openVouchers); return true    // Cmd+3
+            case 19: router.handle(.openVouchers); return true    // Cmd+2
+            case 20: router.handle(.openAccounts); return true    // Cmd+3
             case 21: router.handle(.openReports); return true     // Cmd+4
             case 23: router.handle(.openInventory); return true   // Cmd+5
-            case 22: router.handle(.openPayroll); return true     // Cmd+6
-            case 26: router.handle(.openBanking); return true     // Cmd+7
-            case 28: router.handle(.openAudit); return true       // Cmd+8
-            case 25: router.handle(.openSettings); return true    // Cmd+9
+            case 22: router.handle(.openGST); return true         // Cmd+6
+            case 26: router.handle(.openPayroll); return true     // Cmd+7
+            case 28: router.handle(.openBanking); return true     // Cmd+8
+            case 25: router.handle(.openAudit); return true       // Cmd+9
+            case 29: router.handle(.openSettings); return true    // Cmd+0
             case 40: router.handle(.commandPalette); return true  // Cmd+K
             case 44: router.handle(.quickSearch); return true     // Cmd+/
             case 43: router.handle(.showShortcutHelp); return true // Cmd+,

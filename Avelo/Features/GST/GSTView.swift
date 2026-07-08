@@ -62,8 +62,8 @@ private struct GSTBody: View {
                 title: "GST",
                 subtitle: "Offline tax summary, filing-ready views, and return exports in one focused workspace.",
                 hints: [
-                    .init(title: "Summary", key: "⌘1"),
-                    .init(title: "Filing", key: "⌘2"),
+                    .init(title: "GST", key: "⌘6"),
+                    .init(title: "Refresh", key: "⌘R"),
                     .init(title: "Export CSV", key: "⇧⌘E")
                 ],
                 primaryActionTitle: "Refresh",
@@ -76,7 +76,7 @@ private struct GSTBody: View {
                 DatePicker("To", selection: $vm.toDate, displayedComponents: .date)
                     .onChange(of: vm.toDate) { _, _ in vm.reload() }
                 Spacer()
-                Button("Export CSV") { vm.exportSummaryCSV() }
+                Button("Export CSV") { exportCSV() }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
             }
             .padding(12)
@@ -127,6 +127,20 @@ private struct GSTBody: View {
         }
     }
 
+    private func exportCSV() {
+        Task {
+            do {
+                let data = try vm.summaryCSVData()
+                let name = "GST-Summary-\(DateFormatters.isoDate.string(from: vm.fromDate))-to-\(DateFormatters.isoDate.string(from: vm.toDate)).csv"
+                if let url = try await NSPanelBridge.saveData(data, suggestedName: name) {
+                    env.showSuccess("GST summary exported to \(url.lastPathComponent).")
+                }
+            } catch {
+                env.showError(AppError.wrap(error))
+            }
+        }
+    }
+
     @ViewBuilder
     private func gstRow(_ title: String, _ paise: Int64) -> some View {
         HStack {
@@ -164,12 +178,10 @@ public final class GSTViewModel {
         }
     }
 
-    public func exportSummaryCSV() {
-        do {
-            let svc = GSTService(db: db, companyId: companyId)
-            _ = try svc.exportGSTSummaryCSV(fromDate: fromDate, toDate: toDate)
-        } catch {
-            self.error = AppError.wrap(error)
-        }
+    /// Builds the GST summary CSV bytes for the current period. The view layer
+    /// owns the save panel and writes the returned data to disk.
+    public func summaryCSVData() throws -> Data {
+        let svc = GSTService(db: db, companyId: companyId)
+        return try svc.exportGSTSummaryCSV(fromDate: fromDate, toDate: toDate)
     }
 }

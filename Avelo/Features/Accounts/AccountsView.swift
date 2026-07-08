@@ -84,9 +84,8 @@ private struct AccountsBody: View {
                 title: "Accounts",
                 subtitle: "Groups, ledgers, and account drill-downs with Tally-style master navigation.",
                 hints: [
-                    .init(title: "Groups", key: "⌘1"),
-                    .init(title: "Ledgers", key: "⌘2"),
-                    .init(title: "New account", key: "⇧⌘N")
+                    .init(title: "Accounts", key: "⌘3"),
+                    .init(title: "New account", key: "⇧⌘A")
                 ],
                 primaryActionTitle: "New Account",
                 primaryActionSystemImage: "plus",
