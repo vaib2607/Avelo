@@ -57,6 +57,7 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_payroll_employees",
             "avelo_payroll_entries",
             "avelo_stock_movements",
+            "avelo_voucher_drafts",
             "avelo_voucher_sequences",
             "avelo_voucher_templates",
             "avelo_voucher_types",

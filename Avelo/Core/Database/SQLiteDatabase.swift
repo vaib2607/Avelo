@@ -145,6 +145,14 @@ public struct Row {
         return value
     }
 
+    public func optionalEnumValue<T: RawRepresentable>(_ name: String, as type: T.Type = T.self) throws -> T? where T.RawValue == String {
+        guard let raw = try checkedOptionalText(name) else { return nil }
+        guard let value = T(rawValue: raw) else {
+            throw AppError.database(.rowReadFailed("invalid \(String(describing: T.self)) value for column \(name): \(raw)"))
+        }
+        return value
+    }
+
     public func int(_ name: String) -> Int64 {
         let i = index(of: name)
         guard i >= 0, let box else { return 0 }

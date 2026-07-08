@@ -36,7 +36,7 @@ The pattern is `PascalCase` for types, `camelCase` for methods/properties, `snak
 | `VoucherType.Code` | `enum String` | case journal, sales, purchase, payment, receipt, contra, creditNote, debitNote, opening, payroll |
 | `Voucher` | `struct` | id, companyId, financialYearId, typeCode, number, date, partyAccountId?, narration, isReversal, reversalOfId?, createdAt, updatedAt |
 | `Voucher.ID` | `typealias = UUID` | |
-| `LedgerLine` | `struct` | id, voucherId, accountId, amountPaise (Int64, always > 0), side (EntrySide), taxCode?, costCenter?, lineOrder |
+| `LedgerLine` | `struct` | id, voucherId, accountId, amountPaise (Int64, always > 0), side (EntrySide), taxCode? (HSN/SAC code for invoice display, e.g. `7208`; not a GST-ledger discriminator — that's `Account.code`, e.g. `IGST_OUTPUT`), costCenter?, lineOrder |
 | `LedgerLine.ID` | `typealias = UUID` | |
 | `EntrySide` | `enum String` | case debit, credit |
 | `Transaction` | alias for `Voucher` | The transaction is the voucher. No separate `Transaction` type. |

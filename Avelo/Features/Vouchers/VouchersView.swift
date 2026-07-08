@@ -152,8 +152,22 @@ private struct VouchersBody: View {
                             .disabled(v.isReversal)
                         Button("Reverse") { env.router.present(.reverseVoucher(v.id)) }
                             .disabled(v.isReversal)
+                        if v.voucherTypeCode == .sales || v.voucherTypeCode == .purchase {
+                            Button("Export PDF…") { exportInvoicePDF(v) }
+                        }
                     }
                 }
+            }
+        }
+    }
+
+    private func exportInvoicePDF(_ voucher: Voucher) {
+        Task {
+            do {
+                let data = try vm.invoicePDFData(voucherId: voucher.id)
+                _ = try await NSPanelBridge.saveData(data, suggestedName: "\(voucher.number).pdf")
+            } catch {
+                env.showError(AppError.wrap(error))
             }
         }
     }

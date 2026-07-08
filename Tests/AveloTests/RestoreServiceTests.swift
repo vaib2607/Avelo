@@ -249,7 +249,7 @@ final class RestoreServiceTests: XCTestCase {
             "SELECT COUNT(*) FROM avelo_accounts WHERE company_id = ?",
             bind: [.text(targetCompanyId.uuidString)]
         ) { $0.int(0) }
-        XCTAssertEqual(accountCount, 7)
+        XCTAssertEqual(accountCount, 8)
 
         let auditEvents = try AuditRepository(db: tc.db).list(filter: .init(companyId: targetCompanyId))
         XCTAssertEqual(auditEvents.count, 1)

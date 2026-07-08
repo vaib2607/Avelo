@@ -14,6 +14,7 @@ public final class InvoicePDFService: Sendable {
         let companyRepo = CompanyRepository(db: db)
         let accountRepo = AccountRepository(db: db)
         let lineRepo = LedgerLineRepository(db: db)
+        let inventoryRepo = InventoryRepository(db: db)
 
         guard let voucher = try voucherRepo.findById(voucherId) else {
             throw AppError.notFound("Voucher")
@@ -35,6 +36,26 @@ public final class InvoicePDFService: Sendable {
             accountById: accountById
         )
 
+        let taxBreakdown = try GSTService(db: db, companyId: voucher.companyId).voucherTaxBreakdown(voucherId: voucherId)
+        let placeOfSupply = TaxInvoicePDFView.placeOfSupply(supplierGSTIN: company.gstin, partyGSTIN: party?.gstin)
+
+        // Stock detail (AVL-P0-022): there is no persisted link from a
+        // specific ledger line to a specific stock movement (item-account
+        // linking is itself an unimplemented, deferred feature), so this
+        // renders as its own section sourced directly from the movements
+        // rather than guessing which ledger line a movement corresponds to.
+        let movements = try inventoryRepo.listMovements(forVoucher: voucherId)
+        let stockRows: [TaxInvoicePDFView.StockRow] = try movements.map { movement in
+            let item = try inventoryRepo.findItemById(movement.itemId)
+            return TaxInvoicePDFView.StockRow(
+                itemName: item?.name ?? "Unknown item",
+                quantityDisplay: movement.quantityDisplayString,
+                unit: movement.enteredUnit ?? item?.unit ?? "",
+                rateDisplay: Currency.formatPaise(movement.unitCostPaise),
+                valueDisplay: Currency.formatPaise(movement.totalValuePaise)
+            )
+        }
+
         let view = TaxInvoicePDFView(
             frame: NSRect(x: 0, y: 0, width: 595.2, height: 841.8),
             company: company,
@@ -42,7 +63,10 @@ public final class InvoicePDFService: Sendable {
             party: party,
             lines: lines,
             accountById: accountById,
-            visibleTotalPaise: visibleTotalPaise
+            visibleTotalPaise: visibleTotalPaise,
+            taxBreakdown: taxBreakdown,
+            placeOfSupply: placeOfSupply,
+            stockRows: stockRows
         )
         return view.dataWithPDF(inside: view.bounds)
     }
@@ -50,12 +74,33 @@ public final class InvoicePDFService: Sendable {
 
 private final class TaxInvoicePDFView: NSView {
 
+    /// Whether a GSTIN-derivable recipient is in the same state as the
+    /// supplier (CGST+SGST) or a different one (IGST). `nil` when the party
+    /// has no GSTIN at all -- this pass covers registered (B2B) parties
+    /// only; an unregistered/B2C party renders "Unregistered" and omits
+    /// place of supply rather than guessing (AVL-P0-022 core B2B slice).
+    enum PlaceOfSupply {
+        case intraState(String)
+        case interState(supplierState: String?, partyState: String)
+    }
+
+    struct StockRow {
+        let itemName: String
+        let quantityDisplay: String
+        let unit: String
+        let rateDisplay: String
+        let valueDisplay: String
+    }
+
     private let company: Company
     private let voucher: Voucher
     private let party: Account?
     private let lines: [LedgerLine]
     private let accountById: [Account.ID: Account]
     private let visibleTotalPaise: Int64
+    private let taxBreakdown: GSTService.VoucherTaxBreakdown
+    private let placeOfSupply: PlaceOfSupply?
+    private let stockRows: [StockRow]
 
     init(frame frameRect: NSRect,
          company: Company,
@@ -63,15 +108,36 @@ private final class TaxInvoicePDFView: NSView {
          party: Account?,
          lines: [LedgerLine],
          accountById: [Account.ID: Account],
-         visibleTotalPaise: Int64) {
+         visibleTotalPaise: Int64,
+         taxBreakdown: GSTService.VoucherTaxBreakdown,
+         placeOfSupply: PlaceOfSupply?,
+         stockRows: [StockRow]) {
         self.company = company
         self.voucher = voucher
         self.party = party
         self.lines = lines
         self.accountById = accountById
         self.visibleTotalPaise = visibleTotalPaise
+        self.taxBreakdown = taxBreakdown
+        self.placeOfSupply = placeOfSupply
+        self.stockRows = stockRows
         super.init(frame: frameRect)
         autoresizesSubviews = false
+    }
+
+    /// Derives place of supply by comparing GST state-code prefixes.
+    /// Returns `nil` when the party has no GSTIN (unregistered/B2C party --
+    /// explicitly out of scope for this pass). Does not reconcile against
+    /// whichever CGST/SGST/IGST lines were actually posted; if those
+    /// disagree with the GSTIN-derived state, both facts render as-is
+    /// rather than one silently overriding the other.
+    static func placeOfSupply(supplierGSTIN: String?, partyGSTIN: String?) -> PlaceOfSupply? {
+        guard let partyGSTIN, let partyState = GSTStateCode.stateName(forGSTIN: partyGSTIN) else { return nil }
+        let supplierState = supplierGSTIN.flatMap(GSTStateCode.stateName(forGSTIN:))
+        if let supplierState, supplierState == partyState {
+            return .intraState(partyState)
+        }
+        return .interState(supplierState: supplierState, partyState: partyState)
     }
 
     @available(*, unavailable)
@@ -159,19 +225,29 @@ private final class TaxInvoicePDFView: NSView {
             drawText("Party: \(party.name)", x: margin + 180, y: cursorY - 18, font: .systemFont(ofSize: 11))
             if let gstin = party.gstin, !gstin.isEmpty {
                 drawText("Party GSTIN: \(gstin)", x: margin + 350, y: cursorY - 18, font: .systemFont(ofSize: 11))
+            } else {
+                drawText("Party GSTIN: Unregistered", x: margin + 350, y: cursorY - 18, font: .systemFont(ofSize: 11))
             }
         }
-        advance(24)
+        advance(18)
+        switch placeOfSupply {
+        case .intraState(let state):
+            drawText("Place of Supply: \(state) (Intra-State)", x: margin, y: cursorY - 18, font: .systemFont(ofSize: 11))
+            advance(20)
+        case .interState(_, let partyState):
+            drawText("Place of Supply: \(partyState) (Inter-State)", x: margin, y: cursorY - 18, font: .systemFont(ofSize: 11))
+            advance(20)
+        case nil:
+            break
+        }
         if !voucher.narration.isEmpty {
             drawText("Narration: \(voucher.narration)", x: margin, y: cursorY - 18, font: .systemFont(ofSize: 11), width: pageWidth)
             advance(20)
         }
 
         let columns: [(String, CGFloat)] = [
-            ("Description", 220),
-            ("HSN/SAC", 80),
-            ("Qty", 50),
-            ("Rate", 80),
+            ("Description", 300),
+            ("HSN/SAC", 100),
             ("Amount", 90)
         ]
         let columnGap: CGFloat = 8
@@ -196,11 +272,7 @@ private final class TaxInvoicePDFView: NSView {
             x += columns[0].1 + columnGap
             drawText(line.taxCode ?? "", x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[1].1)
             x += columns[1].1 + columnGap
-            drawText("", x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[2].1)
-            x += columns[2].1 + columnGap
-            drawText("", x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[3].1)
-            x += columns[3].1 + columnGap
-            drawText(Currency.formatPaise(line.amountPaise), x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[4].1, alignment: .right)
+            drawText(Currency.formatPaise(line.amountPaise), x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[2].1, alignment: .right)
             advance(rowHeight)
         }
 
@@ -214,6 +286,69 @@ private final class TaxInvoicePDFView: NSView {
 
         drawText("Total", x: bounds.width - margin - 180, y: cursorY - 18, font: .boldSystemFont(ofSize: 11), width: 100, alignment: .right)
         drawText(Currency.formatPaise(visibleTotalPaise), x: bounds.width - margin - 80, y: cursorY - 18, font: .boldSystemFont(ofSize: 11), width: 80, alignment: .right)
+        advance(28)
+
+        func drawTaxRow(_ label: String, _ paise: Int64) {
+            drawText(label, x: bounds.width - margin - 180, y: cursorY - 16, font: .systemFont(ofSize: 10), width: 100, alignment: .right)
+            drawText(Currency.formatPaise(paise), x: bounds.width - margin - 80, y: cursorY - 16, font: .systemFont(ofSize: 10), width: 80, alignment: .right)
+            advance(18)
+        }
+
+        // Only the applicable tax pair is shown (CGST+SGST for intra-state,
+        // IGST for inter-state), matching how a real GST invoice never
+        // shows both -- never guessed from place-of-supply, always read
+        // straight from what was actually posted (AVL-P0-022).
+        if taxBreakdown.taxableValuePaise != 0 || taxBreakdown.igstPaise != 0
+            || taxBreakdown.cgstPaise != 0 || taxBreakdown.sgstPaise != 0 || taxBreakdown.cessPaise != 0 {
+            drawTaxRow("Taxable Value", taxBreakdown.taxableValuePaise)
+            if taxBreakdown.igstPaise != 0 {
+                drawTaxRow("IGST", taxBreakdown.igstPaise)
+            }
+            if taxBreakdown.cgstPaise != 0 {
+                drawTaxRow("CGST", taxBreakdown.cgstPaise)
+            }
+            if taxBreakdown.sgstPaise != 0 {
+                drawTaxRow("SGST", taxBreakdown.sgstPaise)
+            }
+            if taxBreakdown.cessPaise != 0 {
+                drawTaxRow("CESS", taxBreakdown.cessPaise)
+            }
+            advance(10)
+        }
+
+        if !stockRows.isEmpty {
+            advance(8)
+            drawText("Stock Detail", x: margin, y: cursorY - 16, font: .boldSystemFont(ofSize: 11))
+            advance(20)
+            let stockColumns: [(String, CGFloat)] = [
+                ("Item", 220), ("Qty", 90), ("Unit", 80), ("Rate", 80), ("Value", 90)
+            ]
+            var sx = margin
+            for (title, width) in stockColumns {
+                drawText(title, x: sx, y: cursorY - 16, font: .boldSystemFont(ofSize: 9), width: width)
+                sx += width + columnGap
+            }
+            advance(16)
+            for row in stockRows {
+                sx = margin
+                drawText(row.itemName, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[0].1)
+                sx += stockColumns[0].1 + columnGap
+                drawText(row.quantityDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[1].1)
+                sx += stockColumns[1].1 + columnGap
+                drawText(row.unit, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[2].1)
+                sx += stockColumns[2].1 + columnGap
+                drawText(row.rateDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[3].1, alignment: .right)
+                sx += stockColumns[3].1 + columnGap
+                drawText(row.valueDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[4].1, alignment: .right)
+                advance(16)
+            }
+        }
+
+        // Signed QR / e-invoice IRN is intentionally not implemented here:
+        // it requires an online call to the government e-invoice portal for
+        // IRN issuance, which conflicts with Avelo's R-1 (100% offline, zero
+        // network calls). See Docs/Avelo_Release_Board.md AVL-P0-022 /
+        // AVL-P1-008 -- revisit only if R-1 itself is ever revisited.
         drawText("Generated by Avelo", x: margin, y: 22, font: .systemFont(ofSize: 9), color: .secondaryLabelColor)
     }
 }

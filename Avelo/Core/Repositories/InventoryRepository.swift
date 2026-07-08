@@ -279,6 +279,16 @@ public struct InventoryRepository: Sendable {
         return try db.query(sql, bind: bind) { try Self.rowToMovement($0) }
     }
 
+    /// Stock movements linked to a single voucher (AVL-P0-022), oldest
+    /// first. Used by invoice PDF rendering to show a stock detail section
+    /// for inventory-linked sales/purchase vouchers.
+    public func listMovements(forVoucher voucherId: Voucher.ID) throws -> [StockMovement] {
+        try db.query(
+            "SELECT \(Self.movementColumns) FROM avelo_stock_movements WHERE voucher_id = ? ORDER BY created_at ASC",
+            bind: [.text(voucherId.uuidString)]
+        ) { try Self.rowToMovement($0) }
+    }
+
     public struct ItemBalance: Sendable {
         public let itemId: InventoryItem.ID
         public let inQuantity: ExactQuantity

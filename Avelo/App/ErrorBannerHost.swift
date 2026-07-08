@@ -18,7 +18,7 @@ public struct ErrorBannerHost: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Working…")
+                    Text(busyLabel)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -29,5 +29,14 @@ public struct ErrorBannerHost: View {
         }
         .padding(.top, 8)
         .animation(.easeInOut(duration: 0.2), value: env.banner)
+    }
+
+    /// AVL-P0-015: a large schema upgrade shows "(2 of 5)" instead of an
+    /// indeterminate spinner, so a long migration doesn't look hung.
+    private var busyLabel: String {
+        if let progress = env.migrationProgress {
+            return "Migrating database… (\(progress.completed) of \(progress.total))"
+        }
+        return "Working…"
     }
 }

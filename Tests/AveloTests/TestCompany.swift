@@ -23,6 +23,7 @@ struct TestCompany {
     let roundOffId: Account.ID
     let cgstOutputId: Account.ID
     let sgstOutputId: Account.ID
+    let igstOutputId: Account.ID
 
     static func make() throws -> TestCompany {
         let db = try SQLiteDatabase(path: ":memory:")
@@ -116,11 +117,13 @@ struct TestCompany {
         let roundOff = try insertAccount("ROUND_OFF", "Round Off", group: expense, openingPaise: 0, side: "debit")
         let cgstOutput = try insertAccount("CGST_OUTPUT", "CGST Output", group: liability, openingPaise: 0, side: "credit")
         let sgstOutput = try insertAccount("SGST_OUTPUT", "SGST Output", group: liability, openingPaise: 0, side: "credit")
+        let igstOutput = try insertAccount("IGST_OUTPUT", "IGST Output", group: liability, openingPaise: 0, side: "credit")
 
         return TestCompany(
             db: db, companyId: companyId, fy: fy,
             assetsGroupId: assets, incomeGroupId: income, expenseGroupId: expense, capitalGroupId: capital, liabilityGroupId: liability,
-            cashId: cash, salesId: sales, rentId: rent, capitalId: capitalAcc, roundOffId: roundOff, cgstOutputId: cgstOutput, sgstOutputId: sgstOutput
+            cashId: cash, salesId: sales, rentId: rent, capitalId: capitalAcc, roundOffId: roundOff, cgstOutputId: cgstOutput, sgstOutputId: sgstOutput,
+            igstOutputId: igstOutput
         )
     }
 

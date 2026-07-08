@@ -108,4 +108,11 @@ public final class VouchersViewModel {
     public func accountName(_ id: Account.ID) -> String {
         accounts.first(where: { $0.id == id })?.name ?? id.uuidString.prefix(8) + "…"
     }
+
+    /// Renders a GST tax invoice PDF for a Sales/Purchase voucher
+    /// (AVL-P0-022). The view owns the save panel; this just produces the
+    /// bytes to write.
+    public func invoicePDFData(voucherId: Voucher.ID) throws -> Data {
+        try InvoicePDFService(db: db).exportTaxInvoicePDF(voucherId: voucherId)
+    }
 }

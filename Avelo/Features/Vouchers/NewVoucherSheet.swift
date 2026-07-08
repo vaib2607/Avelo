@@ -46,6 +46,14 @@ public struct NewVoucherSheet: View {
                                              fyId: ctx.financialYear.id, initialType: initialType)
             let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
             model.load(accounts: accounts, initialDate: ctx.financialYear.startDate)
+            // Consume a pending draft recovery (AVL-P0-018) exactly once: if
+            // the user chose "Resume" on the recovery prompt for this same
+            // voucher type, preload the saved fields instead of starting
+            // blank, then clear the pending value so it is never replayed.
+            if let recovered = env.pendingDraftRecovery, recovered.voucherTypeCode == initialType {
+                model.loadFromRecoveredDraft(recovered)
+                env.pendingDraftRecovery = nil
+            }
             model.revalidate()
             vm = model
         } catch {
@@ -59,6 +67,7 @@ public struct NewVoucherSheet: View {
         do {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
             _ = try svc.post(draft: vm.buildDraft(), in: ctx.financialYear, workflow: vm.buildWorkflowInputs())
+            vm.deleteDraft()
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher posted.")
@@ -99,12 +108,14 @@ private struct NewVoucherBody: View {
             topBar
             Divider()
             ScrollView { mainContent }
-                .onChange(of: vm.lines) { _, _ in vm.revalidate() }
-                .onChange(of: vm.partyAccountId) { _, _ in vm.revalidate() }
-                .onChange(of: vm.billReferenceType) { _, _ in vm.revalidate() }
-                .onChange(of: vm.billReferenceNumber) { _, _ in vm.revalidate() }
-                .onChange(of: vm.narration) { _, _ in vm.revalidate() }
-                .onChange(of: vm.date) { _, _ in vm.revalidate() }
+                .onChange(of: vm.lines) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
+                .onChange(of: vm.partyAccountId) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
+                .onChange(of: vm.billReferenceType) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
+                .onChange(of: vm.billReferenceNumber) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
+                .onChange(of: vm.narration) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
+                .onChange(of: vm.date) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
+                .onChange(of: vm.chequeNumber) { _, _ in vm.scheduleAutosave() }
+                .onChange(of: vm.chequeDueDate) { _, _ in vm.scheduleAutosave() }
             Divider()
             bottomBar
         }
@@ -139,7 +150,7 @@ private struct NewVoucherBody: View {
                         env.showError(AppError.wrap(error))
                     }
                 }
-                Button { router.presentedSheet = nil } label: {
+                Button { vm.deleteDraft(); router.presentedSheet = nil } label: {
                     Image(systemName: "xmark.circle.fill")
                 }
                 .buttonStyle(.plain)
@@ -268,7 +279,7 @@ private struct NewVoucherBody: View {
     private var bottomBar: some View {
         HStack {
             Spacer()
-            Button("Cancel") { router.presentedSheet = nil }
+            Button("Cancel") { vm.deleteDraft(); router.presentedSheet = nil }
                 .keyboardShortcut(.cancelAction)
             Button("Post") { postOnce() }
                 .keyboardShortcut(.defaultAction)

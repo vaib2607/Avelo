@@ -102,6 +102,93 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertNil(vm.lines.last?.accountId)
     }
 
+    // AVL-P0-018: draft autosave and crash recovery.
+
+    @MainActor
+    func testLoadFromRecoveredDraftPopulatesFieldsAndReusesDraftId() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        let originalDraftId = vm.draftId
+
+        let entry = VoucherEntryDraft(
+            companyId: tc.companyId,
+            voucherTypeCode: .payment,
+            date: DateFormatters.parseDate("2024-05-01")!,
+            partyAccountId: tc.cashId,
+            narration: "Recovered narration",
+            billReferenceType: .advance,
+            billReferenceNumber: "REF-9",
+            chequeNumber: "CHQ-9",
+            chequeDueDate: DateFormatters.parseDate("2024-05-15"),
+            linesJSON: #"[{"accountId":null,"amount":"250.00","side":"credit","taxCode":null,"costCenter":null}]"#
+        )
+
+        vm.loadFromRecoveredDraft(entry)
+
+        XCTAssertNotEqual(vm.draftId, originalDraftId, "continuing to edit a resumed draft must update its own row, not a fresh one")
+        XCTAssertEqual(vm.draftId, entry.id)
+        XCTAssertEqual(vm.narration, "Recovered narration")
+        XCTAssertEqual(vm.partyAccountId, tc.cashId)
+        XCTAssertEqual(vm.billReferenceType, .advance)
+        XCTAssertEqual(vm.billReferenceNumber, "REF-9")
+        XCTAssertEqual(vm.chequeNumber, "CHQ-9")
+        XCTAssertNotNil(vm.chequeDueDate)
+        XCTAssertEqual(vm.lines.count, 1)
+        XCTAssertEqual(vm.lines[0].amount, "250.00")
+        XCTAssertEqual(vm.lines[0].side, .credit)
+    }
+
+    @MainActor
+    func testLoadFromRecoveredDraftIgnoresEmptyLinesRatherThanClearingTheEditor() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        let entry = VoucherEntryDraft(companyId: tc.companyId, voucherTypeCode: .journal, date: Date(), linesJSON: "[]")
+
+        vm.loadFromRecoveredDraft(entry)
+
+        XCTAssertEqual(vm.lines.count, 1, "the default blank line is kept when the recovered draft had no lines")
+    }
+
+    @MainActor
+    func testScheduleAutosavePersistsDraftAfterDebounceWindow() async throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .payment)
+        vm.narration = "In-progress entry"
+
+        vm.scheduleAutosave()
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+
+        let saved = try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId)
+        XCTAssertEqual(saved?.id, vm.draftId)
+        XCTAssertEqual(saved?.narration, "In-progress entry")
+        XCTAssertEqual(saved?.voucherTypeCode, .payment)
+    }
+
+    @MainActor
+    func testScheduleAutosaveDoesNothingInEditMode() async throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal, existingId: UUID())
+        vm.narration = "Should not autosave"
+
+        vm.scheduleAutosave()
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+
+        XCTAssertNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
+    }
+
+    @MainActor
+    func testDeleteDraftRemovesTheAutosavedRow() async throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.scheduleAutosave()
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+        XCTAssertNotNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
+
+        vm.deleteDraft()
+
+        XCTAssertNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
+    }
+
     @MainActor
     func testRemoveLineDropsOnlyTheTargetedRow() throws {
         let tc = try TestCompany.make()

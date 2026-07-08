@@ -70,6 +70,27 @@ public struct RootView: View {
                   message: Text(err.localizedMessage),
                   dismissButton: .default(Text("OK")) { env.globalError = nil })
         }
+        .alert(item: Binding(
+            get: { env.pendingDraftRecovery },
+            set: { env.pendingDraftRecovery = $0 }
+        )) { draft in
+            // AVL-P0-018: never auto-post a recovered draft. "Resume" only
+            // reopens the editor pre-filled so the user can explicitly
+            // review and save it; "Discard" removes it without a trace.
+            Alert(
+                title: Text("Recover unsaved voucher?"),
+                message: Text("Avelo found an unsaved \(draft.voucherTypeCode.rawValue) voucher draft from \(DateFormatters.displayDateTimeFormatter.string(from: draft.updatedAt)). Resume editing it, or discard it."),
+                primaryButton: .default(Text("Resume")) {
+                    router.present(draft.voucherTypeCode.routerSheet)
+                },
+                secondaryButton: .destructive(Text("Discard")) {
+                    if let ctx = env.companyContext {
+                        try? VoucherDraftRepository(db: ctx.database).deleteAll(companyId: ctx.companyId)
+                    }
+                    env.pendingDraftRecovery = nil
+                }
+            )
+        }
         .onReceive(NotificationCenter.default.publisher(for: .aveloRequestNewCompany)) { _ in
             router.present(.newCompany)
         }
@@ -173,6 +194,25 @@ public struct RootView: View {
         } catch {
             env.showError(AppError.wrap(error))
             return nil
+        }
+    }
+}
+
+extension VoucherType.Code {
+    /// Reverse of `RouterSheet.initialVoucherType`, used to reopen a
+    /// "new voucher" sheet of the same type as a recovered draft (AVL-P0-018).
+    var routerSheet: RouterSheet {
+        switch self {
+        case .journal:     return .newJournal
+        case .payment:     return .newPayment
+        case .receipt:     return .newReceipt
+        case .contra:      return .newContra
+        case .purchase:    return .newPurchase
+        case .sales:       return .newSales
+        case .creditNote:  return .newCreditNote
+        case .debitNote:   return .newDebitNote
+        case .opening, .payroll:
+            return .newJournal
         }
     }
 }

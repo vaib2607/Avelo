@@ -57,6 +57,102 @@ final class LongOperationActivityTests: XCTestCase {
         XCTAssertEqual(probe.endCount, 1)
     }
 
+    // AVL-P0-015: migration progress reporting, cancellation, and failure wrapping.
+
+    private struct CountingMigration: Migration {
+        let version: SchemaVersion
+        let description: String
+        func up(_ db: SQLiteDatabase) throws {}
+    }
+
+    /// `avelo_migrations` is normally created as part of `MigrationV001`'s
+    /// base schema; these tests use bare `CountingMigration` fixtures instead
+    /// of the real migration set, so the bookkeeping table needs bootstrapping
+    /// by hand before `runMigrations` can record anything into it.
+    private func bootstrapMigrationsTable(_ db: SQLiteDatabase) throws {
+        try db.execute("CREATE TABLE avelo_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL, description TEXT NOT NULL)")
+    }
+
+    func testMigrationRunnerFailureIsWrappedWithVersionAndDescription() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        defer { db.close() }
+
+        XCTAssertThrowsError(
+            try MigrationRunner(migrations: [ThrowingMigration()]).runMigrations(on: db)
+        ) { error in
+            guard case AppError.database(.migrationFailed(let message)) = error else {
+                return XCTFail("Expected a wrapped .migrationFailed error, got \(error)")
+            }
+            XCTAssertTrue(message.contains("1"), "message should name the failing version")
+            XCTAssertTrue(message.contains("throwing migration"), "message should name the failing migration's description")
+        }
+    }
+
+    func testMigrationRunnerReportsProgressOnlyForPendingMigrations() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        defer { db.close() }
+        try bootstrapMigrationsTable(db)
+        let migrations: [Migration] = [
+            CountingMigration(version: .v1, description: "one"),
+            CountingMigration(version: .v2, description: "two"),
+            CountingMigration(version: .v3, description: "three")
+        ]
+
+        // Pre-apply v1 directly, matching how a real partially-migrated
+        // database looks, so progress should only ever count v2 and v3.
+        try MigrationRunner(migrations: [migrations[0]]).runMigrations(on: db)
+
+        var reported: [(Int, Int)] = []
+        try MigrationRunner(migrations: migrations).runMigrations(on: db) { completed, total in
+            reported.append((completed, total))
+        }
+
+        XCTAssertEqual(reported.map(\.0), [1, 2])
+        XCTAssertEqual(reported.map(\.1), [2, 2], "total should reflect only the migrations pending this run, not the full history")
+    }
+
+    func testMigrationRunnerReportsNoProgressWhenAlreadyUpToDate() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        defer { db.close() }
+        try bootstrapMigrationsTable(db)
+        let migration = CountingMigration(version: .v1, description: "one")
+        try MigrationRunner(migrations: [migration]).runMigrations(on: db)
+
+        var callCount = 0
+        try MigrationRunner(migrations: [migration]).runMigrations(on: db) { _, _ in callCount += 1 }
+
+        XCTAssertEqual(callCount, 0)
+    }
+
+    func testMigrationRunnerStopsBeforeApplyingAnyMigrationWhenTaskIsAlreadyCancelled() async throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        defer { db.close() }
+        let migration = CountingMigration(version: .v1, description: "one")
+        let runner = MigrationRunner(migrations: [migration])
+
+        let task = Task<Result<Void, Error>, Never> {
+            // Yielding first guarantees this body suspends before doing any
+            // work, so the `cancel()` called synchronously right after this
+            // Task is created (below) is reliably visible by the time
+            // `runMigrations`'s internal `Task.checkCancellation()` runs.
+            await Task.yield()
+            do {
+                try runner.runMigrations(on: db)
+                return .success(())
+            } catch {
+                return .failure(error)
+            }
+        }
+        task.cancel()
+        let result = await task.value
+
+        guard case .failure(let error) = result else {
+            return XCTFail("Expected cancellation to be observed before migrations ran")
+        }
+        XCTAssertTrue(error is CancellationError)
+        XCTAssertEqual(try db.userVersion(), 0, "no migration should have applied once the task was cancelled")
+    }
+
     func testBackupExportReleasesActivityWhenExportFails() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

@@ -153,7 +153,8 @@ public final actor DatabaseManager {
         }
     }
 
-    public func openCompany(id: UUID) throws -> CompanyHandle {
+    public func openCompany(id: UUID,
+                            onMigrationProgress: (@Sendable (_ completed: Int, _ total: Int) -> Void)? = nil) throws -> CompanyHandle {
         if let existing = openHandles[id] { return existing }
         let url = try companyFileURL(id: id)
         let fm = FileManager.default
@@ -165,7 +166,7 @@ public final actor DatabaseManager {
         let current = try db.userVersion()
         if current < SchemaVersion.current.rawValue {
             do {
-                try MigrationRunner().runMigrations(on: db)
+                try MigrationRunner().runMigrations(on: db, onProgress: onMigrationProgress)
             } catch {
                 AveloOpsLogger.error("migration failed for company \(id.uuidString, privacy: .public)")
                 throw error

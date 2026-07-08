@@ -28,6 +28,19 @@ public final class GSTService: Sendable {
         public let cessPaise: Int64
     }
 
+    /// Per-voucher CGST/SGST/IGST/CESS split, for invoice PDF rendering
+    /// (AVL-P0-022). Unlike `gstr1InvoiceRows`, this never excludes a
+    /// voucher for having zero tax (e.g. a purchase from an unregistered
+    /// party legitimately has no tax lines) -- the caller decides how to
+    /// render an all-zero breakdown, this just reports the truth.
+    public struct VoucherTaxBreakdown: Sendable, Hashable {
+        public let taxableValuePaise: Int64
+        public let igstPaise: Int64
+        public let cgstPaise: Int64
+        public let sgstPaise: Int64
+        public let cessPaise: Int64
+    }
+
     public struct GSTR1InvoiceRow: Sendable, Hashable {
         public let voucherId: Voucher.ID
         public let invoiceNumber: String
@@ -81,6 +94,37 @@ public final class GSTService: Sendable {
         var csv = rows.map { $0.joined(separator: ",") }.joined(separator: "\n")
         csv += "\n"
         return Data(csv.utf8)
+    }
+
+    public func voucherTaxBreakdown(voucherId: Voucher.ID) throws -> VoucherTaxBreakdown {
+        let outputCodes = ["IGST_OUTPUT", "CGST_OUTPUT", "SGST_OUTPUT", "CESS"]
+        let codeList = outputCodes.map { "'\($0)'" }.joined(separator: ",")
+        let sql = """
+            SELECT
+                   COALESCE(SUM(CASE
+                       WHEN tax.code NOT IN (\(codeList)) AND l.side = 'credit' THEN l.amount_paise
+                       ELSE 0 END), 0) AS taxable_value,
+                   COALESCE(SUM(CASE WHEN tax.code = 'IGST_OUTPUT' THEN l.amount_paise ELSE 0 END), 0) AS igst,
+                   COALESCE(SUM(CASE WHEN tax.code = 'CGST_OUTPUT' THEN l.amount_paise ELSE 0 END), 0) AS cgst,
+                   COALESCE(SUM(CASE WHEN tax.code = 'SGST_OUTPUT' THEN l.amount_paise ELSE 0 END), 0) AS sgst,
+                   COALESCE(SUM(CASE WHEN tax.code = 'CESS' THEN l.amount_paise ELSE 0 END), 0) AS cess
+            FROM avelo_vouchers v
+            JOIN avelo_ledger_lines l ON l.voucher_id = v.id AND l.company_id = v.company_id
+            JOIN avelo_accounts tax ON tax.id = l.account_id
+            WHERE v.company_id = ?
+              AND v.id = ?
+            GROUP BY v.id
+        """
+        let row = try db.queryOne(sql, bind: [.text(companyId.uuidString), .text(voucherId.uuidString)]) { row in
+            VoucherTaxBreakdown(
+                taxableValuePaise: row.int("taxable_value"),
+                igstPaise: row.int("igst"),
+                cgstPaise: row.int("cgst"),
+                sgstPaise: row.int("sgst"),
+                cessPaise: row.int("cess")
+            )
+        }
+        return row ?? VoucherTaxBreakdown(taxableValuePaise: 0, igstPaise: 0, cgstPaise: 0, sgstPaise: 0, cessPaise: 0)
     }
 
     public func gstr1InvoiceRows(fromDate: Date, toDate: Date) throws -> [GSTR1InvoiceRow] {

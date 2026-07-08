@@ -27,6 +27,14 @@ public final class VoucherEditViewModel {
     public let db: SQLiteDatabase
     public let fyId: FinancialYear.ID
 
+    /// Identity of this entry's autosaved draft row (AVL-P0-018). Stable for
+    /// the lifetime of one "new voucher" sheet so repeated autosaves upsert
+    /// the same row instead of accumulating one per keystroke pause; replaced
+    /// with the recovered draft's own id in `loadFromRecoveredDraft` so
+    /// continuing to edit a resumed draft keeps updating that same row.
+    public private(set) var draftId: UUID = UUID()
+    private var autosaveTask: Task<Void, Never>?
+
     public init(companyId: Company.ID, db: SQLiteDatabase, fyId: FinancialYear.ID, initialType: VoucherType.Code, existingId: Voucher.ID? = nil) {
         self.companyId = companyId
         self.db = db
@@ -147,6 +155,88 @@ public final class VoucherEditViewModel {
         }
     }
 
+    // MARK: - Draft autosave and crash recovery (AVL-P0-018)
+    //
+    // Only `.create` mode autosaves. An `.edit` session's underlying voucher
+    // already exists and survives a crash intact; only its in-flight edits
+    // would be lost, which is a smaller and separately-scoped risk than
+    // losing an entire unsaved new voucher.
+
+    /// Debounced autosave, called from the editor's field-change hooks.
+    /// Waits for a short pause in typing before persisting, so a fast typist
+    /// does not trigger a database write on every keystroke.
+    public func scheduleAutosave() {
+        guard case .create = mode else { return }
+        autosaveTask?.cancel()
+        let snapshot = currentDraftSnapshot()
+        let db = self.db
+        autosaveTask = Task {
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard !Task.isCancelled else { return }
+            // Autosave is best-effort scratch state, not a financial write;
+            // a failure here must never surface as a user-facing error.
+            try? VoucherDraftRepository(db: db).upsert(snapshot)
+        }
+    }
+
+    /// Removes the autosaved draft. Called after a successful post (the
+    /// draft is superseded by the real voucher) and on explicit cancel (the
+    /// user chose to discard it) so drafts never outlive the session that
+    /// created them except across a crash.
+    public func deleteDraft() {
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        guard case .create = mode else { return }
+        try? VoucherDraftRepository(db: db).delete(id: draftId)
+    }
+
+    /// Restores editor state from a previously autosaved draft, reusing its
+    /// id so further autosaves continue updating the same row rather than
+    /// creating a duplicate.
+    public func loadFromRecoveredDraft(_ entry: VoucherEntryDraft) {
+        draftId = entry.id
+        date = entry.date
+        partyAccountId = entry.partyAccountId
+        narration = entry.narration
+        billReferenceType = entry.billReferenceType
+        billReferenceNumber = entry.billReferenceNumber ?? ""
+        chequeNumber = entry.chequeNumber ?? ""
+        chequeDueDate = entry.chequeDueDate
+        if let data = entry.linesJSON.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([DraftLineDTO].self, from: data),
+           !decoded.isEmpty {
+            lines = decoded.map {
+                LineRow(
+                    accountId: $0.accountId.flatMap(UUID.init(uuidString:)),
+                    amount: $0.amount,
+                    side: $0.side == "credit" ? .credit : .debit,
+                    taxCode: $0.taxCode,
+                    costCenter: $0.costCenter
+                )
+            }
+        }
+    }
+
+    private func currentDraftSnapshot() -> VoucherEntryDraft {
+        let encodedLines = (try? JSONEncoder().encode(lines.map {
+            DraftLineDTO(accountId: $0.accountId?.uuidString, amount: $0.amount, side: $0.side.rawValue, taxCode: $0.taxCode, costCenter: $0.costCenter)
+        })).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        return VoucherEntryDraft(
+            id: draftId,
+            companyId: companyId,
+            voucherTypeCode: draft.voucherTypeCode,
+            date: date,
+            partyAccountId: partyAccountId,
+            narration: narration,
+            billReferenceType: billReferenceType,
+            billReferenceNumber: billReferenceNumber.isEmpty ? nil : billReferenceNumber,
+            chequeNumber: chequeNumber.isEmpty ? nil : chequeNumber,
+            chequeDueDate: chequeDueDate,
+            linesJSON: encodedLines,
+            updatedAt: Date()
+        )
+    }
+
     public func removeLine(_ id: UUID) {
         lines.removeAll(where: { $0.id == id })
     }
@@ -230,4 +320,12 @@ private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
     }
+}
+
+private struct DraftLineDTO: Codable {
+    let accountId: String?
+    let amount: String
+    let side: String
+    let taxCode: String?
+    let costCenter: String?
 }

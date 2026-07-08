@@ -506,4 +506,33 @@ final class InventoryServiceTests: XCTestCase {
             }
         }
     }
+
+    // AVL-P0-022: invoice PDF rendering needs movements scoped to one voucher.
+    func testListMovementsForVoucherReturnsOnlyThatVouchersMovements() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        let item = try service.createItem(code: "SKU-V", name: "Voucher Item", unit: "NOS")
+
+        let voucherA = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: VoucherDraft(
+            mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-06-15")!,
+            partyAccountId: tc.capitalId,
+            lines: [.init(accountId: tc.capitalId, amountPaise: 1000, side: .debit), .init(accountId: tc.salesId, amountPaise: 1000, side: .credit)]
+        ), in: tc.fy).voucher
+        let voucherB = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: VoucherDraft(
+            mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-06-16")!,
+            partyAccountId: tc.capitalId,
+            lines: [.init(accountId: tc.capitalId, amountPaise: 1000, side: .debit), .init(accountId: tc.salesId, amountPaise: 1000, side: .credit)]
+        ), in: tc.fy).voucher
+
+        _ = try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-15")!, type: .stockIn, quantity: 5, ratePaise: 1000, voucherId: voucherA.id)
+        _ = try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-15")!, type: .stockIn, quantity: 3, ratePaise: 1000, voucherId: voucherA.id)
+        _ = try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-16")!, type: .stockIn, quantity: 1, ratePaise: 1000, voucherId: voucherB.id)
+
+        let forA = try InventoryRepository(db: tc.db).listMovements(forVoucher: voucherA.id)
+        let forB = try InventoryRepository(db: tc.db).listMovements(forVoucher: voucherB.id)
+
+        XCTAssertEqual(forA.count, 2)
+        XCTAssertEqual(forB.count, 1)
+        XCTAssertTrue(forA.allSatisfy { $0.voucherId == voucherA.id })
+    }
 }

@@ -244,7 +244,7 @@ END;
 | account_id | TEXT | NOT NULL, FK avelo_accounts(id) |
 | amount_paise | INTEGER | NOT NULL, CHECK(amount_paise > 0) |
 | side | TEXT | NOT NULL, CHECK(side IN ('debit','credit')) |
-| tax_code | TEXT | nullable, e.g. `CGST_IN_9`, `SGST_IN_9`, `IGST_IN_18`, `CESS_1` |
+| tax_code | TEXT | nullable, HSN/SAC code for invoice line display (AVL-P0-022), e.g. `7208`, `9983` — not a GST-ledger-account discriminator; that role is played by `Account.code` values (`IGST_OUTPUT`, `CGST_OUTPUT`, `SGST_OUTPUT`, `CESS`) on separate GST-liability accounts, read via `GSTService.voucherTaxBreakdown`/`gstr1InvoiceRows` |
 | cost_center | TEXT | nullable |
 | line_order | INTEGER | NOT NULL |
 
@@ -494,7 +494,32 @@ Indexes:
 - `idx_avelo_bank_statement_lines_clearance` on `(company_id, is_cleared, statement_date)`.
 - `idx_avelo_bank_statement_lines_matched_voucher` on `(matched_voucher_id)`.
 
-## 20. avelo_migrations
+## 20. avelo_voucher_drafts
+
+Autosaved, in-progress "new voucher" entries (AVL-P0-018), added in V18. Deliberately outside the double-entry/audit model: a row here is never validated, never balanced, and never posted automatically. It exists only so a crash or quit does not silently discard everything the user typed, and is deleted the moment the user explicitly posts or cancels. Recovery only ever offers the most-recently-updated row for a company and never auto-posts it.
+
+| Column | Type | Constraint |
+|---|---|---|
+| id | TEXT | PK |
+| company_id | TEXT | NOT NULL, FK `avelo_companies(id)` ON DELETE CASCADE |
+| voucher_type_code | TEXT | NOT NULL |
+| date | TEXT | NOT NULL |
+| party_account_id | TEXT | nullable, no FK (scratch value only, re-validated on resume) |
+| narration | TEXT | NOT NULL DEFAULT '' |
+| bill_reference_type | TEXT | nullable |
+| bill_reference_number | TEXT | nullable |
+| cheque_number | TEXT | nullable |
+| cheque_due_date | TEXT | nullable |
+| lines_json | TEXT | NOT NULL — JSON array of `{accountId, amount, side, taxCode?, costCenter?}` |
+| updated_at | TEXT | NOT NULL |
+
+Index: `idx_avelo_voucher_drafts_company` on `(company_id, updated_at)`.
+
+### GST state-code lookup (not a database table)
+
+Place of supply (AVL-P0-022) is derived from a GSTIN's leading two-digit state-code prefix (e.g. `27` = Maharashtra) rather than a separate address/state field on `Account`. The standard CBIC state-code table lives in `Avelo/Core/Validation/GSTStateCode.swift` as static Swift data, since the code list is fixed by statute and never changes at runtime.
+
+## 21. avelo_migrations
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -502,7 +527,7 @@ Indexes:
 | applied_at | TEXT | NOT NULL |
 | description | TEXT | NOT NULL |
 
-## 21. Registry DB tables (`avelo_registry.sqlite`)
+## 22. Registry DB tables (`avelo_registry.sqlite`)
 
 ### avelo_registry_companies
 
@@ -514,7 +539,7 @@ Indexes:
 | last_opened_at | TEXT | nullable |
 | created_at | TEXT | NOT NULL |
 
-## 21. Index summary (one place)
+## 23. Index summary (one place)
 
 ```
 idx_avelo_companies_name
@@ -548,11 +573,12 @@ idx_avelo_br_account_cleared
 idx_avelo_bank_statement_lines_account_date
 idx_avelo_bank_statement_lines_clearance
 idx_avelo_bank_statement_lines_matched_voucher
+idx_avelo_voucher_drafts_company
 ```
 
-## 22. Migration policy
+## 24. Migration policy
 
-- `SchemaVersion.current = 4`.
+- `SchemaVersion.current = 18`.
 - `MigrationRunner` reads `PRAGMA user_version`, compares to highest `avelo_migrations.version`, and applies missing migrations in order inside a single transaction.
 - Each migration is a `struct: Migration` with a numeric version, a description, and a `func up(db: SQLiteDatabase) throws` body.
 - Migrations are append-only. Never edit a past migration.

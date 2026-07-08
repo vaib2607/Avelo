@@ -70,7 +70,7 @@ final class ViewModelHardeningTests: XCTestCase {
 
         waitForReload(vm)
         XCTAssertEqual(vm.accounts.map(\.code), ["A000", "A001"])
-        XCTAssertEqual(vm.pagination.totalCount, 15)
+        XCTAssertEqual(vm.pagination.totalCount, 16)
     }
 
     func testInventoryReloadIgnoresStaleResultsAndRespectsPagination() throws {

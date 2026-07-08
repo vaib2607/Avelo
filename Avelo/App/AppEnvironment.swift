@@ -17,6 +17,18 @@ public final class AppEnvironment {
     /// degrade (e.g. to a temporary directory). Surfaced to the user on launch.
     public var startupError: AppError?
 
+    /// A leftover autosaved voucher draft found for the just-opened company
+    /// (AVL-P0-018). Drives the recovery prompt in `RootView`; "Resume"
+    /// leaves this set so `NewVoucherSheet.setup()` can consume it once,
+    /// "Discard" clears it after deleting the row.
+    public var pendingDraftRecovery: VoucherEntryDraft?
+
+    /// Set while a schema migration is running as part of `openCompany`
+    /// (AVL-P0-015), so the UI can show real progress on a large upgrade
+    /// instead of an indeterminate "Working…" spinner. `nil` the rest of the
+    /// time, including for every other `isBusy` state.
+    public var migrationProgress: (completed: Int, total: Int)?
+
     public let manager: DatabaseManager
     public let router: AppRouter
     public let keyboard: KeyboardRouter
@@ -236,9 +248,13 @@ public final class AppEnvironment {
 
     public func openCompany(_ id: Company.ID) async {
         isBusy = true
-        defer { isBusy = false }
+        defer { isBusy = false; migrationProgress = nil }
         do {
-            let handle = try await manager.openCompany(id: id)
+            let handle = try await manager.openCompany(id: id) { [weak self] completed, total in
+                Task { @MainActor in
+                    self?.migrationProgress = (completed, total)
+                }
+            }
             let fyRepo = FinancialYearRepository(db: handle.db)
             guard let fy = try fyRepo.findMostRecent(handle.companyId) else {
                 throw AppError.notFound("Financial year for company \(id.uuidString)")
@@ -252,6 +268,10 @@ public final class AppEnvironment {
             self.accountTree = AccountTreeCache(companyId: handle.companyId, database: handle.db, financialYearId: fy.id)
             await self.accountTree?.reload()
             router.reset()
+            // AVL-P0-018: offer to recover any voucher draft left behind by a
+            // crash or quit while this company was open. Best-effort: a
+            // lookup failure here must not block opening the company.
+            self.pendingDraftRecovery = try? VoucherDraftRepository(db: handle.db).mostRecent(companyId: handle.companyId)
             banner = BannerPayload(kind: .success("Company opened."), message: "Company opened.")
         } catch {
             globalError = AppError.wrap(error)
@@ -297,6 +317,7 @@ public final class AppEnvironment {
         }
         companyContext = nil
         accountTree = nil
+        pendingDraftRecovery = nil
         router.reset()
     }
 
