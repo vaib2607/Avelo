@@ -70,8 +70,10 @@ public enum DemoCompanySeeder {
             return g
         }
 
-        let currentAssets = try group("CURRENT_ASSETS")
-        let currentLiabilities = try group("CURRENT_LIAB")
+        // Post to Tally's leaf sub-groups, not their non-leaf parents
+        // (Avelo enforces leaf-only ledger posting).
+        let sundryDebtors = try group("SUNDRY_DEBTORS")
+        let sundryCreditors = try group("SUNDRY_CREDITORS")
         let directIncome = try group("DIRECT_INCOME")
         let indirectExpense = try group("INDIRECT_EXPENSE")
 
@@ -86,11 +88,11 @@ public enum DemoCompanySeeder {
         _ = try account("SALES")
         let salaryExpense = try account("SALARY_EXPENSE")
 
-        let customer = try accounts.createAccount(.init(code: "CUST_DEMO", name: "\(companyName) Customer", groupId: currentAssets.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
-        let vendor = try accounts.createAccount(.init(code: "VEND_DEMO", name: "\(companyName) Vendor", groupId: currentLiabilities.id, openingBalancePaise: 0, openingBalanceSide: .credit, gstin: nil, existingAccountId: nil))
+        let customer = try accounts.createAccount(.init(code: "CUST_DEMO", name: "\(companyName) Customer", groupId: sundryDebtors.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
+        let vendor = try accounts.createAccount(.init(code: "VEND_DEMO", name: "\(companyName) Vendor", groupId: sundryCreditors.id, openingBalancePaise: 0, openingBalanceSide: .credit, gstin: nil, existingAccountId: nil))
         let consultingIncome = try accounts.createAccount(.init(code: "CONSULTING", name: "Consulting Income", groupId: directIncome.id, openingBalancePaise: 0, openingBalanceSide: .credit, gstin: nil, existingAccountId: nil))
         let travelExpense = try accounts.createAccount(.init(code: "TRAVEL_EXP", name: "Travel Expense", groupId: indirectExpense.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
-        let salaryPayable = try accounts.createAccount(.init(code: "SAL_PAY", name: "Salary Payable Demo", groupId: currentLiabilities.id, openingBalancePaise: 0, openingBalanceSide: .credit, gstin: nil, existingAccountId: nil))
+        let salaryPayable = try accounts.createAccount(.init(code: "SAL_PAY", name: "Salary Payable Demo", groupId: sundryCreditors.id, openingBalancePaise: 0, openingBalanceSide: .credit, gstin: nil, existingAccountId: nil))
         let officeExpense = try accounts.createAccount(.init(code: "OFFICE_SUP", name: "Office Supplies", groupId: indirectExpense.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
 
         let serviceInvoice = try vouchers.post(draft: VoucherDraft(mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-04-12")!, partyAccountId: customer.id, narration: "Demo consulting invoice", lines: [.init(accountId: customer.id, amountPaise: 125_000, side: .debit), .init(accountId: consultingIncome.id, amountPaise: 125_000, side: .credit)]), in: fy)

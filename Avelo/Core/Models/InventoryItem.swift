@@ -14,6 +14,25 @@ public enum ValuationMethod: String, CaseIterable, Sendable, Codable, Identifiab
     }
 }
 
+/// Tally item-level GST taxability. RCM/ITC-eligibility flags are deferred
+/// (Phase 7 GST rate-setup polish) — taxability is the field that actually
+/// gates whether tax gets computed at all, so it ships first.
+public enum GSTTaxability: String, CaseIterable, Sendable, Codable, Identifiable {
+    case taxable
+    case exempt
+    case nilRated
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .taxable:  return "Taxable"
+        case .exempt:   return "Exempt"
+        case .nilRated: return "Nil Rated"
+        }
+    }
+}
+
 public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
     public typealias ID = UUID
 
@@ -26,6 +45,12 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
     public var baseUnitsPerAlternateUnit: ExactQuantity?
     public var valuationMethod: ValuationMethod
     public var isActive: Bool
+    public var hsnCode: String?
+    /// GST rate in basis points (1800 = 18%), matching the full IGST rate —
+    /// intra-state splits this into CGST+SGST halves at posting time.
+    public var gstRateBps: Int?
+    public var gstCessRateBps: Int?
+    public var gstTaxability: GSTTaxability
     public let createdAt: Date
 
     public init(id: ID = UUID(),
@@ -37,6 +62,10 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
                 baseUnitsPerAlternateUnit: ExactQuantity? = nil,
                 valuationMethod: ValuationMethod = .fifo,
                 isActive: Bool = true,
+                hsnCode: String? = nil,
+                gstRateBps: Int? = nil,
+                gstCessRateBps: Int? = nil,
+                gstTaxability: GSTTaxability = .taxable,
                 createdAt: Date = Date()) {
         self.id = id
         self.companyId = companyId
@@ -47,6 +76,10 @@ public struct InventoryItem: Identifiable, Hashable, Sendable, Codable {
         self.baseUnitsPerAlternateUnit = baseUnitsPerAlternateUnit
         self.valuationMethod = valuationMethod
         self.isActive = isActive
+        self.hsnCode = hsnCode
+        self.gstRateBps = gstRateBps
+        self.gstCessRateBps = gstCessRateBps
+        self.gstTaxability = gstTaxability
         self.createdAt = createdAt
     }
 

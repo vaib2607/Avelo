@@ -126,12 +126,17 @@ struct AveloApp: App {
                 CommandMenu("Masters") {
                     Button("New Account…") { environment.router.present(.newAccount) }
                         .keyboardShortcut("a", modifiers: [.command, .shift])
+                    Button("New Group…") { environment.router.present(.newGroup) }
+                        .keyboardShortcut("g", modifiers: [.command, .shift])
                     Button("New Item…") { environment.router.present(.newItem) }
                         .keyboardShortcut("i", modifiers: [.command, .shift])
                     Button("New Employee…") { environment.router.present(.newEmployee) }
                         .keyboardShortcut("e", modifiers: [.command, .shift])
                     Button("New Financial Year…") { environment.router.present(.newFinancialYear) }
                         .keyboardShortcut("y", modifiers: [.command, .shift])
+                    Divider()
+                    Button("New Cost Centre…") { environment.router.present(.newCostCentre) }
+                    Button("New Cost Category…") { environment.router.present(.newCostCategory) }
                 }
                 CommandMenu("Voucher") {
                     Button("Contra (F4)")     { environment.router.present(.newContra) }
@@ -141,8 +146,8 @@ struct AveloApp: App {
                     Button("Memo")            { environment.router.present(.newJournal) }
                     Button("Sales (F8)")      { environment.router.present(.newSales) }
                     Button("Purchase (F9)")   { environment.router.present(.newPurchase) }
-                    Button("Credit Note") { environment.router.present(.newCreditNote) }
-                    Button("Debit Note")  { environment.router.present(.newDebitNote) }
+                    Button("Credit Note (⌃F8)") { environment.router.present(.newCreditNote) }
+                    Button("Debit Note (⌃F9)")  { environment.router.present(.newDebitNote) }
                 }
                 CommandMenu("Reports") {
                     Button("Trial Balance") { environment.router.openReport(.trialBalance) }

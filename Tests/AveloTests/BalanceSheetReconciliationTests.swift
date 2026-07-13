@@ -104,7 +104,10 @@ final class BalanceSheetReconciliationTests: XCTestCase {
         let assetSections = Dictionary(uniqueKeysWithValues: report.assets.map { ($0.title, $0.totalPaise) })
         let liabilitySections = Dictionary(uniqueKeysWithValues: report.liabilities.map { ($0.title, $0.totalPaise) })
 
-        XCTAssertEqual(assetSections["Current Assets"], 30000)
+        // Section title is now the ledger's immediate leaf group ("Cash-in-Hand"),
+        // not the non-leaf "Current Assets" ancestor, now that the seeded chart
+        // mirrors Tally's Current Assets sub-group hierarchy.
+        XCTAssertEqual(assetSections["Cash-in-Hand"], 30000)
         XCTAssertTrue(liabilitySections.isEmpty)
     }
 

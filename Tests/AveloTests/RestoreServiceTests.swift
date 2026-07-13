@@ -261,6 +261,15 @@ final class RestoreServiceTests: XCTestCase {
         let tc = try TestCompany.make()
         let targetCompanyId = UUID()
         try AuditTestKeySupport.ensureKey(for: targetCompanyId)
+        // With FK enforcement on (SQLiteDatabase's default), dropping
+        // avelo_vouchers while avelo_voucher_item_lines' company-ownership
+        // trigger still references the just-dropped avelo_inventory_items
+        // makes SQLite reparse that trigger and fail with a misleading "no
+        // such table: avelo_inventory_items" instead of ever reaching
+        // avelo_vouchers. `RestoreService.prepareRestoredCompanyDatabase`
+        // itself always disables FKs before touching schema (see its first
+        // line) -- this setup step just matches that real precondition.
+        try tc.db.execute("PRAGMA foreign_keys = OFF")
         try tc.db.execute("DROP TABLE avelo_inventory_items")
         try tc.db.execute("DROP TABLE avelo_vouchers")
 

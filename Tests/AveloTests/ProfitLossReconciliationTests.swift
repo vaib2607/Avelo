@@ -154,7 +154,9 @@ final class ProfitLossReconciliationTests: XCTestCase {
                 let amount = creditMovement - debitMovement
                     - (signedOpening < 0 ? -signedOpening : 0)
                     + (signedOpening > 0 ? signedOpening : 0)
-                if groupCode == "DIRECT_INCOME" {
+                // Sales/Purchase Accounts are separate Tally primary groups
+                // that roll into direct income/expense, same as the app.
+                if groupCode == "DIRECT_INCOME" || groupCode == "SALES_ACCOUNTS" {
                     expectedDirectIncome += amount
                 } else if groupCode == "INDIRECT_INCOME" {
                     expectedIndirectIncome += amount
@@ -163,7 +165,7 @@ final class ProfitLossReconciliationTests: XCTestCase {
                 let amount = debitMovement - creditMovement
                     + (signedOpening > 0 ? signedOpening : 0)
                     - (signedOpening < 0 ? -signedOpening : 0)
-                if groupCode == "DIRECT_EXPENSE" {
+                if groupCode == "DIRECT_EXPENSE" || groupCode == "PURCHASE_ACCOUNTS" {
                     expectedDirectExpense += amount
                 } else if groupCode == "INDIRECT_EXPENSE" {
                     expectedIndirectExpense += amount

@@ -39,21 +39,39 @@ public final class InvoicePDFService: Sendable {
         let taxBreakdown = try GSTService(db: db, companyId: voucher.companyId).voucherTaxBreakdown(voucherId: voucherId)
         let placeOfSupply = TaxInvoicePDFView.placeOfSupply(supplierGSTIN: company.gstin, partyGSTIN: party?.gstin)
 
-        // Stock detail (AVL-P0-022): there is no persisted link from a
-        // specific ledger line to a specific stock movement (item-account
-        // linking is itself an unimplemented, deferred feature), so this
-        // renders as its own section sourced directly from the movements
-        // rather than guessing which ledger line a movement corresponds to.
-        let movements = try inventoryRepo.listMovements(forVoucher: voucherId)
-        let stockRows: [TaxInvoicePDFView.StockRow] = try movements.map { movement in
-            let item = try inventoryRepo.findItemById(movement.itemId)
-            return TaxInvoicePDFView.StockRow(
-                itemName: item?.name ?? "Unknown item",
-                quantityDisplay: movement.quantityDisplayString,
-                unit: movement.enteredUnit ?? item?.unit ?? "",
-                rateDisplay: Currency.formatPaise(movement.unitCostPaise),
-                valueDisplay: Currency.formatPaise(movement.totalValuePaise)
-            )
+        // Stock detail (AVL-P0-022 / Phase 2): item-invoice-mode postings
+        // (`ItemInvoiceService`) persist structured `avelo_voucher_item_lines`
+        // with HSN and per-line rate, so prefer that as the source of truth
+        // when present. Older/manual postings have no item lines -- there is
+        // no persisted link from a ledger line to a stock movement for those,
+        // so fall back to rendering straight from the movements themselves.
+        let itemLines = try VoucherItemLineRepository(db: db).findForVoucher(voucherId)
+        let stockRows: [TaxInvoicePDFView.StockRow]
+        if !itemLines.isEmpty {
+            stockRows = try itemLines.map { line in
+                let item = try inventoryRepo.findItemById(line.itemId)
+                return TaxInvoicePDFView.StockRow(
+                    itemName: item?.name ?? "Unknown item",
+                    hsnCode: line.hsnCode,
+                    quantityDisplay: String(line.quantity),
+                    unit: item?.unit ?? "",
+                    rateDisplay: Currency.formatPaise(line.ratePaise),
+                    valueDisplay: Currency.formatPaise(line.invoiceValuePaise)
+                )
+            }
+        } else {
+            let movements = try inventoryRepo.listMovements(forVoucher: voucherId)
+            stockRows = try movements.map { movement in
+                let item = try inventoryRepo.findItemById(movement.itemId)
+                return TaxInvoicePDFView.StockRow(
+                    itemName: item?.name ?? "Unknown item",
+                    hsnCode: item?.hsnCode,
+                    quantityDisplay: movement.quantityDisplayString,
+                    unit: movement.enteredUnit ?? item?.unit ?? "",
+                    rateDisplay: Currency.formatPaise(movement.unitCostPaise),
+                    valueDisplay: Currency.formatPaise(movement.totalValuePaise)
+                )
+            }
         }
 
         let view = TaxInvoicePDFView(
@@ -86,6 +104,7 @@ private final class TaxInvoicePDFView: NSView {
 
     struct StockRow {
         let itemName: String
+        let hsnCode: String?
         let quantityDisplay: String
         let unit: String
         let rateDisplay: String
@@ -321,7 +340,7 @@ private final class TaxInvoicePDFView: NSView {
             drawText("Stock Detail", x: margin, y: cursorY - 16, font: .boldSystemFont(ofSize: 11))
             advance(20)
             let stockColumns: [(String, CGFloat)] = [
-                ("Item", 220), ("Qty", 90), ("Unit", 80), ("Rate", 80), ("Value", 90)
+                ("Item", 170), ("HSN", 70), ("Qty", 70), ("Unit", 60), ("Rate", 70), ("Value", 90)
             ]
             var sx = margin
             for (title, width) in stockColumns {
@@ -333,13 +352,15 @@ private final class TaxInvoicePDFView: NSView {
                 sx = margin
                 drawText(row.itemName, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[0].1)
                 sx += stockColumns[0].1 + columnGap
-                drawText(row.quantityDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[1].1)
+                drawText(row.hsnCode ?? "", x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[1].1)
                 sx += stockColumns[1].1 + columnGap
-                drawText(row.unit, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[2].1)
+                drawText(row.quantityDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[2].1)
                 sx += stockColumns[2].1 + columnGap
-                drawText(row.rateDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[3].1, alignment: .right)
+                drawText(row.unit, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[3].1)
                 sx += stockColumns[3].1 + columnGap
-                drawText(row.valueDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[4].1, alignment: .right)
+                drawText(row.rateDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[4].1, alignment: .right)
+                sx += stockColumns[4].1 + columnGap
+                drawText(row.valueDisplay, x: sx, y: cursorY - 14, font: .systemFont(ofSize: 9), width: stockColumns[5].1, alignment: .right)
                 advance(16)
             }
         }

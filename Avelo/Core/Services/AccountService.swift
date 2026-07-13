@@ -77,7 +77,14 @@ public final class AccountService: Sendable {
             name: input.name,
             openingBalancePaise: input.openingBalancePaise,
             openingBalanceSide: input.openingBalanceSide,
-            gstin: input.gstin
+            gstin: input.gstin,
+            mailingName: input.mailingName,
+            mailingAddress: input.mailingAddress,
+            stateCode: input.stateCode,
+            country: input.country,
+            gstRegistrationType: input.gstRegistrationType,
+            maintainBillwise: input.maintainBillwise,
+            creditPeriodDays: input.creditPeriodDays
         )
         try db.write { tx in
             let repo = AccountRepository(db: tx)
@@ -152,6 +159,24 @@ public final class AccountService: Sendable {
         )
         try groupRepository.insert(group)
         return group
+    }
+
+    public func updateGroup(_ group: AccountGroup) throws {
+        guard group.companyId == audit.companyId else {
+            throw AppError.notFound("Account group")
+        }
+        guard try groupRepository.findById(group.id) != nil else {
+            throw AppError.notFound("Account group")
+        }
+        if let parentId = group.parentGroupId {
+            guard parentId != group.id else {
+                throw AppError.businessRule("A group cannot be its own parent.")
+            }
+            guard let parent = try groupRepository.findById(parentId), parent.companyId == audit.companyId else {
+                throw AppError.notFound("Account group")
+            }
+        }
+        try groupRepository.update(group)
     }
 
     public func deleteGroup(_ id: AccountGroup.ID) throws {

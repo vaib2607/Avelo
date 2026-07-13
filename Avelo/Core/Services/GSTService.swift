@@ -72,7 +72,7 @@ public final class GSTService: Sendable {
             igstPaise: s.igstPaise,
             cgstPaise: s.cgstPaise,
             sgstPaise: s.sgstPaise,
-            cessPaise: 0
+            cessPaise: s.cessPaise
         )
     }
 

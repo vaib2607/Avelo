@@ -58,4 +58,13 @@ public enum GSTStateCode {
         guard gstin.count >= 2 else { return nil }
         return table[String(gstin.prefix(2))]
     }
+
+    /// The two-digit state code itself (not the name) for a GSTIN, or `nil`
+    /// if the prefix isn't a recognized code. Used to compare place-of-supply
+    /// between two parties without caring what the state is actually called.
+    public static func code(forGSTIN gstin: String) -> String? {
+        guard gstin.count >= 2 else { return nil }
+        let prefix = String(gstin.prefix(2))
+        return table[prefix] != nil ? prefix : nil
+    }
 }

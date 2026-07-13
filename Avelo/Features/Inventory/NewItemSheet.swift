@@ -11,6 +11,10 @@ public struct NewItemSheet: View {
     @State private var alternateUnit: String = ""
     @State private var baseUnitsPerAlternateUnit: String = ""
     @State private var valuationMethod: ValuationMethod = .fifo
+    @State private var hsnCode: String = ""
+    @State private var gstRate: String = ""
+    @State private var gstCessRate: String = ""
+    @State private var gstTaxability: GSTTaxability = .taxable
     @State private var canSave: Bool = false
 
     public init() {}
@@ -34,6 +38,14 @@ public struct NewItemSheet: View {
                 Picker("Valuation", selection: $valuationMethod) {
                     ForEach(ValuationMethod.allCases) { method in
                         Text(method.displayName).tag(method)
+                    }
+                }
+                TextField("HSN code (optional)", text: $hsnCode)
+                TextField("GST rate % (optional)", text: $gstRate)
+                TextField("Cess rate % (optional)", text: $gstCessRate)
+                Picker("GST taxability", selection: $gstTaxability) {
+                    ForEach(GSTTaxability.allCases) { t in
+                        Text(t.displayName).tag(t)
                     }
                 }
             }
@@ -70,6 +82,12 @@ public struct NewItemSheet: View {
         return (try? ExactQuantity.parse(decimal: ratio)) != nil
     }
 
+    private func bps(from percentString: String) -> Int? {
+        let trimmed = percentString.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let value = Decimal(string: trimmed) else { return nil }
+        return NSDecimalNumber(decimal: value * 100).intValue
+    }
+
     private func save() {
         guard let ctx = env.companyContext else { return }
         do {
@@ -81,7 +99,11 @@ public struct NewItemSheet: View {
                 unit: unit,
                 alternateUnit: alt.isEmpty ? nil : alt,
                 baseUnitsPerAlternateUnit: ratio.isEmpty ? nil : try ExactQuantity.parse(decimal: ratio),
-                valuationMethod: valuationMethod
+                valuationMethod: valuationMethod,
+                hsnCode: hsnCode.trimmingCharacters(in: .whitespaces).isEmpty ? nil : hsnCode.trimmingCharacters(in: .whitespaces),
+                gstRateBps: bps(from: gstRate),
+                gstCessRateBps: bps(from: gstCessRate),
+                gstTaxability: gstTaxability
             )
             env.showSuccess("Item created.")
             router.presentedSheet = nil

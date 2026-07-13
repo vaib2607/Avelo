@@ -58,6 +58,7 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_payroll_entries",
             "avelo_stock_movements",
             "avelo_voucher_drafts",
+            "avelo_voucher_item_lines",
             "avelo_voucher_sequences",
             "avelo_voucher_templates",
             "avelo_voucher_types",
@@ -81,7 +82,11 @@ final class SchemaDriftTests: XCTestCase {
             "created_at",
             "alternate_unit",
             "alt_unit_base_numerator",
-            "alt_unit_base_denominator"
+            "alt_unit_base_denominator",
+            "hsn_code",
+            "gst_rate_bps",
+            "gst_cess_rate_bps",
+            "gst_taxability"
         ])
         XCTAssertEqual(try columns("avelo_vouchers", in: db), [
             "id",
@@ -218,6 +223,23 @@ final class SchemaDriftTests: XCTestCase {
             "is_active",
             "joined_on",
             "end_date",
+            "created_at"
+        ])
+        XCTAssertEqual(try columns("avelo_voucher_item_lines", in: db), [
+            "id",
+            "company_id",
+            "voucher_id",
+            "item_id",
+            "quantity",
+            "rate_paise",
+            "taxable_value_paise",
+            "hsn_code",
+            "gst_rate_bps",
+            "cgst_paise",
+            "sgst_paise",
+            "igst_paise",
+            "cess_paise",
+            "line_order",
             "created_at"
         ])
         XCTAssertEqual(try columns("avelo_payroll_entries", in: db), [

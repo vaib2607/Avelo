@@ -3,28 +3,35 @@ import CryptoKit
 
 enum AuditChainKeyProvider {
     private static let lock = NSLock()
-    private static var registeredStores: [CompanyKeyStoring] = [CompanyKeyStore()]
+    private static var stores: [CompanyKeyStoring] = [CompanyKeyStore()]
 
-    static func installOverride(_ store: CompanyKeyStoring?) {
+    /// A single global `store` (rather than a fallback chain) meant one
+    /// `DatabaseManager`/test fixture registering its key store would
+    /// silently replace whatever another concurrently-running one had
+    /// registered — any lookup for the *other* company would then fail with
+    /// "signing key missing" even though that company's key was never lost,
+    /// just no longer reachable. Each registered store is asked in turn;
+    /// the first to actually have the key wins.
+    static func registerStore(_ newStore: CompanyKeyStoring) {
         lock.lock()
         defer { lock.unlock() }
-        registeredStores = [store ?? CompanyKeyStore()]
-    }
-
-    static func registerStore(_ store: CompanyKeyStoring) {
-        lock.lock()
-        defer { lock.unlock() }
-        registeredStores.insert(store, at: 0)
+        // Re-registering the same store instance (e.g. a test helper calling
+        // this once per test method) would otherwise grow this list without
+        // bound over a long test run.
+        if let newObj = newStore as? AnyObject, stores.contains(where: { ($0 as? AnyObject) === newObj }) {
+            return
+        }
+        stores.insert(newStore, at: 0)
     }
 
     static func signingKey(companyId: Company.ID) throws -> SymmetricKey {
-        let stores: [CompanyKeyStoring] = {
+        let currentStores: [CompanyKeyStoring] = {
             lock.lock()
             defer { lock.unlock() }
-            return registeredStores
+            return stores
         }()
         var companyKey: Data?
-        for store in stores {
+        for store in currentStores {
             if let found = try store.retrieve(companyId: companyId) {
                 companyKey = found
                 break

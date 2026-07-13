@@ -8,6 +8,13 @@ public struct AccountRepository: Sendable {
         self.db = db
     }
 
+    /// Single source of truth for the account SELECT column list.
+    static let selectColumns = """
+        id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
+        is_active, is_bank_account, gstin, mailing_name, mailing_address, state_code, country,
+        gst_registration_type, maintain_billwise, credit_period_days, last_used_at, created_at, updated_at
+        """
+
     public struct Filter: Sendable {
         public var companyId: Company.ID
         public var groupId: AccountGroup.ID?
@@ -34,8 +41,7 @@ public struct AccountRepository: Sendable {
     public func findById(_ id: Account.ID) throws -> Account? {
         try db.queryOne(
             """
-            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            SELECT \(Self.selectColumns)
             FROM avelo_accounts
             WHERE id = ?
             """,
@@ -46,8 +52,7 @@ public struct AccountRepository: Sendable {
     public func findByCode(_ code: String, companyId: Company.ID) throws -> Account? {
         try db.queryOne(
             """
-            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            SELECT \(Self.selectColumns)
             FROM avelo_accounts
             WHERE company_id = ? AND code = ?
             """,
@@ -59,8 +64,7 @@ public struct AccountRepository: Sendable {
         guard !codes.isEmpty else { return [:] }
         let placeholders = Array(repeating: "?", count: codes.count).joined(separator: ",")
         let sql = """
-            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            SELECT \(Self.selectColumns)
             FROM avelo_accounts
             WHERE company_id = ? AND code IN (\(placeholders))
             """
@@ -79,8 +83,7 @@ public struct AccountRepository: Sendable {
     public func listForCompany(_ companyId: Company.ID) throws -> [Account] {
         try db.query(
             """
-            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            SELECT \(Self.selectColumns)
             FROM avelo_accounts
             WHERE company_id = ?
             ORDER BY code COLLATE NOCASE
@@ -97,8 +100,7 @@ public struct AccountRepository: Sendable {
         let built = Self.filterWhereClause(filter)
         return try db.query(
             """
-            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            SELECT \(Self.selectColumns)
             FROM avelo_accounts
             \(built.sql)
             ORDER BY code COLLATE NOCASE
@@ -136,8 +138,7 @@ public struct AccountRepository: Sendable {
     public func listLedgersForGroup(_ groupId: AccountGroup.ID) throws -> [Account] {
         try db.query(
             """
-            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            SELECT \(Self.selectColumns)
             FROM avelo_accounts
             WHERE group_id = ? AND is_active = 1
             ORDER BY code COLLATE NOCASE
@@ -149,8 +150,7 @@ public struct AccountRepository: Sendable {
     public func listActiveForCompany(_ companyId: Company.ID) throws -> [Account] {
         try db.query(
             """
-            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            SELECT \(Self.selectColumns)
             FROM avelo_accounts
             WHERE company_id = ? AND is_active = 1
             ORDER BY code COLLATE NOCASE
@@ -162,8 +162,7 @@ public struct AccountRepository: Sendable {
     public func listBankAccountsForCompany(_ companyId: Company.ID) throws -> [Account] {
         try db.query(
             """
-            SELECT id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-                   is_active, is_bank_account, gstin, last_used_at, created_at, updated_at
+            SELECT \(Self.selectColumns)
             FROM avelo_accounts
             WHERE company_id = ? AND is_bank_account = 1 AND is_active = 1
             ORDER BY code COLLATE NOCASE
@@ -177,8 +176,9 @@ public struct AccountRepository: Sendable {
             """
             INSERT INTO avelo_accounts
             (id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side,
-             is_active, is_bank_account, gstin, last_used_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             is_active, is_bank_account, gstin, mailing_name, mailing_address, state_code, country,
+             gst_registration_type, maintain_billwise, credit_period_days, last_used_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(account.id.uuidString),
@@ -191,6 +191,13 @@ public struct AccountRepository: Sendable {
                 .bool(account.isActive),
                 .bool(account.isBankAccount),
                 .optionalText(account.gstin),
+                .optionalText(account.mailingName),
+                .optionalText(account.mailingAddress),
+                .optionalText(account.stateCode),
+                .optionalText(account.country),
+                .optionalText(account.gstRegistrationType?.rawValue),
+                .bool(account.maintainBillwise ?? false),
+                .optionalInteger(account.creditPeriodDays.map(Int64.init)),
                 .optionalTimestamp(account.lastUsedAt),
                 .timestamp(account.createdAt),
                 .timestamp(account.updatedAt)
@@ -203,7 +210,9 @@ public struct AccountRepository: Sendable {
             """
             UPDATE avelo_accounts SET
                 group_id = ?, code = ?, name = ?, opening_balance_paise = ?, opening_balance_side = ?,
-                is_active = ?, is_bank_account = ?, gstin = ?, last_used_at = ?, updated_at = ?
+                is_active = ?, is_bank_account = ?, gstin = ?, mailing_name = ?, mailing_address = ?,
+                state_code = ?, country = ?, gst_registration_type = ?, maintain_billwise = ?,
+                credit_period_days = ?, last_used_at = ?, updated_at = ?
             WHERE id = ?
             """,
             [
@@ -215,6 +224,13 @@ public struct AccountRepository: Sendable {
                 .bool(account.isActive),
                 .bool(account.isBankAccount),
                 .optionalText(account.gstin),
+                .optionalText(account.mailingName),
+                .optionalText(account.mailingAddress),
+                .optionalText(account.stateCode),
+                .optionalText(account.country),
+                .optionalText(account.gstRegistrationType?.rawValue),
+                .bool(account.maintainBillwise ?? false),
+                .optionalInteger(account.creditPeriodDays.map(Int64.init)),
                 .optionalTimestamp(account.lastUsedAt),
                 .timestamp(Date()),
                 .text(account.id.uuidString)
@@ -271,6 +287,13 @@ public struct AccountRepository: Sendable {
             isActive: try r.requiredBool("is_active"),
             isBankAccount: try r.requiredBool("is_bank_account"),
             gstin: try r.checkedOptionalText("gstin"),
+            mailingName: try r.checkedOptionalText("mailing_name"),
+            mailingAddress: try r.checkedOptionalText("mailing_address"),
+            stateCode: try r.checkedOptionalText("state_code"),
+            country: try r.checkedOptionalText("country"),
+            gstRegistrationType: (try r.checkedOptionalText("gst_registration_type")).flatMap(GSTRegistrationType.init(rawValue:)),
+            maintainBillwise: try r.requiredBool("maintain_billwise"),
+            creditPeriodDays: r.optionalInt("credit_period_days").map(Int.init),
             lastUsedAt: try r.optionalTimestamp("last_used_at"),
             createdAt: try r.timestamp("created_at"),
             updatedAt: try r.timestamp("updated_at")

@@ -202,4 +202,95 @@ final class VoucherDraftTests: XCTestCase {
 
         XCTAssertEqual(vm.lines.map(\.id), remainingIds)
     }
+
+    // MARK: - Tally single-entry mode
+
+    @MainActor
+    private func singleEntryVM(_ tc: TestCompany, type: VoucherType.Code) -> VoucherEditViewModel {
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: type)
+        vm.singleEntryMode = true
+        return vm
+    }
+
+    @MainActor
+    func testContraSingleEntryComposesBalancedDraft() throws {
+        let tc = try TestCompany.make()
+        let vm = singleEntryVM(tc, type: .contra)
+        let bank = UUID(), cash = UUID()
+        vm.accountLedgerId = bank
+        vm.lines = [.init(accountId: cash, amount: "5000.00", side: .debit)] // side is ignored
+
+        let d = vm.buildDraft()
+
+        XCTAssertEqual(d.lines.count, 2)
+        // Account line first: destination bank debited with the particulars total.
+        XCTAssertEqual(d.lines[0].accountId, bank)
+        XCTAssertEqual(d.lines[0].side, .debit)
+        XCTAssertEqual(d.lines[0].amountPaise, 500_000)
+        // Particulars credited regardless of the row's raw side.
+        XCTAssertEqual(d.lines[1].accountId, cash)
+        XCTAssertEqual(d.lines[1].side, .credit)
+        XCTAssertTrue(d.isBalanced)
+        XCTAssertTrue(vm.isBalanced)
+    }
+
+    @MainActor
+    func testPaymentSingleEntryCreditsTheAccountLedger() throws {
+        let tc = try TestCompany.make()
+        let vm = singleEntryVM(tc, type: .payment)
+        vm.accountLedgerId = UUID()
+        vm.lines = [
+            .init(accountId: UUID(), amount: "100.00", side: .credit),
+            .init(accountId: UUID(), amount: "250.00", side: .credit)
+        ]
+
+        let d = vm.buildDraft()
+
+        XCTAssertEqual(d.lines[0].side, .credit)          // cash/bank pays out
+        XCTAssertEqual(d.lines[0].amountPaise, 35_000)
+        XCTAssertTrue(d.lines.dropFirst().allSatisfy { $0.side == .debit })
+        XCTAssertTrue(d.isBalanced)
+    }
+
+    @MainActor
+    func testSingleEntryNotBalancedWithoutAccountOrAmounts() throws {
+        let tc = try TestCompany.make()
+        let vm = singleEntryVM(tc, type: .receipt)
+        XCTAssertFalse(vm.isBalanced)                     // no account, no amounts
+        vm.accountLedgerId = UUID()
+        XCTAssertFalse(vm.isBalanced)                     // still no amounts
+        vm.lines = [.init(accountId: UUID(), amount: "10.00", side: .credit)]
+        XCTAssertTrue(vm.isBalanced)
+    }
+
+    @MainActor
+    func testAddLinePrefillsBalancingAmountInDoubleEntry() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.lines = [.init(accountId: UUID(), amount: "750.00", side: .debit)]
+
+        vm.addLine()
+
+        let added = try XCTUnwrap(vm.lines.last)
+        XCTAssertEqual(added.side, .credit)
+        XCTAssertEqual(Currency.parseRupeeInput(added.amount), 75_000)
+    }
+
+    @MainActor
+    func testIsCashOrBankClassification() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .contra)
+        let bankGroup = AccountGroup(companyId: tc.companyId, code: "BANK_ACCOUNTS", name: "Bank Accounts", nature: .assets)
+        let assetGroup = AccountGroup(companyId: tc.companyId, code: "CURRENT_ASSETS", name: "Current Assets", nature: .assets)
+        vm.groups = [bankGroup, assetGroup]
+
+        func account(_ code: String, group: AccountGroup, bankFlag: Bool = false) -> Account {
+            Account(companyId: tc.companyId, groupId: group.id, code: code, name: code, isBankAccount: bankFlag)
+        }
+
+        XCTAssertTrue(vm.isCashOrBank(account("BANK_HDFC", group: bankGroup)))            // by group
+        XCTAssertTrue(vm.isCashOrBank(account("ODD_BANK", group: assetGroup, bankFlag: true))) // by flag
+        XCTAssertTrue(vm.isCashOrBank(account("CASH_IN_HAND", group: assetGroup)))        // legacy seed cash ledger
+        XCTAssertFalse(vm.isCashOrBank(account("SUNDRY_DEBTORS", group: assetGroup)))
+    }
 }

@@ -20,8 +20,8 @@ public struct DashboardView: View {
                 monthlyPLSection
                 recentVouchersSection
                 ModuleFooterBar(items: [
-                    .init(title: "Next", detail: "Press F4–F11 for a new voucher, or ⌘4 to switch to Reports."),
-                    .init(title: "Shortcut", detail: "F4-F11 map to the main voucher families."),
+                    .init(title: "Next", detail: "Press F4–F9 for a new voucher, or ⌘4 to switch to Reports."),
+                    .init(title: "Shortcut", detail: "F4–F9 and ⌃F8/⌃F9 map to the Tally voucher families."),
                     .init(title: "Context", detail: "Company, FY, and module are always shown above.")
                 ])
             }
@@ -47,8 +47,8 @@ public struct DashboardView: View {
                     quickButton("Journal", "F7", .newJournal, "book.closed")
                     quickButton("Sales", "F8", .newSales, "cart")
                     quickButton("Purchase", "F9", .newPurchase, "bag")
-                    quickButton("Credit Note", "F10", .newCreditNote, "doc.badge.plus")
-                    quickButton("Debit Note", "F11", .newDebitNote, "document.badge.minus")
+                    quickButton("Credit Note", "⌃F8", .newCreditNote, "doc.badge.plus")
+                    quickButton("Debit Note", "⌃F9", .newDebitNote, "document.badge.minus")
                 }
                 .padding(6)
             }

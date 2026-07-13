@@ -67,14 +67,16 @@ enum LocalRCFlowRunner {
         try companyService.setInventoryMode(enabled: true, linkMode: .autoPrompt)
 
         let groups = try accountService.listGroups()
-        guard let currentAssets = groups.first(where: { $0.code == "CURRENT_ASSETS" }) else {
-            throw AppError.notFound("Current Assets group")
+        // Post to the leaf sub-group, not the non-leaf "Current Assets"
+        // parent (Avelo enforces leaf-only ledger posting).
+        guard let sundryDebtors = groups.first(where: { $0.code == "SUNDRY_DEBTORS" }) else {
+            throw AppError.notFound("Sundry Debtors group")
         }
 
         let partyAccount = try accountService.createAccount(.init(
             code: "CUST_RC",
             name: "RC Customer",
-            groupId: currentAssets.id,
+            groupId: sundryDebtors.id,
             openingBalancePaise: 0,
             openingBalanceSide: .debit,
             gstin: nil,

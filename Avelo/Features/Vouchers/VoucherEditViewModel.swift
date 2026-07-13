@@ -22,6 +22,100 @@ public final class VoucherEditViewModel {
     public var tcsTaxAmount: String = ""
     public var lines: [LineRow] = [LineRow()]
 
+    // MARK: - Tally single-entry mode (Contra F4 / Payment F5 / Receipt F6)
+    //
+    // In single-entry mode the top "Account" field holds the cash/bank ledger
+    // and `lines` holds only the particulars (counter-ledgers). `buildDraft()`
+    // composes the balancing account line, so posting and validation are
+    // unchanged from double entry.
+    public var singleEntryMode: Bool = false
+    // ponytail: accountLedgerId is not persisted by draft autosave (fixed
+    // scratch-table schema); crash recovery restores particulars only and the
+    // user re-picks the cash/bank account. Add a column when drafts get a
+    // schema migration.
+    public var accountLedgerId: Account.ID?
+    public var groups: [AccountGroup] = []
+
+    // MARK: - Tally item-invoice mode (Sales/Purchase item-grid entry)
+    //
+    // Alternate to the ledger-line editor above: the user picks items and
+    // quantities instead of ledger lines, and `ItemInvoiceService` computes
+    // GST and posts both the ledger voucher and the item lines/stock
+    // movements server-side. Only offered for Sales/Purchase.
+    public var itemInvoiceMode: Bool = false
+    public var items: [InventoryItem] = []
+    public var salesOrPurchaseLedgerId: Account.ID?
+    public var itemLines: [ItemLineRow] = [ItemLineRow()]
+
+    public struct ItemLineRow: Identifiable, Equatable {
+        public let id = UUID()
+        public var itemId: InventoryItem.ID?
+        public var quantity: String = ""
+        public var rate: String = "0.00"
+
+        public init() {}
+    }
+
+    public func addItemLine() { itemLines.append(ItemLineRow()) }
+
+    public func removeItemLine(_ id: UUID) {
+        itemLines.removeAll(where: { $0.id == id })
+    }
+
+    /// Item lines with both an item and a positive quantity picked; blank
+    /// trailing rows (same UX as the ledger-line grid) are silently dropped.
+    public func buildItemLineInputs() -> [ItemInvoiceService.ItemLineInput] {
+        itemLines.compactMap { row in
+            guard let itemId = row.itemId,
+                  let qty = Int64(row.quantity.trimmingCharacters(in: .whitespaces)), qty > 0 else { return nil }
+            let rate = Currency.parseRupeeInput(row.rate) ?? 0
+            return .init(itemId: itemId, quantity: qty, ratePaise: rate)
+        }
+    }
+
+    public var itemInvoiceValidationErrors: [String] {
+        var errors: [String] = []
+        if partyAccountId == nil { errors.append("Select a party account.") }
+        if salesOrPurchaseLedgerId == nil { errors.append("Select the sales/purchase ledger.") }
+        if buildItemLineInputs().isEmpty { errors.append("Add at least one item line with a quantity.") }
+        return errors
+    }
+
+    public var canPostItemInvoice: Bool { itemInvoiceValidationErrors.isEmpty }
+
+    /// Side of the top "Account" ledger per Tally: Contra debits the
+    /// destination, Receipt debits the receiving cash/bank, Payment credits
+    /// the paying cash/bank.
+    public var accountSide: LedgerSide {
+        switch draft.voucherTypeCode {
+        case .payment: return .credit
+        default:       return .debit
+        }
+    }
+
+    public var particularsSide: LedgerSide {
+        accountSide == .debit ? .credit : .debit
+    }
+
+    /// Tally classifies contra-eligible ledgers by group (Cash-in-Hand, Bank
+    /// Accounts, Bank OD). Avelo's legacy seed keeps cash as a ledger under
+    /// Current Assets, so the account-level flags are checked too.
+    public func isCashOrBank(_ account: Account) -> Bool {
+        if account.isBankAccount { return true }
+        if account.code == "CASH_IN_HAND" { return true }
+        if let group = groups.first(where: { $0.id == account.groupId }) {
+            return ["BANK_ACCOUNTS", "CASH_IN_HAND", "BANK_OD"].contains(group.code)
+        }
+        return false
+    }
+
+    public var particularsTotalPaise: Int64 {
+        (try? CheckedMath.sum(
+            lines.lazy.map { Currency.parseRupeeInput($0.amount) ?? 0 },
+            context: "summing single-entry particulars"
+        )) ?? 0
+    }
+
     public let mode: VoucherDraft.Mode
     public let companyId: Company.ID
     public let db: SQLiteDatabase
@@ -83,8 +177,9 @@ public final class VoucherEditViewModel {
         }
     }
 
-    public func load(accounts: [Account], initialDate: Date) {
+    public func load(accounts: [Account], groups: [AccountGroup] = [], initialDate: Date) {
         self.accounts = accounts
+        self.groups = groups
         if case .edit(let vid) = mode {
             do {
                 let svc = VoucherService(db: db, companyId: companyId)
@@ -118,7 +213,16 @@ public final class VoucherEditViewModel {
     }
 
     public func addLine() {
-        lines.append(LineRow())
+        var row = LineRow()
+        // Tally pre-fills the balancing amount on the next line.
+        if !singleEntryMode {
+            let diff = (try? CheckedMath.subtract(totalDebitPaise, totalCreditPaise, context: "suggesting balancing amount")) ?? 0
+            if diff != 0 {
+                row.side = diff > 0 ? .credit : .debit
+                row.amount = Currency.formatAmountInput(paise: abs(diff))
+            }
+        }
+        lines.append(row)
     }
 
     public func pasteTSV(_ text: String) {
@@ -255,7 +359,12 @@ public final class VoucherEditViewModel {
         )) ?? 0
     }
 
-    public var isBalanced: Bool { totalDebitPaise == totalCreditPaise && totalDebitPaise > 0 }
+    public var isBalanced: Bool {
+        if singleEntryMode {
+            return accountLedgerId != nil && particularsTotalPaise > 0
+        }
+        return totalDebitPaise == totalCreditPaise && totalDebitPaise > 0
+    }
 
     public func buildDraft() -> VoucherDraft {
         var d = draft
@@ -264,6 +373,32 @@ public final class VoucherEditViewModel {
         d.billReferenceType = billReferenceType
         d.billReferenceNumber = billReferenceNumber.isEmpty ? nil : billReferenceNumber
         d.narration = narration
+        if singleEntryMode {
+            // Account line first (as Tally displays it), then particulars with
+            // the side forced — the composed voucher balances by construction.
+            var composed: [VoucherDraft.Line] = [
+                VoucherDraft.Line(
+                    accountId: accountLedgerId,
+                    amountPaise: particularsTotalPaise,
+                    side: accountSide,
+                    taxCode: nil,
+                    costCenter: nil,
+                    lineOrder: 0
+                )
+            ]
+            composed += lines.enumerated().map { (idx, row) in
+                VoucherDraft.Line(
+                    accountId: row.accountId,
+                    amountPaise: Currency.parseRupeeInput(row.amount) ?? 0,
+                    side: particularsSide,
+                    taxCode: row.taxCode,
+                    costCenter: row.costCenter,
+                    lineOrder: idx + 1
+                )
+            }
+            d.lines = composed
+            return d
+        }
         d.lines = lines.enumerated().map { (idx, row) in
             VoucherDraft.Line(
                 accountId: row.accountId,

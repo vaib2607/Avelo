@@ -42,8 +42,8 @@ public struct ShortcutHelpSheet: View {
                         ("Cmd+K → Memo", "Journal-style memo entry"),
                         ("F8", "New Sales voucher"),
                         ("F9", "New Purchase voucher"),
-                        ("F10", "New Credit Note"),
-                        ("F11", "New Debit Note"),
+                        ("⌃F8", "New Credit Note"),
+                        ("⌃F9", "New Debit Note"),
                     ])
 
                     section("Reports (Cmd+Opt)", rows: [

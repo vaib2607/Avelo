@@ -234,6 +234,7 @@ public enum ReportResult {
         public var igstPaise: Int64 { output.last(where: { $0.label.contains("IGST") })?.amountPaise ?? 0 }
         public var cgstPaise: Int64 { output.last(where: { $0.label.contains("CGST") })?.amountPaise ?? 0 }
         public var sgstPaise: Int64 { output.last(where: { $0.label.contains("SGST") })?.amountPaise ?? 0 }
+        public var cessPaise: Int64 { output.last(where: { $0.label.contains("CESS") })?.amountPaise ?? 0 }
 
         public init(fromDate: Date, toDate: Date, output: [GstBucket], input: [GstBucket], netPayablePaise: Int64) {
             self.fromDate = fromDate

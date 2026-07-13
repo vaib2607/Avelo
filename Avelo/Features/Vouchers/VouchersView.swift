@@ -112,7 +112,7 @@ private struct VouchersBody: View {
             )
             ModuleFooterBar(items: [
                 .init(title: "Next", detail: "Use Edit or Reverse on any row to continue the workflow."),
-                .init(title: "Shortcut", detail: "F4-F11 open the common voucher entry screens."),
+                .init(title: "Shortcut", detail: "F4–F9 and ⌃F8/⌃F9 open the Tally voucher entry screens."),
                 .init(title: "Filter", detail: "Use the Type button to narrow by voucher family.")
             ])
         }

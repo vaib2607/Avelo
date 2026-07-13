@@ -154,4 +154,30 @@ final class Phase6HardeningTests: XCTestCase {
             XCTAssertTrue(message.localizedCaseInsensitiveContains("child groups"))
         }
     }
+
+    func testUpdateGroupRejectsSelfAsParent() throws {
+        let tc = try TestCompany.make()
+        let accountService = AccountService(db: tc.db, companyId: tc.companyId)
+        var group = try accountService.createGroup(code: "7000", name: "Loop", nature: .assets)
+        group.parentGroupId = group.id
+
+        XCTAssertThrowsError(try accountService.updateGroup(group)) { error in
+            guard case AppError.businessRule(let message) = error else {
+                return XCTFail("Expected businessRule, got \(error)")
+            }
+            XCTAssertTrue(message.localizedCaseInsensitiveContains("own parent"))
+        }
+    }
+
+    func testUpdateGroupPersistsRename() throws {
+        let tc = try TestCompany.make()
+        let accountService = AccountService(db: tc.db, companyId: tc.companyId)
+        var group = try accountService.createGroup(code: "7100", name: "Original", nature: .assets)
+        group.name = "Renamed"
+
+        try accountService.updateGroup(group)
+
+        let reloaded = try XCTUnwrap(accountService.findGroup(group.id))
+        XCTAssertEqual(reloaded.name, "Renamed")
+    }
 }

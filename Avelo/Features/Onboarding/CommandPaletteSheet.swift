@@ -49,8 +49,8 @@ public struct CommandPaletteSheet: View {
         out.append(Command(title: "Memo", subtitle: "Journal-style note", symbol: "note.text") { $0.present(.newJournal) })
         voucher("Sales", "F8", .newSales)
         voucher("Purchase", "F9", .newPurchase)
-        voucher("Credit Note", "F10", .newCreditNote)
-        voucher("Debit Note", "F11", .newDebitNote)
+        voucher("Credit Note", "⌃F8", .newCreditNote)
+        voucher("Debit Note", "⌃F9", .newDebitNote)
 
         out.append(Command(title: "New Account", subtitle: "Create", symbol: "plus.circle") { $0.present(.newAccount) })
         out.append(Command(title: "Backup Company", subtitle: "Action", symbol: "externaldrive") { $0.present(.backup) })

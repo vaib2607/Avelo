@@ -180,9 +180,13 @@ public struct RootView: View {
         case .reverseVoucher(let id): ReverseVoucherSheet(voucherId: id)
         case .newAccount:           NewAccountSheet()
         case .editAccount(let id):  NewAccountSheet(existing: id)
+        case .newGroup:             GroupMasterSheet()
+        case .editGroup(let id):    GroupMasterSheet(existing: id)
         case .newFinancialYear:     NewFinancialYearSheet()
         case .newEmployee:          NewEmployeeSheet()
         case .newItem:              NewItemSheet()
+        case .newCostCentre:        CostMasterSheet(kind: .costCentre)
+        case .newCostCategory:      CostMasterSheet(kind: .costCategory)
         case .lockFinancialYear(let id): LockFinancialYearSheet(fyId: id)
         case .closeFinancialYear(let id): CloseFinancialYearSheet(fyId: id)
         }

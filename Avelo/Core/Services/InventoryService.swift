@@ -75,7 +75,11 @@ public final class InventoryService: Sendable {
                            unit: String,
                            alternateUnit: String? = nil,
                            baseUnitsPerAlternateUnit: ExactQuantity? = nil,
-                           valuationMethod: ValuationMethod = .fifo) throws -> InventoryItem {
+                           valuationMethod: ValuationMethod = .fifo,
+                           hsnCode: String? = nil,
+                           gstRateBps: Int? = nil,
+                           gstCessRateBps: Int? = nil,
+                           gstTaxability: GSTTaxability = .taxable) throws -> InventoryItem {
         try ensureInventoryEnabled()
         let trimmedAlternateUnit = alternateUnit?.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasAlternateUnit = !(trimmedAlternateUnit?.isEmpty ?? true)
@@ -89,7 +93,11 @@ public final class InventoryService: Sendable {
             unit: unit,
             alternateUnit: hasAlternateUnit ? trimmedAlternateUnit : nil,
             baseUnitsPerAlternateUnit: baseUnitsPerAlternateUnit,
-            valuationMethod: valuationMethod
+            valuationMethod: valuationMethod,
+            hsnCode: hsnCode,
+            gstRateBps: gstRateBps,
+            gstCessRateBps: gstCessRateBps,
+            gstTaxability: gstTaxability
         )
         try db.write { tx in
             let repo = InventoryRepository(db: tx)

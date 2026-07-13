@@ -8,9 +8,11 @@ extension ReportRepository {
         let groups = try AccountGroupRepository(db: db).listForCompany(filter.companyId)
         let groupById: [UUID: AccountGroup] = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
 
-        let directIncome = try sectionRows(filter: filter, fromDate: fromDate, toDate: toDate, nature: .income, rootCodes: ["DIRECT_INCOME"], groupById: groupById)
+        // Sales/Purchase Accounts are Tally primary groups distinct from
+        // Direct Income/Expenses, but both roll into the trading account.
+        let directIncome = try sectionRows(filter: filter, fromDate: fromDate, toDate: toDate, nature: .income, rootCodes: ["DIRECT_INCOME", "SALES_ACCOUNTS"], groupById: groupById)
         let indirectIncome = try sectionRows(filter: filter, fromDate: fromDate, toDate: toDate, nature: .income, rootCodes: ["INDIRECT_INCOME"], groupById: groupById)
-        let directExpense = try sectionRows(filter: filter, fromDate: fromDate, toDate: toDate, nature: .expense, rootCodes: ["DIRECT_EXPENSE"], groupById: groupById)
+        let directExpense = try sectionRows(filter: filter, fromDate: fromDate, toDate: toDate, nature: .expense, rootCodes: ["DIRECT_EXPENSE", "PURCHASE_ACCOUNTS"], groupById: groupById)
         let indirectExpense = try sectionRows(filter: filter, fromDate: fromDate, toDate: toDate, nature: .expense, rootCodes: ["INDIRECT_EXPENSE"], groupById: groupById)
 
         let ti = try CheckedMath.add(directIncome.totalPaise, indirectIncome.totalPaise, context: "calculating total income")

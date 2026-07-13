@@ -69,9 +69,13 @@ public enum RouterSheet: Identifiable, Sendable {
     case reverseVoucher(Voucher.ID)
     case newAccount
     case editAccount(Account.ID)
+    case newGroup
+    case editGroup(AccountGroup.ID)
     case newFinancialYear
     case newEmployee
     case newItem
+    case newCostCentre
+    case newCostCategory
     case lockFinancialYear(FinancialYear.ID)
     case closeFinancialYear(FinancialYear.ID)
 
@@ -97,9 +101,13 @@ public enum RouterSheet: Identifiable, Sendable {
         case .reverseVoucher(let id): return "reverseVoucher-\(id.uuidString)"
         case .newAccount: return "newAccount"
         case .editAccount(let id): return "editAccount-\(id.uuidString)"
+        case .newGroup: return "newGroup"
+        case .editGroup(let id): return "editGroup-\(id.uuidString)"
         case .newFinancialYear: return "newFinancialYear"
         case .newEmployee: return "newEmployee"
         case .newItem: return "newItem"
+        case .newCostCentre: return "newCostCentre"
+        case .newCostCategory: return "newCostCategory"
         case .lockFinancialYear(let id): return "lockFy-\(id.uuidString)"
         case .closeFinancialYear(let id): return "closeFy-\(id.uuidString)"
         }

@@ -78,6 +78,7 @@ private struct GSTBody: View {
                 Spacer()
                 Button("Export CSV") { exportCSV() }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
+                Button("Export GSTR-1 (Invoices)") { exportGSTR1() }
             }
             .padding(12)
             Divider()
@@ -94,6 +95,7 @@ private struct GSTBody: View {
                                 gstRow("IGST", s.igstPaise)
                                 gstRow("CGST", s.cgstPaise)
                                 gstRow("SGST", s.sgstPaise)
+                                gstRow("CESS", s.cessPaise)
                                 gstRow("Net payable", s.netPayablePaise)
                             }
                         } else {
@@ -110,6 +112,7 @@ private struct GSTBody: View {
                                 gstRow("IGST", filing.igstPaise)
                                 gstRow("CGST", filing.cgstPaise)
                                 gstRow("SGST", filing.sgstPaise)
+                                gstRow("CESS", filing.cessPaise)
                             }
                         } else {
                             Text("No filing view available.")
@@ -134,6 +137,20 @@ private struct GSTBody: View {
                 let name = "GST-Summary-\(DateFormatters.isoDate.string(from: vm.fromDate))-to-\(DateFormatters.isoDate.string(from: vm.toDate)).csv"
                 if let url = try await NSPanelBridge.saveData(data, suggestedName: name) {
                     env.showSuccess("GST summary exported to \(url.lastPathComponent).")
+                }
+            } catch {
+                env.showError(AppError.wrap(error))
+            }
+        }
+    }
+
+    private func exportGSTR1() {
+        Task {
+            do {
+                let data = try vm.gstr1InvoiceCSVData()
+                let name = "GSTR1-Invoices-\(DateFormatters.isoDate.string(from: vm.fromDate))-to-\(DateFormatters.isoDate.string(from: vm.toDate)).csv"
+                if let url = try await NSPanelBridge.saveData(data, suggestedName: name) {
+                    env.showSuccess("GSTR-1 invoice export saved to \(url.lastPathComponent).")
                 }
             } catch {
                 env.showError(AppError.wrap(error))
@@ -183,5 +200,12 @@ public final class GSTViewModel {
     public func summaryCSVData() throws -> Data {
         let svc = GSTService(db: db, companyId: companyId)
         return try svc.exportGSTSummaryCSV(fromDate: fromDate, toDate: toDate)
+    }
+
+    /// Invoice-level GSTR-1 rows (B2B detail with party GSTIN and tax split)
+    /// as CSV bytes for the current period.
+    public func gstr1InvoiceCSVData() throws -> Data {
+        let svc = GSTService(db: db, companyId: companyId)
+        return try svc.exportGSTR1InvoiceCSV(fromDate: fromDate, toDate: toDate)
     }
 }

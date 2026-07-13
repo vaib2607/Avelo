@@ -91,9 +91,15 @@ private struct AccountsBody: View {
                 primaryActionSystemImage: "plus",
                 primaryAction: { env.router.present(.newAccount) }
             )
-            Text("Groups")
-                .font(.headline)
-                .padding(12)
+            HStack {
+                Text("Groups").font(.headline)
+                Spacer()
+                Button { env.router.present(.newGroup) } label: {
+                    Label("New Group", systemImage: "plus")
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding(12)
             List(selection: $vm.selectedGroupId) {
                 Section {
                     Button {
@@ -108,20 +114,43 @@ private struct AccountsBody: View {
                     .buttonStyle(.plain)
                 }
                 Section("Groups") {
-                    ForEach(vm.groups) { g in
+                    ForEach(orderedGroups, id: \.group.id) { entry in
                         HStack {
-                            Text(g.name.capitalized)
+                            Text(String(repeating: "  ", count: entry.depth) + entry.group.name)
                             Spacer()
+                            Button {
+                                env.router.present(.editGroup(entry.group.id))
+                            } label: {
+                                Image(systemName: "pencil")
+                            }
+                            .buttonStyle(.borderless)
                         }
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            vm.selectedGroupId = g.id
+                            vm.selectedGroupId = entry.group.id
                             vm.reloadFirstPage()
                         }
                     }
                 }
             }
         }
+    }
+
+    /// Tally's List of Accounts shows groups as an indented tree (parent,
+    /// then its children, depth-first), not the repository's flat
+    /// sort-order listing.
+    private var orderedGroups: [(group: AccountGroup, depth: Int)] {
+        var byParent: [AccountGroup.ID?: [AccountGroup]] = [:]
+        for g in vm.groups { byParent[g.parentGroupId, default: []].append(g) }
+        var result: [(AccountGroup, Int)] = []
+        func visit(_ parentId: AccountGroup.ID?, depth: Int) {
+            for g in byParent[parentId] ?? [] {
+                result.append((g, depth))
+                visit(g.id, depth: depth + 1)
+            }
+        }
+        visit(nil, depth: 0)
+        return result
     }
 
     @ViewBuilder

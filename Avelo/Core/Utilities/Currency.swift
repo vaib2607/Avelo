@@ -183,6 +183,21 @@ public enum Currency {
         }
     }
 
+    /// Same half-up rounding as `percentagePaise`, but for a rate expressed
+    /// in basis points (1/100th of a percent, e.g. 1800 = 18%). GST rates
+    /// are whole percentages in practice, but some cess/special rates carry
+    /// fractional percent (e.g. 0.25%), which `ratePercent: Int64` can't express.
+    public static func percentagePaiseBps(_ amountPaise: Int64, rateBasisPoints: Int64) throws -> Int64 {
+        let scaled = try CheckedMath.multiply(amountPaise, rateBasisPoints, context: "calculating basis-point percentage paise")
+        if scaled >= 0 {
+            let adjusted = try CheckedMath.add(scaled, 5000, context: "rounding basis-point percentage paise")
+            return adjusted / 10000
+        } else {
+            let adjusted = try CheckedMath.subtract(scaled, 5000, context: "rounding basis-point percentage paise")
+            return adjusted / 10000
+        }
+    }
+
     public static func formatAmountInput(paise: Int64) -> String {
         if paise == 0 { return "0.00" }
         return formatPaise(paise, style: .plain)

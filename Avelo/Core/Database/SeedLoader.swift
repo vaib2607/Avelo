@@ -64,6 +64,19 @@ public struct SeedLoader: Sendable {
             var groupByCode: [String: String] = [:]
             for (id, code) in groups { groupByCode[code] = id }
 
+            // Second pass: wire the Tally group hierarchy (all rows inserted
+            // with NULL parent above, so ordering never matters).
+            for g in payload.groups {
+                guard let under = g.under else { continue }
+                guard let parentId = groupByCode[under] else {
+                    throw AppError.businessRule("Seed loader: unknown parent group code '\(under)' for group '\(g.code)'")
+                }
+                try tx.execute(
+                    "UPDATE avelo_account_groups SET parent_group_id = ? WHERE company_id = ? AND code = ?",
+                    [.text(parentId), .text(companyId.uuidString), .text(g.code)]
+                )
+            }
+
             for l in payload.ledgers {
                 guard let gid = groupByCode[l.under] else {
                     throw AppError.businessRule("Seed loader: unknown group code '\(l.under)' for ledger '\(l.code)'")
@@ -111,9 +124,10 @@ struct DefaultChartOfAccountsPayload: Codable, Sendable {
         let name: String
         let nature: String
         let sortOrder: Int
+        var under: String? = nil
 
         enum CodingKeys: String, CodingKey {
-            case code, name, nature
+            case code, name, nature, under
             case sortOrder = "sort_order"
         }
     }
@@ -154,29 +168,52 @@ struct DefaultChartOfAccountsPayload: Codable, Sendable {
 enum DefaultChartOfDefaults {
 
     static let builtIn: DefaultChartOfAccountsPayload = {
+        // Tally's 28 reserved groups: 15 primary + 13 sub-groups.
         let groups: [DefaultChartOfAccountsPayload.Group] = [
+            // Primary — capital nature
             .init(code: "CAPITAL",        name: "Capital Account",      nature: "liabilities", sortOrder: 1),
             .init(code: "LOANS",          name: "Loans (Liability)",    nature: "liabilities", sortOrder: 2),
             .init(code: "CURRENT_LIAB",   name: "Current Liabilities",  nature: "liabilities", sortOrder: 3),
-            .init(code: "DUTIES_TAXES",   name: "Duties & Taxes",       nature: "liabilities", sortOrder: 4),
-            .init(code: "FIXED_ASSETS",   name: "Fixed Assets",         nature: "assets",      sortOrder: 5),
-            .init(code: "INVESTMENTS",    name: "Investments",          nature: "assets",      sortOrder: 6),
-            .init(code: "CURRENT_ASSETS", name: "Current Assets",       nature: "assets",      sortOrder: 7),
-            .init(code: "STOCK_IN_HAND",  name: "Stock-in-Hand",        nature: "assets",      sortOrder: 8),
-            .init(code: "BANK_ACCOUNTS",  name: "Bank Accounts",        nature: "assets",      sortOrder: 9),
-            .init(code: "DIRECT_INCOME",  name: "Direct Income",        nature: "income",      sortOrder: 10),
-            .init(code: "INDIRECT_INCOME",name: "Indirect Income",      nature: "income",      sortOrder: 11),
-            .init(code: "DIRECT_EXPENSE", name: "Direct Expenses",      nature: "expense",     sortOrder: 12),
-            .init(code: "INDIRECT_EXPENSE",name: "Indirect Expenses",   nature: "expense",     sortOrder: 13)
+            .init(code: "FIXED_ASSETS",   name: "Fixed Assets",         nature: "assets",      sortOrder: 4),
+            .init(code: "INVESTMENTS",    name: "Investments",          nature: "assets",      sortOrder: 5),
+            .init(code: "CURRENT_ASSETS", name: "Current Assets",       nature: "assets",      sortOrder: 6),
+            .init(code: "MISC_EXPENSES_ASSET", name: "Misc. Expenses (Asset)", nature: "assets", sortOrder: 7),
+            .init(code: "SUSPENSE",       name: "Suspense A/c",         nature: "liabilities", sortOrder: 8),
+            .init(code: "BRANCH_DIVISIONS", name: "Branch / Divisions", nature: "liabilities", sortOrder: 9),
+            // Primary — revenue nature
+            .init(code: "SALES_ACCOUNTS", name: "Sales Accounts",       nature: "income",      sortOrder: 10),
+            .init(code: "PURCHASE_ACCOUNTS", name: "Purchase Accounts", nature: "expense",     sortOrder: 11),
+            .init(code: "DIRECT_INCOME",  name: "Direct Income",        nature: "income",      sortOrder: 12),
+            .init(code: "INDIRECT_INCOME",name: "Indirect Income",      nature: "income",      sortOrder: 13),
+            .init(code: "DIRECT_EXPENSE", name: "Direct Expenses",      nature: "expense",     sortOrder: 14),
+            .init(code: "INDIRECT_EXPENSE",name: "Indirect Expenses",   nature: "expense",     sortOrder: 15),
+            // Sub-groups
+            // Note: kept as a primary (not nested under CAPITAL) because
+            // Avelo enforces leaf-only posting and Owner's/Partner's Capital
+            // are seeded directly on CAPITAL; a user can re-parent this via
+            // the Groups master if they want the Tally-exact nesting.
+            .init(code: "RESERVES_SURPLUS", name: "Reserves & Surplus", nature: "liabilities", sortOrder: 16),
+            .init(code: "BANK_OD",        name: "Bank OD A/c",          nature: "liabilities", sortOrder: 17, under: "LOANS"),
+            .init(code: "SECURED_LOANS",  name: "Secured Loans",        nature: "liabilities", sortOrder: 18, under: "LOANS"),
+            .init(code: "UNSECURED_LOANS", name: "Unsecured Loans",     nature: "liabilities", sortOrder: 19, under: "LOANS"),
+            .init(code: "DUTIES_TAXES",   name: "Duties & Taxes",       nature: "liabilities", sortOrder: 20, under: "CURRENT_LIAB"),
+            .init(code: "PROVISIONS",     name: "Provisions",           nature: "liabilities", sortOrder: 21, under: "CURRENT_LIAB"),
+            .init(code: "SUNDRY_CREDITORS", name: "Sundry Creditors",   nature: "liabilities", sortOrder: 22, under: "CURRENT_LIAB"),
+            .init(code: "BANK_ACCOUNTS",  name: "Bank Accounts",        nature: "assets",      sortOrder: 23, under: "CURRENT_ASSETS"),
+            .init(code: "CASH_IN_HAND",   name: "Cash-in-Hand",         nature: "assets",      sortOrder: 24, under: "CURRENT_ASSETS"),
+            .init(code: "DEPOSITS_ASSET", name: "Deposits (Asset)",     nature: "assets",      sortOrder: 25, under: "CURRENT_ASSETS"),
+            .init(code: "LOANS_ADVANCES_ASSET", name: "Loans & Advances (Asset)", nature: "assets", sortOrder: 26, under: "CURRENT_ASSETS"),
+            .init(code: "STOCK_IN_HAND",  name: "Stock-in-Hand",        nature: "assets",      sortOrder: 27, under: "CURRENT_ASSETS"),
+            .init(code: "SUNDRY_DEBTORS", name: "Sundry Debtors",       nature: "assets",      sortOrder: 28, under: "CURRENT_ASSETS")
         ]
 
         let ledgers: [DefaultChartOfAccountsPayload.Ledger] = [
             .init(code: "OWNERS_CAPITAL",   name: "Owner's Capital",      under: "CAPITAL",        openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
             .init(code: "PARTNERS_CAPITAL", name: "Partner's Capital",    under: "CAPITAL",        openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
-            .init(code: "SECURED_LOAN",     name: "Secured Loan",         under: "LOANS",          openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
-            .init(code: "UNSECURED_LOAN",   name: "Unsecured Loan",       under: "LOANS",          openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
-            .init(code: "SUNDRY_CREDITORS", name: "Sundry Creditors",     under: "CURRENT_LIAB",   openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
-            .init(code: "SALARY_PAYABLE",   name: "Salary Payable",       under: "CURRENT_LIAB",   openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
+            .init(code: "SECURED_LOAN",     name: "Secured Loan",         under: "SECURED_LOANS",  openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
+            .init(code: "UNSECURED_LOAN",   name: "Unsecured Loan",       under: "UNSECURED_LOANS", openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
+            .init(code: "SUNDRY_CREDITORS", name: "Sundry Creditors",     under: "SUNDRY_CREDITORS", openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
+            .init(code: "SALARY_PAYABLE",   name: "Salary Payable",       under: "SUNDRY_CREDITORS", openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
             .init(code: "CGST_INPUT",       name: "CGST Input",           under: "DUTIES_TAXES",   openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "CGST_OUTPUT",      name: "CGST Output",          under: "DUTIES_TAXES",   openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
             .init(code: "SGST_INPUT",       name: "SGST Input",           under: "DUTIES_TAXES",   openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
@@ -189,17 +226,17 @@ enum DefaultChartOfDefaults {
             .init(code: "BUILDING",         name: "Building",             under: "FIXED_ASSETS",   openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "COMPUTER",         name: "Computer",             under: "FIXED_ASSETS",   openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "VEHICLE",          name: "Vehicle",              under: "FIXED_ASSETS",   openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
-            .init(code: "CASH_IN_HAND",     name: "Cash-in-Hand",         under: "CURRENT_ASSETS", openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
-            .init(code: "SUNDRY_DEBTORS",   name: "Sundry Debtors",       under: "CURRENT_ASSETS", openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
+            .init(code: "CASH_IN_HAND",     name: "Cash-in-Hand",         under: "CASH_IN_HAND",   openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
+            .init(code: "SUNDRY_DEBTORS",   name: "Sundry Debtors",       under: "SUNDRY_DEBTORS", openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "RAW_MATERIAL",     name: "Raw Material",         under: "STOCK_IN_HAND",  openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "FINISHED_GOODS",   name: "Finished Goods",       under: "STOCK_IN_HAND",  openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "BANK_HDFC",        name: "HDFC Bank",            under: "BANK_ACCOUNTS",  openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: true),
             .init(code: "BANK_SBI",         name: "SBI Bank",             under: "BANK_ACCOUNTS",  openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: true),
-            .init(code: "SALES",            name: "Sales",                under: "DIRECT_INCOME",  openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
+            .init(code: "SALES",            name: "Sales",                under: "SALES_ACCOUNTS", openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
             .init(code: "SERVICE_INCOME",   name: "Service Income",       under: "DIRECT_INCOME",  openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
             .init(code: "DISCOUNT_RECEIVED",name: "Discount Received",    under: "INDIRECT_INCOME",openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
             .init(code: "INTEREST_RECEIVED",name: "Interest Received",    under: "INDIRECT_INCOME",openingBalancePaise: 0, openingBalanceSide: "credit", isBankAccount: false),
-            .init(code: "PURCHASE",         name: "Purchase",             under: "DIRECT_EXPENSE", openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
+            .init(code: "PURCHASE",         name: "Purchase",             under: "PURCHASE_ACCOUNTS", openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "DIRECT_EXPENSES",  name: "Direct Expenses",      under: "DIRECT_EXPENSE", openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "ROUND_OFF",        name: "Round Off",            under: "INDIRECT_EXPENSE",openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),
             .init(code: "SALARY_EXPENSE",   name: "Salary Expense",       under: "INDIRECT_EXPENSE",openingBalancePaise: 0, openingBalanceSide: "debit",  isBankAccount: false),

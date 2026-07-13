@@ -4,9 +4,11 @@ import AppKit
 /// Translates global NSEvents into `KeyboardCommand`s and dispatches them
 /// to the active `KeyboardRouter`.
 ///
-/// Designed for the macOS-only Tally-style UX. Function keys (F4–F11) map to
-/// voucher types; Esc/Enter/Cmd-key combinations map to navigation, drill,
-/// and quick-search/command-palette commands.
+/// Designed for the macOS-only Tally-style UX. Function keys map to voucher
+/// types exactly as in Tally: F4 Contra, F5 Payment, F6 Receipt, F7 Journal,
+/// F8 Sales, F9 Purchase, Ctrl+F8 Credit Note, Ctrl+F9 Debit Note.
+/// Esc/Enter/Cmd-key combinations map to navigation, drill, and
+/// quick-search/command-palette commands.
 ///
 /// Key code reference (US keyboard):
 ///   F1=122, F2=120, F3=99, F4=118, F5=96, F6=97, F7=98, F8=100,
@@ -48,10 +50,15 @@ public final class KeyboardMonitor {
 
     private func isVoucherFunctionKey(_ event: NSEvent) -> Bool {
         let mods = event.modifierFlags
-        guard !mods.contains(.command), !mods.contains(.shift),
-              !mods.contains(.option), !mods.contains(.control) else { return false }
+        guard !mods.contains(.command), !mods.contains(.shift), !mods.contains(.option) else { return false }
+        if mods.contains(.control) {
+            switch event.keyCode {
+            case 100, 101: return true // Ctrl+F8 / Ctrl+F9 (Credit/Debit Note)
+            default: return false
+            }
+        }
         switch event.keyCode {
-        case 118, 96, 97, 98, 100, 101, 109, 103: return true // F4–F11
+        case 118, 96, 97, 98, 100, 101: return true // F4–F9
         default: return false
         }
     }
@@ -102,6 +109,15 @@ public final class KeyboardMonitor {
             }
         }
 
+        // Tally: Ctrl+F8 = Credit Note, Ctrl+F9 = Debit Note.
+        if ctrl && !cmd && !shift && !opt {
+            switch keyCode {
+            case 100: router.handle(.newVoucher(.creditNote)); return true      // Ctrl+F8
+            case 101: router.handle(.newVoucher(.debitNote)); return true       // Ctrl+F9
+            default: break
+            }
+        }
+
         if !cmd && !shift && !opt && !ctrl {
             switch keyCode {
             case 53: router.handle(.goBack); return true                        // Esc
@@ -112,8 +128,7 @@ public final class KeyboardMonitor {
             case 98:  router.handle(.newVoucher(.journal)); return true         // F7
             case 100: router.handle(.newVoucher(.sales)); return true           // F8
             case 101: router.handle(.newVoucher(.purchase)); return true        // F9
-            case 109: router.handle(.newVoucher(.creditNote)); return true      // F10
-            case 103: router.handle(.newVoucher(.debitNote)); return true       // F11
+            // F10/F11 reserved for Tally's Reversing Journal / Memo (Phase 5).
             case 15: router.handle(.reload); return true                        // R
             default: break
             }

@@ -8,7 +8,7 @@ public struct InventoryRepository: Sendable {
         self.db = db
     }
 
-    private static let itemColumns = "id, company_id, code, name, unit, alternate_unit, alt_unit_base_numerator, alt_unit_base_denominator, valuation_method, is_active, created_at"
+    private static let itemColumns = "id, company_id, code, name, unit, alternate_unit, alt_unit_base_numerator, alt_unit_base_denominator, valuation_method, is_active, hsn_code, gst_rate_bps, gst_cess_rate_bps, gst_taxability, created_at"
     private static let movementColumns = "id, company_id, item_id, voucher_id, date, movement_type, quantity, quantity_numerator, quantity_denominator, entered_unit, unit_cost_paise, total_value_paise, reversed_movement_id, reference_voucher_number, reason, created_at"
 
     public struct ItemFilter: Sendable {
@@ -104,8 +104,8 @@ public struct InventoryRepository: Sendable {
         try db.execute(
             """
             INSERT INTO avelo_inventory_items
-            (id, company_id, code, name, unit, alternate_unit, alt_unit_base_numerator, alt_unit_base_denominator, valuation_method, is_active, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, company_id, code, name, unit, alternate_unit, alt_unit_base_numerator, alt_unit_base_denominator, valuation_method, is_active, hsn_code, gst_rate_bps, gst_cess_rate_bps, gst_taxability, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(item.id.uuidString),
@@ -118,6 +118,10 @@ public struct InventoryRepository: Sendable {
                 .optionalInteger(item.baseUnitsPerAlternateUnit?.denominator),
                 .text(item.valuationMethod.rawValue),
                 .bool(item.isActive),
+                .optionalText(item.hsnCode),
+                .optionalInteger(item.gstRateBps.map(Int64.init)),
+                .optionalInteger(item.gstCessRateBps.map(Int64.init)),
+                .text(item.gstTaxability.rawValue),
                 .timestamp(item.createdAt)
             ]
         )
@@ -127,7 +131,8 @@ public struct InventoryRepository: Sendable {
         try db.execute(
             """
             UPDATE avelo_inventory_items SET
-                code = ?, name = ?, unit = ?, alternate_unit = ?, alt_unit_base_numerator = ?, alt_unit_base_denominator = ?, valuation_method = ?, is_active = ?
+                code = ?, name = ?, unit = ?, alternate_unit = ?, alt_unit_base_numerator = ?, alt_unit_base_denominator = ?, valuation_method = ?, is_active = ?,
+                hsn_code = ?, gst_rate_bps = ?, gst_cess_rate_bps = ?, gst_taxability = ?
             WHERE id = ?
             """,
             [
@@ -139,6 +144,10 @@ public struct InventoryRepository: Sendable {
                 .optionalInteger(item.baseUnitsPerAlternateUnit?.denominator),
                 .text(item.valuationMethod.rawValue),
                 .bool(item.isActive),
+                .optionalText(item.hsnCode),
+                .optionalInteger(item.gstRateBps.map(Int64.init)),
+                .optionalInteger(item.gstCessRateBps.map(Int64.init)),
+                .text(item.gstTaxability.rawValue),
                 .text(item.id.uuidString)
             ]
         )
@@ -351,6 +360,10 @@ public struct InventoryRepository: Sendable {
             }(),
             valuationMethod: vm,
             isActive: try r.requiredBool("is_active"),
+            hsnCode: try r.checkedOptionalText("hsn_code"),
+            gstRateBps: r.optionalInt("gst_rate_bps").map(Int.init),
+            gstCessRateBps: r.optionalInt("gst_cess_rate_bps").map(Int.init),
+            gstTaxability: try r.enumValue("gst_taxability"),
             createdAt: try r.timestamp("created_at")
         )
     }
