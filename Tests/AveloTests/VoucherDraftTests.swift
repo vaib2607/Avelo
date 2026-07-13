@@ -110,6 +110,7 @@ final class VoucherDraftTests: XCTestCase {
         let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
         let originalDraftId = vm.draftId
 
+        let bankLedgerId = UUID()
         let entry = VoucherEntryDraft(
             companyId: tc.companyId,
             voucherTypeCode: .payment,
@@ -120,6 +121,7 @@ final class VoucherDraftTests: XCTestCase {
             billReferenceNumber: "REF-9",
             chequeNumber: "CHQ-9",
             chequeDueDate: DateFormatters.parseDate("2024-05-15"),
+            accountLedgerId: bankLedgerId,
             linesJSON: #"[{"accountId":null,"amount":"250.00","side":"credit","taxCode":null,"costCenter":null}]"#
         )
 
@@ -133,6 +135,7 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertEqual(vm.billReferenceNumber, "REF-9")
         XCTAssertEqual(vm.chequeNumber, "CHQ-9")
         XCTAssertNotNil(vm.chequeDueDate)
+        XCTAssertEqual(vm.accountLedgerId, bankLedgerId)
         XCTAssertEqual(vm.lines.count, 1)
         XCTAssertEqual(vm.lines[0].amount, "250.00")
         XCTAssertEqual(vm.lines[0].side, .credit)
@@ -162,6 +165,23 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertEqual(saved?.id, vm.draftId)
         XCTAssertEqual(saved?.narration, "In-progress entry")
         XCTAssertEqual(saved?.voucherTypeCode, .payment)
+    }
+
+    /// AVL-P0-018 follow-up: single-entry-mode autosave must persist the
+    /// cash/bank ledger (MigrationV021's `account_ledger_id`), not just the
+    /// particulars, so crash recovery doesn't force the user to re-pick it.
+    @MainActor
+    func testScheduleAutosavePersistsAccountLedgerIdInSingleEntryMode() async throws {
+        let tc = try TestCompany.make()
+        let vm = singleEntryVM(tc, type: .payment)
+        let bankLedgerId = UUID()
+        vm.accountLedgerId = bankLedgerId
+
+        vm.scheduleAutosave()
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+
+        let saved = try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId)
+        XCTAssertEqual(saved?.accountLedgerId, bankLedgerId)
     }
 
     @MainActor

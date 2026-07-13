@@ -14,8 +14,8 @@ public struct VoucherDraftRepository: Sendable {
             INSERT INTO avelo_voucher_drafts
             (id, company_id, voucher_type_code, date, party_account_id, narration,
              bill_reference_type, bill_reference_number, cheque_number, cheque_due_date,
-             lines_json, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             account_ledger_id, lines_json, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 voucher_type_code = excluded.voucher_type_code,
                 date = excluded.date,
@@ -25,6 +25,7 @@ public struct VoucherDraftRepository: Sendable {
                 bill_reference_number = excluded.bill_reference_number,
                 cheque_number = excluded.cheque_number,
                 cheque_due_date = excluded.cheque_due_date,
+                account_ledger_id = excluded.account_ledger_id,
                 lines_json = excluded.lines_json,
                 updated_at = excluded.updated_at
             """,
@@ -39,6 +40,7 @@ public struct VoucherDraftRepository: Sendable {
                 .optionalText(entry.billReferenceNumber),
                 .optionalText(entry.chequeNumber),
                 .optionalTimestamp(entry.chequeDueDate),
+                .optionalText(entry.accountLedgerId?.uuidString),
                 .text(entry.linesJSON),
                 .timestamp(entry.updatedAt)
             ]
@@ -54,7 +56,7 @@ public struct VoucherDraftRepository: Sendable {
             """
             SELECT id, company_id, voucher_type_code, date, party_account_id, narration,
                    bill_reference_type, bill_reference_number, cheque_number, cheque_due_date,
-                   lines_json, updated_at
+                   account_ledger_id, lines_json, updated_at
             FROM avelo_voucher_drafts
             WHERE company_id = ?
             ORDER BY updated_at DESC
@@ -85,6 +87,7 @@ public struct VoucherDraftRepository: Sendable {
             billReferenceNumber: try r.checkedOptionalText("bill_reference_number"),
             chequeNumber: try r.checkedOptionalText("cheque_number"),
             chequeDueDate: try r.optionalTimestamp("cheque_due_date"),
+            accountLedgerId: try UUIDParsing.optional(try r.checkedOptionalText("account_ledger_id"), field: "avelo_voucher_drafts.account_ledger_id"),
             linesJSON: try r.requiredText("lines_json"),
             updatedAt: try r.timestamp("updated_at")
         )

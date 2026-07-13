@@ -18,6 +18,7 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
     public var billReferenceNumber: String?
     public var chequeNumber: String?
     public var chequeDueDate: Date?
+    public var accountLedgerId: Account.ID?
     public var linesJSON: String
     public var updatedAt: Date
 
@@ -31,6 +32,7 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
                 billReferenceNumber: String? = nil,
                 chequeNumber: String? = nil,
                 chequeDueDate: Date? = nil,
+                accountLedgerId: Account.ID? = nil,
                 linesJSON: String,
                 updatedAt: Date = Date()) {
         self.id = id
@@ -43,6 +45,7 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
         self.billReferenceNumber = billReferenceNumber
         self.chequeNumber = chequeNumber
         self.chequeDueDate = chequeDueDate
+        self.accountLedgerId = accountLedgerId
         self.linesJSON = linesJSON
         self.updatedAt = updatedAt
     }

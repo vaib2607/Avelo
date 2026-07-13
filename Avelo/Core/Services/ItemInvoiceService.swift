@@ -8,16 +8,13 @@ import Foundation
 /// through the existing `VoucherService` unchanged, then persists the
 /// structured item lines and records stock movements.
 ///
-/// Deliberately two separate database writes (ledger posting via
-/// `VoucherService.post`, then item lines + stock movements) rather than one
-/// atomic transaction spanning all three — matches how the rest of the app
-/// already relates vouchers to inventory (`DemoCompanySeeder` posts a
-/// voucher, then separately calls `InventoryService.recordMovement`).
-///
-/// ponytail: not atomic across accounting + stock — a crash between the two
-/// writes could leave a posted voucher with no stock movement (item lines
-/// audit trail still recorded either way). Upgrade path if this bites:
-/// move stock recording inside `VoucherService.post`'s own transaction.
+/// Ledger posting, item-line insertion, and stock movements all run inside
+/// one outer `db.write` block: `SQLiteDatabase.write` is reentrant (tracks
+/// nesting depth, only the outermost call opens/commits the transaction), so
+/// `VoucherService.post`'s and `InventoryService.recordMovement`'s own
+/// `db.write` calls join this transaction instead of committing separately.
+/// A failure anywhere (e.g. selling more than is on hand) rolls back the
+/// voucher too — no posted voucher can exist without its stock movement.
 public final class ItemInvoiceService: Sendable {
 
     public let db: SQLiteDatabase
@@ -149,40 +146,43 @@ public final class ItemInvoiceService: Sendable {
         )
 
         let voucherService = VoucherService(db: db, companyId: companyId)
-        let postResult = try voucherService.post(draft: draft, in: fy)
-        let voucher = postResult.voucher
+        var voucher: Voucher!
+        var itemLines: [VoucherItemLine] = []
+        try db.write { _ in
+            voucher = try voucherService.post(draft: draft, in: fy).voucher
 
-        let itemLines = computations.enumerated().map { (idx, c) in
-            VoucherItemLine(
-                companyId: companyId,
-                voucherId: voucher.id,
-                itemId: c.item.id,
-                quantity: c.input.quantity,
-                ratePaise: c.input.ratePaise,
-                taxableValuePaise: c.result.taxableValuePaise,
-                hsnCode: c.item.hsnCode,
-                gstRateBps: c.item.gstRateBps,
-                cgstPaise: c.result.cgstPaise,
-                sgstPaise: c.result.sgstPaise,
-                igstPaise: c.result.igstPaise,
-                cessPaise: c.result.cessPaise,
-                lineOrder: idx
-            )
-        }
-        try VoucherItemLineRepository(db: db).insertBatch(itemLines)
-
-        if company.isInventoryEnabled {
-            let inventoryService = InventoryService(db: db, companyId: companyId)
-            for c in computations {
-                _ = try inventoryService.recordMovement(
+            itemLines = computations.enumerated().map { (idx, c) in
+                VoucherItemLine(
+                    companyId: companyId,
+                    voucherId: voucher.id,
                     itemId: c.item.id,
-                    date: date,
-                    type: isSales ? .stockOut : .stockIn,
                     quantity: c.input.quantity,
                     ratePaise: c.input.ratePaise,
-                    voucherId: voucher.id,
-                    notes: "Item invoice \(voucher.number)"
+                    taxableValuePaise: c.result.taxableValuePaise,
+                    hsnCode: c.item.hsnCode,
+                    gstRateBps: c.item.gstRateBps,
+                    cgstPaise: c.result.cgstPaise,
+                    sgstPaise: c.result.sgstPaise,
+                    igstPaise: c.result.igstPaise,
+                    cessPaise: c.result.cessPaise,
+                    lineOrder: idx
                 )
+            }
+            try VoucherItemLineRepository(db: db).insertBatch(itemLines)
+
+            if company.isInventoryEnabled {
+                let inventoryService = InventoryService(db: db, companyId: companyId)
+                for c in computations {
+                    _ = try inventoryService.recordMovement(
+                        itemId: c.item.id,
+                        date: date,
+                        type: isSales ? .stockOut : .stockIn,
+                        quantity: c.input.quantity,
+                        ratePaise: c.input.ratePaise,
+                        voucherId: voucher.id,
+                        notes: "Item invoice \(voucher.number)"
+                    )
+                }
             }
         }
 

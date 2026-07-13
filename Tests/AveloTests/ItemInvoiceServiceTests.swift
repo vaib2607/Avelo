@@ -198,6 +198,31 @@ final class ItemInvoiceServiceTests: XCTestCase {
         ))
     }
 
+    /// Regression for the item-invoice atomicity fix: a stock-movement
+    /// failure (selling more than is on hand) must roll back the ledger
+    /// voucher too, not leave a posted voucher with no stock movement.
+    func testStockMovementFailureRollsBackVoucherPosting() throws {
+        let fx = try makeFixture()
+        // No stock-in performed — any sale exceeds the on-hand quantity (0).
+        let svc = ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId)
+
+        XCTAssertThrowsError(try svc.post(
+            voucherTypeCode: .sales,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: fx.customerId,
+            salesOrPurchaseLedgerId: fx.tc.salesId,
+            items: [.init(itemId: fx.itemId, quantity: 5, ratePaise: 50_000)],
+            in: fx.tc.fy
+        )) { error in
+            guard case AppError.validation = error else { return XCTFail("Expected validation error, got \(error)") }
+        }
+
+        let voucherCount = try VoucherRepository(db: fx.tc.db).count(
+            filter: .init(companyId: fx.tc.companyId, voucherTypeCodes: [.sales])
+        )
+        XCTAssertEqual(voucherCount, 0, "Voucher posting must roll back when the stock movement fails")
+    }
+
     func testThrowsForNonSalesPurchaseVoucherType() throws {
         let fx = try makeFixture()
         let svc = ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId)

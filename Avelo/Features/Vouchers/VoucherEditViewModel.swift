@@ -29,10 +29,6 @@ public final class VoucherEditViewModel {
     // composes the balancing account line, so posting and validation are
     // unchanged from double entry.
     public var singleEntryMode: Bool = false
-    // ponytail: accountLedgerId is not persisted by draft autosave (fixed
-    // scratch-table schema); crash recovery restores particulars only and the
-    // user re-picks the cash/bank account. Add a column when drafts get a
-    // schema migration.
     public var accountLedgerId: Account.ID?
     public var groups: [AccountGroup] = []
 
@@ -306,6 +302,7 @@ public final class VoucherEditViewModel {
         billReferenceNumber = entry.billReferenceNumber ?? ""
         chequeNumber = entry.chequeNumber ?? ""
         chequeDueDate = entry.chequeDueDate
+        accountLedgerId = entry.accountLedgerId
         if let data = entry.linesJSON.data(using: .utf8),
            let decoded = try? JSONDecoder().decode([DraftLineDTO].self, from: data),
            !decoded.isEmpty {
@@ -336,6 +333,7 @@ public final class VoucherEditViewModel {
             billReferenceNumber: billReferenceNumber.isEmpty ? nil : billReferenceNumber,
             chequeNumber: chequeNumber.isEmpty ? nil : chequeNumber,
             chequeDueDate: chequeDueDate,
+            accountLedgerId: accountLedgerId,
             linesJSON: encodedLines,
             updatedAt: Date()
         )

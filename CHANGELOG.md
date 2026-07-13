@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added Tally item-invoice mode for Sales/Purchase (item-grid entry with per-line GST auto-calc via `GSTInvoiceCalculator`, structured item lines in `avelo_voucher_item_lines`) and single-entry mode for Contra/Payment/Receipt.
+- Fixed item-invoice posting atomicity: `ItemInvoiceService` now posts the ledger voucher, item lines, and stock movements inside one transaction, so a stock-movement failure (e.g. selling more than is on hand) rolls back the voucher instead of leaving it posted with no stock movement.
+- Added `MigrationV021`: voucher drafts now persist `account_ledger_id`, so crash recovery restores the cash/bank ledger for single-entry-mode (Contra/Payment/Receipt) drafts instead of forcing the user to re-pick it.
+- Recorded that `AVL-P0-014` through `AVL-P0-023` (except `AVL-P0-019`/`AVL-P0-022`, already tracked) have landed implementation and automated proof in `Docs/Avelo_Release_Board.md` and `Docs/Avelo_Execution_Checklist.md`; only manual accountant/operator acceptance remains open on each.
+
 ### Migration notes
 
 - The recommended local workflow now uses `make setup`, `make test`, `make bundle`, and `make verify` instead of asking contributors to stitch together raw `swift` commands manually.

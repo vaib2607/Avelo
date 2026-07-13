@@ -100,6 +100,15 @@ Execution queue alignment:
 - `AVL-P0-028` implementation and automated proof are landed; it remains open only until accountant company-picker preservation acceptance is executed and recorded.
 - `AVL-P0-031` implementation and automated proof are landed; it remains open only until operator recovery acceptance is executed and recorded.
 - `AVL-P0-029` implementation and automated proof are landed; it remains open only until operator company-create rollback acceptance is executed and recorded.
+- `AVL-P0-013` implementation and automated proof are landed; it remains open only until clean-device/manual storage-policy acceptance is executed and recorded.
+- `AVL-P0-014` implementation and automated proof are landed; it remains open only until sleep/App Nap manual QA is executed and recorded.
+- `AVL-P0-015` implementation and automated proof are landed; it remains open only until operator large-migration acceptance is executed and recorded.
+- `AVL-P0-016` implementation and automated proof are landed; it remains open only until accountant shell-flow acceptance is executed and recorded.
+- `AVL-P0-017` implementation and automated proof are landed; it remains open only until operational leak-free acceptance is executed and recorded.
+- `AVL-P0-018` implementation and automated proof are landed (including single-entry-mode `accountLedgerId` recovery via `MigrationV021`); it remains open only until accountant draft-recovery acceptance is executed and recorded.
+- `AVL-P0-020` implementation and automated proof of the commit/`addLine`/keyboard-routing contract are landed; full `@FocusState` traversal isn't headlessly testable, so it remains open until manual keyboard-entry acceptance is executed and recorded.
+- `AVL-P0-021` implementation and automated proof are landed; it remains open only until accountant locale-entry acceptance is executed and recorded.
+- `AVL-P0-023` implementation and automated proof are landed; it remains open only until accountant FY/GST period acceptance is executed and recorded.
 
 ## Release-Risk Split
 

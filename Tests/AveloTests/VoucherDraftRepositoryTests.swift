@@ -5,7 +5,7 @@ import XCTest
 /// on a missing draft, and never leak across companies.
 final class VoucherDraftRepositoryTests: XCTestCase {
 
-    private func makeDraft(companyId: Company.ID, id: UUID = UUID(), updatedAt: Date = Date()) -> VoucherEntryDraft {
+    private func makeDraft(companyId: Company.ID, id: UUID = UUID(), updatedAt: Date = Date(), accountLedgerId: Account.ID? = nil) -> VoucherEntryDraft {
         VoucherEntryDraft(
             id: id,
             companyId: companyId,
@@ -17,6 +17,7 @@ final class VoucherDraftRepositoryTests: XCTestCase {
             billReferenceNumber: "REF-1",
             chequeNumber: "CHQ-1",
             chequeDueDate: DateFormatters.parseDate("2024-05-10"),
+            accountLedgerId: accountLedgerId,
             linesJSON: #"[{"accountId":null,"amount":"100.00","side":"debit","taxCode":null,"costCenter":null}]"#,
             updatedAt: updatedAt
         )
@@ -38,6 +39,32 @@ final class VoucherDraftRepositoryTests: XCTestCase {
         XCTAssertEqual(found?.chequeNumber, "CHQ-1")
         XCTAssertNotNil(found?.chequeDueDate)
         XCTAssertEqual(found?.linesJSON, draft.linesJSON)
+    }
+
+    /// AVL-P0-018 follow-up: single-entry-mode drafts (Contra/Payment/Receipt)
+    /// must round-trip their cash/bank ledger too, or crash recovery loses
+    /// the account and forces the user to re-pick it.
+    func testUpsertThenFindRoundTripsAccountLedgerId() throws {
+        let tc = try TestCompany.make()
+        let repo = VoucherDraftRepository(db: tc.db)
+        let ledgerId = UUID()
+        let draft = makeDraft(companyId: tc.companyId, accountLedgerId: ledgerId)
+
+        try repo.upsert(draft)
+        let found = try repo.mostRecent(companyId: tc.companyId)
+
+        XCTAssertEqual(found?.accountLedgerId, ledgerId)
+    }
+
+    func testUpsertThenFindRoundTripsNilAccountLedgerId() throws {
+        let tc = try TestCompany.make()
+        let repo = VoucherDraftRepository(db: tc.db)
+        let draft = makeDraft(companyId: tc.companyId, accountLedgerId: nil)
+
+        try repo.upsert(draft)
+        let found = try repo.mostRecent(companyId: tc.companyId)
+
+        XCTAssertNil(found?.accountLedgerId)
     }
 
     func testUpsertingSameIdReplacesRatherThanDuplicates() throws {
