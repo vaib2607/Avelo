@@ -83,7 +83,7 @@ Execution queue alignment:
   - `Implementation remaining`
   - `Proof remaining`
   - `Manual acceptance remaining`
-- The current Wave `P0-A` proof-closure queue is: `AVL-P0-012`, `AVL-P0-011`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-030`, `AVL-P0-027`, and `AVL-P0-002`.
+- The Wave `P0-A` proof-closure queue is now empty; all 7 items (`AVL-P0-012`, `AVL-P0-011`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-030`, `AVL-P0-027`, `AVL-P0-002`) have landed automated proof and now await only manual acceptance (see bullets below).
 - The current Wave `P0-B` remaining implementation queue is empty; the wave now contains only proof and manual-acceptance closure work.
 - `AVL-P0-003` implementation and automated proof are landed; it remains open only until accountant outstanding/bill-allocation acceptance is executed and recorded.
 - `AVL-P0-004` implementation and automated proof are landed; it remains open only until accountant bounced-cheque acceptance is executed and recorded.
@@ -109,6 +109,13 @@ Execution queue alignment:
 - `AVL-P0-020` implementation and automated proof of the commit/`addLine`/keyboard-routing contract are landed; full `@FocusState` traversal isn't headlessly testable, so it remains open until manual keyboard-entry acceptance is executed and recorded.
 - `AVL-P0-021` implementation and automated proof are landed; it remains open only until accountant locale-entry acceptance is executed and recorded.
 - `AVL-P0-023` implementation and automated proof are landed; it remains open only until accountant FY/GST period acceptance is executed and recorded.
+- `AVL-P0-012` implementation and automated proof are landed (`AuditTamperEvidenceTests` detects mutated/deleted/inserted/reordered rows and whole-chain rewrite); it remains open only until accountant tamper-rejection acceptance is executed and recorded.
+- `AVL-P0-011` implementation and automated proof are landed (`CheckedMath` fail-closed overflow handling across voucher, report, and reconciliation paths); it remains open only until accountant overflow acceptance is executed and recorded.
+- `AVL-P0-025` implementation and automated proof are landed (`FinancialYearServiceTests` covers overlap rejection and corrupt-overlap fail-closed lookup); it remains open only until accountant overlapping-FY acceptance is executed and recorded.
+- `AVL-P0-026` implementation and automated proof are landed (`FiscalLockEnforcementTests` covers inventory, bank, payroll, opening-balance, and voucher-update lock rejection at service and trigger layers); it remains open only until accountant locked-period acceptance is executed and recorded.
+- `AVL-P0-030` implementation and automated proof are landed (`CompanyIsolationTests` covers cross-company rejection at service and trigger layers across vouchers, accounts, ledger lines, stock, payroll, and bank import); it remains open only until accountant company-isolation acceptance is executed and recorded.
+- `AVL-P0-027` implementation and automated proof are landed (`SQLiteDatabaseTests` covers malformed-value and corrupt-database fail-closed reads); it remains open only until accountant corruption-handling acceptance is executed and recorded.
+- `AVL-P0-002` implementation and automated proof are landed (`VoucherServiceTests` covers failed-post, failed-batch-chunk, cancellation, and concurrent-posting gap-free numbering); it remains open only until accountant contiguous-numbering acceptance is executed and recorded.
 
 ## Release-Risk Split
 
