@@ -130,6 +130,41 @@ public struct AccountingWorkflowsRepository: Sendable {
         ) { try Self.rowToCheque($0) }
     }
 
+    public struct ChequeRegisterRow: Identifiable, Sendable {
+        public let cheque: Cheque
+        public let voucherNumber: String
+        public let partyName: String
+        public let amountPaise: Int64
+        public var id: Cheque.ID { cheque.id }
+    }
+
+    public func listCheques(companyId: Company.ID, status: ChequeStatus? = nil) throws -> [ChequeRegisterRow] {
+        var sql = """
+            SELECT c.id, c.company_id, c.voucher_id, c.cheque_number, c.issue_date, c.due_date, c.status,
+                   c.bounced_reversal_voucher_id, c.represented_from_cheque_id, c.created_at,
+                   v.number AS voucher_number, v.total_paise,
+                   COALESCE(party.name, '') AS party_name
+            FROM avelo_cheques c
+            JOIN avelo_vouchers v ON v.id = c.voucher_id AND v.company_id = c.company_id
+            LEFT JOIN avelo_accounts party ON party.id = v.party_account_id AND party.company_id = c.company_id
+            WHERE c.company_id = ?
+        """
+        var bind: [SQLValue] = [.text(companyId.uuidString)]
+        if let status {
+            sql += " AND c.status = ?"
+            bind.append(.text(status.rawValue))
+        }
+        sql += " ORDER BY c.due_date IS NULL, c.due_date, c.issue_date DESC"
+        return try db.query(sql, bind: bind) { row in
+            ChequeRegisterRow(
+                cheque: try Self.rowToCheque(row),
+                voucherNumber: try row.requiredText("voucher_number"),
+                partyName: try row.requiredText("party_name"),
+                amountPaise: try row.requiredInt("total_paise")
+            )
+        }
+    }
+
     public func findBillAllocation(for voucherId: Voucher.ID) throws -> BillAllocation? {
         try db.queryOne(
             """

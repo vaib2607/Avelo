@@ -1,42 +1,73 @@
 import SwiftUI
 
+private enum BankingSection: String, CaseIterable, Identifiable {
+    case reconciliation = "Reconciliation"
+    case cheques = "Cheques"
+    var id: String { rawValue }
+}
+
 public struct BankingView: View {
 
     @Environment(AppEnvironment.self) private var env
     @State private var vm: BankingViewModel?
+    @State private var chequesVM: ChequesViewModel?
     @State private var showImport: Bool = false
+    @State private var section: BankingSection = .reconciliation
 
     public init() {}
 
     public var body: some View {
-        BankingContent(vm: vm)
-            .navigationTitle("Banking")
-            .toolbar {
-                ToolbarItem {
+        VStack(spacing: 0) {
+            Picker("", selection: $section) {
+                ForEach(BankingSection.allCases) { s in
+                    Text(s.rawValue).tag(s)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(12)
+            switch section {
+            case .reconciliation:
+                BankingContent(vm: vm)
+            case .cheques:
+                ChequesContent(vm: chequesVM)
+            }
+        }
+        .navigationTitle("Banking")
+        .toolbar {
+            ToolbarItem {
+                if section == .reconciliation {
                     Button { showImport = true } label: {
                         Label("Import statement", systemImage: "tray.and.arrow.down")
                     }
                     .keyboardShortcut("i", modifiers: .command)
                 }
             }
-            .onAppear { setup() }
-            .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
-            .sheet(isPresented: $showImport) {
-                if let ctx = env.companyContext {
-                    ImportStatementSheet(companyId: ctx.companyId, db: ctx.database, accounts: vm?.accounts ?? [])
-                }
+        }
+        .onAppear { setup() }
+        .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+        .sheet(isPresented: $showImport) {
+            if let ctx = env.companyContext {
+                ImportStatementSheet(companyId: ctx.companyId, db: ctx.database, accounts: vm?.accounts ?? [])
             }
+        }
     }
 
     private func setup() {
         guard let ctx = env.companyContext else {
             vm = nil
+            chequesVM = nil
             return
         }
         if vm == nil || vm?.companyId != ctx.companyId {
             let model = BankingViewModel(companyId: ctx.companyId, db: ctx.database)
             model.reload()
             vm = model
+        }
+        if chequesVM == nil || chequesVM?.companyId != ctx.companyId {
+            let model = ChequesViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            chequesVM = model
         }
     }
 }
