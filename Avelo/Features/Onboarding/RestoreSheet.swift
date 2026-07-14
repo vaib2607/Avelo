@@ -44,6 +44,16 @@ public struct RestoreSheet: View {
         Task<Void, Never> {
             defer { isWorking = false }
             do {
+                let trimmedRecoveryKey = recoveryKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                let suppliedRecoveryKey: String?
+                if trimmedRecoveryKey.isEmpty {
+                    suppliedRecoveryKey = nil
+                } else {
+                    let canonicalRecoveryKey = try RecoveryKeyCodec.canonicalize(trimmedRecoveryKey)
+                    recoveryKey = canonicalRecoveryKey
+                    suppliedRecoveryKey = canonicalRecoveryKey
+                }
+
                 let panel = NSOpenPanel()
                 panel.canChooseFiles = true
                 panel.canChooseDirectories = false
@@ -51,8 +61,7 @@ public struct RestoreSheet: View {
                 let result = await NSPanelBridge.runOpen(panel)
                 if result == .OK, let url = panel.url {
                     let restore = RestoreService(manager: env.manager)
-                    let key = recoveryKey.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let restored = try await restore.restore(from: url, recoveryKey: key.isEmpty ? nil : key)
+                    let restored = try await restore.restore(from: url, recoveryKey: suppliedRecoveryKey)
                     await env.openCompany(restored.id)
                     env.notifyDataChanged()
                     env.showSuccess("Restored as new company.")

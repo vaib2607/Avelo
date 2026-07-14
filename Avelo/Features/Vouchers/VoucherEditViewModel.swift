@@ -22,6 +22,13 @@ public final class VoucherEditViewModel {
     public var tcsTaxAmount: String = ""
     public var lines: [LineRow] = [LineRow()]
 
+    // MARK: - Narration recall (AVL-P2-012, Ctrl+R)
+    public var narrationSuggestions: [String] = []
+
+    public func loadNarrationSuggestions() {
+        narrationSuggestions = (try? VoucherRepository(db: db).recentNarrations(companyId: companyId)) ?? []
+    }
+
     // MARK: - Tally single-entry mode (Contra F4 / Payment F5 / Receipt F6)
     //
     // In single-entry mode the top "Account" field holds the cash/bank ledger
@@ -99,6 +106,10 @@ public final class VoucherEditViewModel {
     public func isCashOrBank(_ account: Account) -> Bool {
         if account.isBankAccount { return true }
         if account.code == "CASH_IN_HAND" { return true }
+        if account.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .compare("Cash", options: .caseInsensitive) == .orderedSame {
+            return true
+        }
         if let group = groups.first(where: { $0.id == account.groupId }) {
             return ["BANK_ACCOUNTS", "CASH_IN_HAND", "BANK_OD"].contains(group.code)
         }
@@ -306,16 +317,97 @@ public final class VoucherEditViewModel {
         if let data = entry.linesJSON.data(using: .utf8),
            let decoded = try? JSONDecoder().decode([DraftLineDTO].self, from: data),
            !decoded.isEmpty {
-            lines = decoded.map {
-                LineRow(
-                    accountId: $0.accountId.flatMap(UUID.init(uuidString:)),
-                    amount: $0.amount,
-                    side: $0.side == "credit" ? .credit : .debit,
-                    taxCode: $0.taxCode,
-                    costCenter: $0.costCenter
-                )
+            let recoveredLines: [DraftLineDTO]
+            if entry.accountLedgerId == nil,
+               let sourceIndex = Self.singleEntrySourceIndex(
+                   for: entry.voucherTypeCode,
+                   in: decoded
+               ),
+               let sourceID = decoded[sourceIndex].accountId.flatMap(UUID.init(uuidString:)) {
+                // Older duplicate drafts contained every posted line. Recover
+                // them as the single-entry editor expects: the type-specific
+                // cash/bank line becomes Account and only particulars remain.
+                accountLedgerId = sourceID
+                recoveredLines = decoded.enumerated().compactMap { index, line in
+                    index == sourceIndex ? nil : line
+                }
+            } else {
+                recoveredLines = decoded
+            }
+            if !recoveredLines.isEmpty {
+                lines = recoveredLines.map {
+                    LineRow(
+                        accountId: $0.accountId.flatMap(UUID.init(uuidString:)),
+                        amount: $0.amount,
+                        side: $0.side == "credit" ? .credit : .debit,
+                        taxCode: $0.taxCode,
+                        costCenter: $0.costCenter
+                    )
+                }
             }
         }
+    }
+
+    /// AVL-P2-011 (duplicate voucher, Alt+2): builds a `VoucherEntryDraft`
+    /// from an existing posted voucher's lines, reusing the same
+    /// `pendingDraftRecovery` / `loadFromRecoveredDraft` path draft-crash-
+    /// recovery already uses to preload a freshly-opened `NewVoucherSheet`.
+    /// A fresh id keeps it independent of the source voucher's own
+    /// (nonexistent) draft row — this never touches `avelo_voucher_drafts`.
+    public static func duplicateDraft(from voucher: Voucher, lines: [LedgerLine]) -> VoucherEntryDraft {
+        let sourceLine = singleEntrySourceLine(
+            for: voucher.voucherTypeCode,
+            in: lines,
+            isReversal: voucher.isReversal
+        )
+        let counterpartLines = sourceLine.map { source in
+            lines.filter { $0.id != source.id }
+        } ?? lines
+        let encodedLines = (try? JSONEncoder().encode(counterpartLines.map {
+            DraftLineDTO(accountId: $0.accountId.uuidString, amount: Currency.formatAmountInput(paise: $0.amountPaise), side: $0.side.rawValue, taxCode: $0.taxCode, costCenter: $0.costCenter)
+        })).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        return VoucherEntryDraft(
+            companyId: voucher.companyId,
+            voucherTypeCode: voucher.voucherTypeCode,
+            date: voucher.date,
+            partyAccountId: voucher.partyAccountId,
+            narration: voucher.narration,
+            accountLedgerId: sourceLine?.accountId,
+            linesJSON: encodedLines
+        )
+    }
+
+    /// Payment stores the paying cash/bank ledger on credit; Receipt and
+    /// Contra store their receiving/destination cash/bank ledger on debit.
+    /// New single-entry vouchers use this convention to identify the cash/bank
+    /// line while copying only its counterpart lines into the draft.
+    private static func singleEntrySourceLine(for type: VoucherType.Code,
+                                              in lines: [LedgerLine],
+                                              isReversal: Bool) -> LedgerLine? {
+        guard let side = singleEntryAccountSide(for: type, isReversal: isReversal) else { return nil }
+        return lines.sorted { $0.lineOrder < $1.lineOrder }.first { $0.side == side }
+    }
+
+    private static func singleEntrySourceIndex(for type: VoucherType.Code,
+                                               in lines: [DraftLineDTO]) -> Int? {
+        guard let side = singleEntryAccountSide(for: type, isReversal: false) else { return nil }
+        return lines.firstIndex {
+            $0.side == side.rawValue && $0.accountId.flatMap(UUID.init(uuidString:)) != nil
+        }
+    }
+
+    private static func singleEntryAccountSide(for type: VoucherType.Code,
+                                               isReversal: Bool) -> LedgerSide? {
+        let normalSide: LedgerSide
+        switch type {
+        case .payment:
+            normalSide = .credit
+        case .receipt, .contra:
+            normalSide = .debit
+        default:
+            return nil
+        }
+        return isReversal ? (normalSide == .debit ? .credit : .debit) : normalSide
     }
 
     private func currentDraftSnapshot() -> VoucherEntryDraft {

@@ -336,7 +336,8 @@ public struct RestoreService: Sendable {
     }
 
     public func restore(from sourceURL: URL, recoveryKey: String? = nil) async throws -> CompanyRegistryEntry {
-        try await activityController.perform(reason: "Avelo backup restore") {
+        let decodedRecoveryKey = try Self.decodedRecoveryKey(from: recoveryKey)
+        return try await activityController.perform(reason: "Avelo backup restore") {
             let fm = FileManager.default
             guard fm.fileExists(atPath: sourceURL.path) else {
                 AveloRestoreLogger.error("restore source missing: \(sourceURL.path, privacy: .public)")
@@ -387,7 +388,6 @@ public struct RestoreService: Sendable {
             }
 
             do {
-                let decodedRecoveryKey = try recoveryKey.map { try RecoveryKeyCodec.decode($0) }
                 let opened = try Self.openStagedDatabase(stagingURL: stagingURL, key: decodedRecoveryKey)
                 let db = opened.db
                 defer { db.close() }
@@ -458,6 +458,18 @@ public struct RestoreService: Sendable {
                 throw error
             }
         }
+    }
+
+    private static func decodedRecoveryKey(from recoveryKey: String?) throws -> Data? {
+        guard let recoveryKey else {
+            return nil
+        }
+        let trimmed = recoveryKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        let canonical = try RecoveryKeyCodec.canonicalize(trimmed)
+        return try RecoveryKeyCodec.decode(canonical)
     }
 
     private enum StagedSource {

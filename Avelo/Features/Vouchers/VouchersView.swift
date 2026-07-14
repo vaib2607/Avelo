@@ -152,12 +152,50 @@ private struct VouchersBody: View {
                             .disabled(v.isReversal)
                         Button("Reverse") { env.router.present(.reverseVoucher(v.id)) }
                             .disabled(v.isReversal)
+                        // No ⌥2 keyboard shortcut here: Table has no row
+                        // selection binding, so a global shortcut would be
+                        // ambiguous across rows. Mouse-only until selection
+                        // state is added (tracked with AVL-P1-044).
+                        Button("Duplicate") { duplicate(v) }
+                            .disabled(routerSheet(for: v.voucherTypeCode) == nil)
                         if v.voucherTypeCode == .sales || v.voucherTypeCode == .purchase {
                             Button("Export PDF…") { exportInvoicePDF(v) }
                         }
                     }
                 }
             }
+        }
+    }
+
+    /// AVL-P2-011 (Alt+2 duplicate): preloads a fresh `NewVoucherSheet` with
+    /// the source voucher's lines via the same `pendingDraftRecovery` hook
+    /// draft-crash-recovery uses — no new persistence path, no
+    /// `avelo_voucher_drafts` row, a brand-new voucher number on save.
+    private func duplicate(_ voucher: Voucher) {
+        guard let ctx = env.companyContext, let sheet = routerSheet(for: voucher.voucherTypeCode) else { return }
+        do {
+            let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
+            let lines = try svc.lines(for: voucher.id)
+            env.pendingDraftRecovery = VoucherEditViewModel.duplicateDraft(from: voucher, lines: lines)
+            env.router.present(sheet)
+        } catch {
+            env.showError(AppError.wrap(error))
+        }
+    }
+
+    /// `.opening` and `.payroll` are system-generated and have no "New X"
+    /// sheet to duplicate into.
+    private func routerSheet(for typeCode: VoucherType.Code) -> RouterSheet? {
+        switch typeCode {
+        case .journal: return .newJournal
+        case .payment: return .newPayment
+        case .receipt: return .newReceipt
+        case .contra: return .newContra
+        case .purchase: return .newPurchase
+        case .sales: return .newSales
+        case .creditNote: return .newCreditNote
+        case .debitNote: return .newDebitNote
+        case .opening, .payroll: return nil
         }
     }
 

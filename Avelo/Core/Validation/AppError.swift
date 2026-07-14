@@ -2,6 +2,7 @@ import Foundation
 
 public enum AppError: Error, Sendable, Equatable, Identifiable {
     case validation(ValidationError)
+    case recoveryKey(RecoveryKeyError)
     case database(SQLiteError)
     case featureUnavailable(String)
     case fileSystem(String)
@@ -15,6 +16,8 @@ public enum AppError: Error, Sendable, Equatable, Identifiable {
     public var localizedMessage: String {
         switch self {
         case .validation(let e):
+            return e.message
+        case .recoveryKey(let e):
             return e.message
         case .database(let e):
             return "Database error: \(e.message)"
@@ -41,6 +44,9 @@ public enum AppError: Error, Sendable, Equatable, Identifiable {
         if let appErr = error as? AppError {
             return appErr
         }
+        if let recoveryKeyError = error as? RecoveryKeyError {
+            return .recoveryKey(recoveryKeyError)
+        }
         if let sqliteErr = error as? SQLiteError {
             return .database(sqliteErr)
         }
@@ -50,6 +56,7 @@ public enum AppError: Error, Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .validation(let e):  return "validation-\(e.code.rawValue)"
+        case .recoveryKey(let e): return "recovery-key-\(e.identifier)"
         case .database(let e):    return "database-\(e.message.hashValue)"
         case .featureUnavailable(let s): return "unavail-\(s.hashValue)"
         case .fileSystem(let s):   return "fs-\(s.hashValue)"

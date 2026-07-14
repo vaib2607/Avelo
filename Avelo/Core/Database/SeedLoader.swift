@@ -24,6 +24,15 @@ public struct SeedLoader: Sendable {
             payload = DefaultChartOfDefaults.builtIn
         }
 
+        try load(payload, into: db, companyId: companyId, financialYearId: financialYearId)
+    }
+
+    func load(_ payload: DefaultChartOfAccountsPayload,
+              into db: SQLiteDatabase,
+              companyId: Company.ID,
+              financialYearId: FinancialYear.ID) throws {
+        try validateAccountGroupHierarchy(payload.groups)
+
         try db.write { tx in
             for vt in payload.voucherTypes {
                 try tx.execute(
@@ -109,6 +118,40 @@ public struct SeedLoader: Sendable {
                         .integer(Int64(vt.defaultPadding))
                     ]
                 )
+            }
+        }
+    }
+
+    private func validateAccountGroupHierarchy(_ groups: [DefaultChartOfAccountsPayload.Group]) throws {
+        var groupsByCode: [String: DefaultChartOfAccountsPayload.Group] = [:]
+        for group in groups {
+            guard groupsByCode[group.code] == nil else {
+                throw AppError.businessRule("Seed loader: duplicate account-group code '\(group.code)'.")
+            }
+            guard AccountNature(rawValue: group.nature) != nil else {
+                throw AppError.businessRule("Seed loader: invalid nature '\(group.nature)' for group '\(group.code)'.")
+            }
+            groupsByCode[group.code] = group
+        }
+
+        for group in groups {
+            guard let parentCode = group.under else { continue }
+            guard let parent = groupsByCode[parentCode] else {
+                throw AppError.businessRule("Seed loader: unknown parent group code '\(parentCode)' for group '\(group.code)'")
+            }
+            guard parent.nature == group.nature else {
+                throw AppError.businessRule("Seed loader: parent and child account groups must have the same nature.")
+            }
+        }
+
+        for group in groups {
+            var currentCode = group.code
+            var visited: Set<String> = []
+            while let parentCode = groupsByCode[currentCode]?.under {
+                guard visited.insert(currentCode).inserted else {
+                    throw AppError.businessRule("Seed loader: account-group hierarchy contains a cycle involving '\(currentCode)'.")
+                }
+                currentCode = parentCode
             }
         }
     }

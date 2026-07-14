@@ -1,0 +1,17 @@
+[2026-07-14T12:55:41.683Z] RESULT
+============================================================
+{
+  "success": false,
+  "output": "API Error: Unable to connect to API (ENOTFOUND)\n",
+  "parsedOutput": {
+    "sections": [],
+    "codeBlocks": []
+  },
+  "durationMs": 189713,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "testgaps",
+  "timestamp": "2026-07-14T12:55:41.683Z",
+  "executionId": "testgaps_1784033551970_nrf5jx",
+  "error": "Process exited with code 1"
+}

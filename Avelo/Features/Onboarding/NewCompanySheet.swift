@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 public struct NewCompanySheet: View {
@@ -132,6 +133,9 @@ public struct NewCompanySheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(nsColor: .textBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                Button("Copy Recovery Key") {
+                    copyRecoveryKey(createdRecoveryKey)
+                }
                 Toggle("I've saved this recovery key", isOn: $recoveryAcknowledged)
             }
         }
@@ -228,5 +232,11 @@ public struct NewCompanySheet: View {
                 env.showError(AppError.wrap(error))
             }
         }
+    }
+
+    private func copyRecoveryKey(_ recoveryKey: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        _ = pasteboard.setString(recoveryKey, forType: .string)
     }
 }

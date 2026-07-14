@@ -1,0 +1,127 @@
+[2026-07-11T17:21:22.656Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Based on the security scan, here's the comprehensive vulnerability report:\n\n```json\n{\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"medium\",\n      \"file\": \"Avelo/Core/Database/SQLiteDatabase.swift\",\n      \"line\": 386,\n      \"type\": \"Hardcoded Encryption Passphrase\",\n      \"description\": \"Hardcoded legacy encryption passphrase 'Avelo.v2.local.sqlcipher.commoncrypto.store' is embedded in source code and compiled binaries. This passphrase is visible to anyone with access to the binary. Used for legacy database migration only (not for new databases), but poses risk if binary is compromised.\",\n      \"scope\": \"Legacy database migration only. New databases use per-company Keychain-stored keys.\",\n      \"affectedLocations\": [\n        \"LegacyKeyMigrationService.swift:39\",\n        \"LegacyKeyMigrationService.swift:75\",\n        \"RestoreService.swift:478\"\n      ]\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"Avelo/Core/Database/RestoreService.swift\",\n      \"line\": 734,\n      \"type\": \"Non-Parameterized SQL Identifier (Trigger Name)\",\n      \"description\": \"SQL trigger names directly interpolated into DROP TRIGGER statement: `DROP TRIGGER IF EXISTS \\\\(triggerName)`. While not exploitable (trigger names from hardcoded array), violates parameterization best practices.\",\n      \"exploitability\": \"No injection risk - trigger names are hardcoded, not user-supplied\",\n      \"mitigation\": \"Add defense-in-depth comment or refactor to use parameterized approach if SQLite supports it\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"Avelo/Core/Database/RestoreService.swift\",\n      \"line\": 578,\n      \"type\": \"Non-Parameterized Table Names\",\n      \"description\": \"Table names directly interpolated in UPDATE statements: `UPDATE \\\\(table) SET company_id = ?`. SQLite doesn't support parameterized table names, and all tables come from hardcoded array.\",\n      \"exploitability\": \"No injection risk - table names are hardcoded in companyScopedTables array\",\n      \"note\": \"Standard practice for SQLite; not a vulnerability\"\n    }\n  ],\n  \"riskScore\": 28,\n  \"riskLevel\": \"LOW\",\n  \"summary\": {\n    \"highSeverity\": 0,\n    \"mediumSeverity\": 1,\n    \"lowSeverity\": 2,\n    \"overallAssessment\": \"Low risk. Strong security practices with only legacy code issue. No SQL injection, no active credentials, proper encryption.\"\n  },\n  \"strengths\": [\n    \"✓ All user-supplied values properly parameterized in SQL queries\",\n    \"✓ Per-company encryption keys stored securely in macOS Keychain\",\n    \"✓ Cryptographically secure random key generation via SecRandomCopyBytes\",\n    \"✓ No active hardcoded API keys, passwords, or auth tokens\",\n    \"✓ Proper input validation (GSTIN format, account codes)\",\n    \"✓ Strong SQLCipher encryption for database at-rest\",\n    \"✓ No sensitive data logged in cleartext (proper privacy markers)\",\n    \"✓ Local-only application - no network exposure\",\n    \"✓ Backup files excluded from Time Machine\",\n    \"✓ Database checksums prevent tampered restores\"\n  ],\n  \"recommendations\": [\n    {\n      \"priority\": \"high\",\n      \"action\": \"Remove legacy hardcoded passphrase\",\n      \"details\": \"After 1-2 release cycles when users have migrated to Keychain-based keys, remove legacyHardcodedPassphrase from SQLiteDatabase.swift and migration code entirely. This eliminates the only medium-severity finding.\",\n      \"timeline\": \"Next major release\"\n    },\n    {\n      \"priority\": \"medium\",\n      \"action\": \"Validate Keychain permissions\",\n      \"details\": \"Verify that Keychain items are configured with appropriate privacy levels and access groups. Test that keys are not accessible by other processes.\",\n      \"timeline\": \"During next security audit\"\n    },\n    {\n      \"priority\": \"medium\",\n      \"action\": \"Enforce parameterized SQL as defense-in-depth\",\n      \"details\": \"Add code review guidelines requiring parameterized SQL even for hardcoded identifiers. Add comments explaining why interpolation is safe where SQLite requires it (table/trigger names).\",\n      \"timeline\": \"Next code review cycle\"\n    },\n    {\n      \"priority\": \"low\",\n      \"action\": \"Document security architecture\",\n      \"details\": \"Create SECURITY.md documenting the encryption model, key storage, and database protection mechanisms for future maintainers and security audits.\",\n      \"timeline\": \"Before next release\"\n    },\n    {\n      \"priority\": \"low\",\n      \"action\": \"Rotate backup encryption if supported\",\n      \"details\": \"Verify that backup/restore operations use unique encryption contexts. If backups contain encrypted database copies, ensure encryption keys are managed independently.\",\n      \"timeline\": \"During backup feature review\"\n    }\n  ],\n  \"attackSurfaces\": {\n    \"networkAttacks\": \"None - local-only application\",\n    \"sqlInjection\": \"Protected - all user inputs parameterized\",\n    \"xss\": \"N/A - native macOS app, no HTML/JavaScript\",\n    \"authorizationBypass\": \"Protected - single-user desktop with per-company context scoping\",\n    \"credentialTheft\": \"Low - only legacy passphrase; active keys in Keychain\",\n    \"dataExfiltration\": \"Protected - encrypted at-rest, no external API calls\",\n    \"supplyChainRisk\": \"Standard Swift dependencies (minimal risk with SPM)\"\n  },\n  \"complianceNotes\": {\n    \"dataProtection\": \"✓ Encryption at-rest implemented\",\n    \"accessControl\": \"✓ Per-company context enforced\",\n    \"logging\": \"✓ No sensitive data in logs\",\n    \"backups\": \"✓ Encrypted backups with integrity checks\",\n    \"keyManagement\": \"✓ Secure key generation and storage via Keychain\"\n  },\n  \"testingRecommendations\": [\n    \"Verify Keychain access restrictions with Activity Monitor (check if other processes can read company keys)\",\n    \"Test that database files cannot be read when moved to other machines (Keychain-bound encryption)\",\n    \"Validate that legacy migration properly transitions users to new encryption model\",\n    \"Audit all network calls if external APIs are added in future\",\n    \"Test backup/restore cycle for encryption integrity\"\n  ],\n  \"nextSteps\": [\n    \"1. Schedule removal of legacy passphrase code in next major release\",\n    \"2. Add security documentation (SECURITY.md)\",\n    \"3. Implement code review checklist for SQL parameterization\"\n  ]\n}\n```\n\n## Key Findings\n\n**No Critical Issues Found.** The Avelo app implements strong security practices:\n\n1. **Medium (Legacy Code)**: Hardcoded encryption passphrase for backward compatibility — should be removed after users upgrade\n2. **Low (Defense-in-Depth)**: Non-parameterized SQL identifiers where SQLite requires interpolation — not exploitable but violates layered security\n3. **Strong Encryption**: Per-company Keychain-based key management, SQLCipher encryption, secure random generation\n4. **SQL Injection Protected**: All user inputs properly parameterized\n5. **No Network Risk**: Local-only app with no external API exposure\n\n**Risk Score: 28/100 (LOW)** — only legacy migration code poses a manageable risk that should be cleaned up after the next release cycle.\n",
+  "parsedOutput": {
+    "vulnerabilities": [
+      {
+        "severity": "medium",
+        "file": "Avelo/Core/Database/SQLiteDatabase.swift",
+        "line": 386,
+        "type": "Hardcoded Encryption Passphrase",
+        "description": "Hardcoded legacy encryption passphrase 'Avelo.v2.local.sqlcipher.commoncrypto.store' is embedded in source code and compiled binaries. This passphrase is visible to anyone with access to the binary. Used for legacy database migration only (not for new databases), but poses risk if binary is compromised.",
+        "scope": "Legacy database migration only. New databases use per-company Keychain-stored keys.",
+        "affectedLocations": [
+          "LegacyKeyMigrationService.swift:39",
+          "LegacyKeyMigrationService.swift:75",
+          "RestoreService.swift:478"
+        ]
+      },
+      {
+        "severity": "low",
+        "file": "Avelo/Core/Database/RestoreService.swift",
+        "line": 734,
+        "type": "Non-Parameterized SQL Identifier (Trigger Name)",
+        "description": "SQL trigger names directly interpolated into DROP TRIGGER statement: `DROP TRIGGER IF EXISTS \\(triggerName)`. While not exploitable (trigger names from hardcoded array), violates parameterization best practices.",
+        "exploitability": "No injection risk - trigger names are hardcoded, not user-supplied",
+        "mitigation": "Add defense-in-depth comment or refactor to use parameterized approach if SQLite supports it"
+      },
+      {
+        "severity": "low",
+        "file": "Avelo/Core/Database/RestoreService.swift",
+        "line": 578,
+        "type": "Non-Parameterized Table Names",
+        "description": "Table names directly interpolated in UPDATE statements: `UPDATE \\(table) SET company_id = ?`. SQLite doesn't support parameterized table names, and all tables come from hardcoded array.",
+        "exploitability": "No injection risk - table names are hardcoded in companyScopedTables array",
+        "note": "Standard practice for SQLite; not a vulnerability"
+      }
+    ],
+    "riskScore": 28,
+    "riskLevel": "LOW",
+    "summary": {
+      "highSeverity": 0,
+      "mediumSeverity": 1,
+      "lowSeverity": 2,
+      "overallAssessment": "Low risk. Strong security practices with only legacy code issue. No SQL injection, no active credentials, proper encryption."
+    },
+    "strengths": [
+      "✓ All user-supplied values properly parameterized in SQL queries",
+      "✓ Per-company encryption keys stored securely in macOS Keychain",
+      "✓ Cryptographically secure random key generation via SecRandomCopyBytes",
+      "✓ No active hardcoded API keys, passwords, or auth tokens",
+      "✓ Proper input validation (GSTIN format, account codes)",
+      "✓ Strong SQLCipher encryption for database at-rest",
+      "✓ No sensitive data logged in cleartext (proper privacy markers)",
+      "✓ Local-only application - no network exposure",
+      "✓ Backup files excluded from Time Machine",
+      "✓ Database checksums prevent tampered restores"
+    ],
+    "recommendations": [
+      {
+        "priority": "high",
+        "action": "Remove legacy hardcoded passphrase",
+        "details": "After 1-2 release cycles when users have migrated to Keychain-based keys, remove legacyHardcodedPassphrase from SQLiteDatabase.swift and migration code entirely. This eliminates the only medium-severity finding.",
+        "timeline": "Next major release"
+      },
+      {
+        "priority": "medium",
+        "action": "Validate Keychain permissions",
+        "details": "Verify that Keychain items are configured with appropriate privacy levels and access groups. Test that keys are not accessible by other processes.",
+        "timeline": "During next security audit"
+      },
+      {
+        "priority": "medium",
+        "action": "Enforce parameterized SQL as defense-in-depth",
+        "details": "Add code review guidelines requiring parameterized SQL even for hardcoded identifiers. Add comments explaining why interpolation is safe where SQLite requires it (table/trigger names).",
+        "timeline": "Next code review cycle"
+      },
+      {
+        "priority": "low",
+        "action": "Document security architecture",
+        "details": "Create SECURITY.md documenting the encryption model, key storage, and database protection mechanisms for future maintainers and security audits.",
+        "timeline": "Before next release"
+      },
+      {
+        "priority": "low",
+        "action": "Rotate backup encryption if supported",
+        "details": "Verify that backup/restore operations use unique encryption contexts. If backups contain encrypted database copies, ensure encryption keys are managed independently.",
+        "timeline": "During backup feature review"
+      }
+    ],
+    "attackSurfaces": {
+      "networkAttacks": "None - local-only application",
+      "sqlInjection": "Protected - all user inputs parameterized",
+      "xss": "N/A - native macOS app, no HTML/JavaScript",
+      "authorizationBypass": "Protected - single-user desktop with per-company context scoping",
+      "credentialTheft": "Low - only legacy passphrase; active keys in Keychain",
+      "dataExfiltration": "Protected - encrypted at-rest, no external API calls",
+      "supplyChainRisk": "Standard Swift dependencies (minimal risk with SPM)"
+    },
+    "complianceNotes": {
+      "dataProtection": "✓ Encryption at-rest implemented",
+      "accessControl": "✓ Per-company context enforced",
+      "logging": "✓ No sensitive data in logs",
+      "backups": "✓ Encrypted backups with integrity checks",
+      "keyManagement": "✓ Secure key generation and storage via Keychain"
+    },
+    "testingRecommendations": [
+      "Verify Keychain access restrictions with Activity Monitor (check if other processes can read company keys)",
+      "Test that database files cannot be read when moved to other machines (Keychain-bound encryption)",
+      "Validate that legacy migration properly transitions users to new encryption model",
+      "Audit all network calls if external APIs are added in future",
+      "Test backup/restore cycle for encryption integrity"
+    ],
+    "nextSteps": [
+      "1. Schedule removal of legacy passphrase code in next major release",
+      "2. Add security documentation (SECURITY.md)",
+      "3. Implement code review checklist for SQL parameterization"
+    ]
+  },
+  "durationMs": 246358,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-07-11T17:21:22.655Z",
+  "executionId": "audit_1783790236297_z0vw0n"
+}

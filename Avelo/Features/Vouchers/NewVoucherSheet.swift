@@ -123,24 +123,45 @@ private struct NewVoucherBody: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @State private var submitGate = OneShotSubmitGate()
+    @State private var accountCreationSheet: RouterSheet?
+    @State private var accountCreationTarget: AccountCreationTarget?
+    @State private var accountCreationEligibility: (Account) -> Bool = { _ in true }
+    @State private var accountIDsBeforeCreation: Set<Account.ID> = []
+    @State private var accountCreationRouter = AppRouter()
 
     var body: some View {
+        editorContent
+            .sheet(item: $accountCreationSheet, onDismiss: finishAccountCreation) { sheet in
+                if case .newAccount = sheet {
+                    NewAccountSheet().environment(accountCreationRouter)
+                }
+            }
+            .onChange(of: accountCreationRouter.presentedSheet == nil) { _, isDismissed in
+                if isDismissed { accountCreationSheet = nil }
+            }
+    }
+
+    private var editorContent: some View {
         VStack(spacing: 0) {
             topBar
             Divider()
-            ScrollView { mainContent }
-                .onChange(of: vm.lines) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
-                .onChange(of: vm.accountLedgerId) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
-                .onChange(of: vm.partyAccountId) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
-                .onChange(of: vm.billReferenceType) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
-                .onChange(of: vm.billReferenceNumber) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
-                .onChange(of: vm.narration) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
-                .onChange(of: vm.date) { _, _ in vm.revalidate(); vm.scheduleAutosave() }
-                .onChange(of: vm.chequeNumber) { _, _ in vm.scheduleAutosave() }
-                .onChange(of: vm.chequeDueDate) { _, _ in vm.scheduleAutosave() }
+            voucherEditorScrollView
             Divider()
             bottomBar
         }
+    }
+
+    private var voucherEditorScrollView: some View {
+        ScrollView { mainContent }
+            .onChange(of: vm.lines) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.accountLedgerId) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.partyAccountId) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.billReferenceType) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.billReferenceNumber) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.narration) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.date) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.chequeNumber) { _, _ in voucherAutosaveDidChange() }
+            .onChange(of: vm.chequeDueDate) { _, _ in voucherAutosaveDidChange() }
     }
 
     private var topBar: some View {
@@ -188,16 +209,21 @@ private struct NewVoucherBody: View {
             if vm.singleEntryMode { accountSection }
             workflowSection
             if isItemInvoiceEligible { itemInvoiceToggle }
-            if vm.itemInvoiceMode {
-                itemGridSection
-                if !vm.itemInvoiceValidationErrors.isEmpty { itemInvoiceValidationSection }
-            } else {
-                linesSection
-                if !vm.validationErrors.isEmpty { validationSection }
-                totalsSection
-            }
+            voucherEntrySection
         }
         .padding(16)
+    }
+
+    @ViewBuilder
+    private var voucherEntrySection: some View {
+        if vm.itemInvoiceMode {
+            itemGridSection
+            if !vm.itemInvoiceValidationErrors.isEmpty { itemInvoiceValidationSection }
+        } else {
+            linesSection
+            if !vm.validationErrors.isEmpty { validationSection }
+            totalsSection
+        }
     }
 
     private var isContra: Bool { initialType == .contra }
@@ -209,6 +235,8 @@ private struct NewVoucherBody: View {
     private var itemInvoiceToggle: some View {
         Toggle("Item invoice (GST auto-calculated from item masters)", isOn: $vm.itemInvoiceMode)
             .toggleStyle(.switch)
+            .keyboardShortcut("v", modifiers: [.control])
+            .help("Toggle voucher / item-invoice mode (⌃V)")
     }
 
     private var itemGridSection: some View {
@@ -216,7 +244,8 @@ private struct NewVoucherBody: View {
             VStack(alignment: .leading, spacing: 8) {
                 AccountPicker(selection: $vm.salesOrPurchaseLedgerId,
                               accounts: vm.accounts,
-                              placeholder: initialType == .sales ? "Sales ledger…" : "Purchase ledger…")
+                              placeholder: initialType == .sales ? "Sales ledger…" : "Purchase ledger…",
+                              onCreate: { beginAccountCreation(for: .salesOrPurchaseLedger) })
                 HStack {
                     Text("Item").frame(maxWidth: .infinity, alignment: .leading)
                     Text("Qty").frame(width: 90, alignment: .leading)
@@ -281,7 +310,8 @@ private struct NewVoucherBody: View {
                 if !isContra {
                     AccountPicker(selection: $vm.partyAccountId,
                                   accounts: vm.accounts,
-                                  placeholder: "Party (optional)")
+                                  placeholder: "Party (optional)",
+                                  onCreate: { beginAccountCreation(for: .party) })
                     Picker("Bill reference type", selection: $vm.billReferenceType) {
                         Text("None").tag(VoucherDraft.BillReferenceType?.none)
                         ForEach(VoucherDraft.BillReferenceType.allCases) { type in
@@ -290,11 +320,37 @@ private struct NewVoucherBody: View {
                     }
                     TextField("Bill reference number", text: $vm.billReferenceNumber)
                 }
-                TextField("Narration", text: $vm.narration, axis: .vertical)
-                    .lineLimit(2...4)
+                narrationField
             }
             .formStyle(.grouped)
         }
+    }
+
+    private var narrationField: some View {
+        HStack(alignment: .top) {
+            TextField("Narration", text: $vm.narration, axis: .vertical)
+                .lineLimit(2...4)
+            narrationRecallMenu
+        }
+    }
+
+    private var narrationRecallMenu: some View {
+        Menu {
+            if vm.narrationSuggestions.isEmpty {
+                Text("No recent narrations").foregroundStyle(.secondary)
+            }
+            ForEach(vm.narrationSuggestions, id: \.self) { suggestion in
+                Button(suggestion) { vm.narration = suggestion }
+            }
+        } label: {
+            Image(systemName: "clock.arrow.circlepath")
+        }
+        .accessibilityLabel("Recall a recent narration")
+        .menuStyle(.borderlessButton)
+        .frame(width: 24)
+        .keyboardShortcut("r", modifiers: [.control])
+        .onAppear { vm.loadNarrationSuggestions() }
+        .help("Recall a recent narration (⌃R)")
     }
 
     /// Tally single-entry "Account" field: the cash/bank ledger this voucher
@@ -305,7 +361,13 @@ private struct NewVoucherBody: View {
                 AccountPicker(selection: $vm.accountLedgerId,
                               accounts: vm.accounts,
                               placeholder: isContra ? "Destination cash/bank ledger…" : "Cash/Bank ledger…",
-                              filter: { vm.isCashOrBank($0) })
+                              filter: accountLedgerEligibility,
+                              onCreate: {
+                                  beginAccountCreation(
+                                      for: .accountLedger,
+                                      eligibility: accountLedgerEligibility
+                                  )
+                              })
                 Text(vm.accountSide == .debit ? "This ledger will be debited." : "This ledger will be credited.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -366,11 +428,21 @@ private struct NewVoucherBody: View {
         return !vm.isCashOrBank(account)
     }
 
+    private func accountLedgerEligibility(_ account: Account) -> Bool {
+        vm.isCashOrBank(account)
+    }
+
     private func lineRow(line: Binding<VoucherEditViewModel.LineRow>) -> some View {
         HStack {
             AccountPicker(selection: line.accountId,
                           accounts: vm.accounts,
-                          filter: { particularsFilter($0) })
+                          filter: particularsFilter,
+                          onCreate: {
+                              beginAccountCreation(
+                                  for: .line(line.wrappedValue.id),
+                                  eligibility: particularsFilter
+                              )
+                          })
             if !vm.singleEntryMode {
                 Picker("", selection: line.side) {
                     Text("Debit").tag(LedgerSide.debit)
@@ -505,4 +577,81 @@ private struct NewVoucherBody: View {
         }
         #endif
     }
+
+    private func voucherDraftDidChange() {
+        vm.revalidate()
+        vm.scheduleAutosave()
+    }
+
+    private func voucherAutosaveDidChange() {
+        vm.scheduleAutosave()
+    }
+
+    private func beginAccountCreation(for target: AccountCreationTarget,
+                                      eligibility: @escaping (Account) -> Bool = { _ in true }) {
+        accountCreationTarget = target
+        accountCreationEligibility = eligibility
+        accountIDsBeforeCreation = Set(vm.accounts.map(\.id))
+        accountCreationRouter.presentedSheet = .newAccount
+        accountCreationSheet = .newAccount
+    }
+
+    private func finishAccountCreation() {
+        defer { resetAccountCreationRequest() }
+        guard let ctx = env.companyContext, let target = accountCreationTarget else { return }
+        do {
+            let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
+            vm.accounts = accounts
+            switch accountCreationSelection(
+                before: accountIDsBeforeCreation,
+                accounts: accounts,
+                eligibility: accountCreationEligibility
+            ) {
+            case .selected(let createdID):
+                switch target {
+                case .accountLedger: vm.accountLedgerId = createdID
+                case .party: vm.partyAccountId = createdID
+                case .salesOrPurchaseLedger: vm.salesOrPurchaseLedgerId = createdID
+                case .line(let id):
+                    if let index = vm.lines.firstIndex(where: { $0.id == id }) { vm.lines[index].accountId = createdID }
+                }
+                vm.revalidate()
+            case .rejected:
+                env.showError(AppError.businessRule("The new account is not eligible for this field and was not selected."))
+            case .none:
+                break
+            }
+        } catch { env.showError(AppError.wrap(error)) }
+    }
+
+    private func resetAccountCreationRequest() {
+        accountCreationTarget = nil
+        accountCreationEligibility = { _ in true }
+        accountIDsBeforeCreation = []
+    }
+}
+
+internal enum AccountCreationTarget: Hashable {
+    case accountLedger, party, salesOrPurchaseLedger
+    case line(UUID)
+}
+
+internal func newlyCreatedAccountID(before: Set<Account.ID>, after: Set<Account.ID>) -> Account.ID? {
+    after.subtracting(before).first
+}
+
+internal enum AccountCreationSelection: Equatable {
+    case none
+    case selected(Account.ID)
+    case rejected(Account.ID)
+}
+
+internal func accountCreationSelection(before: Set<Account.ID>,
+                                       accounts: [Account],
+                                       eligibility: (Account) -> Bool) -> AccountCreationSelection {
+    guard let createdID = newlyCreatedAccountID(before: before, after: Set(accounts.map(\.id))),
+          let created = accounts.first(where: { $0.id == createdID }) else {
+        return .none
+    }
+    return eligibility(created) ? .selected(created.id) : .rejected(created.id)
 }

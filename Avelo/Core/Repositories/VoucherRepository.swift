@@ -68,6 +68,23 @@ public struct VoucherRepository: Sendable {
         return try db.query(sql, bind: bind) { try Self.rowToVoucher($0) }
     }
 
+    /// AVL-P2-012 (narration recall, Ctrl+R): distinct narrations from this
+    /// company's own voucher history, most recent first. Scoped per company
+    /// like every other read here — no cross-company recall leakage.
+    public func recentNarrations(companyId: Company.ID, limit: Int = 20) throws -> [String] {
+        try db.query(
+            """
+            SELECT narration, MAX(date) AS last_used
+            FROM avelo_vouchers
+            WHERE company_id = ? AND length(trim(narration)) > 0
+            GROUP BY narration
+            ORDER BY last_used DESC
+            LIMIT ?
+            """,
+            bind: [.text(companyId.uuidString), .integer(Int64(limit))]
+        ) { try $0.requiredText("narration") }
+    }
+
     public func count(filter: Filter) throws -> Int {
         let built = Self.filterWhereClause(filter)
         let sql = """

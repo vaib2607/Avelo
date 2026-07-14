@@ -3,6 +3,7 @@ import SwiftUI
 private enum InventorySection: String, CaseIterable, Identifiable {
     case items = "Items"
     case orders = "Orders"
+    case boms = "BOM"
     var id: String { rawValue }
 }
 
@@ -11,6 +12,7 @@ public struct InventoryView: View {
     @Environment(AppEnvironment.self) private var env
     @State private var vm: InventoryViewModel?
     @State private var ordersVM: InventoryOrdersViewModel?
+    @State private var bomsVM: BOMsViewModel?
     @State private var showMovement: InventoryItem.ID?
     @State private var section: InventorySection = .items
 
@@ -31,6 +33,8 @@ public struct InventoryView: View {
                 InventoryContent(vm: vm, showMovement: $showMovement)
             case .orders:
                 OrdersContent(vm: ordersVM)
+            case .boms:
+                BOMsContent(vm: bomsVM)
             }
         }
         .navigationTitle("Inventory")
@@ -41,7 +45,7 @@ public struct InventoryView: View {
                     Button {
                         env.router.present(.newItem)
                     } label: { Label("New Item", systemImage: "plus") }
-                case .orders:
+                case .orders, .boms:
                     EmptyView()
                 }
             }
@@ -54,6 +58,7 @@ public struct InventoryView: View {
         guard let ctx = env.companyContext else {
             vm = nil
             ordersVM = nil
+            bomsVM = nil
             return
         }
         if vm == nil || vm?.companyId != ctx.companyId {
@@ -65,6 +70,11 @@ public struct InventoryView: View {
             let model = InventoryOrdersViewModel(companyId: ctx.companyId, db: ctx.database)
             model.reload()
             ordersVM = model
+        }
+        if bomsVM == nil || bomsVM?.companyId != ctx.companyId {
+            let model = BOMsViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            bomsVM = model
         }
     }
 }

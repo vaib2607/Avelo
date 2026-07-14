@@ -13,7 +13,8 @@ public struct VoucherDraftValidator: Sendable {
     public func validate(_ draft: VoucherDraft,
                          companyId: Company.ID,
                          financialYearId: FinancialYear.ID,
-                         existingVoucherId: Voucher.ID? = nil) -> ValidationResult {
+                         existingVoucherId: Voucher.ID? = nil,
+                         isSystemReversal: Bool = false) -> ValidationResult {
         var errors: [ValidationError] = []
 
         let filled = draft.filledLines
@@ -124,6 +125,22 @@ public struct VoucherDraftValidator: Sendable {
             break
         }
 
+        // A system reversal deliberately mirrors a previously valid voucher.
+        // Its cash/bank sides are therefore the inverse of the entry form's
+        // single-entry convention, while still requiring all normal balance,
+        // fiscal-year, and account checks below.
+        if filled.count >= 2 && !isSystemReversal {
+            do {
+                errors += try singleEntryVoucherErrors(for: draft, companyId: companyId)
+            } catch {
+                errors.append(ValidationError(
+                    code: .internal,
+                    field: "lines",
+                    message: "Unable to validate cash/bank eligibility for this voucher."
+                ))
+            }
+        }
+
         do {
             if let fyId = try fyIdForDate(draft.date, companyId: companyId) {
                 if fyId != financialYearId {
@@ -201,5 +218,74 @@ public struct VoucherDraftValidator: Sendable {
             bind: [.text(id.uuidString), .text(companyId.uuidString)]
         ) { r in r.int("is_active") }
         return (v ?? 0) != 0
+    }
+
+    private func singleEntryVoucherErrors(for draft: VoucherDraft,
+                                          companyId: Company.ID) throws -> [ValidationError] {
+        guard [.payment, .receipt, .contra].contains(draft.voucherTypeCode) else {
+            return []
+        }
+
+        let accounts = try AccountRepository(db: db).listForCompany(companyId)
+        let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
+        let groupCodesByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0.code) })
+        let cashOrBankAccountIDs = Set(accounts.lazy.filter {
+            isCashOrBank($0, groupCodesByID: groupCodesByID)
+        }.map(\.id))
+        let lines = draft.filledLines
+        let cashOrBankLines = lines.filter {
+            $0.accountId.map { cashOrBankAccountIDs.contains($0) } ?? false
+        }
+
+        switch draft.voucherTypeCode {
+        case .payment, .receipt:
+            let accountSide: LedgerSide = draft.voucherTypeCode == .payment ? .credit : .debit
+            let particularsSide: LedgerSide = accountSide == .debit ? .credit : .debit
+            guard cashOrBankLines.count == 1,
+                  cashOrBankLines.first?.side == accountSide,
+                  lines.filter({ line in
+                      line.accountId.map { !cashOrBankAccountIDs.contains($0) } ?? false
+                  }).allSatisfy({ $0.side == particularsSide }) else {
+                return [singleEntryValidationError(
+                    "Payment requires one cash/bank credit ledger; Receipt requires one cash/bank debit ledger; particulars must be on the opposite side."
+                )]
+            }
+        case .contra:
+            let debitCount = lines.filter { $0.side == .debit }.count
+            let creditCount = lines.filter { $0.side == .credit }.count
+            guard cashOrBankLines.count == lines.count,
+                  debitCount == 1,
+                  creditCount >= 1 else {
+                return [singleEntryValidationError(
+                    "Contra vouchers require only cash/bank ledgers, with one destination ledger debited and one or more source ledgers credited."
+                )]
+            }
+        default:
+            break
+        }
+
+        return []
+    }
+
+    private func isCashOrBank(_ account: Account,
+                              groupCodesByID: [AccountGroup.ID: String]) -> Bool {
+        if account.isBankAccount || account.code == "CASH_IN_HAND" {
+            return true
+        }
+        if account.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .compare("Cash", options: .caseInsensitive) == .orderedSame {
+            return true
+        }
+        guard let groupCode = groupCodesByID[account.groupId] else { return false }
+        return ["BANK_ACCOUNTS", "CASH_IN_HAND", "BANK_OD"].contains(groupCode)
+    }
+
+    private func singleEntryValidationError(_ message: String) -> ValidationError {
+        ValidationError(
+            code: .internal,
+            field: "lines",
+            message: message,
+            suggestedFix: "Select cash/bank ledgers only where this voucher type allows them."
+        )
     }
 }

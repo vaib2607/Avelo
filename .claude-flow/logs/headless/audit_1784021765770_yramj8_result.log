@@ -1,0 +1,165 @@
+[2026-07-14T09:38:53.012Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Based on my comprehensive security analysis of the Avelo Swift/macOS codebase, here's the full security audit report:\n\n```json\n{\n  \"auditDate\": \"2026-07-14\",\n  \"codebase\": \"Avelo v1.1 Desktop Accounting Application\",\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"low\",\n      \"file\": \"Avelo/Core/Database/SQLiteDatabase.swift\",\n      \"line\": 372,\n      \"title\": \"Encryption Key Passed via String Interpolation\",\n      \"description\": \"Encryption key material is interpolated into PRAGMA statements. While the key is immediately used and not logged, this is a best-practice concern. Consider using a parameterized PRAGMA approach or wrapper.\",\n      \"impact\": \"Low — key is not persisted in logs or debugger. The immediate use in execNoLock() prevents exposure through standard logging.\",\n      \"remediation\": \"Consider wrapping PRAGMA key execution to avoid any possible logging of key material.\"\n    }\n  ],\n  \"findings\": {\n    \"secretsAndCredentials\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"No API keys, passwords, or tokens found in production code\",\n        \"Legacy hardcoded passphrase (Avelo.v2.local.sqlcipher.commoncrypto.store) isolated to migration/restore flows only\",\n        \"Per-company encryption keys stored in macOS Keychain (system-managed, not application-stored)\",\n        \"No credentials in configuration files, comments, or string literals\"\n      ]\n    },\n    \"sqlInjection\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"All user-supplied data bound via parameterized SQLValue enum\",\n        \"SQL interpolation limited to schema structure (table names, trigger definitions, column lists)\",\n        \"Interpolated values come from hardcoded migration code, not user input\",\n        \"Example: AccountRepository.findByCodes() uses placeholders (?) with separate bind array\",\n        \"Query builders in AccountTreeCache and ReportRepository use placeholder-based construction\"\n      ]\n    },\n    \"inputValidation\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"GSTIN validation: 15-character format, state codes, PAN structure, mod-36 check digit verified\",\n        \"PAN validation: 10-character format (5 letters, 4 digits, 1 letter) validated\",\n        \"Account codes: alphanumeric + underscore only\",\n        \"Company names: non-empty validation\",\n        \"Opening balances: non-negative validation\",\n        \"Credit periods: non-negative validation\",\n        \"State codes: validated against GSTStateCode.table\"\n      ]\n    },\n    \"authentication\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"Single-user macOS desktop application — OS-level authentication sufficient\",\n        \"Multi-tenant database via company_id isolation enforced at schema level\",\n        \"Database triggers (17 ownership constraints) verify cross-table company consistency\",\n        \"Foreign key constraints enabled (PRAGMA foreign_keys = ON)\"\n      ]\n    },\n    \"encryption\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"SQLCipher encryption enabled with 32-byte (256-bit) random keys\",\n        \"Per-company keys generated on creation, stored in Keychain\",\n        \"Legacy migration path supports plaintext-to-encrypted transition\",\n        \"Database validation: wrong key rejected on connection (SELECT count(*) test)\"\n      ]\n    },\n    \"networkCommunication\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"No URLSession, HTTP requests, or web service calls found\",\n        \"Application is fully local-only — no cloud sync or remote APIs\",\n        \"All data persisted in local SQLCipher database\"\n      ]\n    },\n    \"codeInjection\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"No shell execution or Process invocation for user input\",\n        \"No dynamic code evaluation or reflection over untrusted data\",\n        \"Process-related classes are only for UI feedback (LongOperationActivityController)\"\n      ]\n    },\n    \"fileHandling\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"FileManager used with standard APIs (removeItem, atomicWrites)\",\n        \"Database files in macOS standard locations (Application Support)\",\n        \"Backup service uses atomic writes (temp file + rename pattern)\",\n        \"File permissions handled by OS (standard umask applies)\"\n      ]\n    },\n    \"dependencies\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"Only one dependency: CSQLCipher (vendored locally in Vendor/SQLCipher)\",\n        \"No external package manager dependencies (SPM)\",\n        \"Swift 5.9+ standard library only\",\n        \"SQLCipher compiled with CommonCrypto (Apple security framework)\"\n      ]\n    },\n    \"dataIsolation\": {\n      \"status\": \"PASS\",\n      \"details\": [\n        \"Multi-tenant via company_id schema partitioning\",\n        \"17 database triggers enforce ownership constraints on all tables\",\n        \"Every company-referenced table has company_id check\",\n        \"Example: avelo_accounts.company_id matches all referenced ledger_lines\"\n      ]\n    }\n  },\n  \"riskScore\": 22,\n  \"riskLevel\": \"LOW\",\n  \"recommendations\": [\n    {\n      \"priority\": \"low\",\n      \"category\": \"best-practice\",\n      \"title\": \"Wrap PRAGMA Key Execution\",\n      \"description\": \"Create a dedicated key-setting method that abstracts PRAGMA execution to minimize any possibility of key material appearing in logs.\",\n      \"effort\": \"minimal\"\n    },\n    {\n      \"priority\": \"low\",\n      \"category\": \"test-coverage\",\n      \"title\": \"Add GSTIN/PAN Validator Tests\",\n      \"description\": \"Validators have logic but lack direct test coverage. Add unit tests for valid/invalid GSTIN and PAN edge cases.\",\n      \"effort\": \"minimal\",\n      \"currentStatus\": \"No test coverage\"\n    },\n    {\n      \"priority\": \"informational\",\n      \"category\": \"documentation\",\n      \"title\": \"Document Keychain Storage\",\n      \"description\": \"Add code comments explaining how per-company encryption keys are stored and retrieved from macOS Keychain.\",\n      \"effort\": \"minimal\"\n    }\n  ],\n  \"auditScope\": [\n    \"SQL injection and parameterization\",\n    \"Hardcoded secrets and credentials\",\n    \"Authentication and authorization\",\n    \"Encryption and key management\",\n    \"Input validation for GSTIN/PAN\",\n    \"File handling and permissions\",\n    \"Network communication\",\n    \"Code injection and shell execution\",\n    \"Dependency security\",\n    \"Data isolation (multi-tenant)\"\n  ],\n  \"notApplicable\": [\n    \"XSS vulnerabilities (native macOS app, no web rendering)\",\n    \"CSRF/session attacks (single-user desktop app)\",\n    \"API authentication tokens (no network communication)\"\n  ],\n  \"conclusion\": \"Avelo is a LOW-RISK single-user macOS accounting application with strong encryption, comprehensive input validation, proper SQL parameterization, and multi-tenant schema isolation. No critical or high-severity vulnerabilities identified. The application follows security best practices for desktop applications including OS-level Keychain integration for secrets management.\"\n}\n```\n\n**Summary**: Risk score **22/100** (LOW). The codebase demonstrates solid security practices with parameterized queries, validated inputs, vendored dependencies, Keychain-managed encryption keys, and database-level tenant isolation.\n",
+  "parsedOutput": {
+    "auditDate": "2026-07-14",
+    "codebase": "Avelo v1.1 Desktop Accounting Application",
+    "vulnerabilities": [
+      {
+        "severity": "low",
+        "file": "Avelo/Core/Database/SQLiteDatabase.swift",
+        "line": 372,
+        "title": "Encryption Key Passed via String Interpolation",
+        "description": "Encryption key material is interpolated into PRAGMA statements. While the key is immediately used and not logged, this is a best-practice concern. Consider using a parameterized PRAGMA approach or wrapper.",
+        "impact": "Low — key is not persisted in logs or debugger. The immediate use in execNoLock() prevents exposure through standard logging.",
+        "remediation": "Consider wrapping PRAGMA key execution to avoid any possible logging of key material."
+      }
+    ],
+    "findings": {
+      "secretsAndCredentials": {
+        "status": "PASS",
+        "details": [
+          "No API keys, passwords, or tokens found in production code",
+          "Legacy hardcoded passphrase (Avelo.v2.local.sqlcipher.commoncrypto.store) isolated to migration/restore flows only",
+          "Per-company encryption keys stored in macOS Keychain (system-managed, not application-stored)",
+          "No credentials in configuration files, comments, or string literals"
+        ]
+      },
+      "sqlInjection": {
+        "status": "PASS",
+        "details": [
+          "All user-supplied data bound via parameterized SQLValue enum",
+          "SQL interpolation limited to schema structure (table names, trigger definitions, column lists)",
+          "Interpolated values come from hardcoded migration code, not user input",
+          "Example: AccountRepository.findByCodes() uses placeholders (?) with separate bind array",
+          "Query builders in AccountTreeCache and ReportRepository use placeholder-based construction"
+        ]
+      },
+      "inputValidation": {
+        "status": "PASS",
+        "details": [
+          "GSTIN validation: 15-character format, state codes, PAN structure, mod-36 check digit verified",
+          "PAN validation: 10-character format (5 letters, 4 digits, 1 letter) validated",
+          "Account codes: alphanumeric + underscore only",
+          "Company names: non-empty validation",
+          "Opening balances: non-negative validation",
+          "Credit periods: non-negative validation",
+          "State codes: validated against GSTStateCode.table"
+        ]
+      },
+      "authentication": {
+        "status": "PASS",
+        "details": [
+          "Single-user macOS desktop application — OS-level authentication sufficient",
+          "Multi-tenant database via company_id isolation enforced at schema level",
+          "Database triggers (17 ownership constraints) verify cross-table company consistency",
+          "Foreign key constraints enabled (PRAGMA foreign_keys = ON)"
+        ]
+      },
+      "encryption": {
+        "status": "PASS",
+        "details": [
+          "SQLCipher encryption enabled with 32-byte (256-bit) random keys",
+          "Per-company keys generated on creation, stored in Keychain",
+          "Legacy migration path supports plaintext-to-encrypted transition",
+          "Database validation: wrong key rejected on connection (SELECT count(*) test)"
+        ]
+      },
+      "networkCommunication": {
+        "status": "PASS",
+        "details": [
+          "No URLSession, HTTP requests, or web service calls found",
+          "Application is fully local-only — no cloud sync or remote APIs",
+          "All data persisted in local SQLCipher database"
+        ]
+      },
+      "codeInjection": {
+        "status": "PASS",
+        "details": [
+          "No shell execution or Process invocation for user input",
+          "No dynamic code evaluation or reflection over untrusted data",
+          "Process-related classes are only for UI feedback (LongOperationActivityController)"
+        ]
+      },
+      "fileHandling": {
+        "status": "PASS",
+        "details": [
+          "FileManager used with standard APIs (removeItem, atomicWrites)",
+          "Database files in macOS standard locations (Application Support)",
+          "Backup service uses atomic writes (temp file + rename pattern)",
+          "File permissions handled by OS (standard umask applies)"
+        ]
+      },
+      "dependencies": {
+        "status": "PASS",
+        "details": [
+          "Only one dependency: CSQLCipher (vendored locally in Vendor/SQLCipher)",
+          "No external package manager dependencies (SPM)",
+          "Swift 5.9+ standard library only",
+          "SQLCipher compiled with CommonCrypto (Apple security framework)"
+        ]
+      },
+      "dataIsolation": {
+        "status": "PASS",
+        "details": [
+          "Multi-tenant via company_id schema partitioning",
+          "17 database triggers enforce ownership constraints on all tables",
+          "Every company-referenced table has company_id check",
+          "Example: avelo_accounts.company_id matches all referenced ledger_lines"
+        ]
+      }
+    },
+    "riskScore": 22,
+    "riskLevel": "LOW",
+    "recommendations": [
+      {
+        "priority": "low",
+        "category": "best-practice",
+        "title": "Wrap PRAGMA Key Execution",
+        "description": "Create a dedicated key-setting method that abstracts PRAGMA execution to minimize any possibility of key material appearing in logs.",
+        "effort": "minimal"
+      },
+      {
+        "priority": "low",
+        "category": "test-coverage",
+        "title": "Add GSTIN/PAN Validator Tests",
+        "description": "Validators have logic but lack direct test coverage. Add unit tests for valid/invalid GSTIN and PAN edge cases.",
+        "effort": "minimal",
+        "currentStatus": "No test coverage"
+      },
+      {
+        "priority": "informational",
+        "category": "documentation",
+        "title": "Document Keychain Storage",
+        "description": "Add code comments explaining how per-company encryption keys are stored and retrieved from macOS Keychain.",
+        "effort": "minimal"
+      }
+    ],
+    "auditScope": [
+      "SQL injection and parameterization",
+      "Hardcoded secrets and credentials",
+      "Authentication and authorization",
+      "Encryption and key management",
+      "Input validation for GSTIN/PAN",
+      "File handling and permissions",
+      "Network communication",
+      "Code injection and shell execution",
+      "Dependency security",
+      "Data isolation (multi-tenant)"
+    ],
+    "notApplicable": [
+      "XSS vulnerabilities (native macOS app, no web rendering)",
+      "CSRF/session attacks (single-user desktop app)",
+      "API authentication tokens (no network communication)"
+    ],
+    "conclusion": "Avelo is a LOW-RISK single-user macOS accounting application with strong encryption, comprehensive input validation, proper SQL parameterization, and multi-tenant schema isolation. No critical or high-severity vulnerabilities identified. The application follows security best practices for desktop applications including OS-level Keychain integration for secrets management."
+  },
+  "durationMs": 167241,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-07-14T09:38:53.011Z",
+  "executionId": "audit_1784021765770_yramj8"
+}

@@ -9,22 +9,26 @@ public struct AccountPicker: View {
     public var placeholder: String = "Choose account…"
     public var filter: ((Account) -> Bool)? = nil
     public var isEditable: Bool = true
+    public var onCreate: (() -> Void)? = nil
 
     @State private var isExpanded: Bool = false
     @State private var query: String = ""
     @State private var selectedIndex: Int = 0
-    @FocusState private var fieldFocused: Bool
+    @FocusState private var pickerButtonFocused: Bool
+    @FocusState private var searchFieldFocused: Bool
 
     public init(selection: Binding<Account.ID?>,
                 accounts: [Account],
                 placeholder: String = "Choose account…",
                 filter: ((Account) -> Bool)? = nil,
-                isEditable: Bool = true) {
+                isEditable: Bool = true,
+                onCreate: (() -> Void)? = nil) {
         self._selection = selection
         self.accounts = accounts
         self.placeholder = placeholder
         self.filter = filter
         self.isEditable = isEditable
+        self.onCreate = onCreate
     }
 
     public var body: some View {
@@ -45,7 +49,13 @@ public struct AccountPicker: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.bordered)
-        .disabled(!isEditable || sortedAccounts.isEmpty)
+        .focusable()
+        .focused($pickerButtonFocused)
+        .onKeyPress("c", phases: .down, action: handleCreateAccountShortcut)
+        // Keep the picker reachable when it can create an account. This
+        // matters most for filtered fields (for example cash/bank): an empty
+        // eligible list must not also hide the Alt+C escape hatch.
+        .disabled(!isEditable || (sortedAccounts.isEmpty && onCreate == nil))
         .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
             popoverContent
         }
@@ -65,7 +75,8 @@ public struct AccountPicker: View {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Type code or name…", text: $query)
                     .textFieldStyle(.plain)
-                    .focused($fieldFocused)
+                    .focused($searchFieldFocused)
+                    .onKeyPress("c", phases: .down, action: handleCreateAccountShortcut)
                     .onSubmit(pickSelected)
                     .onChange(of: query) { _, _ in selectedIndex = 0 }
             }
@@ -73,7 +84,13 @@ public struct AccountPicker: View {
             Divider()
             let matches = filteredAccounts
             if matches.isEmpty {
-                Text("No matching account").foregroundStyle(.secondary).padding(16)
+                VStack(spacing: 10) {
+                    Text("No matching account").foregroundStyle(.secondary)
+                    if onCreate != nil {
+                        Button("Create account…", action: requestAccountCreation)
+                    }
+                }
+                .padding(16)
             } else {
                 ScrollViewReader { proxy in
                     List {
@@ -91,10 +108,18 @@ public struct AccountPicker: View {
                     }
                 }
             }
+            if onCreate != nil {
+                Divider()
+                Button(action: requestAccountCreation) {
+                    Label("Create account…", systemImage: "plus")
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             moveKeys
         }
         .frame(width: 360)
-        .onAppear { fieldFocused = true }
+        .onAppear { searchFieldFocused = true }
     }
 
     @ViewBuilder
@@ -140,7 +165,29 @@ public struct AccountPicker: View {
 
     private func pick(_ acc: Account) {
         selection = acc.id
+        closePopover()
+    }
+
+    private func handleCreateAccountShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
+        guard onCreate != nil,
+              keyPress.modifiers.contains(.option),
+              pickerButtonFocused || searchFieldFocused else {
+            return .ignored
+        }
+        requestAccountCreation()
+        return .handled
+    }
+
+    private func requestAccountCreation() {
+        guard let onCreate else { return }
+        closePopover()
+        onCreate()
+    }
+
+    private func closePopover() {
         isExpanded = false
+        pickerButtonFocused = false
+        searchFieldFocused = false
     }
 
     /// All eligible accounts, recently-used first then by code.

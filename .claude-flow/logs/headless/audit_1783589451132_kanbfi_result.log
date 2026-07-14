@@ -1,0 +1,68 @@
+[2026-07-09T09:34:55.641Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "## Security Analysis Complete ✓\n\nI've conducted a comprehensive security audit of the Avelo codebase. Here's the detailed report:\n\n```json\n{\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"medium\",\n      \"file\": \"Avelo/Core/Validation/AccountInputValidator.swift\",\n      \"line\": 123,\n      \"description\": \"GSTIN format validator implements incorrect grammar. Real GSTIN format is: 2 digits (state) + 5 letters + 4 digits + 1 letter (PAN) + 1 alphanumeric (entity) + 'Z' + 1 alphanumeric (checksum). Current code checks 6 letters + 3 digits + alternating pattern, which rejects valid GSTINs and accepts invalid ones. This undermines tax-compliance data integrity for a GST-focused accounting app.\",\n      \"evidence\": \"Lines 130-138 implement wrong position grammar; does not match 15-char GSTIN spec\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"Avelo/Core/Database/DatabaseManager.swift\",\n      \"line\": 43,\n      \"description\": \"Application Support and Companies directories created without explicit POSIX permissions, defaulting to process umask (typically 0755). Leaks company existence, count, UUIDs, and file timestamps to any local user account on shared Mac, though SQLCipher encryption protects actual data.\",\n      \"evidence\": \"createDirectory calls lack attributes: argument; same pattern at LocalRCFlowRunner.swift:16-17\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"Avelo/Core/Database/SQLiteDatabase.swift\",\n      \"line\": 386,\n      \"description\": \"Hardcoded SQLCipher passphrase embedded in binary. However, confirmed to be used ONLY for legacy database detection/migration (DatabaseManager creates all new companies with SecRandomCopyBytes-generated per-company keys). Residual risk limited to unmigrated legacy databases.\",\n      \"evidence\": \"legacyHardcodedPassphrase consumed only in LegacyKeyMigrationService.swift:39,75 and RestoreService.swift:478\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"Avelo/App/SelfTestHarness.swift\",\n      \"line\": 43,\n      \"description\": \"Self-test output path taken from AVELO_SELFTEST_OUTPUT environment variable or --self-test-output CLI arg without validation. No path canonicalization, allow-listing, or symlink checks. Could allow arbitrary file overwrite (requires local code/config execution). Self-test runs against throw-away temp company only.\",\n      \"evidence\": \"ProcessInfo.processInfo.environment lookup + URL(fileURLWithPath:) write with no sanitization\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"Avelo/Avelo.entitlements\",\n      \"line\": 4,\n      \"description\": \"Empty entitlements plist — app runs unsandboxed with full user-level filesystem/process access. App Sandbox (even with broad file-access entitlements) would reduce blast radius for file-parsing bugs in import/restore workflows.\",\n      \"evidence\": \"Entitlements file contains only empty <dict/> — no sandbox keys\"\n    },\n    {\n      \"severity\": \"informational\",\n      \"file\": \"Avelo/Core/Database/RestoreService.swift\",\n      \"line\": 365,\n      \"description\": \"Company name (business name) logged with privacy: .public in restore rejection paths. Mild PII exposure in unified logs (accessible to local admin via 'log show'). Not sensitive compared to keys/amounts; logging hygiene is otherwise excellent.\",\n      \"evidence\": \"AveloRestoreLogger.error with companyName marked .public\"\n    }\n  ],\n  \"riskScore\": 22,\n  \"recommendations\": [\n    \"**PRIORITY: Fix GSTIN validator** (AccountInputValidator.swift:123-140) — implement correct 15-character grammar (2 digits + 5 letters + 4 digits + 1 letter + 1 alphanumeric + 'Z' + 1 alphanumeric). Add regression tests with real anonymized GSTIN samples. This is the highest-value fix for tax-compliance correctness.\",\n    \"**Fix directory permissions** — Pass explicit 0700 attributes to FileManager.createDirectory calls in DatabaseManager.swift:43-44 and LocalRCFlowRunner.swift:16-17 to ensure company directories remain private to owning user.\",\n    \"**Validate self-test output path** (SelfTestHarness.swift:43-48) — resolve to absolute path, reject '..' or symlinks outside expected directory, or restrict to fixed app-controlled location.\",\n    \"**Enable App Sandbox** — Add com.apple.security.app-sandbox + com.apple.security.files.user-selected.read-write for open/save panels. Largest remaining hardening gap for financial-data app.\",\n    \"**Track legacy passphrase deprecation** — Add local telemetry to detect when last legacy database was migrated, then remove hardcoded passphrase code path with confidence.\",\n    \"**Adjust logging privacy** — Downgrade company name to privacy: .private in RestoreService.swift:365.\"\n  ],\n  \"summary\": \"Avelo's core security architecture is sound: SQLCipher (3.53.1, CommonCrypto backend) encrypts at-rest data, per-company keys are generated with SecRandomCopyBytes and stored in Keychain with kSecAttrAccessibleWhenUnlockedThisDeviceOnly, all SQL uses parameterized bind values, zero network I/O (eliminates remote attack surface). The legacy hardcoded passphrase is isolated to migration-only code paths and poses minimal risk. Most significant finding is the GSTIN validator functional/compliance bug rather than a classic exploit. Remaining findings are local-attack-surface hardening gaps with low exploitability given no network exposure. No API keys/tokens/passwords found beyond the already-known legacy passphrase.\"\n}\n```\n\n### Key Findings Summary\n\n**High-Value Fix:**\n- **GSTIN validation bug** — The format checker is wrong and will reject valid GST identification numbers. This directly impacts your tax-compliance data integrity.\n\n**Security-Relevant Items:**\n- Directory permissions should be tightened (0700 instead of world-readable)\n- Self-test harness should validate file paths\n- App Sandbox would be a good hardening step\n\n**Positive Notes:**\n- SQLCipher encryption is properly implemented\n- All database queries use parameterized statements (no SQL injection risk)\n- Per-company encryption keys are securely generated and stored in Keychain\n- Zero network I/O eliminates remote attack surface entirely\n- Logging hygiene is good overall\n\nThe **risk score of 22/100** reflects that this is a well-secured financial application with no classic exploitable vulnerabilities, though the GSTIN validator should be corrected for compliance reasons.\n",
+  "parsedOutput": {
+    "vulnerabilities": [
+      {
+        "severity": "medium",
+        "file": "Avelo/Core/Validation/AccountInputValidator.swift",
+        "line": 123,
+        "description": "GSTIN format validator implements incorrect grammar. Real GSTIN format is: 2 digits (state) + 5 letters + 4 digits + 1 letter (PAN) + 1 alphanumeric (entity) + 'Z' + 1 alphanumeric (checksum). Current code checks 6 letters + 3 digits + alternating pattern, which rejects valid GSTINs and accepts invalid ones. This undermines tax-compliance data integrity for a GST-focused accounting app.",
+        "evidence": "Lines 130-138 implement wrong position grammar; does not match 15-char GSTIN spec"
+      },
+      {
+        "severity": "medium",
+        "file": "Avelo/Core/Database/DatabaseManager.swift",
+        "line": 43,
+        "description": "Application Support and Companies directories created without explicit POSIX permissions, defaulting to process umask (typically 0755). Leaks company existence, count, UUIDs, and file timestamps to any local user account on shared Mac, though SQLCipher encryption protects actual data.",
+        "evidence": "createDirectory calls lack attributes: argument; same pattern at LocalRCFlowRunner.swift:16-17"
+      },
+      {
+        "severity": "low",
+        "file": "Avelo/Core/Database/SQLiteDatabase.swift",
+        "line": 386,
+        "description": "Hardcoded SQLCipher passphrase embedded in binary. However, confirmed to be used ONLY for legacy database detection/migration (DatabaseManager creates all new companies with SecRandomCopyBytes-generated per-company keys). Residual risk limited to unmigrated legacy databases.",
+        "evidence": "legacyHardcodedPassphrase consumed only in LegacyKeyMigrationService.swift:39,75 and RestoreService.swift:478"
+      },
+      {
+        "severity": "low",
+        "file": "Avelo/App/SelfTestHarness.swift",
+        "line": 43,
+        "description": "Self-test output path taken from AVELO_SELFTEST_OUTPUT environment variable or --self-test-output CLI arg without validation. No path canonicalization, allow-listing, or symlink checks. Could allow arbitrary file overwrite (requires local code/config execution). Self-test runs against throw-away temp company only.",
+        "evidence": "ProcessInfo.processInfo.environment lookup + URL(fileURLWithPath:) write with no sanitization"
+      },
+      {
+        "severity": "low",
+        "file": "Avelo/Avelo.entitlements",
+        "line": 4,
+        "description": "Empty entitlements plist — app runs unsandboxed with full user-level filesystem/process access. App Sandbox (even with broad file-access entitlements) would reduce blast radius for file-parsing bugs in import/restore workflows.",
+        "evidence": "Entitlements file contains only empty <dict/> — no sandbox keys"
+      },
+      {
+        "severity": "informational",
+        "file": "Avelo/Core/Database/RestoreService.swift",
+        "line": 365,
+        "description": "Company name (business name) logged with privacy: .public in restore rejection paths. Mild PII exposure in unified logs (accessible to local admin via 'log show'). Not sensitive compared to keys/amounts; logging hygiene is otherwise excellent.",
+        "evidence": "AveloRestoreLogger.error with companyName marked .public"
+      }
+    ],
+    "riskScore": 22,
+    "recommendations": [
+      "**PRIORITY: Fix GSTIN validator** (AccountInputValidator.swift:123-140) — implement correct 15-character grammar (2 digits + 5 letters + 4 digits + 1 letter + 1 alphanumeric + 'Z' + 1 alphanumeric). Add regression tests with real anonymized GSTIN samples. This is the highest-value fix for tax-compliance correctness.",
+      "**Fix directory permissions** — Pass explicit 0700 attributes to FileManager.createDirectory calls in DatabaseManager.swift:43-44 and LocalRCFlowRunner.swift:16-17 to ensure company directories remain private to owning user.",
+      "**Validate self-test output path** (SelfTestHarness.swift:43-48) — resolve to absolute path, reject '..' or symlinks outside expected directory, or restrict to fixed app-controlled location.",
+      "**Enable App Sandbox** — Add com.apple.security.app-sandbox + com.apple.security.files.user-selected.read-write for open/save panels. Largest remaining hardening gap for financial-data app.",
+      "**Track legacy passphrase deprecation** — Add local telemetry to detect when last legacy database was migrated, then remove hardcoded passphrase code path with confidence.",
+      "**Adjust logging privacy** — Downgrade company name to privacy: .private in RestoreService.swift:365."
+    ],
+    "summary": "Avelo's core security architecture is sound: SQLCipher (3.53.1, CommonCrypto backend) encrypts at-rest data, per-company keys are generated with SecRandomCopyBytes and stored in Keychain with kSecAttrAccessibleWhenUnlockedThisDeviceOnly, all SQL uses parameterized bind values, zero network I/O (eliminates remote attack surface). The legacy hardcoded passphrase is isolated to migration-only code paths and poses minimal risk. Most significant finding is the GSTIN validator functional/compliance bug rather than a classic exploit. Remaining findings are local-attack-surface hardening gaps with low exploitability given no network exposure. No API keys/tokens/passwords found beyond the already-known legacy passphrase."
+  },
+  "durationMs": 244509,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-07-09T09:34:55.641Z",
+  "executionId": "audit_1783589451132_kanbfi"
+}

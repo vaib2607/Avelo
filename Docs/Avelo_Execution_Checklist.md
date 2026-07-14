@@ -1,5 +1,7 @@
 # AVELO Master Execution Checklist
 
+Snapshot: 2026-07-15
+
 ## Summary
 
 This file is the remaining-work execution queue. It tracks only unfinished `AVL-*` backlog items from `Docs/Avelo_Release_Board.md`, grouped into dependency-ordered waves through P2.
@@ -16,6 +18,10 @@ Execution states:
 - `Implementation remaining` — code, schema, workflow, or UI behavior is still missing.
 - `Proof remaining` — implementation has landed substantially, but targeted/full-suite/manual proof is still incomplete.
 - `Manual acceptance remaining` — automated proof is complete enough to stop coding, but accountant QA is still pending.
+- `Policy excluded` — intentionally excluded by a non-negotiable rule; prove it is absent rather than implement it.
+- `Closed` — implementation, current automated proof, applicable human acceptance, and evidence metadata are complete.
+
+Current-worktree reset: active source, migration, test, documentation, and bundle changes mean earlier green logs are historical only. Every affected row is at least `Proof remaining` until the current worktree and one exact artifact complete the supported gate.
 
 Evidence template required before striking an item:
 
@@ -23,6 +29,7 @@ Evidence template required before striking an item:
 - `Automated proof`: exact targeted test commands.
 - `Manual proof`: accountant scenario, steps, and expected output/result.
 - `Residual risk`: blank if closed; explicit if reopened or partially blocked.
+- `Evidence identity`: date/time/timezone, commit, worktree diff identity, macOS/Xcode/Swift, machine, schema/fixture, skipped tests, artifact version/build/SHA-256/signing identity, and owner.
 
 ## Release gate policy
 
@@ -32,8 +39,9 @@ Before calling Avelo release-ready:
 
 - no `AVL-P0-*` remains open on the board
 - every P0 item has targeted automated proof
-- relevant `swift test` full-suite proof is recorded
+- `make rule-audit`, a warnings-as-errors release build, `make test`, `make rc-local`, applicable benchmarks, bundle self-test, and separate GUI launch proof are recorded
 - every P0 item has a written manual accountant acceptance script and completed result
+- operator, keyboard, accessibility, visual/PDF, and distribution acceptance is complete where applicable
 
 ### P1 gate
 
@@ -99,10 +107,14 @@ Exit criteria for this wave:
 | AVL-P0-016 | Manual acceptance remaining | None | Execute accountant shell-flow acceptance against the shipped single-source `AppEnvironment.companyContext`/router state. | Company-switch/window/sheet accountant acceptance is still pending; automated proof is complete on `AppEnvironmentFlowTests` and full `swift test`. |
 | AVL-P0-017 | Manual acceptance remaining | None | Execute operational leak-free acceptance against the shipped `sqlite3_finalize`/reset/clear coverage on every statement lifecycle path. | Operational leak-free acceptance is still pending; automated proof is complete on `SQLiteDatabaseTests` and full `swift test`. |
 | AVL-P0-018 | Manual acceptance remaining | None | Execute accountant draft-recovery acceptance against the shipped autosave/crash-recovery flow (kill/relaunch, single-entry-mode `accountLedgerId` restored via `MigrationV021`). | Accountant draft-recovery acceptance is still pending; automated proof is complete on `VoucherDraftTests`, `VoucherDraftRepositoryTests`, and full `swift test`. |
-| AVL-P0-020 | Manual acceptance remaining | None | Execute keyboard-entry acceptance against the shipped voucher-grid commit/focus-request contract (`MoneyTextField.onCommit` → `addLine`). | Full SwiftUI `@FocusState` traversal isn't headlessly testable, so manual keyboard-entry acceptance covers Tab/Shift-Tab/Enter traversal; the commit/`addLine`/keyboard-routing contract is proven on `MoneyTextFieldTests`, `VoucherDraftTests`, and full `swift test`. |
+| AVL-P0-020 | Implementation remaining | None | Make New/Edit voucher editors, `KeyboardShortcutMap`, global monitor, menus, and shortcut help use one contract: Return advances/adds, Command-Return posts/saves, Tab/Shift-Tab traverse, Escape cancels safely. | Focus/request tests plus manual first/middle/last/insert/delete/validation-error traversal; repeated activation posts once; current-worktree `make test` and bundled keyboard acceptance. |
 | AVL-P0-021 | Manual acceptance remaining | None | Execute accountant locale-entry acceptance against the shipped `Currency.parseRupeeInput` locale-aware decimal parsing and paise storage. | Accountant locale-entry acceptance is still pending; automated proof is complete on `CurrencyTests` and full `swift test`. |
 | AVL-P0-023 | Manual acceptance remaining | None | Execute accountant FY/GST period acceptance against the shipped fixed-UTC `IndianFinancialYear` calendar semantics. | Accountant FY/GST period acceptance is still pending; automated proof is complete on `IndianFinancialYearTests`, `FinancialYearServiceTests`, `FinancialYearCloseCarryForwardTests`, and full `swift test`. |
 | AVL-P0-022 | Manual acceptance remaining | None | GST-compliant PDF/invoice output for registered-party (B2B) Sales/Purchase vouchers: mandatory fields, CGST/SGST/IGST/CESS breakdown, HSN/SAC, place of supply, inventory-linked stock detail. B2C/export/notes/RCM deferred to follow-on tickets; signed QR/e-invoice IRN is permanently out of scope (blocked by R-1, offline-only) rather than gated on `AVL-P1-008`. | Implementation and automated proof are landed (`InvoicePDFServiceTests`, `GSTServiceTests`, `GSTStateCodeTests`, `InventoryServiceTests`); remains open only until accountant B2B tax-invoice acceptance is executed and recorded. |
+| AVL-P0-033 | Implementation remaining | None | Centralize inventory capability evaluation and apply it to sidebar, menus, command palette, quick search, keyboard bridge/router, sheets/deep links, dashboard, and services. | Disabled/enabled entry-point matrix, direct-service rejection tests, company-switch/toggle tests, current full gate, and accountant acceptance. |
+| AVL-P0-034 | Implementation remaining | AVL-P0-012 | Inventory every shipped mutation, add missing `AuditAction` cases, and record exactly one same-transaction event with required before/after/reason policy. | Mutation-to-audit matrix test, rollback/failure tests, chain verification, current full gate, and representative accountant audit-diff acceptance. |
+| AVL-P0-035 | Implementation remaining | AVL-P0-033 and AVL-P0-034 | Either fully implement explicit `autoPrompt`/`autoSilent` contracts or remove the unsupported options from production. Keep item-invoice mode separate and forbid account-name inference. | Manual/item-invoice/prompt/silent mode matrix across post/edit/reverse/cancel/restore/lock/valuation/audit; unsupported entry points absent; current full gate and accountant acceptance. |
+| AVL-P0-036 | Implementation remaining | AVL-P0-030 and AVL-P0-031 | Add every supported company-scoped table to restore remap, especially `avelo_voucher_item_lines`; choose and test explicit scratch-draft remap/discard behavior. | Cross-identity restore fixtures at v14-v22 with item invoices, bill/cheque/BOM/opening/draft data; no source company IDs; foreign-key/integrity/audit/report checks; current full gate and operator acceptance. |
 
 ## Wave P1-A — accountant workflow core
 
@@ -133,7 +145,7 @@ Daily bookkeeping and Tally-replacement core before filing breadth.
 | AVL-P1-004 | Implementation remaining | None | Implement PF, ESI, Professional Tax, and payroll effective-rate rounding. | Golden payroll fixtures, full `swift test`, and payroll-operator acceptance. |
 | AVL-P1-005 | Implementation remaining | None | Build Form 16 and 24Q/26Q exports with schema validation. | Export-schema fixtures, full `swift test`, and payroll filing acceptance. |
 | AVL-P1-006 | Implementation remaining | AVL-P1-005 | Add 27Q/27EQ and correction/export workflows. | Validation fixtures, full `swift test`, and filing acceptance. |
-| AVL-P1-008 | Implementation remaining | None (blocked by R-1) | Implement e-invoice IRN lifecycle, reporting-window rules, signed JSON/QR storage, verification, and cancellation. Requires an online call to the government e-invoice portal for IRN issuance, which conflicts with R-1 (100% offline, zero network calls); not actionable unless that rule is revisited. | IRN lifecycle fixtures, full `swift test`, and accountant e-invoice acceptance. |
+| AVL-P1-008 | Policy excluded | None | Keep direct IRN issuance, portal cancellation, and government-signed QR retrieval out of Avelo while R-1 requires zero network access. Scope offline import/retention/printing separately if requested. | Network/routing/dependency scan proves no portal path exists; product copy does not imply IRN or government-signed QR issuance. |
 | AVL-P1-002 | Implementation remaining | AVL-P0-022 baseline document path | Implement RCM self-invoicing and linked postings. | Inward-supply fixtures, full `swift test`, and accountant RCM acceptance. |
 | AVL-P1-007 | Implementation remaining | AVL-P0-022 baseline document path | Build GSTR-1/1A/IFF, 3B, 2B, and IMS reconciliation with accept/reject/pending states. | Portal-format fixtures, full `swift test`, and GST-filing acceptance. |
 | AVL-P1-016 | Implementation remaining | AVL-P1-007 | Implement debit/credit-note linkage across GST periods. | Cross-period note fixtures, full `swift test`, and accountant amendment acceptance. |

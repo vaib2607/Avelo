@@ -1,0 +1,17 @@
+[2026-07-14T12:41:37.953Z] RESULT
+============================================================
+{
+  "success": false,
+  "output": "API Error: Unable to connect to API (ENOTFOUND)\n",
+  "parsedOutput": {
+    "sections": [],
+    "codeBlocks": []
+  },
+  "durationMs": 185385,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "optimize",
+  "timestamp": "2026-07-14T12:41:37.953Z",
+  "executionId": "optimize_1784032712568_ji0auk",
+  "error": "Process exited with code 1"
+}

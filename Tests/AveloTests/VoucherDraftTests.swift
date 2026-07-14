@@ -102,6 +102,130 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertNil(vm.lines.last?.accountId)
     }
 
+    // AVL-P2-011: duplicate voucher (⌥2) reuses the draft-recovery preload path.
+
+    @MainActor
+    func testDuplicateDraftPreloadsFreshEditorWithSourceVoucherLinesAndNewNumber() throws {
+        let tc = try TestCompany.make()
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: VoucherDraft(
+                mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.cashId, narration: "Original sale",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 100_000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 100_000, side: .credit)
+                ]
+            ),
+            in: tc.fy
+        ).voucher
+        let lines = try VoucherService(db: tc.db, companyId: tc.companyId).lines(for: posted.id)
+
+        let duplicateEntry = VoucherEditViewModel.duplicateDraft(from: posted, lines: lines)
+
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        vm.loadFromRecoveredDraft(duplicateEntry)
+
+        XCTAssertEqual(vm.narration, "Original sale")
+        XCTAssertEqual(vm.partyAccountId, tc.cashId)
+        XCTAssertEqual(vm.lines.count, 2)
+        XCTAssertEqual(vm.lines[0].amount, "1000.00")
+
+        // Posting the duplicate produces a distinct voucher with its own number.
+        let secondPosted = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: vm.buildDraft(), in: tc.fy).voucher
+        XCTAssertNotEqual(secondPosted.id, posted.id)
+        XCTAssertNotEqual(secondPosted.number, posted.number)
+    }
+
+    @MainActor
+    func testDuplicatePaymentDraftKeepsOnlyCounterpartLines() throws {
+        let tc = try TestCompany.make()
+        try assertSingleEntryDuplicateRecovery(
+            tc,
+            type: .payment,
+            cashBankAccountId: tc.cashId,
+            sourceSide: .credit,
+            counterpartAccountId: tc.rentId,
+            counterpartSide: .debit
+        )
+    }
+
+    @MainActor
+    func testDuplicateReceiptDraftKeepsOnlyCounterpartLines() throws {
+        let tc = try TestCompany.make()
+        try assertSingleEntryDuplicateRecovery(
+            tc,
+            type: .receipt,
+            cashBankAccountId: tc.cashId,
+            sourceSide: .debit,
+            counterpartAccountId: tc.salesId,
+            counterpartSide: .credit
+        )
+    }
+
+    @MainActor
+    func testDuplicateContraDraftKeepsOnlyCounterpartLines() throws {
+        let tc = try TestCompany.make()
+        let destinationBankId = UUID()
+        try assertSingleEntryDuplicateRecovery(
+            tc,
+            type: .contra,
+            cashBankAccountId: destinationBankId,
+            sourceSide: .debit,
+            counterpartAccountId: tc.cashId,
+            counterpartSide: .credit
+        )
+    }
+
+    @MainActor
+    private func assertSingleEntryDuplicateRecovery(_ tc: TestCompany,
+                                                    type: VoucherType.Code,
+                                                    cashBankAccountId: Account.ID,
+                                                    sourceSide: LedgerSide,
+                                                    counterpartAccountId: Account.ID,
+                                                    counterpartSide: LedgerSide) throws {
+        let voucher = Voucher(
+            companyId: tc.companyId,
+            financialYearId: tc.fy.id,
+            voucherTypeCode: type,
+            number: "\(type.rawValue)-SOURCE",
+            date: tc.fy.startDate,
+            narration: "Source \(type.rawValue)",
+            totalPaise: 12_500
+        )
+        // Deliberately put the cash/bank line second: source selection must
+        // follow the voucher-type side, not assume an existing line position.
+        let sourceLines = [
+            LedgerLine(
+                companyId: tc.companyId,
+                voucherId: voucher.id,
+                accountId: counterpartAccountId,
+                amountPaise: 12_500,
+                side: counterpartSide,
+                lineOrder: 0
+            ),
+            LedgerLine(
+                companyId: tc.companyId,
+                voucherId: voucher.id,
+                accountId: cashBankAccountId,
+                amountPaise: 12_500,
+                side: sourceSide,
+                lineOrder: 1
+            )
+        ]
+
+        let duplicate = VoucherEditViewModel.duplicateDraft(from: voucher, lines: sourceLines)
+        let vm = singleEntryVM(tc, type: type)
+        vm.loadFromRecoveredDraft(duplicate)
+
+        XCTAssertEqual(duplicate.accountLedgerId, cashBankAccountId)
+        XCTAssertEqual(vm.accountLedgerId, cashBankAccountId)
+        XCTAssertEqual(vm.lines.compactMap(\.accountId), [counterpartAccountId])
+
+        let rebuilt = vm.buildDraft()
+        XCTAssertEqual(rebuilt.lines.compactMap(\.accountId), [cashBankAccountId, counterpartAccountId])
+        XCTAssertEqual(rebuilt.lines.map(\.side), [sourceSide, counterpartSide])
+    }
+
     // AVL-P0-018: draft autosave and crash recovery.
 
     @MainActor
@@ -313,6 +437,105 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertFalse(vm.isBalanced)                     // still no amounts
         vm.lines = [.init(accountId: UUID(), amount: "10.00", side: .credit)]
         XCTAssertTrue(vm.isBalanced)
+    }
+
+    func testSingleEntryVoucherValidationAcceptsEligibleCashBankPatterns() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let payment = tc.draft(type: .payment, on: "2024-06-01", lines: [
+            tc.line(tc.rentId, 12_500, .debit),
+            tc.line(tc.cashId, 12_500, .credit)
+        ])
+        let receipt = tc.draft(type: .receipt, on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 12_500, .debit),
+            tc.line(tc.salesId, 12_500, .credit)
+        ])
+
+        XCTAssertEqual(try service.validate(draft: payment, in: tc.fy), .valid)
+        XCTAssertEqual(try service.validate(draft: receipt, in: tc.fy), .valid)
+
+        try tc.db.execute(
+            "UPDATE avelo_accounts SET is_bank_account = 1 WHERE id = ?",
+            [.text(tc.salesId.uuidString)]
+        )
+        let contra = tc.draft(type: .contra, on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 12_500, .debit),
+            tc.line(tc.salesId, 12_500, .credit)
+        ])
+
+        XCTAssertEqual(try service.validate(draft: contra, in: tc.fy), .valid)
+    }
+
+    func testSingleEntryVoucherPostingRejectsIneligibleCashBankPatterns() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        let invalidDrafts = [
+            tc.draft(type: .payment, on: "2024-06-01", lines: [
+                tc.line(tc.rentId, 12_500, .debit),
+                tc.line(tc.salesId, 12_500, .credit)
+            ]),
+            tc.draft(type: .receipt, on: "2024-06-01", lines: [
+                tc.line(tc.rentId, 12_500, .debit),
+                tc.line(tc.salesId, 12_500, .credit)
+            ]),
+            tc.draft(type: .contra, on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 12_500, .debit),
+                tc.line(tc.rentId, 12_500, .credit)
+            ])
+        ]
+
+        for draft in invalidDrafts {
+            XCTAssertThrowsError(try service.post(draft: draft, in: tc.fy)) { error in
+                guard case AppError.validation(let validation) = error else {
+                    return XCTFail("Expected validation error, got \(error)")
+                }
+                XCTAssertEqual(validation.code, .internal)
+                XCTAssertTrue(validation.message.contains("cash/bank"))
+            }
+        }
+    }
+
+    func testSingleEntryVoucherPostingRejectsWrongCashBankSide() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        let invalidDrafts = [
+            tc.draft(type: .payment, on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 12_500, .debit),
+                tc.line(tc.rentId, 12_500, .credit)
+            ]),
+            tc.draft(type: .receipt, on: "2024-06-01", lines: [
+                tc.line(tc.salesId, 12_500, .debit),
+                tc.line(tc.cashId, 12_500, .credit)
+            ])
+        ]
+
+        for draft in invalidDrafts {
+            XCTAssertThrowsError(try service.post(draft: draft, in: tc.fy)) { error in
+                guard case AppError.validation(let validation) = error else {
+                    return XCTFail("Expected validation error, got \(error)")
+                }
+                XCTAssertEqual(validation.code, .internal)
+                XCTAssertTrue(validation.message.contains("cash/bank"))
+            }
+        }
+
+        try tc.db.execute(
+            "UPDATE avelo_accounts SET is_bank_account = 1 WHERE id IN (?, ?)",
+            [.text(tc.rentId.uuidString), .text(tc.salesId.uuidString)]
+        )
+        let contraWithMultipleDestinationLedgers = tc.draft(type: .contra, on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 5_000, .debit),
+            tc.line(tc.rentId, 7_500, .debit),
+            tc.line(tc.salesId, 12_500, .credit)
+        ])
+        XCTAssertThrowsError(try service.post(draft: contraWithMultipleDestinationLedgers, in: tc.fy)) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected validation error, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .internal)
+            XCTAssertTrue(validation.message.contains("cash/bank"))
+        }
     }
 
     @MainActor

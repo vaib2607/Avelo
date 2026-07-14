@@ -777,11 +777,13 @@ public final class VoucherService: Sendable {
 
     public func validate(draft: VoucherDraft,
                          in fy: FinancialYear,
-                         existingVoucherId: Voucher.ID? = nil) throws -> ValidationResult {
+                         existingVoucherId: Voucher.ID? = nil,
+                         isSystemReversal: Bool = false) throws -> ValidationResult {
         let validator = VoucherDraftValidator(db: db, fiscalLockChecker: fiscalLockChecker)
         return validator.validate(draft, companyId: companyId,
                                   financialYearId: fy.id,
-                                  existingVoucherId: existingVoucherId)
+                                  existingVoucherId: existingVoucherId,
+                                  isSystemReversal: isSystemReversal)
     }
 
     public func list(filter: VoucherRepository.Filter) throws -> [Voucher] {
@@ -1037,7 +1039,11 @@ public final class VoucherService: Sendable {
                 )
             }
         )
-        let validation = try validate(draft: reversalDraft, in: targetFY)
+        let validation = try validate(
+            draft: reversalDraft,
+            in: targetFY,
+            isSystemReversal: true
+        )
         if case .invalid(let errs) = validation, let first = errs.first {
             throw AppError.validation(first)
         }

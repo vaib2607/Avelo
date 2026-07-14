@@ -210,8 +210,26 @@ private struct EditVoucherBody: View {
                     }
                     TextField("Bill reference number", text: $vm.billReferenceNumber)
                 }
-                TextField("Narration", text: $vm.narration, axis: .vertical)
-                    .lineLimit(2...4)
+                HStack(alignment: .top) {
+                    TextField("Narration", text: $vm.narration, axis: .vertical)
+                        .lineLimit(2...4)
+                    Menu {
+                        if vm.narrationSuggestions.isEmpty {
+                            Text("No recent narrations").foregroundStyle(.secondary)
+                        }
+                        ForEach(vm.narrationSuggestions, id: \.self) { suggestion in
+                            Button(suggestion) { vm.narration = suggestion }
+                        }
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
+                    .accessibilityLabel("Recall a recent narration")
+                    .menuStyle(.borderlessButton)
+                    .frame(width: 24)
+                    .keyboardShortcut("r", modifiers: [.control])
+                    .onAppear { vm.loadNarrationSuggestions() }
+                    .help("Recall a recent narration (⌃R)")
+                }
             }
             .formStyle(.grouped)
         }

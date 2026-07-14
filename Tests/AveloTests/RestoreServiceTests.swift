@@ -3,6 +3,33 @@ import XCTest
 
 final class RestoreServiceTests: XCTestCase {
 
+    private final class RestoreActivityProbe: @unchecked Sendable, LongOperationActivityControlling {
+        private let lock = NSLock()
+        private var _beginCount = 0
+
+        var beginCount: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return _beginCount
+        }
+
+        func perform<T>(reason: String, operation: () throws -> T) throws -> T {
+            begin()
+            return try operation()
+        }
+
+        func perform<T>(reason: String, operation: () async throws -> T) async throws -> T {
+            begin()
+            return try await operation()
+        }
+
+        private func begin() {
+            lock.lock()
+            _beginCount += 1
+            lock.unlock()
+        }
+    }
+
     private func excludedFromBackup(_ url: URL) throws -> Bool {
         try XCTUnwrap(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup)
     }
@@ -215,6 +242,61 @@ final class RestoreServiceTests: XCTestCase {
         }
     }
 
+    func testRestoreRejectsMistypedRecoveryKeyBeforeStartingOrMutatingDestination() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: sourceRoot)
+            try? FileManager.default.removeItem(at: targetRoot)
+        }
+
+        let backedUp = try await makeBackedUpCompany(root: sourceRoot, name: "Typo Protection Source")
+        let targetKeyStore = InMemoryCompanyKeyStore()
+        let targetManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: targetKeyStore)
+        let preservedCompany = try await CompanyService.create(
+            companyInput: .init(name: "Destination Stays Intact", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: targetManager
+        )
+        let preservedURL = try await targetManager.companyFileURL(id: preservedCompany.id)
+        let preservedBytes = try Data(contentsOf: preservedURL)
+        let activity = RestoreActivityProbe()
+        var mistypedRecoveryKey = backedUp.recoveryKey
+        let payloadIndex = mistypedRecoveryKey.index(mistypedRecoveryKey.startIndex, offsetBy: 4)
+        let originalCharacter = mistypedRecoveryKey[payloadIndex]
+        let replacement = originalCharacter == "A" ? "B" : "A"
+        mistypedRecoveryKey.replaceSubrange(payloadIndex...payloadIndex, with: replacement)
+
+        do {
+            _ = try await RestoreService(manager: targetManager, activityController: activity).restore(
+                from: backedUp.backupURL,
+                recoveryKey: mistypedRecoveryKey
+            )
+            XCTFail("Expected recovery-key checksum mismatch")
+        } catch {
+            XCTAssertEqual(AppError.wrap(error), .recoveryKey(.checksumMismatch))
+        }
+
+        XCTAssertEqual(activity.beginCount, 0)
+        let companies = try await targetManager.listCompanies()
+        XCTAssertEqual(companies.count, 1)
+        XCTAssertEqual(companies.first?.id, preservedCompany.id)
+        XCTAssertEqual(try Data(contentsOf: preservedURL), preservedBytes)
+        XCTAssertEqual(targetKeyStore.storedKeyCount, 1)
+        let companiesDirectory = await targetManager.companiesDirectory
+        let stagedFiles = try FileManager.default.contentsOfDirectory(at: companiesDirectory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix(".restore-") }
+        XCTAssertTrue(stagedFiles.isEmpty)
+    }
+
     func testRestoreCleanupSwallowsSecondaryDeleteFailures() throws {
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try Data("x".utf8).write(to: temp)
@@ -318,11 +400,16 @@ final class RestoreServiceTests: XCTestCase {
         let bomService = BOMService(db: db, companyId: source.companyId)
         let assembly = try inventory.createItem(code: "FG-REST", name: "Restored FG", unit: "PCS")
         let component = try inventory.createItem(code: "RM-REST", name: "Restored RM", unit: "PCS")
-        try bomService.saveBOM(
+        try bomService.createBOM(
             assemblyItemId: assembly.id,
-            outputQuantity: 1,
+            outputQuantity: try ExactQuantity.parse(decimal: "1"),
             components: [
-                BOMComponent(companyId: source.companyId, bomId: UUID(), componentItemId: component.id, quantity: 2)
+                BOMComponent(
+                    companyId: source.companyId,
+                    bomId: UUID(),
+                    componentItemId: component.id,
+                    quantity: try ExactQuantity.parse(decimal: "2")
+                )
             ]
         )
         let posted = try VoucherService(db: db, companyId: source.companyId).post(
@@ -375,10 +462,10 @@ final class RestoreServiceTests: XCTestCase {
         XCTAssertEqual(restoredWorkflow.chequeStatus, .deposited)
         let restoredBom = try XCTUnwrap(BOMService(db: restoredHandle.db, companyId: restored.id).loadBOM(for: assembly.id))
         XCTAssertEqual(restoredBom.0.assemblyItemId, assembly.id)
-        XCTAssertEqual(restoredBom.0.outputQuantity, 1, accuracy: 0.000001)
+        XCTAssertEqual(restoredBom.0.outputQuantity, try ExactQuantity.parse(decimal: "1"))
         XCTAssertEqual(restoredBom.1.count, 1)
         XCTAssertEqual(restoredBom.1[0].componentItemId, component.id)
-        XCTAssertEqual(restoredBom.1[0].quantity, 2, accuracy: 0.000001)
+        XCTAssertEqual(restoredBom.1[0].quantity, try ExactQuantity.parse(decimal: "2"))
 
         let restoreAudit = try AuditRepository(db: restoredHandle.db).list(
             filter: .init(companyId: restored.id, action: .backupImported)

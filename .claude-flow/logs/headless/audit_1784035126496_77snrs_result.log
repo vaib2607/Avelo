@@ -1,0 +1,17 @@
+[2026-07-14T13:21:49.086Z] RESULT
+============================================================
+{
+  "success": false,
+  "output": "API Error: Unable to connect to API (ENOTFOUND)\n",
+  "parsedOutput": {
+    "parseError": true,
+    "rawOutput": "API Error: Unable to connect to API (ENOTFOUND)\n"
+  },
+  "durationMs": 182590,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-07-14T13:21:49.086Z",
+  "executionId": "audit_1784035126496_77snrs",
+  "error": "Process exited with code 1"
+}

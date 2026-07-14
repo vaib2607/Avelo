@@ -1,6 +1,10 @@
 # AVELO Release Board
 
-This is the repo-tracked `P0/P1/P2` execution board for the release push. Each open issue appears once, carries one severity, and maps back to the master execution checklist.
+Snapshot: 2026-07-15
+
+**Canonical verdict: NOT READY FOR PUBLIC PRODUCTION.**
+
+This is the repo-tracked `P0/P1/P2` source of truth for readiness. Each unresolved issue appears once, carries one severity, and maps to `Docs/Avelo_Execution_Checklist.md`. Feature presence, an old green test log, or a locally launchable ad-hoc bundle does not override this verdict.
 
 Current release target:
 - `v1.1` is the performance, accuracy, and reliability hardening release.
@@ -10,6 +14,19 @@ Severity rules:
 - `P0`: release-blocking correctness, data integrity, fiscal lock, restore, or core offline-behavior risk
 - `P1`: high-priority shipped-path gap that can cause broken workflow, bad UX trust, or incomplete validation
 - `P2`: lower-priority release work, deferrable module decisions, or hardening/polish items that do not block core correctness by themselves
+
+State rules:
+
+- `Implementation remaining`: required code/schema/workflow is missing or contradictory.
+- `Proof remaining`: implementation appears present, but current-worktree automated proof is incomplete or stale.
+- `Manual acceptance remaining`: current automated proof is accepted; named human acceptance is still missing.
+- `Policy excluded`: intentionally impossible or excluded under a non-negotiable rule; it is not a hidden dependency.
+- `Closed`: implementation, automated proof, applicable human acceptance, and evidence metadata are complete.
+- Legacy table value `Open` means unresolved only. The execution checklist supplies its current substate until each row is migrated to the taxonomy above.
+
+Evidence is valid only for the recorded commit/worktree and artifact. Record date/time, macOS/Xcode/Swift, machine, schema/fixture, command, result, skipped tests, artifact version/build/SHA-256/signing identity, owner, and `AVL-*` row. The active dirty worktree invalidates historical closure claims until the supported proof set is rerun.
+
+Distribution status: `Scripts/bundle.sh` currently emits an ad-hoc signed local RC with version `1.0` and build `2`. Public production requires the approved Developer ID/notarization or Mac App Store runbook in `Docs/DX.md`, aligned v1.1 metadata, and clean-Mac install/launch/upgrade proof.
 
 Module ship status:
 - `Exposed, not Ready`: company setup, company switching, FYs, accounts, vouchers, reports, inventory, payroll, banking, audit, backup/restore, and the offline shell remain available for development and accountant QA, but the open P0 catalogue below blocks a Ready designation.
@@ -32,11 +49,11 @@ Release split rule:
 - Add minimum viability checks for permissions, disk-full, and backup-write failures so the app fails cleanly.
 - Prevent obvious large-ledger or report slow paths that would make core accounting unusable at launch.
 
-### V2: Should Ship After Launch
+### Landed security/restore baseline (historically labelled V2)
 - Migrate from plain UUIDs to UUIDv7 for time-sortable IDs and better offline merge behavior.
-- Add stronger restore hardening and more explicit integrity verification around imported backups.
+- Preserve and extend restore hardening and explicit integrity verification around imported backups.
 - Add basic large-dataset performance work: better pagination, query-plan tuning, prepared-statement reuse, and benchmark-driven regression checks.
-- SQLCipher at-rest encryption is active for app-managed company databases with per-company raw keys stored in Keychain and user-custody recovery keys for cross-machine restore.
+- SQLCipher at-rest encryption is active for app-managed company databases with per-company raw keys stored in Keychain and user-custody recovery keys for cross-machine restore. This is current baseline, not a post-launch deferral.
 - Backup manifests carry `manifestVersion`; restore rejects unsupported versions before opening imported bytes and verifies checksum/byte-count before encrypted open or copy.
 - Backup export stages the database and manifest through same-directory temp files before atomic replacement; restore/migration paths continue to stage work before final replacement.
 - Add clearer recovery for unusual filesystem cases like network volumes or antivirus locks.
@@ -65,16 +82,16 @@ Hidden entry-point rule:
 
 ## Top 10 Blockers In Execution Order
 
-1. `AVL-P0-011` — replace unchecked financial arithmetic with throwing overflow-safe operations.
-2. `AVL-P0-008` — establish exact alternate-UOM quantity representation needed by valuation.
-3. `AVL-P0-010` — implement authoritative FIFO and weighted-average valuation with stock layers.
-4. `AVL-P0-024` — net each trial-balance account to one closing side.
-5. `AVL-P0-025` — reject overlapping financial years and make date lookup deterministic.
-6. `AVL-P0-026` — enforce fiscal locks across every dated financial write path.
-7. `AVL-P0-030` — enforce company ownership at database and service boundaries.
-8. `AVL-P0-027` — fail closed when persisted dates, enums, columns, or values are malformed.
-9. `AVL-P0-002` — make voucher numbering gap-free under contention and rollback.
-10. `AVL-P0-012` — establish anchored tamper evidence required by cancellation and repair.
+1. `AVL-P0-036` — remap and validate every v14-v22 company-scoped table during restore, including item-invoice rows.
+2. `AVL-P0-034` — complete same-transaction audit action and service coverage for every shipped mutation.
+3. `AVL-P0-033` — enforce the inventory-disabled capability boundary across UI, routing, search, shortcuts, and services.
+4. `AVL-P0-035` — complete or hide ledger-voucher `autoPrompt`/`autoSilent`; never infer stock from account names.
+5. `AVL-P0-020` — make create/edit/help agree on Return, Command-Return, Tab, Shift-Tab, and Escape.
+6. Active voucher/BOM worktree — settle implementation, then rerun focused and full regression proof.
+7. Current automated gate — `make rule-audit`, warnings-as-errors release build, `make test`, `make rc-local`, benchmark, and bundled self-test/GUI launch.
+8. Human gate — accountant, operator, keyboard, accessibility, visual/PDF, and recovery acceptance on the same artifact.
+9. Distribution gate — align v1.1 version/build, choose signing path, notarize or complete App Store acceptance, and test a clean Mac.
+10. Evidence gate — update every P0 row with current commit/worktree/artifact identity; historical logs remain context only.
 
 Execution queue alignment:
 
@@ -83,8 +100,9 @@ Execution queue alignment:
   - `Implementation remaining`
   - `Proof remaining`
   - `Manual acceptance remaining`
-- The Wave `P0-A` proof-closure queue is now empty; all 7 items (`AVL-P0-012`, `AVL-P0-011`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-030`, `AVL-P0-027`, `AVL-P0-002`) have landed automated proof and now await only manual acceptance (see bullets below).
-- The current Wave `P0-B` remaining implementation queue is empty; the wave now contains only proof and manual-acceptance closure work.
+- Evidence reset on 2026-07-15: the current worktree contains active source, migration, test, and bundle changes. All historical automated-proof bullets below are retained as provenance, but affected rows revert to at least `Proof remaining` until the supported commands pass on one identified worktree/artifact.
+- Before the 2026-07-15 worktree reset, Wave `P0-A` had historical automated evidence for 7 items (`AVL-P0-012`, `AVL-P0-011`, `AVL-P0-025`, `AVL-P0-026`, `AVL-P0-030`, `AVL-P0-027`, `AVL-P0-002`). Re-run affected proof before treating any as manual-only.
+- Before the reset, Wave `P0-B` had no known implementation queue. The four new P0 rows and active worktree changes supersede that statement.
 - `AVL-P0-003` implementation and automated proof are landed; it remains open only until accountant outstanding/bill-allocation acceptance is executed and recorded.
 - `AVL-P0-004` implementation and automated proof are landed; it remains open only until accountant bounced-cheque acceptance is executed and recorded.
 - `AVL-P0-009` implementation and automated proof are landed; it remains open only until manufacturing validation acceptance is executed and recorded.
@@ -122,14 +140,14 @@ Execution queue alignment:
 | Track | Status | Notes |
 | --- | --- | --- |
 | V1 | Active | Day-one correctness, restore safety, file-open/save reliability, and launch viability risks stay here until closed. |
-| V2 | Deferred until post-launch unless needed to unblock V1 | Merge behavior, stronger backup integrity, at-rest encryption, and broader scale tuning belong here. |
+| V2 | Deferred future scope only | UUIDv7/merge behavior and broader scale tuning remain future work. SQLCipher, manifest validation, recovery keys, and staged restore are already V1 baseline and must stay green. |
 | V3 | Deferred | Edge-case resilience, maintenance automation, and deep scale or hardware hardening belong here. |
 
 ## Canonical Readiness Backlog
 
 This is the single normalized readiness catalogue. Existing completed `RB-*` entries below are historical implementation evidence, not proof that Avelo is Ready. An item remains `Open` until its automated proof and manual accountant acceptance both pass. Exact Tally chords are compatibility aliases; current macOS bindings remain supported.
 
-### P0 — Must Fix Before “Ready” (32 open)
+### P0 — Must Fix Before “Ready” (36 unresolved)
 
 | ID | Status | Depends | Requirement | Proof of done |
 | --- | --- | --- | --- | --- |
@@ -154,7 +172,7 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P0-019 | Open | AVL-P0-010 | Cascade inventory-cost recalculation after backdated insert, edit, reversal, or cancellation. | Downstream valuation/COGS fixtures update deterministically and expose progress/failure state. |
 | AVL-P0-020 | Open | None | Reliable `@FocusState` Tab/Shift-Tab/Enter navigation in voucher grids. | Full keyboard matrix passes for first, middle, last, inserted, deleted, and validation-error rows. |
 | AVL-P0-021 | Open | None | Locale-aware decimal parsing with unambiguous stored paise. | Indian and comma-decimal locale fixtures round-trip pasted and typed values. |
-| AVL-P0-022 | Open | None | GST-compliant invoice/PDF for registered-party (B2B) Sales/Purchase vouchers: mandatory fields, CGST/SGST/IGST/CESS breakdown, HSN/SAC, place of supply, inventory-linked stock detail. B2C (unregistered party), export invoices, credit/debit notes, and RCM are explicitly deferred to follow-on tickets. Signed QR / e-invoice IRN is permanently out of scope: it requires an online call to the government e-invoice portal, which conflicts with R-1 (100% offline, zero network calls) — see `AVL-P1-008`, which stays open but is no longer a dependency of this ticket. | Field-matrix tests (intra-state CGST/SGST, inter-state IGST, CESS, unregistered-party fallback, inventory-linked/non-linked stock detail) and a working UI export button in `VouchersView`; remains open only until accountant B2B tax-invoice acceptance is executed and recorded. |
+| AVL-P0-022 | Open | None | GST-compliant invoice/PDF for registered-party (B2B) Sales/Purchase vouchers: mandatory fields, CGST/SGST/IGST/CESS breakdown, HSN/SAC, place of supply, inventory-linked stock detail. B2C (unregistered party), export invoices, credit/debit notes, and RCM are deferred. Direct IRN/government-signed QR issuance is policy-excluded by R-1 under `AVL-P1-008`. | Field-matrix tests (intra-state CGST/SGST, inter-state IGST, CESS, unregistered-party fallback, inventory-linked/non-linked stock detail) and a working UI export button in `VouchersView`; remains open until current automated proof and accountant B2B tax-invoice acceptance are recorded. |
 | AVL-P0-023 | Open | None | Force Indian accounting calendar semantics in IST regardless of device timezone. | Boundary tests cover midnight, DST device zones, leap days, GST periods, and FY transitions. |
 | AVL-P0-024 | Open | AVL-P0-011 | Net each trial-balance account to one debit or credit closing side. | ₹100 Dr opening plus ₹40 Cr movement reports ₹60 Dr; authoritative fixtures pass per account. |
 | AVL-P0-025 | Open | AVL-P0-023 | Reject overlapping or ambiguous financial years, enforce the rule on FY updates, and use deterministic containing-date lookup that fails closed on corrupt ambiguity. | Create/import/restore tests reject overlap, adjacent accepted years resolve exactly one containing FY, corrupt overlap fixtures fail closed instead of returning `LIMIT 1`, and migrated databases carry both insert/update overlap guards. |
@@ -165,6 +183,10 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P0-030 | Open | None | Enforce same-company ownership through database constraints/triggers plus service/repository validation. | Adversarial cross-company FY/account/item/employee/voucher/bank/order references are rejected at every boundary. |
 | AVL-P0-031 | Open | None | Make schema-version reads throwing; never interpret an unreadable database as version zero. | Corrupt, locked, wrong-key, and I/O-failure tests stop before any migration mutation. |
 | AVL-P0-032 | Open | AVL-P0-002, AVL-P0-012 | Audit-safe voucher cancellation that preserves the voucher, number, persisted reason/actor/timestamp, linkage, and history. | Cancelled vouchers remain visible, numbers are not reused, reversal linkage and audit evidence persist, reports apply defined treatment, and deletion is unnecessary. |
+| AVL-P0-033 | Implementation remaining | None | Enforce the accounting-only capability boundary when inventory is disabled across sidebar, menus, command palette, quick search, keyboard routing, sheets/deep links, dashboard content, and mutation services. | Entry-point matrix and direct-service tests prove Inventory is unreachable and rejects mutation when disabled; accountant toggles the capability without stale routes or data loss. |
+| AVL-P0-034 | Implementation remaining | AVL-P0-012 | Give every shipped financially or operationally meaningful mutation a persisted `AuditAction` and exactly one same-transaction event; cover FY unlock/reopen, bank import/match/clear, inventory orders/BOMs/masters, repair, export, and other promoted workflows. | A mutation-inventory test maps every public mutation to action, before/after/reason policy, rollback semantics, and one immutable event; accountant verifies representative audit diffs. |
+| AVL-P0-035 | Implementation remaining | AVL-P0-033, AVL-P0-034 | Complete or hide ledger-voucher inventory link modes. `autoPrompt` must collect explicit item/quantity/direction/cost inputs; `autoSilent` requires deterministic mapping/consent/reversal/audit. Account-name or history inference is forbidden. | UI/service tests prove manual, item-invoice, prompt yes/no/policy change, edit/reverse/cancel, fiscal lock, restore, valuation, and audit behavior; unsupported modes are absent from production UI. |
+| AVL-P0-036 | Implementation remaining | AVL-P0-030, AVL-P0-031 | Restore every supported schema table under a new company identity. Include `avelo_voucher_item_lines` in company-ID remap and define whether scratch `avelo_voucher_drafts` are remapped or intentionally discarded. | Restore fixtures containing item invoices, bill/cheque rows, BOM exact quantities, FY openings, and drafts pass checksum, migration, company ownership, audit/trigger recreation, `foreign_key_check`, and post-restore reports without retaining the source company ID. |
 
 ### P1 — Fix Before Broad Rollout (44 open)
 
@@ -177,7 +199,7 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P1-005 | Open | None | Form 16 and 24Q/26Q filing exports with validation. | Official-schema fixtures validate and reconcile to payroll/TDS ledgers. |
 | AVL-P1-006 | Open | AVL-P1-005 | Forms 27Q and 27EQ plus correction/export workflows. | Resident/non-resident and TCS fixtures pass schema validation. |
 | AVL-P1-007 | Open | AVL-P0-022 | GSTR-1/1A/IFF, GSTR-3B, GSTR-2B, and IMS accept/reject/pending reconciliation. | Portal-format fixtures round-trip and every ITC decision is traceable. |
-| AVL-P1-008 | Open | AVL-P0-022 | E-invoice IRN generation, reporting-window enforcement, cancellation, signed JSON/QR storage, verification, and printing. | Sandbox/fixture lifecycle covers success, duplicate, timeout, retry, cancellation, and late-report rejection. |
+| AVL-P1-008 | Policy excluded | None | Direct e-invoice IRN generation, portal cancellation, and government-signed QR retrieval require network access and are excluded by R-1. Offline import/retention/printing of user-supplied valid artifacts would require a separate approved scope. | No shipped route, dependency, entitlement, or test fixture performs a portal call; product copy does not imply Avelo can issue an IRN or government-signed QR. |
 | AVL-P1-009 | Open | AVL-P0-011 | Multi-currency books, exchange rates, realized/unrealized forex journals, and revaluation. | Multi-period golden fixtures reconcile base and foreign balances. |
 | AVL-P1-010 | Open | AVL-P0-030 | Cost centres with per-line allocation and report reconciliation. | Split-allocation fixtures reconcile vouchers and reports. |
 | AVL-P1-011 | Open | AVL-P1-010 | Cost categories for parallel Project/Department-style allocation. | Independent category dimensions reconcile without double counting. |

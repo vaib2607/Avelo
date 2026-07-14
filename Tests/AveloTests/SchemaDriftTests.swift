@@ -137,7 +137,9 @@ final class SchemaDriftTests: XCTestCase {
             "assembly_item_id",
             "output_quantity",
             "created_at",
-            "updated_at"
+            "updated_at",
+            "output_quantity_numerator",
+            "output_quantity_denominator"
         ])
         XCTAssertEqual(try columns("avelo_bom_components", in: db), [
             "id",
@@ -145,7 +147,9 @@ final class SchemaDriftTests: XCTestCase {
             "bom_id",
             "component_item_id",
             "quantity",
-            "line_order"
+            "line_order",
+            "quantity_numerator",
+            "quantity_denominator"
         ])
         XCTAssertEqual(try columns("avelo_audit_events", in: db), [
             "id",

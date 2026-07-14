@@ -145,11 +145,6 @@ public final class AccountService: Sendable {
                             name: String,
                             nature: AccountNature,
                             parentGroupId: AccountGroup.ID? = nil) throws -> AccountGroup {
-        if let parentGroupId {
-            guard let parent = try groupRepository.findById(parentGroupId), parent.companyId == audit.companyId else {
-                throw AppError.notFound("Account group")
-            }
-        }
         let group = AccountGroup(
             companyId: audit.companyId,
             parentGroupId: parentGroupId,
@@ -157,7 +152,11 @@ public final class AccountService: Sendable {
             name: name,
             nature: nature
         )
-        try groupRepository.insert(group)
+        try db.write { tx in
+            let repository = AccountGroupRepository(db: tx)
+            try validateGroupHierarchy(group, using: repository)
+            try repository.insert(group)
+        }
         return group
     }
 
@@ -165,18 +164,56 @@ public final class AccountService: Sendable {
         guard group.companyId == audit.companyId else {
             throw AppError.notFound("Account group")
         }
-        guard try groupRepository.findById(group.id) != nil else {
-            throw AppError.notFound("Account group")
+        try db.write { tx in
+            let repository = AccountGroupRepository(db: tx)
+            guard let existing = try repository.findById(group.id), existing.companyId == audit.companyId else {
+                throw AppError.notFound("Account group")
+            }
+            try validateGroupHierarchy(group, using: repository)
+            try repository.update(group)
         }
+    }
+
+    private func validateGroupHierarchy(_ group: AccountGroup,
+                                        using repository: AccountGroupRepository) throws {
         if let parentId = group.parentGroupId {
             guard parentId != group.id else {
                 throw AppError.businessRule("A group cannot be its own parent.")
             }
-            guard let parent = try groupRepository.findById(parentId), parent.companyId == audit.companyId else {
+            guard let parent = try repository.findById(parentId) else {
                 throw AppError.notFound("Account group")
             }
+            guard parent.companyId == group.companyId else {
+                throw AppError.businessRule("Parent group must belong to the same company.")
+            }
+            guard parent.nature == group.nature else {
+                throw AppError.businessRule("Parent and child account groups must have the same nature.")
+            }
         }
-        try groupRepository.update(group)
+
+        let children = try repository.listChildren(of: group.id)
+        if children.contains(where: { $0.companyId == group.companyId && $0.nature != group.nature }) {
+            throw AppError.businessRule("Parent and child account groups must have the same nature.")
+        }
+
+        let existingGroups = try repository.listForCompany(group.companyId)
+        var groupsById = Dictionary(uniqueKeysWithValues: existingGroups.map { ($0.id, $0) })
+        groupsById[group.id] = group
+
+        var ancestorId = group.parentGroupId
+        var visited: Set<AccountGroup.ID> = []
+        while let currentId = ancestorId {
+            if currentId == group.id {
+                throw AppError.businessRule("A group cannot be placed under one of its descendants.")
+            }
+            guard visited.insert(currentId).inserted else {
+                throw AppError.businessRule("Account-group hierarchy contains a cycle.")
+            }
+            guard let ancestor = groupsById[currentId] else {
+                throw AppError.businessRule("Account-group hierarchy references a group outside its company.")
+            }
+            ancestorId = ancestor.parentGroupId
+        }
     }
 
     public func deleteGroup(_ id: AccountGroup.ID) throws {
