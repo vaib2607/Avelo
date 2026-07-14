@@ -1,36 +1,70 @@
 import SwiftUI
 
+private enum InventorySection: String, CaseIterable, Identifiable {
+    case items = "Items"
+    case orders = "Orders"
+    var id: String { rawValue }
+}
+
 public struct InventoryView: View {
 
     @Environment(AppEnvironment.self) private var env
     @State private var vm: InventoryViewModel?
+    @State private var ordersVM: InventoryOrdersViewModel?
     @State private var showMovement: InventoryItem.ID?
+    @State private var section: InventorySection = .items
 
     public init() {}
 
     public var body: some View {
-        InventoryContent(vm: vm, showMovement: $showMovement)
-            .navigationTitle("Inventory")
-            .toolbar {
-                ToolbarItem {
+        VStack(spacing: 0) {
+            Picker("", selection: $section) {
+                ForEach(InventorySection.allCases) { s in
+                    Text(s.rawValue).tag(s)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(12)
+            switch section {
+            case .items:
+                InventoryContent(vm: vm, showMovement: $showMovement)
+            case .orders:
+                OrdersContent(vm: ordersVM)
+            }
+        }
+        .navigationTitle("Inventory")
+        .toolbar {
+            ToolbarItem {
+                switch section {
+                case .items:
                     Button {
                         env.router.present(.newItem)
                     } label: { Label("New Item", systemImage: "plus") }
+                case .orders:
+                    EmptyView()
                 }
             }
-            .onAppear { setup() }
-            .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+        }
+        .onAppear { setup() }
+        .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
     }
 
     private func setup() {
         guard let ctx = env.companyContext else {
             vm = nil
+            ordersVM = nil
             return
         }
         if vm == nil || vm?.companyId != ctx.companyId {
             let model = InventoryViewModel(companyId: ctx.companyId, db: ctx.database)
             model.reload()
             vm = model
+        }
+        if ordersVM == nil || ordersVM?.companyId != ctx.companyId {
+            let model = InventoryOrdersViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            ordersVM = model
         }
     }
 }

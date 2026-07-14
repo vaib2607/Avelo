@@ -192,13 +192,24 @@ private struct EditVoucherBody: View {
         .padding(16)
     }
 
+    private var isContra: Bool { vm.draft.voucherTypeCode == .contra }
+
     private var headerSection: some View {
         GroupBox("Header") {
             Form {
                 DatePicker("Date", selection: $vm.date, displayedComponents: .date)
-                AccountPicker(selection: $vm.partyAccountId,
-                              accounts: vm.accounts,
-                              placeholder: "Party (optional)")
+                if !isContra {
+                    AccountPicker(selection: $vm.partyAccountId,
+                                  accounts: vm.accounts,
+                                  placeholder: "Party (optional)")
+                    Picker("Bill reference type", selection: $vm.billReferenceType) {
+                        Text("None").tag(VoucherDraft.BillReferenceType?.none)
+                        ForEach(VoucherDraft.BillReferenceType.allCases) { type in
+                            Text(type.rawValue).tag(Optional(type))
+                        }
+                    }
+                    TextField("Bill reference number", text: $vm.billReferenceNumber)
+                }
                 TextField("Narration", text: $vm.narration, axis: .vertical)
                     .lineLimit(2...4)
             }

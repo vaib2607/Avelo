@@ -50,6 +50,111 @@ public struct InventoryOrderRepository: Sendable {
         }
     }
 
+    public func listOrders(companyId: Company.ID, orderType: InventoryOrderType? = nil, status: InventoryOrderStatus? = nil) throws -> [InventoryOrder] {
+        var sql = """
+            SELECT id, company_id, order_type, number, party_account_id, order_date, expected_date, status, created_at, updated_at
+            FROM avelo_inventory_orders
+            WHERE company_id = ?
+        """
+        var bind: [SQLValue] = [.text(companyId.uuidString)]
+        if let orderType {
+            sql += " AND order_type = ?"
+            bind.append(.text(orderType.rawValue))
+        }
+        if let status {
+            sql += " AND status = ?"
+            bind.append(.text(status.rawValue))
+        }
+        sql += " ORDER BY order_date DESC, number DESC"
+        return try db.query(sql, bind: bind, row: Self.rowToOrder)
+    }
+
+    public func findOrder(id: InventoryOrder.ID, companyId: Company.ID) throws -> InventoryOrder? {
+        try db.queryOne(
+            """
+            SELECT id, company_id, order_type, number, party_account_id, order_date, expected_date, status, created_at, updated_at
+            FROM avelo_inventory_orders
+            WHERE id = ? AND company_id = ?
+            """,
+            bind: [.text(id.uuidString), .text(companyId.uuidString)],
+            row: Self.rowToOrder
+        )
+    }
+
+    public func linesForOrder(_ orderId: InventoryOrder.ID, companyId: Company.ID) throws -> [InventoryOrderLine] {
+        try db.query(
+            """
+            SELECT id, company_id, order_id, item_id, quantity, fulfilled_quantity, unit_rate_paise, created_at
+            FROM avelo_inventory_order_lines
+            WHERE order_id = ? AND company_id = ?
+            ORDER BY created_at ASC
+            """,
+            bind: [.text(orderId.uuidString), .text(companyId.uuidString)]
+        ) { row in
+            InventoryOrderLine(
+                id: try UUIDParsing.required(row.requiredText("id"), field: "avelo_inventory_order_lines.id"),
+                companyId: try UUIDParsing.required(row.requiredText("company_id"), field: "avelo_inventory_order_lines.company_id"),
+                orderId: try UUIDParsing.required(row.requiredText("order_id"), field: "avelo_inventory_order_lines.order_id"),
+                itemId: try UUIDParsing.required(row.requiredText("item_id"), field: "avelo_inventory_order_lines.item_id"),
+                quantity: try row.requiredInt("quantity"),
+                fulfilledQuantity: try row.requiredInt("fulfilled_quantity"),
+                unitRatePaise: try row.requiredInt("unit_rate_paise"),
+                createdAt: try row.timestamp("created_at")
+            )
+        }
+    }
+
+    public func findOrderLine(id: InventoryOrderLine.ID, companyId: Company.ID) throws -> InventoryOrderLine? {
+        try db.queryOne(
+            """
+            SELECT id, company_id, order_id, item_id, quantity, fulfilled_quantity, unit_rate_paise, created_at
+            FROM avelo_inventory_order_lines
+            WHERE id = ? AND company_id = ?
+            """,
+            bind: [.text(id.uuidString), .text(companyId.uuidString)]
+        ) { row in
+            InventoryOrderLine(
+                id: try UUIDParsing.required(row.requiredText("id"), field: "avelo_inventory_order_lines.id"),
+                companyId: try UUIDParsing.required(row.requiredText("company_id"), field: "avelo_inventory_order_lines.company_id"),
+                orderId: try UUIDParsing.required(row.requiredText("order_id"), field: "avelo_inventory_order_lines.order_id"),
+                itemId: try UUIDParsing.required(row.requiredText("item_id"), field: "avelo_inventory_order_lines.item_id"),
+                quantity: try row.requiredInt("quantity"),
+                fulfilledQuantity: try row.requiredInt("fulfilled_quantity"),
+                unitRatePaise: try row.requiredInt("unit_rate_paise"),
+                createdAt: try row.timestamp("created_at")
+            )
+        }
+    }
+
+    public func updateLineFulfillment(_ lineId: InventoryOrderLine.ID, companyId: Company.ID, fulfilledQuantity: Int64) throws {
+        try db.execute(
+            "UPDATE avelo_inventory_order_lines SET fulfilled_quantity = ? WHERE id = ? AND company_id = ?",
+            [.integer(fulfilledQuantity), .text(lineId.uuidString), .text(companyId.uuidString)]
+        )
+    }
+
+    public func updateOrderStatus(_ orderId: InventoryOrder.ID, companyId: Company.ID, status: InventoryOrderStatus) throws {
+        try db.execute(
+            "UPDATE avelo_inventory_orders SET status = ?, updated_at = ? WHERE id = ? AND company_id = ?",
+            [.text(status.rawValue), .timestamp(Date()), .text(orderId.uuidString), .text(companyId.uuidString)]
+        )
+    }
+
+    private static func rowToOrder(_ row: Row) throws -> InventoryOrder {
+        InventoryOrder(
+            id: try UUIDParsing.required(row.requiredText("id"), field: "avelo_inventory_orders.id"),
+            companyId: try UUIDParsing.required(row.requiredText("company_id"), field: "avelo_inventory_orders.company_id"),
+            orderType: try row.enumValue("order_type"),
+            number: try row.requiredText("number"),
+            partyAccountId: try UUIDParsing.required(row.requiredText("party_account_id"), field: "avelo_inventory_orders.party_account_id"),
+            orderDate: row.date("order_date"),
+            expectedDate: try row.checkedOptionalDate("expected_date"),
+            status: try row.enumValue("status"),
+            createdAt: try row.timestamp("created_at"),
+            updatedAt: try row.timestamp("updated_at")
+        )
+    }
+
     public func pendingLines(companyId: Company.ID, orderType: InventoryOrderType? = nil) throws -> [PendingInventoryOrderLine] {
         var sql = """
             SELECT l.id, o.id AS order_id, o.order_type, o.number, o.expected_date,

@@ -84,6 +84,58 @@ public final class InventoryOrderService: Sendable {
         return try repository.pendingLines(companyId: companyId, orderType: type)
     }
 
+    public func orders(type: InventoryOrderType? = nil, status: InventoryOrderStatus? = nil) throws -> [InventoryOrder] {
+        try ensureInventoryEnabled()
+        return try repository.listOrders(companyId: companyId, orderType: type, status: status)
+    }
+
+    public func linesForOrder(_ orderId: InventoryOrder.ID) throws -> [InventoryOrderLine] {
+        try ensureInventoryEnabled()
+        guard try repository.findOrder(id: orderId, companyId: companyId) != nil else {
+            throw AppError.notFound("Order")
+        }
+        return try repository.linesForOrder(orderId, companyId: companyId)
+    }
+
+    /// Records fulfilment against one order line. Deliberately manual, not
+    /// linked to voucher posting — matches the plan's scope of a standalone
+    /// pending-fulfilment workspace, not full order-to-invoice conversion.
+    public func recordFulfillment(orderLineId: InventoryOrderLine.ID, fulfilledQuantity: Int64) throws {
+        try ensureInventoryEnabled()
+        guard let line = try repository.findOrderLine(id: orderLineId, companyId: companyId) else {
+            throw AppError.notFound("Order line")
+        }
+        guard let order = try repository.findOrder(id: line.orderId, companyId: companyId) else {
+            throw AppError.notFound("Order")
+        }
+        guard order.status == .open else {
+            throw AppError.businessRule("Only open orders accept fulfilment updates.")
+        }
+        guard fulfilledQuantity >= 0, fulfilledQuantity <= line.quantity else {
+            throw AppError.validation(ValidationError(code: .stockMovementCostMismatch, field: "fulfilledQuantity", message: "Fulfilled quantity must be within the ordered quantity."))
+        }
+        try repository.updateLineFulfillment(orderLineId, companyId: companyId, fulfilledQuantity: fulfilledQuantity)
+    }
+
+    public func closeOrder(_ orderId: InventoryOrder.ID) throws {
+        try setOrderStatus(orderId, to: .closed)
+    }
+
+    public func cancelOrder(_ orderId: InventoryOrder.ID) throws {
+        try setOrderStatus(orderId, to: .cancelled)
+    }
+
+    private func setOrderStatus(_ orderId: InventoryOrder.ID, to status: InventoryOrderStatus) throws {
+        try ensureInventoryEnabled()
+        guard let order = try repository.findOrder(id: orderId, companyId: companyId) else {
+            throw AppError.notFound("Order")
+        }
+        guard order.status == .open else {
+            throw AppError.businessRule("Only open orders can change status.")
+        }
+        try repository.updateOrderStatus(orderId, companyId: companyId, status: status)
+    }
+
     public func setReorderLevel(itemId: InventoryItem.ID,
                                 minimumQuantity: Int64,
                                 reorderQuantity: Int64) throws {

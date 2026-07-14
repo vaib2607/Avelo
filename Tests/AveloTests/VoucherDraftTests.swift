@@ -223,6 +223,38 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertEqual(vm.lines.map(\.id), remainingIds)
     }
 
+    // AVL-P1-035 (bill-wise allocation UI): EditVoucherSheet must surface the
+    // same bill reference fields NewVoucherSheet does — the service/model
+    // layer already round-tripped them, but the edit-mode form was missing
+    // the controls, so an accountant editing a voucher could never see or
+    // change its bill allocation.
+    @MainActor
+    func testEditModeLoadRestoresBillReferenceFromPostedVoucher() throws {
+        let tc = try TestCompany.make()
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.cashId,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-501",
+                narration: "Sale on credit",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 100_000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 100_000, side: .credit)
+                ]
+            ),
+            in: tc.fy
+        ).voucher
+
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales, existingId: posted.id)
+        vm.load(accounts: [], initialDate: posted.date)
+
+        XCTAssertEqual(vm.billReferenceType, .newRef)
+        XCTAssertEqual(vm.billReferenceNumber, "INV-501")
+    }
+
     // MARK: - Tally single-entry mode
 
     @MainActor
