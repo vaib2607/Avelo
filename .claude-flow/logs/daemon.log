@@ -7729,3 +7729,10 @@
 [2026-07-14T21:53:31.383Z] [INFO] Worker testgaps completed in 1ms
 [2026-07-14T21:55:31.383Z] [INFO] Worker audit deferred: Memory too low: 0.3% free
 [2026-07-14T21:57:31.403Z] [INFO] Worker optimize deferred: Memory too low: 1.2% free
+[2026-07-14T21:59:31.351Z] [INFO] Starting worker: consolidate (1/2 concurrent)
+[2026-07-14T21:59:31.354Z] [INFO] Consolidate worker: distillation skipped (no-db)
+[2026-07-14T21:59:31.355Z] [INFO] Worker consolidate completed in 7ms
+[2026-07-14T21:59:31.358Z] [INFO] Starting worker: audit (1/2 concurrent)
+[2026-07-14T21:59:31.359Z] [INFO] Worker audit completed in 3ms
+[2026-07-14T21:59:31.363Z] [INFO] Starting worker: optimize (1/2 concurrent)
+[2026-07-14T21:59:31.364Z] [INFO] Worker optimize completed in 4ms
