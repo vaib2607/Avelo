@@ -121,7 +121,7 @@ private struct VouchersBody: View {
     @ViewBuilder
     private var voucherTable: some View {
         VStack(spacing: 0) {
-            Table(vm.vouchers) {
+            Table(vm.vouchers, selection: $vm.selectedVoucherId) {
                 TableColumn("Date") { v in
                     Text(DateFormatters.userDate.string(from: v.date))
                 }
@@ -164,6 +164,17 @@ private struct VouchersBody: View {
                     }
                 }
             }
+            .onKeyPress(.pageUp) { vm.selectPrevious(); return .handled }
+            .onKeyPress(.pageDown) { vm.selectNext(); return .handled }
+        }
+        // AVL-P2-013 (Ctrl+I insert while browsing): opens a new voucher
+        // without touching vm.query/typeFilter/fromDate/toDate/pagination —
+        // the list's filter/scroll state is untouched because this never
+        // calls reload()/reloadFirstPage().
+        .background {
+            Button("") { env.router.present(.newJournal) }
+                .keyboardShortcut("i", modifiers: [.control])
+                .hidden()
         }
     }
 

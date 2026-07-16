@@ -15,6 +15,7 @@ public final class VouchersViewModel {
     public var pagination = PaginationState()
     public var isLoading: Bool = false
     public var error: AppError?
+    public var selectedVoucherId: Voucher.ID?
 
     public var limit: Int {
         get { pagination.limit }
@@ -103,6 +104,28 @@ public final class VouchersViewModel {
     public func nextPage() {
         pagination.goNext()
         reload()
+    }
+
+    /// AVL-P2-013 (PgUp/PgDn): moves selection within the currently loaded
+    /// page only — does not cross pages, matching the plain lazy scope of
+    /// "continuous browsing" without adding auto-pagination.
+    public func selectPrevious() {
+        move(by: -1)
+    }
+
+    public func selectNext() {
+        move(by: 1)
+    }
+
+    private func move(by delta: Int) {
+        guard !vouchers.isEmpty else { return }
+        guard let current = selectedVoucherId, let index = vouchers.firstIndex(where: { $0.id == current }) else {
+            selectedVoucherId = delta > 0 ? vouchers.first?.id : vouchers.last?.id
+            return
+        }
+        let newIndex = index + delta
+        guard vouchers.indices.contains(newIndex) else { return }
+        selectedVoucherId = vouchers[newIndex].id
     }
 
     public func accountName(_ id: Account.ID) -> String {

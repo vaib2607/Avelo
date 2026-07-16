@@ -82,6 +82,68 @@ final class VouchersViewModelTests: XCTestCase {
         XCTAssertEqual(vm.pagination.totalCount, 12)
     }
 
+    // AVL-P2-013 (PgUp/PgDn): selection moves within the loaded page only,
+    // without touching filter/pagination state (no reload() call at all).
+
+    private func waitForLoad(_ vm: VouchersViewModel) {
+        let done = expectation(description: "page loaded")
+        Task {
+            while vm.isLoading {
+                try? await Task.sleep(nanoseconds: 10_000_000)
+            }
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 5)
+    }
+
+    func testSelectNextAndPreviousMoveThroughLoadedPageWithoutTouchingFilterState() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        for idx in 0..<3 {
+            _ = try svc.post(draft: tc.draft(
+                on: "2024-06-0\(idx + 1)", narration: "Voucher \(idx)",
+                lines: [tc.line(tc.cashId, 1000, .debit), tc.line(tc.salesId, 1000, .credit)]
+            ), in: tc.fy)
+        }
+        let vm = VouchersViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.query = "Voucher"
+        vm.reload()
+        waitForLoad(vm)
+        XCTAssertEqual(vm.vouchers.count, 3)
+
+        XCTAssertNil(vm.selectedVoucherId)
+        vm.selectNext()
+        XCTAssertEqual(vm.selectedVoucherId, vm.vouchers[0].id)
+        vm.selectNext()
+        XCTAssertEqual(vm.selectedVoucherId, vm.vouchers[1].id)
+        vm.selectPrevious()
+        XCTAssertEqual(vm.selectedVoucherId, vm.vouchers[0].id)
+
+        // Boundary: previous at the first row is a no-op, not wraparound.
+        vm.selectPrevious()
+        XCTAssertEqual(vm.selectedVoucherId, vm.vouchers[0].id)
+
+        // Filter/pagination state untouched by any of the above.
+        XCTAssertEqual(vm.query, "Voucher")
+        XCTAssertEqual(vm.pagination.offset, 0)
+    }
+
+    func testSelectNextAtLastRowIsANoOp() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try svc.post(draft: tc.draft(on: "2024-06-01", narration: "Only voucher", lines: [
+            tc.line(tc.cashId, 1000, .debit), tc.line(tc.salesId, 1000, .credit)
+        ]), in: tc.fy)
+        let vm = VouchersViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.reload()
+        waitForLoad(vm)
+
+        vm.selectNext()
+        XCTAssertEqual(vm.selectedVoucherId, vm.vouchers[0].id)
+        vm.selectNext()
+        XCTAssertEqual(vm.selectedVoucherId, vm.vouchers[0].id)
+    }
+
     func testPagedReloadReplacesRowsWithoutDuplicatesWhenOlderPageFinishesLate() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
