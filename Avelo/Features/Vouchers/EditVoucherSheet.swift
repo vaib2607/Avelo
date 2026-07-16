@@ -152,12 +152,21 @@ private struct EditInner: View {
     }
 }
 
+/// Same Tally-style Enter cascade as NewVoucherSheet's VoucherField, minus
+/// the single-entry Account field (edit mode is always double-entry lines).
+private enum EditVoucherField: Hashable {
+    case date
+    case line(UUID)
+    case amount(UUID)
+}
+
 @MainActor
 private struct EditVoucherBody: View {
     @Bindable var vm: VoucherEditViewModel
     let voucherNumber: String
     let onSave: (VoucherEditViewModel) -> Void
     @Environment(AppRouter.self) private var router
+    @FocusState private var focusedField: EditVoucherField?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -212,6 +221,11 @@ private struct EditVoucherBody: View {
     private var headerSection: some View {
         Form {
             DatePicker("Date", selection: $vm.date, displayedComponents: .date)
+                .focused($focusedField, equals: .date)
+                .onKeyPress(.return) {
+                    focusedField = vm.lines.first.map { .line($0.id) }
+                    return .handled
+                }
             if !isContra {
                 AccountPicker(selection: $vm.partyAccountId,
                               accounts: vm.accounts,
@@ -264,19 +278,48 @@ private struct EditVoucherBody: View {
     }
 
     private func lineRow(line: Binding<VoucherEditViewModel.LineRow>) -> some View {
-        HStack {
-            AccountPicker(selection: line.accountId, accounts: vm.accounts)
+        let lineId = line.wrappedValue.id
+        return HStack {
+            AccountPicker(selection: line.accountId,
+                          accounts: vm.accounts,
+                          onCommitSelection: { focusedField = .amount(lineId) },
+                          isFocusedExternally: Binding(
+                              get: { focusedField == .line(lineId) },
+                              set: { if $0 { focusedField = .line(lineId) } }
+                          ))
             Picker("", selection: line.side) {
                 Text("Debit").tag(LedgerSide.debit)
                 Text("Credit").tag(LedgerSide.credit)
             }
             .frame(width: 110)
             .labelsHidden()
-            MoneyTextField(label: "", text: line.amount, onCommit: { vm.addLine() }).frame(width: 160)
-            Button { vm.removeLine(line.wrappedValue.id) } label: { Image(systemName: "minus.circle") }
+            MoneyTextField(label: "", text: line.amount, onCommit: {
+                advanceFocusAfterAmount(lineId: lineId)
+            }, isFocusedExternally: Binding(
+                get: { focusedField == .amount(lineId) },
+                set: { if $0 { focusedField = .amount(lineId) } }
+            ))
+                .frame(width: 160)
+            Button { vm.removeLine(lineId) } label: { Image(systemName: "minus.circle") }
                 .buttonStyle(.plain)
                 .disabled(vm.lines.count <= 2)
         }
+    }
+
+    /// Mirrors NewVoucherSheet's advanceFocusAfterAmount — grow the grid
+    /// only when this line is genuinely filled, then focus the next empty
+    /// line's ledger field (or the freshly-added one).
+    private func advanceFocusAfterAmount(lineId: UUID) {
+        guard let index = vm.lines.firstIndex(where: { $0.id == lineId }) else { return }
+        let filled = vm.lines[index].accountId != nil
+            && (Currency.parseRupeeInput(vm.lines[index].amount) ?? 0) != 0
+        guard filled else { return }
+        if let nextEmpty = vm.lines[(index + 1)...].first(where: { $0.accountId == nil }) {
+            focusedField = .line(nextEmpty.id)
+            return
+        }
+        vm.addLine()
+        if let newLine = vm.lines.last { focusedField = .line(newLine.id) }
     }
 
     private var validationSection: some View {
