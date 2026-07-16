@@ -70,11 +70,11 @@ public struct SettingsView: View {
             Section("Company Features") {
                 Toggle("Enable inventory", isOn: Binding(
                     get: { vm.company?.isInventoryEnabled ?? false },
-                    set: { vm.setInventoryEnabled($0) }
+                    set: { vm.setInventoryEnabled($0); env.refreshCompanyFlags() }
                 ))
                 Picker("Inventory link mode", selection: Binding(
                     get: { vm.company?.inventoryLinkMode ?? .manual },
-                    set: { vm.setInventoryLinkMode($0) }
+                    set: { vm.setInventoryLinkMode($0); env.refreshCompanyFlags() }
                 )) {
                     ForEach(InventoryLinkMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)

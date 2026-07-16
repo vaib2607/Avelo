@@ -101,7 +101,9 @@ public struct DashboardView: View {
             KPICard(title: "Month Sales",value: vm.monthSalesPaise,     accent: .purple)
             KPICard(title: "Month Purchases", value: vm.monthPurchasesPaise, accent: .pink)
             KPICard(title: "GST Payable",value: vm.gstPayablePaise,     accent: .red)
-            KPICard(title: "Stock Value",value: vm.stockValuePaise,     accent: .teal)
+            if env.companyContext?.isInventoryEnabled == true {
+                KPICard(title: "Stock Value",value: vm.stockValuePaise, accent: .teal)
+            }
         }
     }
 

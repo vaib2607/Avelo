@@ -37,7 +37,7 @@ public struct SidebarView: View {
                 .padding(.vertical, 4)
             }
             Section("Modules") {
-                ForEach(SidebarDestination.visibleCases) { dest in
+                ForEach(SidebarDestination.visibleCases(isInventoryEnabled: env.companyContext?.isInventoryEnabled ?? false)) { dest in
                     NavigationLink(value: dest) {
                         HStack {
                             Label(dest.title, systemImage: dest.systemImage)

@@ -408,6 +408,36 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertTrue(report.rows.isEmpty)
     }
 
+    // AVL-P0-033: stockValuation had no isInventoryEnabled gate at all
+    // (unlike its sibling stockAgeing above), so real stock value leaked
+    // into Reports and the Dashboard KPI even when disabled.
+    func testStockValuationReturnsNoOpRowsWhenInventoryIsDisabled() throws {
+        let tc = try TestCompany.make()
+        let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(
+            code: "RAW-2",
+            name: "Raw Material 2",
+            unit: "pcs"
+        )
+        try InventoryService(db: tc.db, companyId: tc.companyId).recordMovement(
+            itemId: item.id,
+            date: DateFormatters.parseDate("2024-04-01")!,
+            type: .stockIn,
+            quantity: 10,
+            ratePaise: 250,
+            notes: "Opening stock"
+        )
+        try tc.db.execute(
+            "UPDATE avelo_companies SET is_inventory_enabled = 0, inventory_link_mode = ? WHERE id = ?",
+            [.text(InventoryLinkMode.manual.rawValue), .text(tc.companyId.uuidString)]
+        )
+
+        let report = try ReportService(db: tc.db, companyId: tc.companyId).stockValuation(
+            asOfDate: DateFormatters.parseDate("2024-05-01")!
+        )
+        XCTAssertTrue(report.rows.isEmpty)
+        XCTAssertEqual(report.totalPaise, 0)
+    }
+
     func testStockValuationUsesAuthoritativeFifoCostingNotCallerStockOutRate() throws {
         let tc = try TestCompany.make()
         let inventory = InventoryService(db: tc.db, companyId: tc.companyId)

@@ -61,6 +61,7 @@ public struct RootView: View {
         .task {
             await env.bootstrap()
             keyboardBridge.attach(router: router)
+            keyboardBridge.attach(isInventoryEnabled: { [weak env] in env?.companyContext?.isInventoryEnabled ?? false })
         }
         .alert(item: Binding(
             get: { env.globalError },
@@ -149,7 +150,17 @@ public struct RootView: View {
         case .vouchers:  VouchersView()
         case .accounts:  AccountsView()
         case .reports:   ReportsView()
-        case .inventory: InventoryView()
+        case .inventory:
+            // AVL-P0-033 defense in depth: sidebar/menu/palette/keyboard
+            // already exclude Inventory when disabled, so this should be
+            // unreachable in normal use — but a stale route must not slip
+            // through to a half-broken screen.
+            if env.companyContext?.isInventoryEnabled == true {
+                InventoryView()
+            } else {
+                ContentUnavailableView("Inventory is disabled", systemImage: "shippingbox",
+                                       description: Text("Enable inventory for this company in Settings to use this module."))
+            }
         case .gst:       GSTView()
         case .payroll:   PayrollView()
         case .banking:   BankingView()
@@ -184,7 +195,13 @@ public struct RootView: View {
         case .editGroup(let id):    GroupMasterSheet(existing: id)
         case .newFinancialYear:     NewFinancialYearSheet()
         case .newEmployee:          NewEmployeeSheet()
-        case .newItem:              NewItemSheet()
+        case .newItem:
+            if env.companyContext?.isInventoryEnabled == true {
+                NewItemSheet()
+            } else {
+                ContentUnavailableView("Inventory is disabled", systemImage: "shippingbox",
+                                       description: Text("Enable inventory for this company in Settings first."))
+            }
         case .newCostCentre:        CostMasterSheet(kind: .costCentre)
         case .newCostCategory:      CostMasterSheet(kind: .costCategory)
         case .lockFinancialYear(let id): LockFinancialYearSheet(fyId: id)

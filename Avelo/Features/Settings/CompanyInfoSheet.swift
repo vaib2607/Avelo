@@ -82,6 +82,7 @@ public struct CompanyInfoSheet: View {
             updated.inventoryLinkMode = inventoryEnabled ? inventoryMode : .manual
             try CompanyService(db: ctx.database, companyId: ctx.companyId, manager: env.manager).update(updated)
             env.notifyDataChanged()
+            env.refreshCompanyFlags()
             env.showSuccess("Company information saved.")
             router.presentedSheet = nil
         } catch {

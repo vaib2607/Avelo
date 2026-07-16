@@ -259,11 +259,13 @@ public final class AppEnvironment {
             guard let fy = try fyRepo.findMostRecent(handle.companyId) else {
                 throw AppError.notFound("Financial year for company \(id.uuidString)")
             }
+            let inventoryEnabled = try CompanyRepository(db: handle.db).findById(handle.companyId)?.isInventoryEnabled ?? false
             self.companyContext = CompanyContext(
                 companyId: handle.companyId,
                 companyName: handle.companyName,
                 financialYear: fy,
-                database: handle.db
+                database: handle.db,
+                isInventoryEnabled: inventoryEnabled
             )
             self.accountTree = AccountTreeCache(companyId: handle.companyId, database: handle.db, financialYearId: fy.id)
             await self.accountTree?.reload()
@@ -288,7 +290,8 @@ public final class AppEnvironment {
                 companyId: ctx.companyId,
                 companyName: ctx.companyName,
                 financialYear: fy,
-                database: ctx.database
+                database: ctx.database,
+                isInventoryEnabled: ctx.isInventoryEnabled
             )
             accountTree = AccountTreeCache(companyId: ctx.companyId, database: ctx.database, financialYearId: fy.id)
             notifyDataChanged()
@@ -307,6 +310,22 @@ public final class AppEnvironment {
         } catch {
             globalError = AppError.wrap(error)
         }
+    }
+
+    /// Re-reads `Company.isInventoryEnabled` from the database and rebuilds
+    /// `companyContext` with it. Call after any write that flips the flag
+    /// (Settings' inventory toggle) so sidebar/menu/palette/keyboard gating
+    /// (AVL-P0-033) reacts immediately instead of only on next company open.
+    public func refreshCompanyFlags() {
+        guard let ctx = companyContext else { return }
+        let inventoryEnabled = ((try? CompanyRepository(db: ctx.database).findById(ctx.companyId)) ?? nil)?.isInventoryEnabled ?? false
+        companyContext = CompanyContext(
+            companyId: ctx.companyId,
+            companyName: ctx.companyName,
+            financialYear: ctx.financialYear,
+            database: ctx.database,
+            isInventoryEnabled: inventoryEnabled
+        )
     }
 
     public func closeCompany() {
@@ -372,12 +391,18 @@ public struct CompanyContext: Sendable {
     public let companyName: String
     public let financialYear: FinancialYear
     public let database: SQLiteDatabase
+    // AVL-P0-033: single source of truth for every UI surface (sidebar,
+    // menus, command palette, keyboard routing, dashboard) that must hide
+    // Inventory when this company has it disabled, instead of each surface
+    // re-reading Company from the database independently.
+    public let isInventoryEnabled: Bool
 
-    public init(companyId: Company.ID, companyName: String, financialYear: FinancialYear, database: SQLiteDatabase) {
+    public init(companyId: Company.ID, companyName: String, financialYear: FinancialYear, database: SQLiteDatabase, isInventoryEnabled: Bool = false) {
         self.companyId = companyId
         self.companyName = companyName
         self.financialYear = financialYear
         self.database = database
+        self.isInventoryEnabled = isInventoryEnabled
     }
 }
 

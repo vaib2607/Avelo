@@ -19,6 +19,7 @@ public final class KeyboardBridge {
     public var suppressedKeyFlash: String?
 
     private weak var router: AppRouter?
+    private var isInventoryEnabledProvider: () -> Bool = { false }
     private var flashGeneration: Int = 0
 
     public init() {}
@@ -40,6 +41,16 @@ public final class KeyboardBridge {
         self.router = router
     }
 
+    /// AVL-P0-033: Inventory shortcuts must no-op (not route through a
+    /// screen that no longer appears anywhere else) when disabled. A
+    /// closure rather than a stored `AppEnvironment` reference keeps this
+    /// class testable without constructing a full environment/company.
+    public func attach(isInventoryEnabled: @escaping () -> Bool) {
+        self.isInventoryEnabledProvider = isInventoryEnabled
+    }
+
+    private var isInventoryEnabled: Bool { isInventoryEnabledProvider() }
+
     public func dispatch(_ command: KeyboardCommand) {
         lastCommand = command
         switch command {
@@ -47,7 +58,7 @@ public final class KeyboardBridge {
         case .openAccounts:      router?.go(.accounts)
         case .openVouchers:      router?.go(.vouchers)
         case .openReports:       router?.go(.reports)
-        case .openInventory:     router?.go(.inventory)
+        case .openInventory:     if isInventoryEnabled { router?.go(.inventory) }
         case .openGST:           router?.go(.gst)
         case .openPayroll:       router?.go(.payroll)
         case .openBanking:       router?.go(.banking)
@@ -58,7 +69,7 @@ public final class KeyboardBridge {
             router?.present(sheet(for: type))
 
         case .newAccount:        router?.present(.newAccount)
-        case .newItem:           router?.present(.newItem)
+        case .newItem:           if isInventoryEnabled { router?.present(.newItem) }
         case .newEmployee:       router?.present(.newEmployee)
 
         case .commandPalette:    commandPaletteActive = true

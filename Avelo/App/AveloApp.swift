@@ -110,8 +110,10 @@ struct AveloApp: App {
                         .keyboardShortcut("3", modifiers: .command)
                     Button("Reports")   { environment.router.go(.reports) }
                         .keyboardShortcut("4", modifiers: .command)
-                    Button("Inventory") { environment.router.go(.inventory) }
-                        .keyboardShortcut("5", modifiers: .command)
+                    if environment.companyContext?.isInventoryEnabled == true {
+                        Button("Inventory") { environment.router.go(.inventory) }
+                            .keyboardShortcut("5", modifiers: .command)
+                    }
                     Button("GST")       { environment.router.go(.gst) }
                         .keyboardShortcut("6", modifiers: .command)
                     Button("Payroll")   { environment.router.go(.payroll) }
@@ -128,8 +130,10 @@ struct AveloApp: App {
                         .keyboardShortcut("a", modifiers: [.command, .shift])
                     Button("New Group…") { environment.router.present(.newGroup) }
                         .keyboardShortcut("g", modifiers: [.command, .shift])
-                    Button("New Item…") { environment.router.present(.newItem) }
-                        .keyboardShortcut("i", modifiers: [.command, .shift])
+                    if environment.companyContext?.isInventoryEnabled == true {
+                        Button("New Item…") { environment.router.present(.newItem) }
+                            .keyboardShortcut("i", modifiers: [.command, .shift])
+                    }
                     Button("New Employee…") { environment.router.present(.newEmployee) }
                         .keyboardShortcut("e", modifiers: [.command, .shift])
                     Button("New Financial Year…") { environment.router.present(.newFinancialYear) }
@@ -171,14 +175,18 @@ struct AveloApp: App {
                     Button("Payables") { environment.router.openReport(.payables) }
                         .keyboardShortcut("0", modifiers: [.command, .option])
                     Button("Outstanding") { environment.router.openReport(.outstanding) }
-                    Button("Stock Summary") { environment.router.openReport(.stockValuation) }
-                    Button("Stock Movement") { environment.router.openReport(.stockMovement) }
-                    Button("Stock Register") { environment.router.openReport(.stockRegister) }
+                    if environment.companyContext?.isInventoryEnabled == true {
+                        Button("Stock Summary") { environment.router.openReport(.stockValuation) }
+                        Button("Stock Movement") { environment.router.openReport(.stockMovement) }
+                        Button("Stock Register") { environment.router.openReport(.stockRegister) }
+                    }
                     Button("GST Filing Views") { environment.router.openReport(.gstFiling) }
                     Button("Cash Flow") { environment.router.openReport(.cashFlow) }
                         .keyboardShortcut("1", modifiers: [.command, .option, .shift])
-                    Button("Stock Ageing") { environment.router.openReport(.stockAgeing) }
-                        .keyboardShortcut("2", modifiers: [.command, .option, .shift])
+                    if environment.companyContext?.isInventoryEnabled == true {
+                        Button("Stock Ageing") { environment.router.openReport(.stockAgeing) }
+                            .keyboardShortcut("2", modifiers: [.command, .option, .shift])
+                    }
                 }
             }
         }

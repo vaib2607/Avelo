@@ -193,6 +193,12 @@ extension ReportRepository {
     // MARK: - Stock Valuation
 
     public func stockValuation(asOfDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.StockValuationReport {
+        // AVL-P0-033: unlike its sibling stockAgeing, this had no gate at
+        // all — real stock value leaked into Reports and the Dashboard KPI
+        // even when the company has inventory disabled.
+        guard try CompanyRepository(db: db).findById(filter.companyId)?.isInventoryEnabled == true else {
+            return ReportResult.StockValuationReport(asOfDate: asOfDate, rows: [])
+        }
         let inventory = InventoryRepository(db: db)
         let items = try inventory.listItemsForCompany(filter.companyId, includeInactive: false)
         guard !items.isEmpty else {

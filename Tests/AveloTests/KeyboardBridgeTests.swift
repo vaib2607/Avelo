@@ -8,6 +8,7 @@ final class KeyboardBridgeTests: XCTestCase {
         let router = AppRouter()
         let bridge = KeyboardBridge()
         bridge.attach(router: router)
+        bridge.attach(isInventoryEnabled: { true })
 
         bridge.dispatch(.openInventory)
         XCTAssertEqual(router.selection, .inventory)
@@ -20,6 +21,22 @@ final class KeyboardBridgeTests: XCTestCase {
 
         bridge.dispatch(.openBanking)
         XCTAssertEqual(router.selection, .banking)
+    }
+
+    // AVL-P0-033: inventory keyboard shortcuts must no-op, not route to a
+    // screen that no longer appears anywhere else, when the company has
+    // inventory disabled.
+    func testDispatchSuppressesInventoryCommandsWhenDisabled() {
+        let router = AppRouter()
+        let bridge = KeyboardBridge()
+        bridge.attach(router: router)
+        bridge.attach(isInventoryEnabled: { false })
+
+        bridge.dispatch(.openInventory)
+        XCTAssertEqual(router.selection, .dashboard)
+
+        bridge.dispatch(.newItem)
+        XCTAssertNil(router.presentedSheet)
     }
 
     func testDispatchRoutesExistingShellCommands() {
