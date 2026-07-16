@@ -9,6 +9,20 @@ This is the human-readable progress checklist for Avelo. It complements:
 
 Checkboxes show evidence, not aspiration: `[x]` means implemented with recorded automated evidence, not necessarily release-accepted; `[ ]` still needs implementation, re-verification, or human acceptance. A feature is not release-ready until current-worktree automated proof and every required accountant, operator, keyboard, accessibility, visual, and distribution gate are complete.
 
+## 0. Current worktree — evidence recorded on 2026-07-15
+
+The worktree is intentionally uncommitted. No commit, tag, or release artifact has been created by this pass.
+
+- [x] Stabilized high-volume voucher posting: transaction-scoped draft validation, bounded multi-row voucher/ledger/audit inserts, and contiguous HMAC audit-chain batching now preserve per-voucher accounting and rollback semantics while removing the prior encrypted batch-post performance regression.
+- [x] Added audit-chain safeguards and regression coverage: checked sequence arithmetic, one-company batch validation, duplicate-event rollback, cross-chunk continuity, and post-failure next-sequence checks.
+- [x] Added voucher-batch regression coverage for inactive accounts, locked financial years, cash/bank eligibility, and chunk rollback behavior.
+- [x] Fixed the headless backup-cleanup test to use `InMemoryCompanyKeyStore`, matching the rest of the test suite and avoiding a real-Keychain `SecItemAdd` block during legacy-key migration. The focused test passed in 0.300s.
+- [x] Targeted audit/voucher regression command passed: 54 tests, 0 failures.
+- [x] All opt-in `PerformanceBenchmarkTests` passed: account-tree reload 0.094s; encrypted post-batch 10k 5.246s (limit 9.037s); encrypted post-batch 100k 98.944s (limit 106.381s); encrypted 50k reporting checks passed.
+- [x] `git diff --check` passed for the current tracked diff.
+- [ ] Re-run the normal full suite from this final worktree. A first run exposed the real-Keychain test dependency above; after the targeted fix passed, the restart was blocked by the execution environment's credit limit before it could begin.
+- [ ] Re-run the rule audit, release-candidate build/bundle self-test, launch smoke, GUI launch, and standard + million-scale benchmarks from this final worktree.
+
 ## 1. Foundation and safety — implemented; release acceptance pending
 
 - [x] Native macOS app built with SwiftUI and SwiftPM.
@@ -44,19 +58,20 @@ Checkboxes show evidence, not aspiration: `[x]` means implemented with recorded 
 - [x] Sales/purchase order services and basic UI.
 - [x] Cheque register, bounce, and re-presentation UI.
 - [x] BOM recipe persistence, circular-BOM rejection, list/edit UI, and repository/service coverage (recipe setup only; not manufacturing execution).
-- [ ] Harden BOM recipe setup before calling it release-ready: exact quantities, explicit create-versus-update, duplicate-component guards, atomic cycle validation, audit records, and archive/load error handling.
+- [x] Hardened BOM recipe setup: exact quantities, explicit create-versus-update, duplicate-component guards, atomic cycle validation, audit records, and archive/load error handling are implemented and covered. Manufacturing execution remains a later workflow.
 - [x] Bank statement CSV import and baseline reconciliation flow.
 - [x] Payroll employees, salary entries, salary vouchers, and payroll register.
 - [ ] `AVL-P0-033`: enforce the accounting-only capability boundary: when inventory is disabled, remove Inventory from sidebar, menus, command palette, quick search, keyboard routing, and sheets, and reject direct/deep-link entry consistently.
 - [ ] `AVL-P0-035`: complete or hide ledger-voucher `autoPrompt` and `autoSilent`. Prompt mode must collect explicit item/quantity/direction/cost inputs; silent mode cannot ship without deterministic mapping, consent, reversal, valuation, and audit proof. Never infer an item from an account name.
 - [ ] `AVL-P0-020`: enforce one voucher keyboard contract—plain Return advances/adds a line, Command-Return posts/saves, Tab/Shift-Tab traverse predictably, and create/edit/help mappings agree.
-- [ ] Close the remaining voucher-entry blockers: type-checkable UI composition, single-entry duplicate/recovery, account-creation eligibility plus domain invariants, robust `Alt+C`, and accessible narration recall.
-- [ ] Complete the active voucher/BOM worktree and rerun its focused and full regression suites.
+- [x] Resolved the active voucher-entry blockers: type-checkable UI composition, single-entry duplicate/recovery, account-creation eligibility plus domain invariants, robust `Alt+C`, and accessible narration recall.
+- [x] Completed the active voucher/BOM implementation worktree and its targeted regression coverage.
+- [ ] Complete the final-worktree full regression and release proof suite; see Section 0 for the specific blocked reruns.
 - [ ] Confirm the new voucher account-creation, narration-recall, item-mode, and BOM flows manually in the bundled app.
 
 ## 4. v1.1 release gate — do next, in this order
 
-1. [ ] Re-run automated proof after the active worktree is settled: relevant targeted tests through `./Scripts/swiftw.sh test --filter ...`, `make test`, `make rc-local`, same-machine benchmark checks, and `make launch-smoke`. Record the commit/worktree identity and all skipped tests. The current launch-smoke target validates/self-tests the bundle; separately launch the GUI with `open dist/Avelo.app` in a normal session.
+1. [ ] Finish current-worktree automated proof. Targeted audit/voucher tests, the focused backup-cleanup test, and all opt-in performance tests passed on 2026-07-15; the normal full-suite restart, `make rule-audit`, `make rc-local`, same-machine benchmark checks, `make launch-smoke`, and GUI launch must still be completed after the final test-harness fix. Record the commit/worktree identity and all skipped tests. The current launch-smoke target validates/self-tests the bundle; separately launch the GUI with `open dist/Avelo.app` in a normal session.
 2. [ ] Run accountant acceptance for invoice rounding, bill settlement, cheque bounce/re-presentation, BOM handling, valuation, backdated stock corrections, trial balance, cancellation, and year close/reopen.
 3. [ ] Run operator acceptance for company create/restore, corrupt database recovery, iCloud-exclusion policy, migrations, App Nap/sleep behavior, and statement-resource cleanup.
 4. [ ] Run keyboard-entry acceptance for Tab, Shift-Tab, Return, validation failures, line insertion, and Tally shortcut routing.

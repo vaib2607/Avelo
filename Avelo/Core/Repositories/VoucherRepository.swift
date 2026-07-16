@@ -147,36 +147,60 @@ public struct VoucherRepository: Sendable {
     }
 
     public func insert(_ voucher: Voucher) throws {
-        try db.execute(
-            """
-            INSERT INTO avelo_vouchers
-            (id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
-             narration, status, is_reversal, reversal_of_id, cancelled_at, cancelled_by, cancellation_reason,
-             cancellation_voucher_id, is_posted, total_paise, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                .text(voucher.id.uuidString),
-                .text(voucher.companyId.uuidString),
-                .text(voucher.financialYearId.uuidString),
-                .text(voucher.voucherTypeCode.rawValue),
-                .text(voucher.number),
-                .date(voucher.date),
-                .optionalText(voucher.partyAccountId?.uuidString),
-                .text(voucher.narration),
-                .text(voucher.status.rawValue),
-                .bool(voucher.isReversal),
-                .optionalText(voucher.reversalOfId?.uuidString),
-                .optionalTimestamp(voucher.cancelledAt),
-                .optionalText(voucher.cancelledBy),
-                .optionalText(voucher.cancellationReason),
-                .optionalText(voucher.cancellationVoucherId?.uuidString),
-                .bool(voucher.isPosted),
-                .integer(voucher.totalPaise),
-                .timestamp(voucher.createdAt),
-                .timestamp(voucher.updatedAt)
-            ]
-        )
+        try insertBatch([voucher])
+    }
+
+    /// Keeps each statement below SQLite's conservative 999-parameter
+    /// default while avoiding one statement execution per voucher during a
+    /// bulk post.
+    public func insertBatch(_ vouchers: [Voucher]) throws {
+        let maximumRowsPerStatement = 47 // 47 rows * 19 columns = 893 bindings
+        var start = vouchers.startIndex
+        while start < vouchers.endIndex {
+            let end = vouchers.index(start, offsetBy: maximumRowsPerStatement, limitedBy: vouchers.endIndex) ?? vouchers.endIndex
+            let rowPlaceholder = "(" + Array(repeating: "?", count: 19).joined(separator: ", ") + ")"
+            let values = Array(repeating: rowPlaceholder, count: vouchers.distance(from: start, to: end)).joined(separator: ", ")
+            var bindings: [SQLValue] = []
+            bindings.reserveCapacity(vouchers.distance(from: start, to: end) * 19)
+            for voucher in vouchers[start..<end] {
+                bindings.append(contentsOf: Self.insertBindings(for: voucher))
+            }
+            try db.execute(
+                """
+                INSERT INTO avelo_vouchers
+                (id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
+                 narration, status, is_reversal, reversal_of_id, cancelled_at, cancelled_by, cancellation_reason,
+                 cancellation_voucher_id, is_posted, total_paise, created_at, updated_at)
+                VALUES \(values)
+                """,
+                bindings
+            )
+            start = end
+        }
+    }
+
+    private static func insertBindings(for voucher: Voucher) -> [SQLValue] {
+        [
+            .text(voucher.id.uuidString),
+            .text(voucher.companyId.uuidString),
+            .text(voucher.financialYearId.uuidString),
+            .text(voucher.voucherTypeCode.rawValue),
+            .text(voucher.number),
+            .date(voucher.date),
+            .optionalText(voucher.partyAccountId?.uuidString),
+            .text(voucher.narration),
+            .text(voucher.status.rawValue),
+            .bool(voucher.isReversal),
+            .optionalText(voucher.reversalOfId?.uuidString),
+            .optionalTimestamp(voucher.cancelledAt),
+            .optionalText(voucher.cancelledBy),
+            .optionalText(voucher.cancellationReason),
+            .optionalText(voucher.cancellationVoucherId?.uuidString),
+            .bool(voucher.isPosted),
+            .integer(voucher.totalPaise),
+            .timestamp(voucher.createdAt),
+            .timestamp(voucher.updatedAt)
+        ]
     }
 
     public func update(_ voucher: Voucher) throws {

@@ -21,26 +21,41 @@ public struct LedgerLineRepository: Sendable {
     }
 
     public func insertBatch(_ lines: [LedgerLine]) throws {
-        for line in lines {
+        let maximumRowsPerStatement = 99 // 99 rows * 9 columns = 891 bindings
+        var start = lines.startIndex
+        while start < lines.endIndex {
+            let end = lines.index(start, offsetBy: maximumRowsPerStatement, limitedBy: lines.endIndex) ?? lines.endIndex
+            let rowPlaceholder = "(" + Array(repeating: "?", count: 9).joined(separator: ", ") + ")"
+            let values = Array(repeating: rowPlaceholder, count: lines.distance(from: start, to: end)).joined(separator: ", ")
+            var bindings: [SQLValue] = []
+            bindings.reserveCapacity(lines.distance(from: start, to: end) * 9)
+            for line in lines[start..<end] {
+                bindings.append(contentsOf: Self.insertBindings(for: line))
+            }
             try db.execute(
                 """
                 INSERT INTO avelo_ledger_lines
                 (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES \(values)
                 """,
-                [
-                    .text(line.id.uuidString),
-                    .text(line.companyId.uuidString),
-                    .text(line.voucherId.uuidString),
-                    .text(line.accountId.uuidString),
-                    .integer(line.amountPaise),
-                    .text(line.side.rawValue),
-                    .optionalText(line.taxCode),
-                    .optionalText(line.costCenter),
-                    .integer(Int64(line.lineOrder))
-                ]
+                bindings
             )
+            start = end
         }
+    }
+
+    private static func insertBindings(for line: LedgerLine) -> [SQLValue] {
+        [
+            .text(line.id.uuidString),
+            .text(line.companyId.uuidString),
+            .text(line.voucherId.uuidString),
+            .text(line.accountId.uuidString),
+            .integer(line.amountPaise),
+            .text(line.side.rawValue),
+            .optionalText(line.taxCode),
+            .optionalText(line.costCenter),
+            .integer(Int64(line.lineOrder))
+        ]
     }
 
     public func deleteForVoucher(_ voucherId: Voucher.ID) throws {

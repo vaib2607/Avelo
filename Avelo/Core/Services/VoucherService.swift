@@ -123,8 +123,14 @@ public final class VoucherService: Sendable {
                 let vRepo = VoucherRepository(db: db)
                 let lRepo = LedgerLineRepository(db: db)
                 let accountRepo = AccountRepository(db: db)
+                let validator = VoucherDraftValidator(db: db, fiscalLockChecker: fiscalLockChecker)
+                let validationContext = try validator.makeBatchContext(companyId: companyId)
                 var accountIdsToMark = Set<Account.ID>()
                 var numbersByType: [VoucherType.Code: Array<String>.Iterator] = [:]
+                var auditRecords: [AuditService.Record] = []
+                auditRecords.reserveCapacity(drafts[index..<end].count)
+                var chunkLines: [LedgerLine] = []
+                chunkLines.reserveCapacity(drafts[index..<end].count * 2)
                 for typeCode in Set(drafts[index..<end].map(\.voucherTypeCode)) {
                     let count = drafts[index..<end].filter { $0.voucherTypeCode == typeCode }.count
                     numbersByType[typeCode] = try sequenceRepo.nextNumbers(
@@ -136,7 +142,12 @@ public final class VoucherService: Sendable {
                 }
                 for draft in drafts[index..<end] {
                     let normalizedDraft = try normalizedDraftForPosting(draft, accountRepo: accountRepo)
-                    let result = try validate(draft: normalizedDraft, in: fy)
+                    let result = validator.validate(
+                        normalizedDraft,
+                        companyId: companyId,
+                        financialYearId: fy.id,
+                        batchContext: validationContext
+                    )
                     if case .invalid(let errs) = result {
                         throw AppError.validation(errs[0])
                     }
@@ -179,16 +190,18 @@ public final class VoucherService: Sendable {
                         createdAt: now,
                         updatedAt: now
                     )
-                    try vRepo.insert(voucher)
-                    try lRepo.insertBatch(lines)
-                    try AuditService(db: db, companyId: companyId).record(
+                    auditRecords.append(.init(
                         action: .voucherPosted,
                         entityType: "voucher",
                         entityId: voucher.id.uuidString,
                         snapshotAfter: VoucherAuditSnapshot(voucher: voucher, lines: lines)
-                    )
+                    ))
                     chunkVouchers.append(voucher)
+                    chunkLines.append(contentsOf: lines)
                 }
+                try vRepo.insertBatch(chunkVouchers)
+                try lRepo.insertBatch(chunkLines)
+                try audit.recordBatch(auditRecords)
                 try accountRepo.markUsedBatch(accountIdsToMark)
             }
             for voucher in chunkVouchers {

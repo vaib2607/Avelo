@@ -101,7 +101,10 @@ final class Phase6HardeningTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = try DatabaseManager(appSupportDirectory: root)
+        let manager = try DatabaseManager(
+            appSupportDirectory: root,
+            keyStore: InMemoryCompanyKeyStore()
+        )
         let companyId = UUID()
         let sourceURL = root.appendingPathComponent("Companies", isDirectory: true)
             .appendingPathComponent("backup-cleanup.sqlite")

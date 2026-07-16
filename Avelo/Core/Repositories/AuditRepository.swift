@@ -9,30 +9,69 @@ public struct AuditRepository: Sendable {
     }
 
     public func append(_ event: AuditEvent) throws {
-        let chain = try AuditChainIntegrity(db: db).nextState(for: event)
-        try db.execute(
-            """
-            INSERT INTO avelo_audit_events
-            (id, company_id, timestamp, actor, action, entity_type, entity_id,
-             snapshot_before_json, snapshot_after_json, reason, sequence_number, previous_chain_hmac, chain_hmac)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                .text(event.id.uuidString),
-                .text(event.companyId.uuidString),
-                .timestamp(event.timestamp),
-                .text(event.actor),
-                .text(event.action.rawValue),
-                .text(event.entityType),
-                .text(event.entityId),
-                .optionalText(event.snapshotBeforeJson),
-                .optionalText(event.snapshotAfterJson),
-                .optionalText(event.reason),
-                .integer(chain.sequenceNumber),
-                .optionalText(chain.previousChainHMAC),
-                .text(chain.chainHMAC)
-            ]
-        )
+        try appendBatch([event])
+    }
+
+    /// Appends one company's events as one atomic, consecutive audit-chain
+    /// segment. Callers already inside `SQLiteDatabase.write` remain in that
+    /// transaction; direct callers receive an atomic write of their own.
+    public func appendBatch(_ events: [AuditEvent]) throws {
+        guard let companyId = events.first?.companyId else { return }
+        guard events.allSatisfy({ $0.companyId == companyId }) else {
+            throw AppError.businessRule("Audit batches may contain events for only one company.")
+        }
+        try db.write { _ in
+            var appender = try AuditChainIntegrity(db: db).makeBatchAppender(for: companyId)
+            var rows: [(event: AuditEvent, chain: AuditChainIntegrity.AppendState)] = []
+            rows.reserveCapacity(events.count)
+            for event in events {
+                rows.append((event, try appender.nextState(for: event)))
+            }
+            try insertBatch(rows)
+        }
+    }
+
+    private func insertBatch(_ rows: [(event: AuditEvent, chain: AuditChainIntegrity.AppendState)]) throws {
+        let maximumRowsPerStatement = 69 // 69 rows * 13 columns = 897 bindings
+        var start = rows.startIndex
+        while start < rows.endIndex {
+            let end = rows.index(start, offsetBy: maximumRowsPerStatement, limitedBy: rows.endIndex) ?? rows.endIndex
+            let rowPlaceholder = "(" + Array(repeating: "?", count: 13).joined(separator: ", ") + ")"
+            let values = Array(repeating: rowPlaceholder, count: rows.distance(from: start, to: end)).joined(separator: ", ")
+            var bindings: [SQLValue] = []
+            bindings.reserveCapacity(rows.distance(from: start, to: end) * 13)
+            for row in rows[start..<end] {
+                bindings.append(contentsOf: Self.insertBindings(event: row.event, chain: row.chain))
+            }
+            try db.execute(
+                """
+                INSERT INTO avelo_audit_events
+                (id, company_id, timestamp, actor, action, entity_type, entity_id,
+                 snapshot_before_json, snapshot_after_json, reason, sequence_number, previous_chain_hmac, chain_hmac)
+                VALUES \(values)
+                """,
+                bindings
+            )
+            start = end
+        }
+    }
+
+    private static func insertBindings(event: AuditEvent, chain: AuditChainIntegrity.AppendState) -> [SQLValue] {
+        [
+            .text(event.id.uuidString),
+            .text(event.companyId.uuidString),
+            .timestamp(event.timestamp),
+            .text(event.actor),
+            .text(event.action.rawValue),
+            .text(event.entityType),
+            .text(event.entityId),
+            .optionalText(event.snapshotBeforeJson),
+            .optionalText(event.snapshotAfterJson),
+            .optionalText(event.reason),
+            .integer(chain.sequenceNumber),
+            .optionalText(chain.previousChainHMAC),
+            .text(chain.chainHMAC)
+        ]
     }
 
     public func verifyIntegrity(companyId: Company.ID) throws {

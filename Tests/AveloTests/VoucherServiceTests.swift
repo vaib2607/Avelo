@@ -118,6 +118,76 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.2, 25)
     }
 
+    func testPostBatchMaintainsContinuousAuditChainAcrossChunks() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let drafts = (0..<501).map { i in
+            tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1_000 + Int64(i), .debit),
+                tc.line(tc.salesId, 1_000 + Int64(i), .credit)
+            ])
+        }
+
+        let results = try svc.postBatch(drafts, in: tc.fy)
+        let audit = AuditRepository(db: tc.db)
+        let events = try audit.list(filter: .init(companyId: tc.companyId, action: .voucherPosted, limit: 600))
+
+        XCTAssertEqual(results.count, 501)
+        XCTAssertEqual(events.count, 501)
+        XCTAssertEqual(Set(events.map(\.entityId)), Set(results.map { $0.voucher.id.uuidString }))
+        XCTAssertNoThrow(try audit.verifyIntegrity(companyId: tc.companyId))
+    }
+
+    func testPostBatchRejectsInactiveAccountsFromTransactionSnapshot() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        try AccountService(db: tc.db, companyId: tc.companyId).disableAccount(tc.salesId)
+
+        XCTAssertThrowsError(try svc.postBatch([
+            tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1_000, .debit),
+                tc.line(tc.salesId, 1_000, .credit)
+            ])
+        ], in: tc.fy)) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected AppError.validation, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .voucherAccountInactive)
+        }
+    }
+
+    func testPostBatchRejectsLockedFinancialYearFromTransactionSnapshot() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        try FinancialYearRepository(db: tc.db).lock(tc.fy.id)
+
+        XCTAssertThrowsError(try svc.postBatch([
+            tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1_000, .debit),
+                tc.line(tc.salesId, 1_000, .credit)
+            ])
+        ], in: tc.fy)) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected AppError.validation, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .voucherFYLocked)
+        }
+    }
+
+    func testPostBatchPreservesSingleEntryCashBankEligibility() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+
+        let results = try svc.postBatch([
+            tc.draft(type: .payment, on: "2024-06-01", lines: [
+                tc.line(tc.salesId, 1_000, .debit),
+                tc.line(tc.cashId, 1_000, .credit)
+            ])
+        ], in: tc.fy)
+
+        XCTAssertEqual(results.count, 1)
+    }
+
     func testPostBatchRollsBackOnlyCurrentChunkOnFailure() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -153,6 +223,21 @@ final class VoucherServiceTests: XCTestCase {
         let lineCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_ledger_lines") { $0.int(0) } ?? 0
         XCTAssertEqual(voucherCount, 500)
         XCTAssertEqual(lineCount, 1000)
+
+        let audit = AuditRepository(db: tc.db)
+        let auditEvents = try audit.list(filter: .init(companyId: tc.companyId, action: .voucherPosted, limit: 600))
+        XCTAssertEqual(auditEvents.count, 500)
+        XCTAssertNoThrow(try audit.verifyIntegrity(companyId: tc.companyId))
+
+        let next = try svc.post(draft: tc.draft(on: "2024-06-05", lines: [
+            tc.line(tc.cashId, 4_000, .debit),
+            tc.line(tc.salesId, 4_000, .credit)
+        ]), in: tc.fy)
+        let nextSequence = try tc.db.queryOne(
+            "SELECT sequence_number FROM avelo_audit_events WHERE entity_id = ?",
+            bind: [.text(next.voucher.id.uuidString)]
+        ) { $0.int("sequence_number") }
+        XCTAssertEqual(nextSequence, 501)
     }
 
     func testUnbalancedPostThrows() throws {

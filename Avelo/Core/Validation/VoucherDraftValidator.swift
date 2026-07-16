@@ -2,6 +2,42 @@ import Foundation
 
 public struct VoucherDraftValidator: Sendable {
 
+    /// A transaction-scoped snapshot used by bulk posting. It eliminates
+    /// repeated reads without changing the validation data or decisions: the
+    /// caller creates it inside the same write transaction that posts the
+    /// vouchers, so financial-year and account state cannot change beneath
+    /// the batch.
+    struct BatchContext: Sendable {
+        private let financialYears: [FinancialYear]
+        private let accountActivityById: [Account.ID: Bool]
+        let cashOrBankAccountIDs: Set<Account.ID>
+
+        init(financialYears: [FinancialYear],
+             accountActivityById: [Account.ID: Bool],
+             cashOrBankAccountIDs: Set<Account.ID>) {
+            self.financialYears = financialYears
+            self.accountActivityById = accountActivityById
+            self.cashOrBankAccountIDs = cashOrBankAccountIDs
+        }
+
+        func financialYearId(containing date: Date) throws -> FinancialYear.ID? {
+            let matches = financialYears.filter { $0.contains(date: date) }
+            if matches.count > 1 {
+                let labels = matches.map(\.label).joined(separator: ", ")
+                throw AppError.businessRule("Overlapping financial years make date lookup ambiguous: \(labels)")
+            }
+            return matches.first?.id
+        }
+
+        func isLocked(financialYearId: FinancialYear.ID) -> Bool {
+            financialYears.first(where: { $0.id == financialYearId })?.isLocked ?? false
+        }
+
+        func isAccountActive(_ id: Account.ID) -> Bool {
+            accountActivityById[id] ?? false
+        }
+    }
+
     public let db: SQLiteDatabase
     public let fiscalLockChecker: FiscalLockChecker
 
@@ -10,11 +46,43 @@ public struct VoucherDraftValidator: Sendable {
         self.fiscalLockChecker = fiscalLockChecker
     }
 
+    func makeBatchContext(companyId: Company.ID) throws -> BatchContext {
+        let financialYears = try FinancialYearRepository(db: db).listForCompany(companyId)
+        let accounts = try AccountRepository(db: db).listForCompany(companyId)
+        let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
+        let groupCodesByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0.code) })
+        let accountActivityById = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0.isActive) })
+        let cashOrBankAccountIDs = Set(accounts.lazy.filter {
+            isCashOrBank($0, groupCodesByID: groupCodesByID)
+        }.map(\.id))
+        return BatchContext(
+            financialYears: financialYears,
+            accountActivityById: accountActivityById,
+            cashOrBankAccountIDs: cashOrBankAccountIDs
+        )
+    }
+
     public func validate(_ draft: VoucherDraft,
                          companyId: Company.ID,
                          financialYearId: FinancialYear.ID,
                          existingVoucherId: Voucher.ID? = nil,
                          isSystemReversal: Bool = false) -> ValidationResult {
+        validate(
+            draft,
+            companyId: companyId,
+            financialYearId: financialYearId,
+            existingVoucherId: existingVoucherId,
+            isSystemReversal: isSystemReversal,
+            batchContext: nil
+        )
+    }
+
+    func validate(_ draft: VoucherDraft,
+                  companyId: Company.ID,
+                  financialYearId: FinancialYear.ID,
+                  existingVoucherId: Voucher.ID? = nil,
+                  isSystemReversal: Bool = false,
+                  batchContext: BatchContext?) -> ValidationResult {
         var errors: [ValidationError] = []
 
         let filled = draft.filledLines
@@ -131,7 +199,11 @@ public struct VoucherDraftValidator: Sendable {
         // fiscal-year, and account checks below.
         if filled.count >= 2 && !isSystemReversal {
             do {
-                errors += try singleEntryVoucherErrors(for: draft, companyId: companyId)
+                errors += try singleEntryVoucherErrors(
+                    for: draft,
+                    companyId: companyId,
+                    cashOrBankAccountIDs: batchContext?.cashOrBankAccountIDs
+                )
             } catch {
                 errors.append(ValidationError(
                     code: .internal,
@@ -142,7 +214,13 @@ public struct VoucherDraftValidator: Sendable {
         }
 
         do {
-            if let fyId = try fyIdForDate(draft.date, companyId: companyId) {
+            let fyId: FinancialYear.ID?
+            if let batchContext {
+                fyId = try batchContext.financialYearId(containing: draft.date)
+            } else {
+                fyId = try fyIdForDate(draft.date, companyId: companyId)
+            }
+            if let fyId {
                 if fyId != financialYearId {
                     errors.append(ValidationError(
                         code: .voucherDateOutsideFY,
@@ -166,7 +244,13 @@ public struct VoucherDraftValidator: Sendable {
         }
 
         do {
-            if try fiscalLockChecker.isLocked(financialYearId: financialYearId) {
+            let isLocked: Bool
+            if let batchContext {
+                isLocked = batchContext.isLocked(financialYearId: financialYearId)
+            } else {
+                isLocked = try fiscalLockChecker.isLocked(financialYearId: financialYearId)
+            }
+            if isLocked {
                 errors.append(ValidationError(
                     code: .voucherFYLocked,
                     field: "date",
@@ -187,7 +271,13 @@ public struct VoucherDraftValidator: Sendable {
             for line in filled {
                 if let acc = line.accountId {
                     do {
-                        if try isAccountActive(acc, companyId: companyId) == false {
+                        let isActive: Bool
+                        if let batchContext {
+                            isActive = batchContext.isAccountActive(acc)
+                        } else {
+                            isActive = try isAccountActive(acc, companyId: companyId)
+                        }
+                        if !isActive {
                             errors.append(ValidationError(
                                 code: .voucherAccountInactive,
                                 field: "lines",
@@ -221,17 +311,23 @@ public struct VoucherDraftValidator: Sendable {
     }
 
     private func singleEntryVoucherErrors(for draft: VoucherDraft,
-                                          companyId: Company.ID) throws -> [ValidationError] {
+                                          companyId: Company.ID,
+                                          cashOrBankAccountIDs cachedCashOrBankAccountIDs: Set<Account.ID>? = nil) throws -> [ValidationError] {
         guard [.payment, .receipt, .contra].contains(draft.voucherTypeCode) else {
             return []
         }
 
-        let accounts = try AccountRepository(db: db).listForCompany(companyId)
-        let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
-        let groupCodesByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0.code) })
-        let cashOrBankAccountIDs = Set(accounts.lazy.filter {
-            isCashOrBank($0, groupCodesByID: groupCodesByID)
-        }.map(\.id))
+        let cashOrBankAccountIDs: Set<Account.ID>
+        if let cachedCashOrBankAccountIDs {
+            cashOrBankAccountIDs = cachedCashOrBankAccountIDs
+        } else {
+            let accounts = try AccountRepository(db: db).listForCompany(companyId)
+            let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
+            let groupCodesByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0.code) })
+            cashOrBankAccountIDs = Set(accounts.lazy.filter {
+                isCashOrBank($0, groupCodesByID: groupCodesByID)
+            }.map(\.id))
+        }
         let lines = draft.filledLines
         let cashOrBankLines = lines.filter {
             $0.accountId.map { cashOrBankAccountIDs.contains($0) } ?? false
