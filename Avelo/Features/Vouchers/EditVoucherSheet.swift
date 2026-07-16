@@ -276,6 +276,15 @@ private struct EditVoucherBody: View {
         }
     }
 
+    /// Always responds to the Save button/⌘Return: saves if valid, otherwise
+    /// re-validates so `validationSection` below surfaces exactly what's
+    /// missing instead of the button silently doing nothing.
+    private func attemptSave() {
+        vm.revalidate()
+        guard vm.canPost else { return }
+        onSave(vm)
+    }
+
     private var totalsSection: some View {
         let difference = (try? CheckedMath.subtract(vm.totalDebitPaise, vm.totalCreditPaise, context: "calculating edit voucher sheet difference")) ?? 0
         return HStack {
@@ -291,10 +300,14 @@ private struct EditVoucherBody: View {
         HStack {
             Spacer()
             Button("Cancel") { router.presentedSheet = nil }.keyboardShortcut(.cancelAction)
-            Button("Save") { onSave(vm) }
-                .keyboardShortcut(.defaultAction)
+            // Not gated on `vm.canPost` — same fix as NewVoucherSheet's Post
+            // button (see its comment): a disabled button swallows both the
+            // click and the keyboard shortcut with zero feedback. `⌘Return`
+            // instead of plain Return avoids colliding with MoneyTextField's
+            // own onSubmit-adds-a-line behavior on the line grid above.
+            Button("Save") { attemptSave() }
+                .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
-                .disabled(!vm.canPost)
         }
         .padding(16)
     }
