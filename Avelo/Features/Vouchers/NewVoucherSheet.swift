@@ -128,6 +128,15 @@ private struct NewVoucherEditor: View {
     }
 }
 
+/// Drives the Tally-style Enter cascade: Date -> Account/first line ledger ->
+/// its amount -> next blank line's ledger -> ... -> Narration.
+private enum VoucherField: Hashable {
+    case date
+    case accountLedger
+    case line(UUID)
+    case amount(UUID)
+}
+
 @MainActor
 private struct NewVoucherBody: View {
     @Bindable var vm: VoucherEditViewModel
@@ -141,6 +150,7 @@ private struct NewVoucherBody: View {
     @State private var accountCreationEligibility: (Account) -> Bool = { _ in true }
     @State private var accountIDsBeforeCreation: Set<Account.ID> = []
     @State private var accountCreationRouter = AppRouter()
+    @FocusState private var focusedField: VoucherField?
 
     var body: some View {
         editorContent
@@ -322,6 +332,11 @@ private struct NewVoucherBody: View {
     private var headerSection: some View {
         Form {
             DatePicker("Date", selection: $vm.date, displayedComponents: .date)
+                .focused($focusedField, equals: .date)
+                .onKeyPress(.return) {
+                    focusedField = vm.singleEntryMode ? .accountLedger : (vm.lines.first.map { .line($0.id) })
+                    return .handled
+                }
             // Tally's Contra has no party or bill reference — only fund
             // movement between cash/bank ledgers.
             if !isContra {
@@ -384,7 +399,14 @@ private struct NewVoucherBody: View {
                                       for: .accountLedger,
                                       eligibility: accountLedgerEligibility
                                   )
-                              })
+                              },
+                              onCommitSelection: {
+                                  if let firstLineId = vm.lines.first?.id { focusedField = .line(firstLineId) }
+                              },
+                              isFocusedExternally: Binding(
+                                  get: { focusedField == .accountLedger },
+                                  set: { if $0 { focusedField = .accountLedger } }
+                              ))
                 Text(vm.accountSide == .debit ? "This ledger will be debited." : "This ledger will be credited.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -457,16 +479,22 @@ private struct NewVoucherBody: View {
     }
 
     private func lineRow(line: Binding<VoucherEditViewModel.LineRow>) -> some View {
-        HStack {
+        let lineId = line.wrappedValue.id
+        return HStack {
             AccountPicker(selection: line.accountId,
                           accounts: vm.accounts,
                           filter: particularsFilter,
                           onCreate: {
                               beginAccountCreation(
-                                  for: .line(line.wrappedValue.id),
+                                  for: .line(lineId),
                                   eligibility: particularsFilter
                               )
-                          })
+                          },
+                          onCommitSelection: { focusedField = .amount(lineId) },
+                          isFocusedExternally: Binding(
+                              get: { focusedField == .line(lineId) },
+                              set: { if $0 { focusedField = .line(lineId) } }
+                          ))
             if !vm.singleEntryMode {
                 Picker("", selection: line.side) {
                     Text("Debit").tag(LedgerSide.debit)
@@ -476,22 +504,38 @@ private struct NewVoucherBody: View {
                 .labelsHidden()
             }
             MoneyTextField(label: "", text: line.amount, onCommit: {
-                // Only grow the grid when this line is actually filled in —
-                // otherwise repeatedly pressing Enter on an already-blank
-                // trailing line spams new blank rows and the voucher never
-                // feels "done" (reported: entry menu seemed stuck on Enter).
-                if line.wrappedValue.accountId != nil, Currency.parseRupeeInput(line.wrappedValue.amount) ?? 0 != 0 {
-                    vm.addLine()
-                }
-            })
+                advanceFocusAfterAmount(lineId: lineId)
+            }, isFocusedExternally: Binding(
+                get: { focusedField == .amount(lineId) },
+                set: { if $0 { focusedField = .amount(lineId) } }
+            ))
                 .frame(width: 160)
-            Button { vm.removeLine(line.wrappedValue.id) } label: {
+            Button { vm.removeLine(lineId) } label: {
                 Image(systemName: "minus.circle")
             }
             .buttonStyle(.plain)
             .disabled(vm.lines.count <= (vm.singleEntryMode ? 1 : 2))
             .frame(width: 32)
         }
+    }
+
+    /// Enter-on-amount cascade: grow the grid only when this line is
+    /// actually filled in (repeatedly pressing Enter on an already-blank
+    /// trailing line must not spam new blank rows — reported: entry menu
+    /// seemed stuck on Enter), then focus the next place to type: the next
+    /// empty line's ledger field if one already exists, otherwise the
+    /// freshly-added blank line's ledger field.
+    private func advanceFocusAfterAmount(lineId: UUID) {
+        guard let index = vm.lines.firstIndex(where: { $0.id == lineId }) else { return }
+        let filled = vm.lines[index].accountId != nil
+            && (Currency.parseRupeeInput(vm.lines[index].amount) ?? 0) != 0
+        guard filled else { return }
+        if let nextEmpty = vm.lines[(index + 1)...].first(where: { $0.accountId == nil }) {
+            focusedField = .line(nextEmpty.id)
+            return
+        }
+        vm.addLine()
+        if let newLine = vm.lines.last { focusedField = .line(newLine.id) }
     }
 
     private var validationSection: some View {

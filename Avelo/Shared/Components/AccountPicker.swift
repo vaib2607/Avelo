@@ -10,6 +10,15 @@ public struct AccountPicker: View {
     public var filter: ((Account) -> Bool)? = nil
     public var isEditable: Bool = true
     public var onCreate: (() -> Void)? = nil
+    /// Fired after a selection is committed (Return or click), once the
+    /// popover has closed — lets the host move focus to the next field in a
+    /// Tally-style Enter cascade without this component knowing about it.
+    public var onCommitSelection: (() -> Void)? = nil
+    /// Two-way link to a host-owned focus flag (e.g. a `@FocusState` enum
+    /// case wrapped in a computed `Binding`). When the host sets this true,
+    /// the picker focuses and opens itself — used to auto-advance into the
+    /// next ledger field in a Tally-style Enter cascade.
+    public var isFocusedExternally: Binding<Bool>? = nil
 
     @State private var isExpanded: Bool = false
     @State private var query: String = ""
@@ -22,13 +31,17 @@ public struct AccountPicker: View {
                 placeholder: String = "Choose account…",
                 filter: ((Account) -> Bool)? = nil,
                 isEditable: Bool = true,
-                onCreate: (() -> Void)? = nil) {
+                onCreate: (() -> Void)? = nil,
+                onCommitSelection: (() -> Void)? = nil,
+                isFocusedExternally: Binding<Bool>? = nil) {
         self._selection = selection
         self.accounts = accounts
         self.placeholder = placeholder
         self.filter = filter
         self.isEditable = isEditable
         self.onCreate = onCreate
+        self.onCommitSelection = onCommitSelection
+        self.isFocusedExternally = isFocusedExternally
     }
 
     public var body: some View {
@@ -51,6 +64,16 @@ public struct AccountPicker: View {
         .buttonStyle(.bordered)
         .focusable()
         .focused($pickerButtonFocused)
+        .onChange(of: pickerButtonFocused) { _, focused in
+            isFocusedExternally?.wrappedValue = focused
+        }
+        .onChange(of: isFocusedExternally?.wrappedValue) { _, external in
+            guard external == true else { return }
+            query = ""
+            selectedIndex = 0
+            pickerButtonFocused = true
+            isExpanded = true
+        }
         .onKeyPress("c", phases: .down, action: handleCreateAccountShortcut)
         // Keep the picker reachable when it can create an account. This
         // matters most for filtered fields (for example cash/bank): an empty
@@ -166,6 +189,7 @@ public struct AccountPicker: View {
     private func pick(_ acc: Account) {
         selection = acc.id
         closePopover()
+        onCommitSelection?()
     }
 
     private func handleCreateAccountShortcut(_ keyPress: KeyPress) -> KeyPress.Result {

@@ -9,6 +9,10 @@ public struct MoneyTextField: View {
     /// typed amount. Voucher-line grids use this to add a new line per the
     /// PRD's "Enter on amount adds a new line" contract (AVL-P0-020).
     public var onCommit: (() -> Void)? = nil
+    /// Two-way link to a host-owned focus flag, mirroring
+    /// `AccountPicker.isFocusedExternally` — lets a Tally-style Enter
+    /// cascade move the caret into this field programmatically.
+    public var isFocusedExternally: Binding<Bool>? = nil
 
     @State private var text: String = ""
     @FocusState private var isFocused: Bool
@@ -17,12 +21,14 @@ public struct MoneyTextField: View {
                 placeholder: String = "0.00",
                 alignment: TextAlignment = .trailing,
                 isEditable: Bool = true,
-                onCommit: (() -> Void)? = nil) {
+                onCommit: (() -> Void)? = nil,
+                isFocusedExternally: Binding<Bool>? = nil) {
         self._paise = paise
         self.placeholder = placeholder
         self.alignment = alignment
         self.isEditable = isEditable
         self.onCommit = onCommit
+        self.isFocusedExternally = isFocusedExternally
     }
 
     public var body: some View {
@@ -48,6 +54,10 @@ public struct MoneyTextField: View {
                     // edit in a voucher-line grid.
                     commitFromText()
                 }
+                isFocusedExternally?.wrappedValue = focused
+            }
+            .onChange(of: isFocusedExternally?.wrappedValue) { _, external in
+                if external == true { isFocused = true }
             }
             .onSubmit {
                 commitFromText()
@@ -73,7 +83,7 @@ public struct MoneyTextField: View {
 }
 
 extension MoneyTextField {
-    public init(label: String, text: Binding<String>, onCommit: (() -> Void)? = nil) {
+    public init(label: String, text: Binding<String>, onCommit: (() -> Void)? = nil, isFocusedExternally: Binding<Bool>? = nil) {
         let paiseBinding = Binding<Int64>(
             get: { Currency.parseRupeeInput(text.wrappedValue) ?? 0 },
             set: { newValue in
@@ -85,6 +95,6 @@ extension MoneyTextField {
                 }
             }
         )
-        self.init(paise: paiseBinding, placeholder: label, onCommit: onCommit)
+        self.init(paise: paiseBinding, placeholder: label, onCommit: onCommit, isFocusedExternally: isFocusedExternally)
     }
 }
