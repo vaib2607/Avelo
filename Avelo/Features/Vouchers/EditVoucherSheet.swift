@@ -23,7 +23,7 @@ public struct EditVoucherSheet: View {
                 ProgressView()
             }
         }
-        .frame(minWidth: 880, minHeight: 640)
+        .frame(minWidth: 760, idealWidth: 780, minHeight: 700, idealHeight: 780)
         .task(id: env.companyContext?.companyId) { loadVoucher() }
         .alert(item: $saveError) { err in
             Alert(title: Text("Couldn't save voucher"), message: Text(err.localizedMessage), dismissButton: .default(Text("OK")))
@@ -169,6 +169,10 @@ private struct EditVoucherBody: View {
                 .onChange(of: vm.narration) { _, _ in vm.revalidate() }
                 .onChange(of: vm.date) { _, _ in vm.revalidate() }
             Divider()
+            totalsSection
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            Divider()
             bottomBar
         }
     }
@@ -199,7 +203,6 @@ private struct EditVoucherBody: View {
             headerSection
             linesSection
             if !vm.validationErrors.isEmpty { validationSection }
-            totalsSection
         }
         .padding(16)
     }
@@ -207,56 +210,56 @@ private struct EditVoucherBody: View {
     private var isContra: Bool { vm.draft.voucherTypeCode == .contra }
 
     private var headerSection: some View {
-        GroupBox("Header") {
-            Form {
-                DatePicker("Date", selection: $vm.date, displayedComponents: .date)
-                if !isContra {
-                    AccountPicker(selection: $vm.partyAccountId,
-                                  accounts: vm.accounts,
-                                  placeholder: "Party (optional)")
-                    Picker("Bill reference type", selection: $vm.billReferenceType) {
-                        Text("None").tag(VoucherDraft.BillReferenceType?.none)
-                        ForEach(VoucherDraft.BillReferenceType.allCases) { type in
-                            Text(type.rawValue).tag(Optional(type))
-                        }
+        Form {
+            DatePicker("Date", selection: $vm.date, displayedComponents: .date)
+            if !isContra {
+                AccountPicker(selection: $vm.partyAccountId,
+                              accounts: vm.accounts,
+                              placeholder: "Party (optional)")
+                Picker("Bill reference type", selection: $vm.billReferenceType) {
+                    Text("None").tag(VoucherDraft.BillReferenceType?.none)
+                    ForEach(VoucherDraft.BillReferenceType.allCases) { type in
+                        Text(type.rawValue).tag(Optional(type))
                     }
-                    TextField("Bill reference number", text: $vm.billReferenceNumber)
                 }
-                HStack(alignment: .top) {
-                    TextField("Narration", text: $vm.narration, axis: .vertical)
-                        .lineLimit(2...4)
-                    Menu {
-                        if vm.narrationSuggestions.isEmpty {
-                            Text("No recent narrations").foregroundStyle(.secondary)
-                        }
-                        ForEach(vm.narrationSuggestions, id: \.self) { suggestion in
-                            Button(suggestion) { vm.narration = suggestion }
-                        }
-                    } label: {
-                        Image(systemName: "clock.arrow.circlepath")
-                    }
-                    .accessibilityLabel("Recall a recent narration")
-                    .menuStyle(.borderlessButton)
-                    .frame(width: 24)
-                    .keyboardShortcut("r", modifiers: [.control])
-                    .onAppear { vm.loadNarrationSuggestions() }
-                    .help("Recall a recent narration (⌃R)")
-                }
+                TextField("Bill reference number", text: $vm.billReferenceNumber)
             }
-            .formStyle(.grouped)
+            HStack(alignment: .top) {
+                TextField("Narration", text: $vm.narration, axis: .vertical)
+                    .lineLimit(2...4)
+                Menu {
+                    if vm.narrationSuggestions.isEmpty {
+                        Text("No recent narrations").foregroundStyle(.secondary)
+                    }
+                    ForEach(vm.narrationSuggestions, id: \.self) { suggestion in
+                        Button(suggestion) { vm.narration = suggestion }
+                    }
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+                .accessibilityLabel("Recall a recent narration")
+                .menuStyle(.borderlessButton)
+                .frame(width: 24)
+                .keyboardShortcut("r", modifiers: [.control])
+                .onAppear { vm.loadNarrationSuggestions() }
+                .help("Recall a recent narration (⌃R)")
+            }
         }
+        .formStyle(.grouped)
     }
 
     private var linesSection: some View {
-        GroupBox("Lines") {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach($vm.lines) { line in
-                    lineRow(line: line)
-                }
-                Button { vm.addLine() } label: { Label("Add line", systemImage: "plus") }
-                    .buttonStyle(.bordered)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Lines")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ForEach($vm.lines) { line in
+                lineRow(line: line)
             }
-            .padding(8)
+            Button { vm.addLine() } label: { Label("Add line", systemImage: "plus") }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -277,15 +280,12 @@ private struct EditVoucherBody: View {
     }
 
     private var validationSection: some View {
-        GroupBox("Validation") {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(vm.validationErrors, id: \.code) { err in
-                    Text("• \(err.message)").foregroundStyle(.red)
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(vm.validationErrors, id: \.code) { err in
+                Text("• \(err.message)").foregroundStyle(.red)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Always responds to the Save button/⌘Return: saves if valid, otherwise

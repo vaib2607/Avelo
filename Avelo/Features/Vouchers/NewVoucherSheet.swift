@@ -37,7 +37,7 @@ public struct NewVoucherSheet: View {
 
     public var body: some View {
         NewVoucherEditor(vm: vm, initialType: initialType, onPost: post(vm:))
-            .frame(minWidth: 880, minHeight: 640)
+            .frame(minWidth: 760, idealWidth: 780, minHeight: 700, idealHeight: 780)
             .environment(router)
             .task(id: env.companyContext?.companyId) { setup() }
             .alert(item: $postError) { err in
@@ -159,6 +159,12 @@ private struct NewVoucherBody: View {
             topBar
             Divider()
             voucherEditorScrollView
+            if !vm.itemInvoiceMode {
+                Divider()
+                totalsSection
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
             Divider()
             bottomBar
         }
@@ -235,7 +241,6 @@ private struct NewVoucherBody: View {
         } else {
             linesSection
             if !vm.validationErrors.isEmpty { validationSection }
-            totalsSection
         }
     }
 
@@ -315,28 +320,26 @@ private struct NewVoucherBody: View {
     }
 
     private var headerSection: some View {
-        GroupBox("Header") {
-            Form {
-                DatePicker("Date", selection: $vm.date, displayedComponents: .date)
-                // Tally's Contra has no party or bill reference — only fund
-                // movement between cash/bank ledgers.
-                if !isContra {
-                    AccountPicker(selection: $vm.partyAccountId,
-                                  accounts: vm.accounts,
-                                  placeholder: "Party (optional)",
-                                  onCreate: { beginAccountCreation(for: .party) })
-                    Picker("Bill reference type", selection: $vm.billReferenceType) {
-                        Text("None").tag(VoucherDraft.BillReferenceType?.none)
-                        ForEach(VoucherDraft.BillReferenceType.allCases) { type in
-                            Text(type.rawValue).tag(Optional(type))
-                        }
+        Form {
+            DatePicker("Date", selection: $vm.date, displayedComponents: .date)
+            // Tally's Contra has no party or bill reference — only fund
+            // movement between cash/bank ledgers.
+            if !isContra {
+                AccountPicker(selection: $vm.partyAccountId,
+                              accounts: vm.accounts,
+                              placeholder: "Party (optional)",
+                              onCreate: { beginAccountCreation(for: .party) })
+                Picker("Bill reference type", selection: $vm.billReferenceType) {
+                    Text("None").tag(VoucherDraft.BillReferenceType?.none)
+                    ForEach(VoucherDraft.BillReferenceType.allCases) { type in
+                        Text(type.rawValue).tag(Optional(type))
                     }
-                    TextField("Bill reference number", text: $vm.billReferenceNumber)
                 }
-                narrationField
+                TextField("Bill reference number", text: $vm.billReferenceNumber)
             }
-            .formStyle(.grouped)
+            narrationField
         }
+        .formStyle(.grouped)
     }
 
     private var narrationField: some View {
@@ -369,7 +372,8 @@ private struct NewVoucherBody: View {
     /// Tally single-entry "Account" field: the cash/bank ledger this voucher
     /// moves money through (Contra: destination Dr, Payment: Cr, Receipt: Dr).
     private var accountSection: some View {
-        GroupBox("Account *") {
+        VStack(alignment: .leading, spacing: 4) {
+            sectionLabel("Account *")
             Form {
                 AccountPicker(selection: $vm.accountLedgerId,
                               accounts: vm.accounts,
@@ -392,7 +396,8 @@ private struct NewVoucherBody: View {
     private var workflowSection: some View {
         // TDS/TCS and post-dated workflows are deferred (VoucherService rejects
         // them outside the frozen schema), so only cheque details are exposed.
-        GroupBox("Cheque (optional)") {
+        VStack(alignment: .leading, spacing: 4) {
+            sectionLabel("Cheque (optional)")
             Form {
                 TextField("Cheque number", text: $vm.chequeNumber)
                 DatePicker("Cheque due date", selection: Binding(
@@ -405,28 +410,34 @@ private struct NewVoucherBody: View {
     }
 
     private var linesSection: some View {
-        GroupBox(vm.singleEntryMode ? "Particulars (\(vm.particularsSide == .debit ? "Dr" : "Cr"))" : "Lines") {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Account").frame(maxWidth: .infinity, alignment: .leading)
-                    if !vm.singleEntryMode {
-                        Text("Side").frame(width: 110, alignment: .leading)
-                    }
-                    Text("Amount (₹)").frame(width: 160, alignment: .leading)
-                    Text("").frame(width: 32)
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(vm.singleEntryMode ? "Particulars (\(vm.particularsSide == .debit ? "Dr" : "Cr"))" : "Lines")
+            HStack {
+                Text("Account").frame(maxWidth: .infinity, alignment: .leading)
+                if !vm.singleEntryMode {
+                    Text("Side").frame(width: 110, alignment: .leading)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                ForEach($vm.lines) { line in
-                    lineRow(line: line)
-                }
-                Button { vm.addLine() } label: {
-                    Label("Add line", systemImage: "plus")
-                }
-                .buttonStyle(.bordered)
+                Text("Amount (₹)").frame(width: 160, alignment: .leading)
+                Text("").frame(width: 32)
             }
-            .padding(8)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            ForEach($vm.lines) { line in
+                lineRow(line: line)
+            }
+            Button { vm.addLine() } label: {
+                Label("Add line", systemImage: "plus")
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
+    }
+
+    private func sectionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
     }
 
     /// Particulars picker filter: Contra allows only cash/bank counter-ledgers
@@ -484,15 +495,12 @@ private struct NewVoucherBody: View {
     }
 
     private var validationSection: some View {
-        GroupBox("Validation") {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(vm.validationErrors, id: \.code) { err in
-                    Text("• \(err.message)").foregroundStyle(.red)
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(vm.validationErrors, id: \.code) { err in
+                Text("• \(err.message)").foregroundStyle(.red)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var totalsSection: some View {
