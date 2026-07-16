@@ -27,6 +27,15 @@ public final class ReportsViewModel {
     public var isLoading: Bool = false
     public var error: AppError?
 
+    // AVL-P1-036 (Alt+N comparative columns): prior-year-same-period column
+    // for the three point-in-time/range statements. Reuses the same
+    // ReportService calls with a one-year-back date shift — no separate
+    // report math, so it can't drift from the primary column's numbers.
+    public var comparativeEnabled: Bool = false
+    public var comparativeTrialBalance: [ReportResult.TrialBalanceRow] = []
+    public var comparativeProfitLoss: ReportResult.ProfitLoss?
+    public var comparativeBalanceSheet: ReportResult.BalanceSheet?
+
     public let companyId: Company.ID
     public let db: SQLiteDatabase
     public let fyId: FinancialYear.ID?
@@ -46,10 +55,19 @@ public final class ReportsViewModel {
             switch selection {
             case .trialBalance:
                 trialBalance = try svc.trialBalance(asOfDate: asOf, financialYearId: fyId).rows
+                comparativeTrialBalance = comparativeEnabled
+                    ? try svc.trialBalance(asOfDate: priorYear(asOf), financialYearId: fyId).rows
+                    : []
             case .profitLoss:
                 profitLoss = try svc.profitAndLoss(fromDate: fromDate, toDate: toDate, financialYearId: fyId)
+                comparativeProfitLoss = comparativeEnabled
+                    ? try svc.profitAndLoss(fromDate: priorYear(fromDate), toDate: priorYear(toDate), financialYearId: fyId)
+                    : nil
             case .balanceSheet:
                 balanceSheet = try svc.balanceSheet(asOfDate: asOf, financialYearId: fyId)
+                comparativeBalanceSheet = comparativeEnabled
+                    ? try svc.balanceSheet(asOfDate: priorYear(asOf), financialYearId: fyId)
+                    : nil
             case .gstSummary:
                 gstSummary = try svc.gstSummary(fromDate: fromDate, toDate: toDate)
             case .dayBook:
@@ -109,6 +127,15 @@ public final class ReportsViewModel {
         } catch {
             self.error = AppError.wrap(error)
         }
+    }
+
+    public func toggleComparative() {
+        comparativeEnabled.toggle()
+        reload()
+    }
+
+    private func priorYear(_ date: Date) -> Date {
+        Calendar(identifier: .gregorian).date(byAdding: .year, value: -1, to: date) ?? date
     }
 
     private func codeMatchesCashBank(_ code: String) -> Bool {

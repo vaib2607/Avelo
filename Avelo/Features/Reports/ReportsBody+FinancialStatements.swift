@@ -15,6 +15,7 @@ extension ReportsBody {
         let debitTotal = (try? CheckedMath.sum(rows.map(\.debitPaise), context: "summing trial balance debit total for UI")) ?? 0
         let creditTotal = (try? CheckedMath.sum(rows.map(\.creditPaise), context: "summing trial balance credit total for UI")) ?? 0
         let difference = (try? CheckedMath.subtract(debitTotal, creditTotal, context: "calculating trial balance difference for UI")) ?? 0
+        let comparativeByAccount = Dictionary(uniqueKeysWithValues: vm.comparativeTrialBalance.map { ($0.id, $0) })
         return Group {
             if rows.isEmpty {
                 EmptyStateView(
@@ -52,6 +53,16 @@ extension ReportsBody {
                     TableColumn("Credit (₹)") { r in
                         Text(Currency.formatPaise(r.creditPaise)).monospacedDigit()
                     }
+                    TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                        if vm.comparativeEnabled {
+                            if let prior = comparativeByAccount[r.id] {
+                                Text(Currency.formatPaise(safeDebitLessCredit(prior, context: "rendering trial balance comparative amount"))).monospacedDigit()
+                            } else {
+                                Text("—").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .width(vm.comparativeEnabled ? nil : 0)
                 }
                 HStack {
                     Spacer()
@@ -65,6 +76,10 @@ extension ReportsBody {
     @ViewBuilder
     var profitLossSection: some View {
         if let pl = vm.profitLoss {
+            let comparativeIncomeRows: [ReportResult.TrialBalanceRow] = vm.comparativeProfitLoss.map { Array($0.income) } ?? []
+            let comparativeExpenseRows: [ReportResult.TrialBalanceRow] = vm.comparativeProfitLoss.map { Array($0.expenses) } ?? []
+            let comparativeIncome = Dictionary(uniqueKeysWithValues: comparativeIncomeRows.map { ($0.id, $0) })
+            let comparativeExpense = Dictionary(uniqueKeysWithValues: comparativeExpenseRows.map { ($0.id, $0) })
             VStack(alignment: .leading, spacing: 8) {
                 Text("Income").font(.headline)
                 Table(pl.income) {
@@ -75,6 +90,16 @@ extension ReportsBody {
                     TableColumn("Amount (₹)", content: { (r: ReportResult.TrialBalanceRow) in
                         Text(Currency.formatPaise(safeDebitLessCredit(r, context: "rendering profit and loss income amount"))).monospacedDigit()
                     })
+                    TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                        if vm.comparativeEnabled {
+                            if let prior = comparativeIncome[r.id] {
+                                Text(Currency.formatPaise(safeDebitLessCredit(prior, context: "rendering profit and loss comparative income amount"))).monospacedDigit()
+                            } else {
+                                Text("—").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .width(vm.comparativeEnabled ? nil : 0)
                 }
                 Text("Total income: \(Currency.formatPaise(pl.totalIncomePaise))").monospacedDigit().bold()
                 Divider()
@@ -87,6 +112,16 @@ extension ReportsBody {
                     TableColumn("Amount (₹)", content: { (r: ReportResult.TrialBalanceRow) in
                         Text(Currency.formatPaise(safeCreditLessDebit(r, context: "rendering profit and loss expense amount"))).monospacedDigit()
                     })
+                    TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                        if vm.comparativeEnabled {
+                            if let prior = comparativeExpense[r.id] {
+                                Text(Currency.formatPaise(safeCreditLessDebit(prior, context: "rendering profit and loss comparative expense amount"))).monospacedDigit()
+                            } else {
+                                Text("—").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .width(vm.comparativeEnabled ? nil : 0)
                 }
                 Text("Total expense: \(Currency.formatPaise(pl.totalExpensesPaise))").monospacedDigit().bold()
                 Divider()
@@ -94,6 +129,12 @@ extension ReportsBody {
                     .font(.title3.bold())
                     .monospacedDigit()
                     .foregroundStyle(pl.netProfitPaise >= 0 ? .green : .red)
+                if vm.comparativeEnabled, let comparativePL = vm.comparativeProfitLoss {
+                    Text("Prior year net: \(Currency.formatPaise(comparativePL.netProfitPaise))")
+                        .font(.callout)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
             }
         } else {
             EmptyStateView(
@@ -108,6 +149,9 @@ extension ReportsBody {
     @ViewBuilder
     var balanceSheetSection: some View {
         if let bs = vm.balanceSheet {
+            let comparativeAssets = Dictionary(uniqueKeysWithValues: (vm.comparativeBalanceSheet?.assets.flatMap { $0.rows } ?? []).map { ($0.id, $0) })
+            let comparativeLiabilities = Dictionary(uniqueKeysWithValues: (vm.comparativeBalanceSheet?.liabilities.flatMap { $0.rows } ?? []).map { ($0.id, $0) })
+            let comparativeEquity = Dictionary(uniqueKeysWithValues: (vm.comparativeBalanceSheet?.equity.flatMap { $0.rows } ?? []).map { ($0.id, $0) })
             HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Assets").font(.headline)
@@ -119,6 +163,16 @@ extension ReportsBody {
                         TableColumn("Amount (₹)") { r in
                             Text(Currency.formatPaise(safeDebitLessCredit(r, context: "rendering balance sheet asset amount"))).monospacedDigit()
                         }
+                        TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                            if vm.comparativeEnabled {
+                                if let prior = comparativeAssets[r.id] {
+                                    Text(Currency.formatPaise(safeDebitLessCredit(prior, context: "rendering balance sheet comparative asset amount"))).monospacedDigit()
+                                } else {
+                                    Text("—").foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .width(vm.comparativeEnabled ? nil : 0)
                     }
                     Text("Total assets: \(Currency.formatPaise(bs.totalAssetsPaise))").monospacedDigit().bold()
                 }
@@ -132,6 +186,16 @@ extension ReportsBody {
                         TableColumn("Amount (₹)") { r in
                             Text(Currency.formatPaise(safeCreditLessDebit(r, context: "rendering balance sheet liability amount"))).monospacedDigit()
                         }
+                        TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                            if vm.comparativeEnabled {
+                                if let prior = comparativeLiabilities[r.id] {
+                                    Text(Currency.formatPaise(safeCreditLessDebit(prior, context: "rendering balance sheet comparative liability amount"))).monospacedDigit()
+                                } else {
+                                    Text("—").foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .width(vm.comparativeEnabled ? nil : 0)
                     }
                     Text("Total liabilities: \(Currency.formatPaise(bs.totalLiabilitiesPaise))").monospacedDigit().bold()
                     Divider()
@@ -144,6 +208,16 @@ extension ReportsBody {
                         TableColumn("Amount (₹)") { r in
                             Text(Currency.formatPaise(safeCreditLessDebit(r, context: "rendering balance sheet equity amount"))).monospacedDigit()
                         }
+                        TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                            if vm.comparativeEnabled {
+                                if let prior = comparativeEquity[r.id] {
+                                    Text(Currency.formatPaise(safeCreditLessDebit(prior, context: "rendering balance sheet comparative equity amount"))).monospacedDigit()
+                                } else {
+                                    Text("—").foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .width(vm.comparativeEnabled ? nil : 0)
                     }
                     Text("Total equity: \(Currency.formatPaise(bs.totalEquityPaise))").monospacedDigit().bold()
                 }

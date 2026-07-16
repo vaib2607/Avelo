@@ -122,6 +122,13 @@ struct ReportsBody: View {
                 }
                 .frame(minWidth: 280)
             }
+            if [.trialBalance, .profitLoss, .balanceSheet].contains(vm.selection) {
+                Toggle("Compare prior year", isOn: $vm.comparativeEnabled)
+                    .toggleStyle(.switch)
+                    .keyboardShortcut("n", modifiers: [.option])
+                    .help("Add a prior-year comparative column (⌥N)")
+                    .onChange(of: vm.comparativeEnabled) { _, _ in vm.reload() }
+            }
             Spacer()
             Button("Refresh") { vm.reload() }
                 .keyboardShortcut("r", modifiers: .command)
