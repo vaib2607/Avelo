@@ -5,6 +5,11 @@ public struct EditVoucherSheet: View {
     @Environment(AppEnvironment.self) private var env
     let voucherId: Voucher.ID
     @State private var payload: VoucherEditPayload?
+    // Same fix as NewVoucherSheet: a window can only have one AppKit-level
+    // sheet/alert presentation at a time, and this sheet already occupies
+    // it, so RootView's root-level `.alert(item: env.globalError)` cannot
+    // present while this sheet is open — errors must surface locally.
+    @State private var saveError: AppError?
 
     public init(voucherId: Voucher.ID) {
         self.voucherId = voucherId
@@ -13,13 +18,16 @@ public struct EditVoucherSheet: View {
     public var body: some View {
         Group {
             if let payload {
-                EditVoucherEditor(payload: payload)
+                EditVoucherEditor(payload: payload, saveError: $saveError)
             } else {
                 ProgressView()
             }
         }
         .frame(minWidth: 880, minHeight: 640)
         .task(id: env.companyContext?.companyId) { loadVoucher() }
+        .alert(item: $saveError) { err in
+            Alert(title: Text("Couldn't save voucher"), message: Text(err.localizedMessage), dismissButton: .default(Text("OK")))
+        }
     }
 
     private func loadVoucher() {
@@ -49,6 +57,7 @@ private struct EditVoucherEditor: View {
     @Environment(AppRouter.self) private var router
     @State private var vm: VoucherEditViewModel?
     let payload: VoucherEditPayload
+    @Binding var saveError: AppError?
 
     var body: some View {
         Group {
@@ -80,13 +89,13 @@ private struct EditVoucherEditor: View {
             vm = model
         } catch {
             vm = nil
-            env.showError(AppError.wrap(error))
+            saveError = AppError.wrap(error)
         }
     }
 
     private func save(vm: VoucherEditViewModel) {
         guard let ctx = env.companyContext else {
-            env.showError(AppError.businessRule("No company is open — cannot save. Close this sheet, open a company, and try again."))
+            saveError = AppError.businessRule("No company is open — cannot save. Close this sheet, open a company, and try again.")
             return
         }
         do {
@@ -102,7 +111,7 @@ private struct EditVoucherEditor: View {
             env.showSuccess("Voucher updated.")
             router.presentedSheet = nil
         } catch {
-            env.showError(AppError.wrap(error))
+            saveError = AppError.wrap(error)
         }
     }
 }

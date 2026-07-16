@@ -410,6 +410,36 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertTrue(vm.isBalanced)
     }
 
+    /// Live-reported bug, root-caused 2026-07-17: posting silently failed
+    /// with "no error, no toast, nothing" for EVERY voucher. Root cause was
+    /// two bugs stacked: (1) `Currency.parseRupeeInput("")` returns 0, not
+    /// nil, so `buildWorkflowInputs()` set tdsTaxPaise/tcsTaxPaise to
+    /// Optional(0) for every voucher that never touched TDS/TCS — which
+    /// VoucherService.post(draft:in:workflow:) gates on being nil (TDS/TCS
+    /// is deferred outside the frozen schema), so posting *always* threw
+    /// featureUnavailable; (2) that error was invisible because it routed
+    /// through env.showError() → a root-level `.alert`, which AppKit can't
+    /// present over an already-active `.sheet` (NewVoucherSheet itself).
+    /// This test exercises the exact real path a live Post button uses —
+    /// VoucherEditViewModel.buildWorkflowInputs() feeding
+    /// VoucherService.post(draft:in:workflow:) — which no test did before
+    /// (zero prior references to buildWorkflowInputs() in the whole suite).
+    @MainActor
+    func testPostingAPlainVoucherThroughBuildWorkflowInputsSucceeds() throws {
+        let tc = try TestCompany.make()
+        let vm = singleEntryVM(tc, type: .payment)
+        vm.date = DateFormatters.parseDate("2024-06-01")!
+        vm.accountLedgerId = tc.cashId
+        vm.lines = [.init(accountId: tc.rentId, amount: "100.00", side: .credit)]
+
+        XCTAssertTrue(vm.isBalanced)
+        let result = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: vm.buildDraft(), in: tc.fy, workflow: vm.buildWorkflowInputs()
+        )
+        XCTAssertEqual(result.voucher.voucherTypeCode, .payment)
+        XCTAssertEqual(result.voucher.totalPaise, 10_000)
+    }
+
     @MainActor
     func testPaymentSingleEntryCreditsTheAccountLedger() throws {
         let tc = try TestCompany.make()

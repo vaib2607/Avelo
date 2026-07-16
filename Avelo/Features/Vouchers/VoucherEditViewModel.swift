@@ -515,10 +515,17 @@ public final class VoucherEditViewModel {
         workflow.billAllocationNumber = billReferenceNumber.isEmpty ? nil : billReferenceNumber
         workflow.chequeNumber = chequeNumber.isEmpty ? nil : chequeNumber
         workflow.chequeDueDate = chequeDueDate
+        // AVL-P0 live bug: Currency.parseRupeeInput("") returns 0, not nil —
+        // VoucherService.post(draft:in:workflow:) gates ALL posting on
+        // tdsTaxPaise/tcsTaxPaise being nil (TDS/TCS is deferred outside the
+        // frozen schema), so leaving these as Optional(0) for every voucher
+        // that never touches TDS/TCS (i.e. nearly every voucher) made Post
+        // throw "Feature unavailable" unconditionally. Must nil out on an
+        // empty string exactly like the section-code fields already do.
         workflow.tdsSectionCode = tdsSectionCode.isEmpty ? nil : tdsSectionCode
-        workflow.tdsTaxPaise = Currency.parseRupeeInput(tdsTaxAmount)
+        workflow.tdsTaxPaise = tdsTaxAmount.isEmpty ? nil : Currency.parseRupeeInput(tdsTaxAmount)
         workflow.tcsSectionCode = tcsSectionCode.isEmpty ? nil : tcsSectionCode
-        workflow.tcsTaxPaise = Currency.parseRupeeInput(tcsTaxAmount)
+        workflow.tcsTaxPaise = tcsTaxAmount.isEmpty ? nil : Currency.parseRupeeInput(tcsTaxAmount)
         return workflow
     }
 

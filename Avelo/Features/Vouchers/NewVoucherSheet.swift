@@ -22,6 +22,13 @@ public struct NewVoucherSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @State private var vm: VoucherEditViewModel?
+    // A window can only have one AppKit-level sheet/alert presentation at a
+    // time. This sheet already occupies that slot, so RootView's root-level
+    // `.alert(item: env.globalError)` cannot present while this is open —
+    // env.showError() silently does nothing visible until this sheet
+    // closes. Post/save errors must surface locally, on this same
+    // presentation, instead of routing through the app-wide error channel.
+    @State private var postError: AppError?
     let initialType: VoucherType.Code
 
     public init(initialType: VoucherType.Code) {
@@ -33,6 +40,9 @@ public struct NewVoucherSheet: View {
             .frame(minWidth: 880, minHeight: 640)
             .environment(router)
             .task(id: env.companyContext?.companyId) { setup() }
+            .alert(item: $postError) { err in
+                Alert(title: Text("Couldn't post voucher"), message: Text(err.localizedMessage), dismissButton: .default(Text("OK")))
+            }
     }
 
     private func setup() {
@@ -71,7 +81,7 @@ public struct NewVoucherSheet: View {
 
     private func post(vm: VoucherEditViewModel) {
         guard let ctx = env.companyContext else {
-            env.showError(AppError.businessRule("No company is open — cannot post. Close this sheet, open a company, and try again."))
+            postError = AppError.businessRule("No company is open — cannot post. Close this sheet, open a company, and try again.")
             return
         }
         do {
@@ -97,7 +107,7 @@ public struct NewVoucherSheet: View {
             env.showSuccess("Voucher posted.")
             router.presentedSheet = nil
         } catch {
-            env.showError(AppError.wrap(error))
+            postError = AppError.wrap(error)
         }
     }
 }
