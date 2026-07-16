@@ -70,7 +70,10 @@ public struct NewVoucherSheet: View {
     }
 
     private func post(vm: VoucherEditViewModel) {
-        guard let ctx = env.companyContext else { return }
+        guard let ctx = env.companyContext else {
+            env.showError(AppError.businessRule("No company is open — cannot post. Close this sheet, open a company, and try again."))
+            return
+        }
         do {
             if vm.itemInvoiceMode, let party = vm.partyAccountId, let ledger = vm.salesOrPurchaseLedgerId {
                 _ = try ItemInvoiceService(db: ctx.database, companyId: ctx.companyId).post(

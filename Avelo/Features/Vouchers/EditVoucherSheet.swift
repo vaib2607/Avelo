@@ -85,7 +85,10 @@ private struct EditVoucherEditor: View {
     }
 
     private func save(vm: VoucherEditViewModel) {
-        guard let ctx = env.companyContext else { return }
+        guard let ctx = env.companyContext else {
+            env.showError(AppError.businessRule("No company is open — cannot save. Close this sheet, open a company, and try again."))
+            return
+        }
         do {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
             _ = try svc.edit(
