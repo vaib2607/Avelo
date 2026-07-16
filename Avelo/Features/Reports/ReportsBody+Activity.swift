@@ -31,6 +31,20 @@ extension ReportsBody {
                 TableColumn("Amount (₹)") { r in
                     Text(Currency.formatPaise(r.amountPaise)).monospacedDigit()
                 }
+                // AVL-P1-037 (Day Book browse/drill/correct): Edit and
+                // Reverse reachable directly from the row, matching
+                // VouchersView's action set, instead of forcing a detour
+                // through the Vouchers list to correct an entry found here.
+                // Both dismiss back to this same Day Book — env.dataRevision
+                // triggers ReportsView's existing reload-on-change, and
+                // Table's row identity (Voucher.ID) keeps scroll position
+                // stable across that reload.
+                TableColumn("Actions") { r in
+                    HStack {
+                        Button("Edit") { openVoucher(r.id) }
+                        Button("Reverse") { env.router.present(.reverseVoucher(r.id)) }
+                    }
+                }
             }
         }
     }
