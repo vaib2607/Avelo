@@ -10,6 +10,8 @@
 [![Version](https://img.shields.io/badge/version-v1.1--dev-blue?style=flat-square)]()
 [![Engine](https://img.shields.io/badge/engine-paise--exact%20double--entry-green?style=flat-square)]()
 [![Storage](https://img.shields.io/badge/storage-SQLCipher%20encrypted-purple?style=flat-square)]()
+[![Architecture Dashboard](https://img.shields.io/badge/🏗%20Architecture%20Dashboard-Live-6366f1?style=flat-square&logo=vercel&logoColor=white)](https://dashboard-mauve-delta-78.vercel.app)
+[![Guided Tour Steps](https://img.shields.io/badge/🎯%20Guided%20Tour%20Steps-27-6366f1?style=flat-square)](https://dashboard-mauve-delta-78.vercel.app)
 
 </div>
 
@@ -46,9 +48,9 @@ Most accounting software forces you into the cloud, charges per-user, or bundles
 
 <div align="center">
 
-| Dashboard | Voucher Entry | Reports |
-|:---------:|:-------------:|:-------:|
-| ![Dashboard](appscreenshotformarketing/Generated%20image%201.png) | ![Vouchers](appscreenshotformarketing/Generated%20image%202.png) | ![Reports](appscreenshotformarketing/Generated%20image%203.png) |
+| Dashboard | Voucher Entry | Reports | Architecture |
+|:---------:|:-------------:|:-------:|:------------:|
+| ![Dashboard](appscreenshotformarketing/Generated%20image%201.png) | ![Vouchers](appscreenshotformarketing/Generated%20image%202.png) | ![Reports](appscreenshotformarketing/Generated%20image%203.png) | [![Architecture Dashboard](https://img.shields.io/badge/Interactive%20Architecture%20Dashboard-Open%20Live%20%F0%9F%9F%A2-6366f1?style=flat-square)](https://dashboard-mauve-delta-78.vercel.app) |
 
 </div>
 
@@ -260,7 +262,28 @@ Company files are encrypted at rest. Keys live in the macOS Keychain for the loc
 ## Architecture
 
 <details>
-<summary>Layer map</summary>
+<summary>🏗 Interactive Architecture Dashboard <span style="font-size:0.85em; color:#6366f1;">← Click to explore live graph</span></summary>
+
+[![Open Architecture Dashboard](https://img.shields.io/badge/🔗_Open_Interactive_Dashboard-6366f1?style=for-the-badge&logo=vercel&logoColor=white)](https://dashboard-mauve-delta-78.vercel.app)
+
+The dashboard renders a **live, zoomable knowledge graph** of Avelo's codebase — 357 nodes, 495 edges, 24 layers, 27 guided tour steps. Auto-updates on every push to `main`.
+
+<details>
+<summary>What you'll see</summary>
+
+| View | Description |
+|------|-------------|
+| **Structural** | Layer-by-layer architecture (Views → AppEnv → Repositories → Models → Database) |
+| **Domain** | Business capability clusters (Voucher, Inventory, GST, Payroll, Reports, etc.) |
+| **Tour** | 27 guided steps — click "Start Tour" for a narrated walkthrough |
+| **Search** | Fuzzy-find any type, file, or symbol instantly |
+| **Path Finder** | Shortest dependency path between any two nodes |
+| **Diff Overlay** | Toggle "Show Changes" after a PR to see impacted nodes |
+
+</details>
+
+<details open>
+<summary>Layer map (static fallback)</summary>
 
 ```
 ┌─────────────────────────────────┐
@@ -275,6 +298,34 @@ Company files are encrypted at rest. Keys live in the macOS Keychain for the loc
 │   Database (SQLite + SQLCipher)  │  Core/Database/
 └─────────────────────────────────┘
 ```
+
+</details>
+
+<details>
+<summary>🎨 Interactive layer map (Mermaid — click to pan/zoom on GitHub)</summary>
+
+```mermaid
+graph TD
+    subgraph "Presentation"
+        A[SwiftUI Views<br/>Features/] --> B[AppRouter / AppEnv<br/>App/]
+    end
+    subgraph "Business Logic"
+        B --> C[Repositories<br/>Core/Repositories/]
+        C --> D[Models / Domain Types<br/>Core/Models/]
+    end
+    subgraph "Persistence"
+        D --> E[Database<br/>SQLite + SQLCipher<br/>Core/Database/]
+    end
+    
+    classDef presentation fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b;
+    classDef logic fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#78350f;
+    classDef persist fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+    class A,B presentation;
+    class C,D logic;
+    class E persist;
+```
+
+</details>
 
 - No network stack, no async frameworks, no Swift packages
 - Raw SQLite C API for all reads and writes
@@ -297,6 +348,7 @@ See [`Docs/Avelo_Schema.md`](Docs/Avelo_Schema.md) for the full frozen schema re
 
 | Document | Purpose |
 |---|---|
+| **Interactive Architecture Dashboard** | [Live graph](https://dashboard-mauve-delta-78.vercel.app) · 357 nodes · 495 edges · 24 layers · 27 tour steps · Zoom/Filter/Search/Path-find |
 | [`Docs/Avelo_Master_PRD.md`](Docs/Avelo_Master_PRD.md) | Normative behavior spec |
 | [`Docs/Avelo_Master_Product_Execution_Plan.md`](Docs/Avelo_Master_Product_Execution_Plan.md) | Consolidated roadmap |
 | [`Docs/Avelo_Architecture.md`](Docs/Avelo_Architecture.md) | Layer map and design decisions |
