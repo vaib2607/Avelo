@@ -19,29 +19,33 @@ public final class PayrollService: Sendable {
     }
 
     public func findEmployee(_ id: PayrollEmployee.ID) throws -> PayrollEmployee? {
-        guard let employee = try repository.findEmployee(id: id), employee.companyId == companyId else {
-            return nil
-        }
-        return employee
+        try repository.findEmployee(id: id)
     }
 
     public func createEmployee(name: String,
                                employeeCode: String,
                                designation: String?,
                                pan: String?,
-                               bankAccountId: Account.ID? = nil,
-                               baseSalaryPaise: Int64) throws -> PayrollEmployee {
-        if let bankAccountId {
-            try requireEligibleAccount(bankAccountId, for: .bankReconciliation, field: "bankAccountId")
-        }
+                               bankAccount: String?,
+                               ifsc: String?,
+                               basicPaise: Int64,
+                               hraPaise: Int64,
+                               otherAllowancesPaise: Int64,
+                               pfApplicable: Bool,
+                               esiApplicable: Bool) throws -> PayrollEmployee {
         let employee = PayrollEmployee(
             companyId: companyId,
             employeeCode: employeeCode,
             name: name,
             designation: designation,
             pan: pan,
-            bankAccountId: bankAccountId,
-            baseSalaryPaise: baseSalaryPaise,
+            bankAccount: bankAccount,
+            ifsc: ifsc,
+            basicPaise: basicPaise,
+            hraPaise: hraPaise,
+            otherAllowancesPaise: otherAllowancesPaise,
+            pfApplicable: pfApplicable,
+            esiApplicable: esiApplicable,
             isActive: true,
             joinedOn: Date()
         )
@@ -49,7 +53,7 @@ public final class PayrollService: Sendable {
             let repo = PayrollRepository(db: tx)
             try repo.insertEmployee(employee)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .payrollEmployeeCreated,
+                action: .employeeCreated,
                 entityType: "payroll_employee",
                 entityId: employee.id.uuidString,
                 snapshotAfter: employee
@@ -59,42 +63,26 @@ public final class PayrollService: Sendable {
     }
 
     public func updateEmployee(_ employee: PayrollEmployee) throws {
-        guard employee.companyId == companyId else {
-            throw AppError.notFound("Employee")
-        }
-        guard let existing = try repository.findEmployee(id: employee.id), existing.companyId == companyId else {
-            throw AppError.notFound("Employee")
-        }
-        if let bankAccountId = employee.bankAccountId {
-            try requireEligibleAccount(bankAccountId, for: .bankReconciliation, field: "bankAccountId")
-        }
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
             try repo.updateEmployee(employee)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .payrollEmployeeUpdated,
+                action: .employeeUpdated,
                 entityType: "payroll_employee",
                 entityId: employee.id.uuidString,
-                snapshotBefore: existing,
                 snapshotAfter: employee
             )
         }
     }
 
     public func deactivateEmployee(_ id: PayrollEmployee.ID) throws {
-        guard let employee = try repository.findEmployee(id: id), employee.companyId == companyId else {
-            throw AppError.notFound("Employee")
-        }
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
             try repo.deactivateEmployee(id)
-            guard let deactivated = try repo.findEmployee(id: id) else { throw AppError.notFound("Employee") }
             try AuditService(db: tx, companyId: companyId).record(
-                action: .payrollEmployeeTerminated,
+                action: .employeeDeactivated,
                 entityType: "payroll_employee",
-                entityId: id.uuidString,
-                snapshotBefore: employee,
-                snapshotAfter: deactivated
+                entityId: id.uuidString
             )
         }
     }
@@ -114,28 +102,38 @@ public final class PayrollService: Sendable {
 
     public func postEntry(employeeId: PayrollEmployee.ID,
                           monthYear: Int,
+                          workingDays: Int,
+                          paidDays: Int,
+                          overtimePaise: Int64,
                           deductionsPaise: Int64,
-                          financialYearId: FinancialYear.ID,
-                          salaryExpenseAccountId: Account.ID,
-                          paymentAccountId: Account.ID) throws -> PayrollEntry {
+                          financialYearId: FinancialYear.ID) throws -> PayrollEntry {
         let employee = try repository.findEmployee(id: employeeId)
         guard let employee = employee else { throw AppError.notFound("Employee") }
-        guard employee.companyId == companyId else {
-            throw AppError.notFound("Employee")
-        }
-        guard let financialYear = try FinancialYearRepository(db: db).findById(financialYearId),
-              financialYear.companyId == companyId else {
-            throw AppError.notFound("Financial year")
-        }
 
-        let gross = employee.baseSalaryPaise
-        let net = try CheckedMath.subtract(
-            gross,
-            deductionsPaise,
-            context: "calculating payroll net salary"
-        )
+        let gross = employee.basicPaise + employee.hraPaise + employee.otherAllowancesPaise + overtimePaise
+        let net = gross - deductionsPaise
         let year = monthYear / 100
         let month = monthYear % 100
+        let entry = PayrollEntry(
+            id: UUID(),
+            companyId: companyId,
+            employeeId: employeeId,
+            financialYearId: financialYearId,
+            month: month,
+            year: year,
+            grossPaise: gross,
+            deductionsPaise: deductionsPaise,
+            netPaise: net,
+            workingDays: Double(workingDays),
+            paidDays: Double(paidDays),
+            basicPaise: employee.basicPaise,
+            hraPaise: employee.hraPaise,
+            otherAllowancesPaise: employee.otherAllowancesPaise,
+            overtimePaise: overtimePaise,
+            pfApplicable: employee.pfApplicable,
+            esiApplicable: employee.esiApplicable,
+            postedAt: Date()
+        )
         let result = PayrollDraftValidator().validate(PayrollDraftValidator.Input(
             employeeId: employeeId,
             month: month,
@@ -149,150 +147,16 @@ public final class PayrollService: Sendable {
         if case .invalid(let errs) = result {
             throw AppError.validation(errs[0])
         }
-        try FiscalLockChecker(db: db).assertOpen(financialYearId: financialYear.id)
-        try requireEligibleAccount(salaryExpenseAccountId, for: .payrollExpense, field: "salaryExpenseAccountId")
-        try requireEligibleAccount(paymentAccountId, for: .payrollSettlement, field: "paymentAccountId")
-        let voucherDate = try salaryVoucherDate(month: month, year: year, financialYearId: financialYear.id)
-        let voucherId = UUID()
-        let now = Date()
-        let entry = PayrollEntry(
-            id: UUID(),
-            companyId: companyId,
-            employeeId: employeeId,
-            financialYearId: financialYear.id,
-            voucherId: voucherId,
-            month: month,
-            year: year,
-            grossPaise: gross,
-            deductionsPaise: deductionsPaise,
-            netPaise: net,
-            postedAt: Date()
-        )
-        var voucher: Voucher?
-        let lines = [
-            LedgerLine(
-                id: UUID(),
-                companyId: companyId,
-                voucherId: voucherId,
-                accountId: salaryExpenseAccountId,
-                amountPaise: gross,
-                side: .debit,
-                lineOrder: 0
-            ),
-            LedgerLine(
-                id: UUID(),
-                companyId: companyId,
-                voucherId: voucherId,
-                accountId: paymentAccountId,
-                amountPaise: gross,
-                side: .credit,
-                lineOrder: 1
-            )
-        ]
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
-            let existing = try repo.listEntries(filter: .init(companyId: companyId, employeeId: employeeId, financialYearId: financialYear.id, monthYear: (year, month), limit: 1))
-            if !existing.isEmpty {
-                throw AppError.duplicateSalary("Payroll already posted for this employee and month.")
-            }
-            let number = try VoucherSequenceRepository(db: tx).nextNumber(
-                companyId: companyId,
-                financialYearId: financialYear.id,
-                typeCode: .payroll
-            )
-            let payrollVoucher = Voucher(
-                id: voucherId,
-                companyId: companyId,
-                financialYearId: financialYear.id,
-                voucherTypeCode: .payroll,
-                number: number,
-                date: voucherDate,
-                partyAccountId: paymentAccountId,
-                narration: "Salary \(String(format: "%04d-%02d", year, month)) - \(employee.name)",
-                isReversal: false,
-                reversalOfId: nil,
-                isPosted: true,
-                totalPaise: gross,
-                createdAt: now,
-                updatedAt: now
-            )
-            try VoucherRepository(db: tx).insert(payrollVoucher)
-            for line in lines {
-                try tx.execute(
-                    """
-                    INSERT INTO avelo_ledger_lines
-                    (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    [
-                        .text(line.id.uuidString),
-                        .text(line.companyId.uuidString),
-                        .text(line.voucherId.uuidString),
-                        .text(line.accountId.uuidString),
-                        .integer(line.amountPaise),
-                        .text(line.side.rawValue),
-                        .optionalText(line.taxCode),
-                        .optionalText(line.costCenter),
-                        .integer(Int64(line.lineOrder))
-                    ]
-                )
-            }
             try repo.insertEntry(entry)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .salaryPosted,
+                action: .payrollEntryPosted,
                 entityType: "payroll_entry",
                 entityId: entry.id.uuidString,
-                snapshotAfter: PayrollPostSnapshot(entry: entry, voucher: payrollVoucher, lines: lines)
+                snapshotAfter: entry
             )
-            voucher = payrollVoucher
         }
-        guard voucher != nil else {
-            throw AppError.validation(.init(code: .internal, message: "Payroll posting did not produce a voucher."))
-        }
-        ReportService.invalidateCache(companyId: companyId)
         return entry
-    }
-
-    private struct PayrollPostSnapshot: Sendable, Codable {
-        let entry: PayrollEntry
-        let voucher: Voucher
-        let lines: [LedgerLine]
-    }
-
-    private func requireEligibleAccount(
-        _ accountId: Account.ID,
-        for context: AccountSelectionContext,
-        field: String
-    ) throws {
-        guard let company = try CompanyRepository(db: db).findById(companyId),
-              let account = try AccountRepository(db: db).findById(accountId) else {
-            throw AppError.validation(.init(code: .voucherAccountInactive, field: field, message: "Account is missing."))
-        }
-        let eligibility = try AccountEligibilityPolicy.loading(db: db, companyId: companyId).evaluate(
-            account: account,
-            for: context,
-            company: company,
-            groups: try AccountGroupRepository(db: db).listForCompany(companyId)
-        )
-        guard eligibility.isEligible else {
-            throw AppError.validation(.init(
-                code: .voucherAccountInactive,
-                field: field,
-                message: eligibility.rejectionReason ?? "Account is not eligible for this payroll field."
-            ))
-        }
-    }
-
-    private func salaryVoucherDate(month: Int, year: Int, financialYearId: FinancialYear.ID) throws -> Date {
-        guard let fy = try FinancialYearRepository(db: db).findById(financialYearId) else {
-            throw AppError.notFound("Financial year")
-        }
-        guard let monthStart = DateFormatters.parseDate(String(format: "%04d-%02d-01", year, month)) else {
-            throw AppError.businessRule("Invalid salary month.")
-        }
-        guard monthStart >= fy.startDate && monthStart <= fy.endDate else {
-            throw AppError.validation(.init(code: .voucherDateOutsideFY, message: "Salary month is outside the selected financial year."))
-        }
-        return monthStart
     }
 }

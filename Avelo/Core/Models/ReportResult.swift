@@ -225,34 +225,21 @@ public enum ReportResult {
         public let toDate: Date
         public let output: [GstBucket]
         public let input: [GstBucket]
-        public let outputTaxablePaise: Int64
-        public let inputTaxablePaise: Int64
-        public let outputTaxPaise: Int64
-        public let inputTaxPaise: Int64
         public let netPayablePaise: Int64
 
+        public var outputTaxablePaise: Int64 { output.first?.amountPaise ?? 0 }
+        public var outputTaxPaise: Int64 { output.dropFirst().first?.amountPaise ?? 0 }
+        public var inputTaxablePaise: Int64 { input.first?.amountPaise ?? 0 }
+        public var inputTaxPaise: Int64 { input.dropFirst().first?.amountPaise ?? 0 }
         public var igstPaise: Int64 { output.last(where: { $0.label.contains("IGST") })?.amountPaise ?? 0 }
         public var cgstPaise: Int64 { output.last(where: { $0.label.contains("CGST") })?.amountPaise ?? 0 }
         public var sgstPaise: Int64 { output.last(where: { $0.label.contains("SGST") })?.amountPaise ?? 0 }
-        public var cessPaise: Int64 { output.last(where: { $0.label.contains("CESS") })?.amountPaise ?? 0 }
 
-        public init(fromDate: Date,
-                    toDate: Date,
-                    output: [GstBucket],
-                    input: [GstBucket],
-                    outputTaxablePaise: Int64 = 0,
-                    inputTaxablePaise: Int64 = 0,
-                    outputTaxPaise: Int64 = 0,
-                    inputTaxPaise: Int64 = 0,
-                    netPayablePaise: Int64) {
+        public init(fromDate: Date, toDate: Date, output: [GstBucket], input: [GstBucket], netPayablePaise: Int64) {
             self.fromDate = fromDate
             self.toDate = toDate
             self.output = output
             self.input = input
-            self.outputTaxablePaise = outputTaxablePaise
-            self.inputTaxablePaise = inputTaxablePaise
-            self.outputTaxPaise = outputTaxPaise
-            self.inputTaxPaise = inputTaxPaise
             self.netPayablePaise = netPayablePaise
         }
     }
@@ -295,11 +282,9 @@ public enum ReportResult {
     }
 
     public struct OutstandingRow: Identifiable, Hashable, Sendable {
-        public let id: String
-        public let accountId: Account.ID
+        public let id: Account.ID
         public let accountName: String
         public let partyName: String
-        public let referenceNumber: String
         public let asOf: Date
         public let totalPaise: Int64
         public let amountPaise: Int64
@@ -309,10 +294,8 @@ public enum ReportResult {
         public let age90PlusPaise: Int64
         public let ageInDays: Int
 
-        public init(id: String,
-                    accountId: Account.ID,
+        public init(id: Account.ID,
                     partyName: String,
-                    referenceNumber: String,
                     asOf: Date,
                     amountPaise: Int64,
                     age0to30Paise: Int64 = 0,
@@ -321,10 +304,8 @@ public enum ReportResult {
                     age90PlusPaise: Int64 = 0,
                     ageInDays: Int = 0) {
             self.id = id
-            self.accountId = accountId
             self.accountName = partyName
             self.partyName = partyName
-            self.referenceNumber = referenceNumber
             self.asOf = asOf
             self.totalPaise = amountPaise
             self.amountPaise = amountPaise
@@ -356,16 +337,16 @@ public enum ReportResult {
         public let itemCode: String
         public let itemName: String
         public let unit: String
-        public let quantity: ExactQuantity
+        public let quantity: Double
         public let ratePaise: Int64
         public let valuePaise: Int64
-        public let openingQty: ExactQuantity
+        public let openingQty: Int64
         public let openingValuePaise: Int64
-        public let inQty: ExactQuantity
+        public let inQty: Int64
         public let inValuePaise: Int64
-        public let outQty: ExactQuantity
+        public let outQty: Int64
         public let outValuePaise: Int64
-        public let closingQty: ExactQuantity
+        public let closingQty: Int64
         public let closingValuePaise: Int64
         public let averageCostPaise: Int64
     }
@@ -380,57 +361,5 @@ public enum ReportResult {
             self.rows = rows
             self.totalPaise = totalPaise
         }
-    }
-
-    public struct CashFlowRow: Identifiable, Hashable, Sendable {
-        public let id: String
-        public let section: Section
-        public let accountCode: String
-        public let accountName: String
-        public let inflowPaise: Int64
-        public let outflowPaise: Int64
-        public let netPaise: Int64
-
-        public enum Section: String, CaseIterable, Sendable {
-            case operating
-            case investing
-            case financing
-
-            public var displayName: String {
-                switch self {
-                case .operating: return "Operating Activities"
-                case .investing: return "Investing Activities"
-                case .financing: return "Financing Activities"
-                }
-            }
-        }
-    }
-
-    public struct CashFlowStatement: Sendable, Hashable {
-        public let fromDate: Date
-        public let toDate: Date
-        public let rows: [CashFlowRow]
-        public let operatingNetPaise: Int64
-        public let investingNetPaise: Int64
-        public let financingNetPaise: Int64
-        public let netCashFlowPaise: Int64
-    }
-
-    public struct StockAgeingRow: Identifiable, Hashable, Sendable {
-        public let id: InventoryItem.ID
-        public let itemCode: String
-        public let itemName: String
-        public let unit: String
-        public let onHandQty: Int64
-        public let onHandValuePaise: Int64
-        public let age0to30Qty: Int64
-        public let age31to60Qty: Int64
-        public let age61to90Qty: Int64
-        public let age90PlusQty: Int64
-    }
-
-    public struct StockAgeingReport: Sendable, Hashable {
-        public let asOfDate: Date
-        public let rows: [StockAgeingRow]
     }
 }

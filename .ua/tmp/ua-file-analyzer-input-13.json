@@ -1,0 +1,56 @@
+{
+  "projectRoot": "/Users/vaibhavkakar/Developer/Avelo",
+  "batchFiles": [
+    {
+      "path": ".claude-flow/metrics/backup.json",
+      "language": "json",
+      "sizeLines": 6,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".claude-flow/metrics/codebase-map.json",
+      "language": "json",
+      "sizeLines": 10,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".claude-flow/metrics/consolidation.json",
+      "language": "json",
+      "sizeLines": 15,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".claude-flow/metrics/harness-loop.json",
+      "language": "json",
+      "sizeLines": 82,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".claude-flow/metrics/performance.json",
+      "language": "json",
+      "sizeLines": 16,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".claude-flow/metrics/security-audit.json",
+      "language": "json",
+      "sizeLines": 11,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".claude-flow/metrics/test-gaps.json",
+      "language": "json",
+      "sizeLines": 7,
+      "fileCategory": "config"
+    }
+  ],
+  "batchImportData": {
+    ".claude-flow/metrics/backup.json": [],
+    ".claude-flow/metrics/codebase-map.json": [],
+    ".claude-flow/metrics/consolidation.json": [],
+    ".claude-flow/metrics/harness-loop.json": [],
+    ".claude-flow/metrics/performance.json": [],
+    ".claude-flow/metrics/security-audit.json": [],
+    ".claude-flow/metrics/test-gaps.json": []
+  }
+}

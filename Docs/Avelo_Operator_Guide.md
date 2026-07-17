@@ -3,6 +3,7 @@
 ## Backup and Restore
 
 - Use the app’s backup flow to export a company into an `.avelobackup` file.
+<<<<<<< HEAD
 - Backups include a manifest version, schema version, company identity, database byte count, and SHA-256 checksum.
 - Restores are staged before import. The app verifies the manifest, checksum, byte count, schema version, company identity, and foreign keys before replacing any local company file.
 - Restores are name-checked before import. If a company already exists with the same name, rename or remove the existing company first.
@@ -26,6 +27,17 @@
 - Stock ageing and reorder alerts are available when inventory is enabled.
 - When inventory is disabled, inventory reporting and alerts intentionally return no operational data.
 
+=======
+- Restores are name-checked before import. If a company already exists with the same name, rename or remove the existing company first.
+- If a restore fails, the app keeps the original company untouched and writes a failure trail in the logs.
+
+## Reports
+
+- Trial balance, profit and loss, balance sheet, GST summary, day book, ledger, outstanding, and stock valuation are available from Reports.
+- Report filters are date-sensitive. If a report looks empty, confirm the financial year and date range first.
+- Search is intentionally limited in this release and appears only where it is already supported in the UI.
+
+>>>>>>> origin/main
 ## Search
 
 - Search is available in selected screens such as reports, settings, and company open.
@@ -33,7 +45,17 @@
 
 ## What Is Not Included Yet
 
+<<<<<<< HEAD
 - Group-company consolidation
 - GST portal/API upload or online filing
 - Cloud sync, remote key recovery, or network backup
 - UUIDv7 migration for time-sortable identifiers
+=======
+- Purchase order and sales order tracking
+- Cash flow or funds flow statements
+- Stock ageing and reorder-level alerts
+- Group-company consolidation
+- Invoice-wise GSTR-1 portal upload data
+- Encryption at rest
+
+>>>>>>> origin/main

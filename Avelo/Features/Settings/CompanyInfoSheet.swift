@@ -6,10 +6,18 @@ public struct CompanyInfoSheet: View {
     @Environment(AppRouter.self) private var router
     @State private var company: Company
     @State private var inventoryEnabled: Bool
+<<<<<<< HEAD
+=======
+    @State private var inventoryMode: InventoryLinkMode
+>>>>>>> origin/main
 
     public init(company: Company) {
         _company = State(initialValue: company)
         _inventoryEnabled = State(initialValue: company.isInventoryEnabled)
+<<<<<<< HEAD
+=======
+        _inventoryMode = State(initialValue: company.inventoryLinkMode)
+>>>>>>> origin/main
     }
 
     public var body: some View {
@@ -41,9 +49,18 @@ public struct CompanyInfoSheet: View {
                     }
                     Section("Inventory") {
                         Toggle("Enable inventory", isOn: $inventoryEnabled)
+<<<<<<< HEAD
                         Text("Ledger vouchers do not create stock movements automatically. Use an item invoice or record stock manually.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+=======
+                        Picker("Link mode", selection: $inventoryMode) {
+                            ForEach(InventoryLinkMode.allCases) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .disabled(!inventoryEnabled)
+>>>>>>> origin/main
                     }
                 }
                 .formStyle(.grouped)
@@ -74,10 +91,16 @@ public struct CompanyInfoSheet: View {
         do {
             var updated = company
             updated.isInventoryEnabled = inventoryEnabled
+<<<<<<< HEAD
             updated.inventoryLinkMode = .manual
             try CompanyService(db: ctx.database, companyId: ctx.companyId, manager: env.manager).update(updated)
             env.notifyDataChanged()
             env.refreshCompanyFlags()
+=======
+            updated.inventoryLinkMode = inventoryEnabled ? inventoryMode : .manual
+            try CompanyService(db: ctx.database, companyId: ctx.companyId, manager: env.manager).update(updated)
+            env.notifyDataChanged()
+>>>>>>> origin/main
             env.showSuccess("Company information saved.")
             router.presentedSheet = nil
         } catch {

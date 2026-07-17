@@ -21,6 +21,7 @@ public struct LedgerLineRepository: Sendable {
     }
 
     public func insertBatch(_ lines: [LedgerLine]) throws {
+<<<<<<< HEAD:Avelo/Core/Repositories/LedgerLineRepository.swift
         let maximumRowsPerStatement = 99 // 99 rows * 9 columns = 891 bindings
         var start = lines.startIndex
         while start < lines.endIndex {
@@ -31,6 +32,28 @@ public struct LedgerLineRepository: Sendable {
             bindings.reserveCapacity(lines.distance(from: start, to: end) * 9)
             for line in lines[start..<end] {
                 bindings.append(contentsOf: Self.insertBindings(for: line))
+=======
+        try db.write { tx in
+            for line in lines {
+                try tx.execute(
+                    """
+                    INSERT INTO avelo_ledger_lines
+                    (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        .text(line.id.uuidString),
+                        .text(line.companyId.uuidString),
+                        .text(line.voucherId.uuidString),
+                        .text(line.accountId.uuidString),
+                        .integer(line.amountPaise),
+                        .text(line.side.rawValue),
+                        .optionalText(line.taxCode),
+                        .optionalText(line.costCenter),
+                        .integer(Int64(line.lineOrder))
+                    ]
+                )
+>>>>>>> origin/main:Mally/Core/Repositories/LedgerLineRepository.swift
             }
             try db.execute(
                 """
@@ -121,11 +144,20 @@ public struct LedgerLineRepository: Sendable {
     }
 
     static func rowToLine(_ r: Row) throws -> LedgerLine {
+<<<<<<< HEAD:Avelo/Core/Repositories/LedgerLineRepository.swift
         let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_ledger_lines.id")
         let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_ledger_lines.company_id")
         let voucherId = try UUIDParsing.required(r.requiredText("voucher_id"), field: "avelo_ledger_lines.voucher_id")
         let accountId = try UUIDParsing.required(r.requiredText("account_id"), field: "avelo_ledger_lines.account_id")
         let side: EntrySide = try r.enumValue("side")
+=======
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_ledger_lines.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_ledger_lines.company_id")
+        let voucherId = try UUIDParsing.required(r.text("voucher_id"), field: "avelo_ledger_lines.voucher_id")
+        let accountId = try UUIDParsing.required(r.text("account_id"), field: "avelo_ledger_lines.account_id")
+        let sideRaw = r.text("side")
+        let side = EntrySide(rawValue: sideRaw) ?? .debit
+>>>>>>> origin/main:Mally/Core/Repositories/LedgerLineRepository.swift
         return LedgerLine(
             id: id,
             companyId: companyId,

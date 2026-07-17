@@ -1,0 +1,117 @@
+{
+  "nodes": [
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Project overview for Avelo, an offline-first macOS accounting application. Covers features, benchmarks, build instructions, architecture layers, and requirements.",
+      "tags": ["documentation", "entry-point", "overview", "architecture"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "AGENTS.md",
+      "summary": "Authoritative repository instructions for developers. Defines source-of-truth order for design decisions, work selection criteria, dependency boundaries, implementation rules, verification gates, and definition of done.",
+      "tags": ["documentation", "development", "guidelines", "governance"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:CONTRIBUTING.md",
+      "type": "document",
+      "name": "CONTRIBUTING.md",
+      "filePath": "CONTRIBUTING.md",
+      "summary": "Contributor guidelines covering branch naming, commit style, local developer workflow, testing expectations, and pull request requirements.",
+      "tags": ["documentation", "development", "contribution-guidelines"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:CHANGELOG.md",
+      "type": "document",
+      "name": "CHANGELOG.md",
+      "filePath": "CHANGELOG.md",
+      "summary": "Release changelog documenting unreleased v1.1 changes, including feature implementations, bug fixes, and performance benchmark results.",
+      "tags": ["documentation", "release-notes", "version-history"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Makefile",
+      "type": "file",
+      "name": "Makefile",
+      "filePath": "Makefile",
+      "summary": "Build automation targets for Swift package management. Orchestrates setup, development build, testing, release bundling, validation, verification, rule audits, and benchmark runs.",
+      "tags": ["build-system", "infrastructure", "automation", "development"],
+      "complexity": "moderate",
+      "languageNotes": "Swift package build targets with local SwiftPM cache fallback and comprehensive rule-audit checks (net-check, R-16, R-15, R-4)."
+    },
+    {
+      "id": "config:ReleaseVersion.env",
+      "type": "config",
+      "name": "ReleaseVersion.env",
+      "filePath": "ReleaseVersion.env",
+      "summary": "Release version configuration specifying the canonical version and build numbers (AVELO_VERSION=1.1, AVELO_BUILD=3) used by release scripts and bundle assembly.",
+      "tags": ["configuration", "release-management", "version-control"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:README.md",
+      "target": "document:AGENTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "document:CONTRIBUTING.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:Makefile",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:CONTRIBUTING.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CONTRIBUTING.md",
+      "target": "file:Makefile",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CHANGELOG.md",
+      "target": "config:ReleaseVersion.env",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:ReleaseVersion.env",
+      "target": "file:Makefile",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Makefile",
+      "target": "document:AGENTS.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

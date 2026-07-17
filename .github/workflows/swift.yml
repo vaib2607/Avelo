@@ -11,11 +11,22 @@ on:
 
 jobs:
   build:
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
     runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v4
+<<<<<<< HEAD
     - name: Bootstrap toolchain path
       run: make setup
     - name: Run local proof set
       run: make verify
+=======
+    - name: Build
+      run: swift build -v
+    - name: Run tests
+      run: swift test -v
+>>>>>>> origin/main

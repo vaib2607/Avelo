@@ -19,7 +19,10 @@ public final class KeyboardBridge {
     public var suppressedKeyFlash: String?
 
     private weak var router: AppRouter?
+<<<<<<< HEAD
     private var isInventoryEnabledProvider: () -> Bool = { false }
+=======
+>>>>>>> origin/main
     private var flashGeneration: Int = 0
 
     public init() {}
@@ -41,6 +44,7 @@ public final class KeyboardBridge {
         self.router = router
     }
 
+<<<<<<< HEAD
     /// AVL-P0-033: Inventory shortcuts must no-op (not route through a
     /// screen that no longer appears anywhere else) when disabled. A
     /// closure rather than a stored `AppEnvironment` reference keeps this
@@ -51,10 +55,13 @@ public final class KeyboardBridge {
 
     private var isInventoryEnabled: Bool { isInventoryEnabledProvider() }
 
+=======
+>>>>>>> origin/main
     public func dispatch(_ command: KeyboardCommand) {
         lastCommand = command
         switch command {
         case .openDashboard:     router?.go(.dashboard)
+<<<<<<< HEAD
         case .openAccounts:      performRegistryAction(.accountsDisplay)
         case .openVouchers:      performRegistryAction(.vouchersDisplay)
         case .openReports:       router?.go(.reports)
@@ -62,18 +69,31 @@ public final class KeyboardBridge {
             router?.setInventoryEnabled(isInventoryEnabled)
             if isInventoryEnabled { router?.go(.inventory) }
         case .openGST:           router?.go(.gst)
+=======
+        case .openAccounts:      router?.go(.accounts)
+        case .openVouchers:      router?.go(.vouchers)
+        case .openReports:       router?.go(.reports)
+        case .openInventory:     router?.go(.inventory)
+>>>>>>> origin/main
         case .openPayroll:       router?.go(.payroll)
         case .openBanking:       router?.go(.banking)
         case .openAudit:         router?.go(.audit)
         case .openSettings:      router?.go(.settings)
 
         case .newVoucher(let type):
+<<<<<<< HEAD
             performRegistryAction(voucherCreateActionId(for: type))
 
         case .newAccount:        performRegistryAction(.accountCreate)
         case .newItem:
             router?.setInventoryEnabled(isInventoryEnabled)
             if isInventoryEnabled { router?.present(.newItem) }
+=======
+            router?.present(sheet(for: type))
+
+        case .newAccount:        router?.present(.newAccount)
+        case .newItem:           router?.present(.newItem)
+>>>>>>> origin/main
         case .newEmployee:       router?.present(.newEmployee)
 
         case .commandPalette:    commandPaletteActive = true
@@ -88,6 +108,7 @@ public final class KeyboardBridge {
     public func dismissQuickSearch()    { quickSearchActive = false }
     public func dismissShortcutHelp()   { shortcutHelpActive = false }
 
+<<<<<<< HEAD
     private func performRegistryAction(_ id: AppActionID) {
         guard let router else { return }
         AppActionRegistry.perform(id, router: router)
@@ -100,6 +121,28 @@ public final class KeyboardBridge {
         switch type {
         case .opening, .payroll: return .voucherCreate(.journal)
         default: return .voucherCreate(type)
+=======
+    private func sheet(for type: VoucherType.Code) -> RouterSheet {
+        switch type {
+        case .journal:     return .newJournal
+        case .payment:     return .newPayment
+        case .receipt:     return .newReceipt
+        case .contra:      return .newContra
+        case .purchase:    return .newPurchase
+        case .sales:       return .newSales
+        case .purchaseOrder: return .newPurchaseOrder
+        case .salesOrder:  return .newSalesOrder
+        case .receiptNote: return .newReceiptNote
+        case .deliveryNote: return .newDeliveryNote
+        case .physicalStock: return .newPhysicalStock
+        case .stockJournal: return .newStockJournal
+        case .rejectionIn:  return .newRejectionIn
+        case .rejectionOut: return .newRejectionOut
+        case .creditNote:  return .newCreditNote
+        case .debitNote:   return .newDebitNote
+        case .opening, .payroll:
+            return .newJournal
+>>>>>>> origin/main
         }
     }
 }

@@ -1,5 +1,6 @@
 # AVELO Release Board
 
+<<<<<<< HEAD
 Snapshot: 2026-07-15
 
 **Canonical verdict: NOT READY FOR PUBLIC PRODUCTION.**
@@ -7,6 +8,9 @@ Snapshot: 2026-07-15
 This is the repo-tracked `P0/P1/P2` source of truth for readiness. Each unresolved issue appears once, carries one severity, and maps to `Docs/Avelo_Execution_Checklist.md`. Feature presence, an old green test log, or a locally launchable ad-hoc bundle does not override this verdict.
 
 The complete product roadmap and requirement crosswalk is `Docs/Avelo_Master_Product_Execution_Plan.md`. This board remains the authority for current status and proof.
+=======
+This is the repo-tracked `P0/P1/P2` execution board for the release push. Each open issue appears once, carries one severity, and maps back to the master execution checklist.
+>>>>>>> origin/main
 
 Current release target:
 - `v1.1` is the performance, accuracy, and reliability hardening release.
@@ -17,6 +21,7 @@ Severity rules:
 - `P1`: high-priority shipped-path gap that can cause broken workflow, bad UX trust, or incomplete validation
 - `P2`: lower-priority release work, deferrable module decisions, or hardening/polish items that do not block core correctness by themselves
 
+<<<<<<< HEAD
 State rules:
 
 - `Implementation remaining`: required code/schema/workflow is missing or contradictory.
@@ -36,6 +41,12 @@ Module ship status:
 - `Exposed, not Ready`: company setup, company switching, FYs, accounts, vouchers, reports, inventory, payroll, banking, audit, backup/restore, and the offline shell remain available for development and accountant QA, but the open P0 catalogue below blocks a Ready designation.
 - `Conditional`: inventory valuation, payroll compliance, banking reconciliation, GST filing, and legal-document output must be labelled incomplete anywhere they remain visible.
 - `Deferred`: features whose broader workflows are still explicit stubs, including BOM costing/production, TDS/TCS, cost-centre/category, and advanced order/logistics flows, cannot be counted as shipped merely because models, fields, routes, or placeholder screens exist. Core cheque bounce/re-presentation and BOM cycle-safe persistence now ship-path test, but broader adjacent workflows remain open until the canonical backlog closes them.
+=======
+Module ship status:
+- `Core ship`: company setup, company switching, FYs, accounts, vouchers, reports, inventory, payroll, banking, audit, backup/restore, offline shell
+- `Conditional`: none in the current local RC shell
+- `Deferred`: PO/SO order-tracking, cash flow statement, stock ageing/reorder alerts, group-company consolidation, and invoice-wise GSTR-1 portal upload data beyond the current summary CSV/report preparation; each requires either a new report family or a cross-file/stateful workflow layer that exceeds the RC scope
+>>>>>>> origin/main
 
 Release split rule:
 - If it affects correctness, data loss, or the app's ability to open and save reliably on day one, it belongs in `V1`.
@@ -47,12 +58,17 @@ Release split rule:
 ### V1: Must Ship
 - Fail loudly on malformed UUIDs instead of substituting fresh IDs. Status: done in shipped repository, registry, and report-decode paths with regression coverage.
 - Keep restore safe and deterministic; minimize mutation during restore and preserve checksum verification.
+<<<<<<< HEAD
 - Preserve currently tested WAL, foreign-key, transaction, and audit-immutability primitives while closing the open fiscal-lock, strict-decoding, tamper-evidence, and company-isolation requirements in the canonical P0 catalogue.
 - `VoucherService.postBatch` commits in bounded chunks of 500 drafts; if a later chunk fails, already-committed chunks remain durable and the failing/later chunks are not partially persisted.
+=======
+- Preserve core correctness guarantees already in place: WAL, foreign keys, transactions, locked fiscal years, audit immutability, company isolation.
+>>>>>>> origin/main
 - Add basic handling for missing or moved company files that gives a clear recovery path or explicit re-link workflow. Status: core open and backup paths now honor registry `sqlite_file_name`, preserve a legacy `id.sqlite` fallback, and fail with explicit re-link or restore guidance when the registered file is missing.
 - Add minimum viability checks for permissions, disk-full, and backup-write failures so the app fails cleanly.
 - Prevent obvious large-ledger or report slow paths that would make core accounting unusable at launch.
 
+<<<<<<< HEAD
 ### Landed security/restore baseline (historically labelled V2)
 - Migrate from plain UUIDs to UUIDv7 for time-sortable IDs and better offline merge behavior.
 - Preserve and extend restore hardening and explicit integrity verification around imported backups.
@@ -72,6 +88,15 @@ Release split rule:
 - `ReportRepository+Statements.swift` was split into financial-statement and compliance-report extensions, and `ReportsView+Content.swift` report sections were split into focused `ReportsBody+...` extensions without changing `ReportService` cache keys or invalidation behavior.
 - Release mechanics re-run on 2026-06-21: `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES swift build` passed, `make net-check` reported 0 matches, release build and bundle validation passed, and `Scripts/bundle_selftest.sh` passed for company setup, voucher CRUD, FY lock, reports, backup, and recovery-key restore.
 
+=======
+### V2: Should Ship After Launch
+- Migrate from plain UUIDs to UUIDv7 for time-sortable IDs and better offline merge behavior.
+- Add stronger restore hardening and more explicit integrity verification around imported backups.
+- Add basic large-dataset performance work: better pagination, query-plan tuning, prepared-statement reuse, and benchmark-driven regression checks.
+- Add SQLCipher or equivalent at-rest encryption if product or security requirements demand it.
+- Add clearer recovery for unusual filesystem cases like network volumes or antivirus locks.
+
+>>>>>>> origin/main
 ### V3: Later Hardening / Scale Work
 - Filesystem-type detection and FAT32-specific backup warnings.
 - Thermal-throttling-aware UI behavior.
@@ -86,6 +111,7 @@ Hidden entry-point rule:
 
 ## Top 10 Blockers In Execution Order
 
+<<<<<<< HEAD
 1. Accountant acceptance for the remaining P0 accounting, report, inventory, GST, audit, and picker workflows.
 2. Operator acceptance for migration, backup/restore, recovery, corruption, storage, sleep/App Nap, and resource cleanup.
 3. Keyboard, VoiceOver, focus, appearance, resize, PDF, and physical-printer acceptance.
@@ -138,12 +164,16 @@ Execution queue alignment:
 - `AVL-P0-030` implementation and automated proof are landed (`CompanyIsolationTests` covers cross-company rejection at service and trigger layers across vouchers, accounts, ledger lines, stock, payroll, and bank import); it remains open only until accountant company-isolation acceptance is executed and recorded.
 - `AVL-P0-027` implementation and automated proof are landed (`SQLiteDatabaseTests` covers malformed-value and corrupt-database fail-closed reads); it remains open only until accountant corruption-handling acceptance is executed and recorded.
 - `AVL-P0-002` implementation and automated proof are landed (`VoucherServiceTests` covers failed-post, failed-batch-chunk, cancellation, and concurrent-posting gap-free numbering); it remains open only until accountant contiguous-numbering acceptance is executed and recorded.
+=======
+1. No current release blockers proven from repo evidence
+>>>>>>> origin/main
 
 ## Release-Risk Split
 
 | Track | Status | Notes |
 | --- | --- | --- |
 | V1 | Active | Day-one correctness, restore safety, file-open/save reliability, and launch viability risks stay here until closed. |
+<<<<<<< HEAD
 | V2 | Deferred future scope only | UUIDv7/merge behavior and broader scale tuning remain future work. SQLCipher, manifest validation, recovery keys, and staged restore are already V1 baseline and must stay green. |
 | V3 | Deferred | Edge-case resilience, maintenance automation, and deep scale or hardware hardening belong here. |
 
@@ -297,6 +327,12 @@ Binding rules: aliases resolve by the active keyboard context; existing macOS bi
 ## Historical RC Board
 
 The following completed entries document earlier RC work. They do not override the open canonical readiness catalogue above.
+=======
+| V2 | Deferred until post-launch unless needed to unblock V1 | Merge behavior, stronger backup integrity, at-rest encryption, and broader scale tuning belong here. |
+| V3 | Deferred | Edge-case resilience, maintenance automation, and deep scale or hardware hardening belong here. |
+
+## Open Board
+>>>>>>> origin/main
 
 | ID | Severity | Status | Checklist Ref | Issue |
 | --- | --- | --- | --- | --- |

@@ -4,6 +4,7 @@ import PDFKit
 
 final class InvoicePDFServiceTests: XCTestCase {
 
+<<<<<<< HEAD
     /// Inserts a party (customer/vendor) account with the given GSTIN
     /// (or none), matching the raw-SQL fixture pattern the existing sales
     /// voucher test already uses (AccountService.createAccount doesn't
@@ -44,6 +45,8 @@ final class InvoicePDFServiceTests: XCTestCase {
         try repo.update(company)
     }
 
+=======
+>>>>>>> origin/main
     func testExportsTaxInvoicePdfForSalesVoucher() throws {
         let tc = try TestCompany.make()
         let companyRepo = CompanyRepository(db: tc.db)
@@ -59,7 +62,10 @@ final class InvoicePDFServiceTests: XCTestCase {
 
         let accounts = AccountRepository(db: tc.db)
         let customerId = UUID()
+<<<<<<< HEAD
         let debtorGroupId = try XCTUnwrap(accounts.findById(tc.customerId)).groupId
+=======
+>>>>>>> origin/main
         try tc.db.execute(
             """
             INSERT INTO avelo_accounts
@@ -70,7 +76,11 @@ final class InvoicePDFServiceTests: XCTestCase {
             [
                 .text(customerId.uuidString),
                 .text(tc.companyId.uuidString),
+<<<<<<< HEAD
                 .text(debtorGroupId.uuidString),
+=======
+                .text(tc.assetsGroupId.uuidString),
+>>>>>>> origin/main
                 .text("CUST-001"),
                 .text("Acme Traders"),
                 .integer(0),
@@ -100,6 +110,7 @@ final class InvoicePDFServiceTests: XCTestCase {
 
         let pdfData = try InvoicePDFService(db: tc.db).exportTaxInvoicePDF(voucherId: voucher.id)
         XCTAssertTrue(pdfData.starts(with: Data("%PDF".utf8)))
+<<<<<<< HEAD
         XCTAssertEqual(try AuditRepository(db: tc.db).list(filter: .init(companyId: tc.companyId, action: .invoicePDFExported)).count, 0)
 
         let savedURL = FileManager.default.temporaryDirectory.appendingPathComponent("invoice-\(UUID().uuidString).pdf")
@@ -107,6 +118,8 @@ final class InvoicePDFServiceTests: XCTestCase {
         try pdfData.write(to: savedURL, options: .atomic)
         try InvoicePDFService(db: tc.db).recordExportSaved(voucherId: voucher.id, url: savedURL)
         XCTAssertEqual(try AuditRepository(db: tc.db).list(filter: .init(companyId: tc.companyId, action: .invoicePDFExported)).count, 1)
+=======
+>>>>>>> origin/main
 
         let document = PDFDocument(data: pdfData)
         XCTAssertNotNil(document)
@@ -122,6 +135,7 @@ final class InvoicePDFServiceTests: XCTestCase {
         XCTAssertTrue(fullText.contains(Currency.formatPaise(118000)))
         XCTAssertTrue(fullText.contains(voucher.number))
     }
+<<<<<<< HEAD
 
     func testExportFailsClosedWhenVisibleInvoiceLinesOverflow() throws {
         let tc = try TestCompany.make()
@@ -377,4 +391,6 @@ final class InvoicePDFServiceTests: XCTestCase {
         let document = PDFDocument(data: data)
         return (document?.string ?? "") + "\n" + ((document?.page(at: 0)?.string) ?? "")
     }
+=======
+>>>>>>> origin/main
 }

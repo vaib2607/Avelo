@@ -21,7 +21,11 @@ public final class OnboardingViewModel {
     public var fyEnd: Date = IndianFinancialYear.end(for: Date())
     public var booksBegin: Date = IndianFinancialYear.start(for: Date())
     public var enableInventory: Bool = false
+<<<<<<< HEAD
     public var inventoryMode: InventoryLinkMode = .manual
+=======
+    public var inventoryMode: InventoryLinkMode = .autoPrompt
+>>>>>>> origin/main
     public var defaultChart: String = "Default"
     public var canCreate: Bool = false
 

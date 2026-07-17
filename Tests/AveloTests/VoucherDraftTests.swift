@@ -2,6 +2,7 @@ import XCTest
 @testable import Avelo
 
 final class VoucherDraftTests: XCTestCase {
+<<<<<<< HEAD
     @MainActor
     func testReloadAccountContextImmediatelyReflectsPartyProfileChanges() throws {
         let tc = try TestCompany.make()
@@ -53,6 +54,8 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertFalse(viewModel.eligibility(regrouped, for: .voucherParty(.sales)).isEligible)
     }
 
+=======
+>>>>>>> origin/main
 
     private func line(_ amount: Int64, _ side: EntrySide, account: Account.ID? = UUID()) -> VoucherDraft.Line {
         VoucherDraft.Line(accountId: account, amountPaise: amount, side: side)
@@ -76,6 +79,7 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertFalse(d.isBalanced)
     }
 
+<<<<<<< HEAD
     func testCheckedTotalsThrowOnOverflow() {
         let d = draft([line(Int64.max, .debit), line(1, .debit), line(Int64.max, .credit)])
         XCTAssertThrowsError(try d.checkedTotals()) { error in
@@ -94,6 +98,8 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertFalse(d.isBalanced)
     }
 
+=======
+>>>>>>> origin/main
     func testFilledLinesExcludesEmptyAndZero() {
         let d = draft([
             line(50000, .debit),
@@ -134,6 +140,7 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertEqual(vm.lines[0].amount, "100.00")
         XCTAssertEqual(vm.lines[1].side, .credit)
     }
+<<<<<<< HEAD
 
     // AVL-P0-020: `MoneyTextField`'s `onCommit` (fired on Return/Enter, not on
     // a plain blur) drives `addLine()` in the voucher-line grid so pressing
@@ -649,4 +656,6 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertTrue(vm.isCashOrBank(account("CASH_IN_HAND", group: assetGroup)))        // legacy seed cash ledger
         XCTAssertFalse(vm.isCashOrBank(account("SUNDRY_DEBTORS", group: assetGroup)))
     }
+=======
+>>>>>>> origin/main
 }

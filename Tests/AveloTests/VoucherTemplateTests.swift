@@ -12,6 +12,7 @@ final class VoucherTemplateTests: XCTestCase {
         let loaded = try XCTUnwrap(VoucherTemplateService(db: tc.db, companyId: tc.companyId).load(name: "Default"))
         XCTAssertEqual(loaded.voucherTypeCode, .journal)
         XCTAssertEqual(loaded.lines.count, 2)
+<<<<<<< HEAD
         let events = try AuditRepository(db: tc.db).list(
             filter: .init(companyId: tc.companyId, action: .voucherTemplateSaved)
         )
@@ -39,5 +40,7 @@ final class VoucherTemplateTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try VoucherTemplateService(db: tc.db, companyId: tc.companyId).load(name: "Broken"))
+=======
+>>>>>>> origin/main
     }
 }

@@ -26,16 +26,22 @@ final class CurrencyTests: XCTestCase {
         XCTAssertEqual(Currency.formatPaise(0, style: .signedIndianGrouping), "₹0.00")
     }
 
+<<<<<<< HEAD
     func testFormatPaiseHandlesInt64MinWithoutTrapping() {
         XCTAssertEqual(Currency.formatPaise(Int64.min), "-₹92,23,37,20,36,85,47,758.08")
     }
 
     func testRupeesToPaiseAndBack() throws {
         let paise = try Currency.rupeesToPaise(Decimal(string: "123.45")!)
+=======
+    func testRupeesToPaiseAndBack() {
+        let paise = Currency.rupeesToPaise(Decimal(string: "123.45")!)
+>>>>>>> origin/main
         XCTAssertEqual(paise, 12345)
         XCTAssertEqual(Currency.paiseToRupees(12345), Decimal(string: "123.45")!)
     }
 
+<<<<<<< HEAD
     func testRupeesToPaiseRoundsToPaise() throws {
         // 1 paise = 0.01 rupee; sub-paise input must round to nearest paise.
         XCTAssertEqual(try Currency.rupeesToPaise(Decimal(string: "10.014")!), 1001)
@@ -50,6 +56,13 @@ final class CurrencyTests: XCTestCase {
             }
             XCTAssertTrue(message.localizedCaseInsensitiveContains("overflow"))
         }
+=======
+    func testRupeesToPaiseRoundsToPaise() {
+        // 1 paise = 0.01 rupee; sub-paise input must round to nearest paise.
+        XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.014")!), 1001)
+        XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.015")!), 1002)
+        XCTAssertEqual(Currency.rupeesToPaise(Decimal(string: "10.016")!), 1002)
+>>>>>>> origin/main
     }
 
     func testParseRupeeInputRoundTrip() {
@@ -64,6 +77,7 @@ final class CurrencyTests: XCTestCase {
         XCTAssertNil(Currency.parseRupeeInput("abc"))            // no digits -> nil
     }
 
+<<<<<<< HEAD
     // AVL-P0-021: locale-aware decimal parsing. Indian-typed amounts always
     // round-trip; comma-decimal paste sources (European locale, spreadsheet
     // exports) resolve to the same paise instead of being silently scaled by
@@ -96,6 +110,8 @@ final class CurrencyTests: XCTestCase {
         XCTAssertNil(Currency.parseRupeeInput("12,3456"))   // single "," with 4+ digits is neither shape
     }
 
+=======
+>>>>>>> origin/main
     func testFormatAmountInput() {
         XCTAssertEqual(Currency.formatAmountInput(paise: 0), "0.00")
         XCTAssertEqual(Currency.formatAmountInput(paise: 12345), "123.45")

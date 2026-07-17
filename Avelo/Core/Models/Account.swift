@@ -3,6 +3,7 @@ import Foundation
 public enum OpeningBalanceSide: String, CaseIterable, Sendable, Codable, Identifiable {
     case debit
     case credit
+<<<<<<< HEAD:Avelo/Core/Models/Account.swift
 
     public var id: String { rawValue }
 
@@ -22,6 +23,8 @@ public enum GSTRegistrationType: String, CaseIterable, Sendable, Codable, Identi
     case consumer
     case sez
     case export
+=======
+>>>>>>> origin/main:Mally/Core/Models/Account.swift
 
     public var id: String { rawValue }
 

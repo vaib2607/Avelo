@@ -1,0 +1,254 @@
+{
+  "nodes": [
+    {
+      "id": "document:Docs/Avelo_ASSEMBLY.md",
+      "type": "document",
+      "name": "Avelo_ASSEMBLY.md",
+      "filePath": "Docs/Avelo_ASSEMBLY.md",
+      "summary": "Project structure and directory assembly reference mapping top-level organization, Core subsystems (Database, Models, Repositories, Services, Validation, Utilities), Features modules, and Shared components with data-flow overview.",
+      "tags": ["documentation", "structure", "architecture", "reference"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:Docs/Avelo_Accounting_Logic_Audit.md",
+      "type": "document",
+      "name": "Avelo_Accounting_Logic_Audit.md",
+      "filePath": "Docs/Avelo_Accounting_Logic_Audit.md",
+      "summary": "Comprehensive audit of accounting logic correctness covering P&L and balance-sheet accuracy, account semantics, GST handling, cash-flow detection, and stock-ageing constraints with prioritized findings and validated test scenarios.",
+      "tags": ["documentation", "audit", "accounting", "testing", "validation"],
+      "complexity": "moderate",
+      "languageNotes": "Account-semantics matrix and workflow expectations documented with debit/credit expectations and regression scenarios."
+    },
+    {
+      "id": "document:Docs/Avelo_Architecture.md",
+      "type": "document",
+      "name": "Avelo_Architecture.md",
+      "filePath": "Docs/Avelo_Architecture.md",
+      "summary": "Normative architecture specification defining 15 layered subsystems including composition, storage, concurrency, database access, SwiftUI patterns, routing, accounting pipelines, reporting, backup/restore, schema evolution, audit, and production boundaries.",
+      "tags": ["documentation", "architecture", "specification", "design", "normative"],
+      "complexity": "moderate",
+      "languageNotes": "Strict layered model with unidirectional dependencies; views never import repositories; data layer never imports SwiftUI."
+    },
+    {
+      "id": "document:Docs/Avelo_Execution_Checklist.md",
+      "type": "document",
+      "name": "Avelo_Execution_Checklist.md",
+      "filePath": "Docs/Avelo_Execution_Checklist.md",
+      "summary": "Master execution checklist for v1.1 release defining P0/P1/P2 gate policies, Wave-based execution (P0-A through P2 phases), acceptance criteria, detailed evidence logs for completed items, and release-gate status.",
+      "tags": ["documentation", "project-management", "release-planning", "execution", "gates"],
+      "complexity": "complex",
+      "languageNotes": "Gates enforced at Wave level: P0-A (proof closure), P0-B (accounting/fiscal), P0-C (storage/UI/legal), P1-A/B/C, P2."
+    },
+    {
+      "id": "document:Docs/Avelo_Master_PRD.md",
+      "type": "document",
+      "name": "Avelo_Master_PRD.md",
+      "filePath": "Docs/Avelo_Master_PRD.md",
+      "summary": "Normative product requirements document defining Avelo as a 100% offline macOS accounting application for Indian small businesses, covering user personas, product model, company lifecycle, voucher/account workspaces, inventory, payroll, banking, reports, and keyboard contracts.",
+      "tags": ["documentation", "product-requirements", "specification", "normative", "design"],
+      "complexity": "moderate",
+      "languageNotes": "Single source of truth for product behavior; every screen, field, keyboard shortcut, and error message specified. Indian FY (1 April to 31 March) with multi-company support."
+    },
+    {
+      "id": "document:Docs/Avelo_Master_Product_Execution_Plan.md",
+      "type": "document",
+      "name": "Avelo_Master_Product_Execution_Plan.md",
+      "filePath": "Docs/Avelo_Master_Product_Execution_Plan.md",
+      "summary": "Master execution and product direction plan covering locked architecture decisions, central account eligibility, declarative definitions, contextual action registry, and 11 phased rollout (Phase 0 through Phase 10) with implementation strategies and verification gates.",
+      "tags": ["documentation", "project-management", "product-planning", "execution", "phases"],
+      "complexity": "complex",
+      "languageNotes": "Phased execution from Phase 0 (v1.1 correctness) through Phase 10 (Extension Language); includes authority statement and locked decisions."
+    },
+    {
+      "id": "document:Docs/Avelo_Module_Checklist.md",
+      "type": "document",
+      "name": "Avelo_Module_Checklist.md",
+      "filePath": "Docs/Avelo_Module_Checklist.md",
+      "summary": "Sequential module build checklist organized in 10 passes (Docs, Shared, Models, Database, Resources, Repositories, Services, Validation, App shell, Features) plus per-slice acceptance criteria for 8 slices (Foundation through Hardening).",
+      "tags": ["documentation", "build-system", "project-management", "checklist"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:Docs/Avelo_Naming_Freeze.md",
+      "type": "document",
+      "name": "Avelo_Naming_Freeze.md",
+      "filePath": "Docs/Avelo_Naming_Freeze.md",
+      "summary": "Naming freeze specification governing 11 categories: application/shared state, core domain names, persisted enum names/values, database boundary names, repository/service names, validation/report namespaces, SQL names, keyboard identifiers, and forbidden type names.",
+      "tags": ["documentation", "naming-conventions", "specification", "standards", "freeze"],
+      "complexity": "moderate",
+      "languageNotes": "Explicit naming freeze for backward-compatibility; persisted enum raw values locked; database/repository/service names specified for deterministic codegen."
+    },
+    {
+      "id": "document:Docs/Avelo_Operator_Guide.md",
+      "type": "document",
+      "name": "Avelo_Operator_Guide.md",
+      "filePath": "Docs/Avelo_Operator_Guide.md",
+      "summary": "Quick-reference operator guide covering backup/restore, encryption, reports, inventory management, and search functionality with brief notes on unimplemented features.",
+      "tags": ["documentation", "operations", "user-guide", "reference"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:Docs/Avelo_Phase0_Manual_Acceptance.md",
+      "type": "document",
+      "name": "Avelo_Phase0_Manual_Acceptance.md",
+      "filePath": "Docs/Avelo_Phase0_Manual_Acceptance.md",
+      "summary": "Phase 0 manual acceptance test specification defining accountant acceptance (company/FY/account selection, voucher keyboard, bills/cheques, reports), operator acceptance (backup/restore/keys/corruption, migration/storage), and accessibility/distribution criteria.",
+      "tags": ["documentation", "testing", "acceptance", "qa", "specification"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:Docs/Avelo_Release_Board.md",
+      "type": "document",
+      "name": "Avelo_Release_Board.md",
+      "filePath": "Docs/Avelo_Release_Board.md",
+      "summary": "Release board and blocker tracking documenting V1 must-ship items, V2 encryption/performance work, V3 later hardening, top 10 release-blocking issues, and canonical backlog with P0/P1/P2 priority categories totaling 101 tracked items.",
+      "tags": ["documentation", "release-planning", "project-management", "blockers"],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:Docs/Avelo_Rules.md",
+      "type": "document",
+      "name": "Avelo_Rules.md",
+      "filePath": "Docs/Avelo_Rules.md",
+      "summary": "Non-negotiable core rules (20 rules) governing system constraints: 100% offline, manual entry, SQLite as record, Int64 paise arithmetic, double-entry validation, financial-year locks, optional inventory, company isolation, and audit append-only semantics.",
+      "tags": ["documentation", "specification", "rules", "constraints", "normative"],
+      "complexity": "moderate",
+      "languageNotes": "Rules enforce strict invariants: offline-only, no URLSession/Analytics, every voucher balanced, no silent deletion, audit append-only, FY locks enforced at SQL trigger."
+    },
+    {
+      "id": "document:Docs/Avelo_Schema.md",
+      "type": "document",
+      "name": "Avelo_Schema.md",
+      "filePath": "Docs/Avelo_Schema.md",
+      "summary": "Complete normalized database schema specification covering 32 tables (companies, financial-years, accounts, vouchers, ledger-lines, inventory, payroll, audit-events, reconciliations, voucher-templates, BOMs, migrations, registry DB) with conventions, foreign-key relationships, and index guidance.",
+      "tags": ["documentation", "database", "schema", "specification", "data-model"],
+      "complexity": "complex",
+      "languageNotes": "SQLite with foreign-key enforcement and migration policy; includes party-profiles (v24) and workspace-configurations (v26) tables."
+    },
+    {
+      "id": "document:Docs/Avelo_Status_Checklist.md",
+      "type": "document",
+      "name": "Avelo_Status_Checklist.md",
+      "filePath": "Docs/Avelo_Status_Checklist.md",
+      "summary": "Current implementation status and completion roadmap tracking Phase 0 foundation, core bookkeeping/reporting, inventory/banking/operational workflows, v1.1 release gates, and post-release phases through Phase 7 (offline compliance/payroll).",
+      "tags": ["documentation", "project-status", "progress-tracking", "checklist"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:Docs/DX.md",
+      "type": "document",
+      "name": "DX.md",
+      "filePath": "Docs/DX.md",
+      "summary": "Developer experience and release evidence specification covering documentation ownership, first-run setup, daily development loop, SwiftPM state management, rule/release-candidate proof, benchmarks, and distribution runbooks for Developer ID and Mac App Store.",
+      "tags": ["documentation", "developer-experience", "developer-guide", "operations"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:Docs/Avelo_Master_PRD.md",
+      "target": "document:Docs/Avelo_Architecture.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "document:Docs/Avelo_Master_PRD.md",
+      "target": "document:Docs/Avelo_Rules.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "document:Docs/Avelo_Architecture.md",
+      "target": "document:Docs/Avelo_Schema.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "document:Docs/Avelo_Architecture.md",
+      "target": "document:Docs/Avelo_Rules.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:Docs/Avelo_Rules.md",
+      "target": "document:Docs/Avelo_Accounting_Logic_Audit.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:Docs/Avelo_Naming_Freeze.md",
+      "target": "document:Docs/Avelo_Architecture.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:Docs/Avelo_Master_Product_Execution_Plan.md",
+      "target": "document:Docs/Avelo_Master_PRD.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "document:Docs/Avelo_Execution_Checklist.md",
+      "target": "document:Docs/Avelo_Master_Product_Execution_Plan.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "document:Docs/Avelo_Phase0_Manual_Acceptance.md",
+      "target": "document:Docs/Avelo_Master_PRD.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:Docs/Avelo_Release_Board.md",
+      "target": "document:Docs/Avelo_Execution_Checklist.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "document:Docs/Avelo_Module_Checklist.md",
+      "target": "document:Docs/Avelo_Architecture.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:Docs/Avelo_ASSEMBLY.md",
+      "target": "document:Docs/Avelo_Architecture.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:Docs/Avelo_Operator_Guide.md",
+      "target": "document:Docs/Avelo_Rules.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:Docs/DX.md",
+      "target": "document:Docs/Avelo_Module_Checklist.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:Docs/Avelo_Status_Checklist.md",
+      "target": "document:Docs/Avelo_Execution_Checklist.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

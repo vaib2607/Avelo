@@ -27,6 +27,7 @@ enum BenchmarkConfig {
     static var scorecardKind: String {
         ProcessInfo.processInfo.environment["AVELO_BENCHMARK_SCORECARD"] ?? "before"
     }
+<<<<<<< HEAD
 
     static var temporaryDirectory: URL {
         if let path = ProcessInfo.processInfo.environment["AVELO_BENCHMARK_TMP_DIR"], !path.isEmpty {
@@ -42,6 +43,8 @@ enum BenchmarkConfig {
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Desktop", isDirectory: true)
     }
+=======
+>>>>>>> origin/main
 }
 
 struct BenchmarkResult: Sendable {

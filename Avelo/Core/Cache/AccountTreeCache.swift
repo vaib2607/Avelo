@@ -14,6 +14,7 @@ public final class AccountTreeCache {
     public private(set) var isDirty: Bool = true
     public private(set) var isLoading: Bool = false
     public private(set) var lastError: AppError?
+<<<<<<< HEAD
     internal var onBackgroundLoad: (@Sendable (Bool) -> Void)?
 
     public let companyId: Company.ID
@@ -24,6 +25,15 @@ public final class AccountTreeCache {
         self.companyId = companyId
         self.database = database
         self.financialYearId = financialYearId
+=======
+
+    public let companyId: Company.ID
+    private let database: SQLiteDatabase
+
+    public init(companyId: Company.ID, database: SQLiteDatabase) {
+        self.companyId = companyId
+        self.database = database
+>>>>>>> origin/main
     }
 
     public func invalidate() {
@@ -33,6 +43,7 @@ public final class AccountTreeCache {
 
     public func current() -> AccountTree? { tree }
 
+<<<<<<< HEAD
     public func reload() async {
         do {
             isLoading = true
@@ -73,6 +84,19 @@ public final class AccountTreeCache {
                 }
             }.value
             self.tree = tree
+=======
+    public func reload() {
+        do {
+            isLoading = true
+            lastError = nil
+            let groups = try AccountGroupRepository(db: database).listForCompany(companyId)
+            let ledgers = try AccountRepository(db: database).listForCompany(companyId)
+            let balances = try loadLedgerBalances(ledgers: ledgers)
+            tree = AccountTree(companyId: companyId,
+                               groups: groups,
+                               ledgers: ledgers,
+                               ledgerBalances: balances)
+>>>>>>> origin/main
             isDirty = false
         } catch {
             lastError = AppError.wrap(error)
@@ -81,6 +105,7 @@ public final class AccountTreeCache {
     }
 
     public func ensureLoaded() -> AccountTree? {
+<<<<<<< HEAD
         if isLoading {
             return tree
         }
@@ -88,6 +113,9 @@ public final class AccountTreeCache {
             isLoading = true
             Task { await reload() }
         }
+=======
+        if isDirty || tree == nil { reload() }
+>>>>>>> origin/main
         return tree
     }
 
@@ -103,6 +131,7 @@ public final class AccountTreeCache {
         ensureLoaded()?.breadcrumb(of: ledgerId) ?? ""
     }
 
+<<<<<<< HEAD
     nonisolated private static func loadLedgerBalances(db: SQLiteDatabase,
                                                        financialYearId: FinancialYear.ID?,
                                                        fromDate: Date?,
@@ -154,6 +183,28 @@ public final class AccountTreeCache {
                 }
             }
             index = end
+=======
+    private func loadLedgerBalances(ledgers: [Account]) throws -> [Account.ID: LedgerBalance] {
+        guard !ledgers.isEmpty else { return [:] }
+        let placeholders = Array(repeating: "?", count: ledgers.count).joined(separator: ",")
+        let sql = """
+            SELECT account_id,
+                   COALESCE(SUM(CASE WHEN side='debit' THEN amount_paise ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN side='credit' THEN amount_paise ELSE 0 END), 0) AS cr
+            FROM avelo_ledger_lines
+            WHERE account_id IN (\(placeholders))
+            GROUP BY account_id
+        """
+        let binds: [SQLValue] = ledgers.map { .text($0.id.uuidString) }
+        var out: [Account.ID: LedgerBalance] = [:]
+        _ = try database.query(sql, bind: binds) { row in
+            if let idStr = row.optionalText("account_id"), let id = UUID(uuidString: idStr) {
+                out[id] = LedgerBalance(
+                    debitPaise: row.int("dr"),
+                    creditPaise: row.int("cr")
+                )
+            }
+>>>>>>> origin/main
         }
         return out
     }

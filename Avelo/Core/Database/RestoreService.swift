@@ -7,11 +7,15 @@ private let AveloRestoreLogger = Logger(subsystem: "com.avelo.desktop", category
 public struct RestoreService: Sendable {
 
     public let manager: DatabaseManager
+<<<<<<< HEAD
     private let activityController: any LongOperationActivityControlling
+=======
+>>>>>>> origin/main
     private static let companyScopedTables: [String] = [
         "avelo_financial_years",
         "avelo_account_groups",
         "avelo_accounts",
+<<<<<<< HEAD
         "avelo_party_profiles",
         "avelo_voucher_types",
         "avelo_vouchers",
@@ -25,15 +29,25 @@ public struct RestoreService: Sendable {
         "avelo_inventory_order_lines",
         "avelo_inventory_orders",
         "avelo_inventory_reorder_levels",
+=======
+        "avelo_voucher_types",
+        "avelo_vouchers",
+        "avelo_ledger_lines",
+        "avelo_inventory_items",
+>>>>>>> origin/main
         "avelo_stock_movements",
         "avelo_payroll_employees",
         "avelo_payroll_entries",
         "avelo_audit_events",
         "avelo_voucher_sequences",
         "avelo_voucher_templates",
+<<<<<<< HEAD
         "avelo_bank_reconciliations",
         "avelo_bank_statement_lines",
         "avelo_workspace_configurations"
+=======
+        "avelo_bank_reconciliations"
+>>>>>>> origin/main
     ]
     private static let auditImmutabilityTriggerSQL: [String] = [
         """
@@ -51,6 +65,7 @@ public struct RestoreService: Sendable {
         "trg_avelo_voucher_fy_locked_insert",
         "trg_avelo_voucher_fy_locked_update",
         "trg_avelo_voucher_fy_locked_delete",
+<<<<<<< HEAD
         "trg_avelo_voucher_date_in_fy_update",
         "trg_avelo_lines_fy_locked_insert",
         "trg_avelo_lines_fy_locked_update",
@@ -69,6 +84,11 @@ public struct RestoreService: Sendable {
         "trg_avelo_bank_reconciliations_fy_locked_delete",
         "trg_avelo_accounts_locked_opening_insert",
         "trg_avelo_accounts_locked_opening_update"
+=======
+        "trg_avelo_lines_fy_locked_insert",
+        "trg_avelo_lines_fy_locked_update",
+        "trg_avelo_lines_fy_locked_delete"
+>>>>>>> origin/main
     ]
     private static let lockedFinancialYearTriggerSQL: [String] = [
         """
@@ -83,12 +103,16 @@ public struct RestoreService: Sendable {
         CREATE TRIGGER trg_avelo_voucher_fy_locked_update
         BEFORE UPDATE ON avelo_vouchers
         WHEN (SELECT is_locked FROM avelo_financial_years WHERE id = OLD.financial_year_id) = 1
+<<<<<<< HEAD
           OR (SELECT is_locked FROM avelo_financial_years WHERE id = NEW.financial_year_id) = 1
+=======
+>>>>>>> origin/main
         BEGIN
             SELECT RAISE(ABORT, 'Financial year is locked; voucher edits are not allowed');
         END;
         """,
         """
+<<<<<<< HEAD
         CREATE TRIGGER trg_avelo_voucher_date_in_fy_update
         BEFORE UPDATE ON avelo_vouchers
         FOR EACH ROW
@@ -103,6 +127,8 @@ public struct RestoreService: Sendable {
         END;
         """,
         """
+=======
+>>>>>>> origin/main
         CREATE TRIGGER trg_avelo_voucher_fy_locked_delete
         BEFORE DELETE ON avelo_vouchers
         WHEN (SELECT is_locked FROM avelo_financial_years WHERE id = OLD.financial_year_id) = 1
@@ -142,6 +168,7 @@ public struct RestoreService: Sendable {
         BEGIN
             SELECT RAISE(ABORT, 'Financial year is locked');
         END;
+<<<<<<< HEAD
         """,
         """
         CREATE TRIGGER trg_avelo_stock_movements_fy_locked_insert
@@ -512,6 +539,38 @@ public struct RestoreService: Sendable {
     ) throws -> BackupManifest {
         guard fileManager.fileExists(atPath: manifestURL.path) else {
             return BackupManifest(
+=======
+        """
+    ]
+
+    public init(manager: DatabaseManager) {
+        self.manager = manager
+    }
+
+    public func restore(from sourceURL: URL) async throws -> CompanyRegistryEntry {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: sourceURL.path) else {
+            AveloRestoreLogger.error("restore source missing: \(sourceURL.path, privacy: .public)")
+            throw AppError.notFound("Backup file not found")
+        }
+
+        let tempFile = sourceURL
+        let manifestURL: URL = {
+            if sourceURL.pathExtension == "manifest.json" {
+                return sourceURL
+            }
+            return sourceURL.appendingPathExtension("manifest.json")
+        }()
+
+        let manifest: BackupManifest
+        if fm.fileExists(atPath: manifestURL.path) {
+            let data = try Data(contentsOf: manifestURL)
+            let dec = JSONDecoder()
+            dec.dateDecodingStrategy = .iso8601
+            manifest = try dec.decode(BackupManifest.self, from: data)
+        } else {
+            manifest = BackupManifest(
+>>>>>>> origin/main
                 schemaVersion: SchemaVersion.current.rawValue,
                 companyName: sourceURL.deletingPathExtension().lastPathComponent,
                 exportedAt: Date(),
@@ -519,6 +578,7 @@ public struct RestoreService: Sendable {
                 originalFileName: sourceURL.lastPathComponent
             )
         }
+<<<<<<< HEAD
         do {
             let data = try Data(contentsOf: manifestURL)
             let dec = JSONDecoder()
@@ -548,6 +608,10 @@ public struct RestoreService: Sendable {
         if manifest.byteCount > 0, manifest.byteCount != Int64(data.count) {
             throw AppError.database(.schemaMismatch("Backup file size does not match its manifest."))
         }
+=======
+
+        let data = try Data(contentsOf: tempFile)
+>>>>>>> origin/main
         if !manifest.checksumSHA256.isEmpty {
             let digest = SHA256.hash(data: data)
             let hex = digest.map { String(format: "%02x", $0) }.joined()
@@ -556,6 +620,62 @@ public struct RestoreService: Sendable {
                 throw AppError.database(.checksumMismatch)
             }
         }
+<<<<<<< HEAD
+=======
+
+        let registryEntries = try await manager.listCompanies()
+        if registryEntries.contains(where: { $0.name.caseInsensitiveCompare(manifest.companyName) == .orderedSame }) {
+            AveloRestoreLogger.error("duplicate restore name rejected: \(manifest.companyName, privacy: .public)")
+            throw AppError.businessRule("A company named \"\(manifest.companyName)\" already exists. Rename or remove the existing company before restoring this backup.")
+        }
+
+        let newId = UUID()
+        let destURL = manager.companiesDirectory.appendingPathComponent("\(newId.uuidString).sqlite")
+        if fm.fileExists(atPath: destURL.path) {
+            do {
+                try fm.removeItem(at: destURL)
+            } catch {
+                throw AppError.fileSystem("Unable to replace existing restored company file at \(destURL.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+        do {
+            try fm.copyItem(at: tempFile, to: destURL)
+        } catch {
+            AveloRestoreLogger.error("restore copy failed to \(destURL.path, privacy: .public)")
+            throw AppError.fileSystem("Unable to copy backup into restored company file at \(destURL.lastPathComponent): \(error.localizedDescription)")
+        }
+
+        do {
+            let db = try SQLiteDatabase(path: destURL.path)
+            defer { db.close() }
+            try Self.validateIntegrity(db: db)
+            let current = db.userVersion()
+            if current < SchemaVersion.current.rawValue {
+                try MigrationRunner().runMigrations(on: db)
+                try Self.validateIntegrity(db: db)
+            }
+            try Self.prepareRestoredCompanyDatabase(
+                db: db,
+                restoredCompanyId: newId,
+                restoredCompanyName: manifest.companyName
+            )
+            try Self.validateIntegrity(db: db)
+
+            let entry = CompanyRegistryEntry(
+                id: newId,
+                name: manifest.companyName,
+                sqliteFileName: destURL.lastPathComponent,
+                lastOpenedAt: nil,
+                createdAt: Date()
+            )
+            try await manager.registerCompany(entry)
+            return entry
+        } catch {
+            AveloRestoreLogger.error("restore failed, cleaning up \(destURL.path, privacy: .public)")
+            try? fm.removeItem(at: destURL)
+            throw error
+        }
+>>>>>>> origin/main
     }
 
     static func prepareRestoredCompanyDatabase(
@@ -578,6 +698,7 @@ public struct RestoreService: Sendable {
             try dropAuditImmutabilityTriggers(db: db)
             try dropLockedFinancialYearTriggers(db: db)
             try db.write { tx in
+<<<<<<< HEAD
                 // Drafts are scratch keystrokes, not durable accounting
                 // history. They can refer to local UI state and are therefore
                 // intentionally discarded rather than remapped into a newly
@@ -586,6 +707,8 @@ public struct RestoreService: Sendable {
                     "DELETE FROM avelo_voucher_drafts WHERE company_id = ?",
                     [.text(sourceCompany.id.uuidString)]
                 )
+=======
+>>>>>>> origin/main
                 try tx.execute(
                     "UPDATE avelo_companies SET id = ?, name = ?, updated_at = ? WHERE id = ?",
                     [
@@ -603,12 +726,19 @@ public struct RestoreService: Sendable {
                     )
                 }
 
+<<<<<<< HEAD
                 try rebuildAuditChain(db: tx, companyId: restoredCompanyId)
                 try writeRestoreAuditEvent(db: tx, companyId: restoredCompanyId)
 
                 try recreateLockedFinancialYearTriggers(db: tx)
                 try recreateAuditImmutabilityTriggers(db: tx)
             }
+=======
+                try writeRestoreAuditEvent(db: tx, companyId: restoredCompanyId)
+            }
+            try recreateLockedFinancialYearTriggers(db: db)
+            try recreateAuditImmutabilityTriggers(db: db)
+>>>>>>> origin/main
 
             let foreignKeyIssues = try db.query("PRAGMA foreign_key_check") { _ in true }
             guard foreignKeyIssues.isEmpty else {
@@ -630,6 +760,7 @@ public struct RestoreService: Sendable {
         }
     }
 
+<<<<<<< HEAD
     private static func validatePreparedCompany(db: SQLiteDatabase, companyId: Company.ID, companyName: String) throws {
         let companies = try CompanyRepository(db: db).listForRegistry()
         guard companies.count == 1, let company = companies.first else {
@@ -660,6 +791,8 @@ public struct RestoreService: Sendable {
         }
     }
 
+=======
+>>>>>>> origin/main
     private static func writeRestoreAuditEvent(db: SQLiteDatabase, companyId: Company.ID) throws {
         try AuditService(db: db, companyId: companyId).record(
             action: .backupImported,
@@ -669,6 +802,7 @@ public struct RestoreService: Sendable {
         )
     }
 
+<<<<<<< HEAD
     private static func rebuildAuditChain(db: SQLiteDatabase, companyId: Company.ID) throws {
         struct ExistingAuditRow {
             let id: String
@@ -741,6 +875,8 @@ public struct RestoreService: Sendable {
         }
     }
 
+=======
+>>>>>>> origin/main
     private static func dropAuditImmutabilityTriggers(db: SQLiteDatabase) throws {
         try db.execute("DROP TRIGGER IF EXISTS trg_avelo_audit_no_update")
         try db.execute("DROP TRIGGER IF EXISTS trg_avelo_audit_no_delete")
@@ -763,6 +899,7 @@ public struct RestoreService: Sendable {
             try db.execute(sql)
         }
     }
+<<<<<<< HEAD
 
     static func cleanupRestoredCompanyFile(at destURL: URL, fileManager: FileManager = .default) {
         do {
@@ -773,4 +910,6 @@ public struct RestoreService: Sendable {
             AveloRestoreLogger.error("restore cleanup failed for \(destURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
+=======
+>>>>>>> origin/main
 }

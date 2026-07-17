@@ -1,147 +1,119 @@
 # Avelo Rules
 
-These are Avelo's non-negotiable product and engineering invariants. A change is not releasable when it violates a rule, even if its local tests pass. `Avelo_Master_PRD.md` defines user-visible behavior, `Avelo_Schema.md` describes persistence, and `Avelo_Release_Board.md` owns the readiness verdict.
+The non-negotiables. Every code-generation pass, every review, and every change must hold these. If a rule is violated, the change is wrong regardless of how clean the code looks.
 
-The consolidated product roadmap is `Avelo_Master_Product_Execution_Plan.md`.
+## R-1. 100% offline
 
-## R-1. Avelo is fully offline
+- No `URLSession`, no `Network`, no `NWConnection`, no Bonjour, no Bluetooth, no IPC over network.
+- No `import Network` outside of the sandbox firewall check at startup.
+- No third-party HTTP, JSON-over-HTTP, or sync libraries. The dependency list is exactly zero.
+- Telemetry, analytics, crash reporting, update checks: all forbidden.
+- The app must run, perform all operations, and persist all data with Wi-Fi disabled and the network cable unplugged.
+- App Sandbox is ON. Only the app-support directory, the documents directory, and user-selected files are writable.
 
-- Shipped code must not use `URLSession`, `Network`, `NWConnection`, web views, telemetry, analytics, crash reporting, online licensing, update checks, or any other network transport.
-- `Package.swift` must contain no externally resolved package dependency. Version-pinned source compiled from `Vendor/` is permitted; runtime network access is not.
-- SQLCipher may be compiled locally against Apple CommonCrypto. OpenSSL and hosted services are out of scope.
-- The app must create, open, post, report, back up, restore, and recover with networking disabled.
-- `make net-check` must report zero shipped-code matches before release.
+## R-2. Manual entry, human-typed, every figure
 
-## R-2. User intent is explicit; derivation is deterministic and reviewable
-
-- A user explicitly supplies or selects every business input: party, account, item, quantity, rate, date, tax treatment, and posting intent.
-- Avelo may deterministically derive GST, CESS, taxable value, valuation, COGS, round-off, totals, and balancing presentation from explicit inputs plus stored master data.
-- Derived values must be visible before or immediately after posting, reproducible from stored inputs, and covered by golden tests.
-- Avelo never infers an item, party, price, tax treatment, or vendor from an account name or usage history.
-
-Account eligibility is a shared policy, not view-local filtering. Account meaning is resolved through the full group hierarchy and explicit role/profile data. Picker visibility, posting validation, import validation, edit validation, and restore validation use the same policy.
-
-Future extensions are restricted to approved typed service commands and datasets. They may not access arbitrary SQL, network transports, processes, DLLs, COM, unrestricted files, or bypass ownership, balancing, fiscal locks, checked arithmetic, or audit requirements.
-- Templates and recalled values create reviewable drafts. No system event posts a voucher automatically.
+- Every monetary value, every quantity, every rate is typed by a human on a keyboard.
+- The app never computes GST for the user. The user types CGST, SGST, IGST as separate lines.
+- The app never suggests an item, price, customer, or vendor from history. The user picks or types.
+- The app never auto-posts a voucher triggered by a system event.
+- Voucher templates (Phase 3) pre-fill a draft that the user must review and save explicitly. Templates never auto-post.
 
 ## R-3. SQLite is the system of record
 
-- Each company database under `~/Library/Application Support/Avelo/Companies/` is authoritative for that company's books. `avelo_registry.sqlite` contains discovery metadata only.
-- App-managed company databases are SQLCipher-encrypted with a random per-company key stored in Keychain. A recovery key is shown only through the explicit recovery workflow.
-- In-memory state and disposable change-token caches may accelerate reads, but they are never authoritative or persisted as financial truth.
-- Every financial write uses `SQLiteDatabase.write { ... }`. A thrown error rolls back the transaction.
+- The SQLite file under `Application Support/Avelo/Companies/<uuid>.sqlite` is the only authoritative store.
+- No in-memory cache is ever the source of truth. Views query live.
+- Reports are live SQL aggregations. No cached totals, no materialised rollups, no precomputed balances.
+- Every write goes through `SQLiteDatabase.write { ... }` which is a `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK` block. Any throw rolls back the entire block.
 
-## R-4. Money and quantity arithmetic is exact
+## R-4. Money is Int64 paise. Never Double.
 
-- Money is `Int64` paise in models, SQL, audit snapshots, services, and report DTOs.
-- `Double` and `Float` are forbidden on money paths. `Decimal` is allowed only at parsing and display boundaries, never as authoritative storage.
-- Fractional quantities and UOM conversions use `ExactQuantity` or an equivalent checked rational/fixed-point representation. Legacy `REAL` columns are migration input only.
-- Addition, subtraction, multiplication, division, absolute value, conversion, aggregation, and formatting use checked, throwing operations. Overflow, underflow, divide-by-zero, and `Int64.min` fail with typed errors.
+- All amounts in memory, in SQL columns, in audit JSON, and in DTOs are `Int64` paise.
+- ₹1.00 = `100` paise. Display divides by 100 and uses an Indian-locale formatter.
+- `Double` and `Float` are banned in any code path that touches money. `Decimal` is allowed only in the boundary formatter layer and only for display rounding, never for storage or arithmetic.
+- Overflow assertion: every aggregation asserts `result <= Int64.max / 2` after every `SUM()`. If it fires, the books are corrupt and the assertion is the safety net.
 
 ## R-5. Double-entry is mandatory before commit
 
-- Every posted voucher has at least two positive ledger lines and equal debit and credit totals.
-- The approved posting pipeline validates, allocates the number, writes the voucher and lines, writes related workflow rows, and records the audit event atomically.
-- Callers may not bypass the posting pipeline with direct repository writes.
-- SQLite triggers enforce company ownership, fiscal locks, and other row-local invariants. Balance is enforced by the only allowed atomic posting pipeline and reconciliation tests because SQLite has no deferred aggregate constraint for voucher lines.
+- For every voucher: `SUM(debit_lines.amount_paise) == SUM(credit_lines.amount_paise)`.
+- Validation runs in `VoucherService.validate` before the DB write begins. The DB write itself is rejected by a trigger if violated.
+- Zero-amount lines are rejected.
+- Single-line vouchers (only a debit, no credit) are rejected.
+- Duplicate account in the same voucher is rejected.
 
-## R-6. Financial-year state is explicit and enforced
+## R-6. Financial-year boundaries and locks are enforced
 
-- A voucher date must resolve to exactly one financial year for its company; overlap or ambiguity fails closed.
-- Locking an FY freezes all dated financial mutations covered by the lock contract. Unlocking is explicit and audited.
-- Closing an FY is a separate action. It publishes the next FY's opening snapshot exactly once; reopen removes that published snapshot; re-close is idempotent.
-- Switching the active FY changes context only. It does not lock, unlock, close, reopen, or rewrite history.
-- Corrections to a locked period use a linked reversal or correction in an open period. Avelo never backdates a new mutation into a locked FY.
+- A voucher can only be posted if its date falls within an open financial year for the company.
+- A financial year is locked when the user explicitly closes it. Locked years reject all inserts, updates, and deletes on vouchers, accounts (for that year), and inventory movements.
+- Year-end close is a separate user action. It creates the next year's opening balances by carrying forward balance-sheet accounts.
+- Switching the active FY in the app only changes the view filter; it never re-locks an already-locked year.
 
-## R-7. Optional modules have complete capability boundaries
+## R-7. Inventory is optional and never pollutes accounting-only workflows
 
-- When inventory is disabled, Inventory is absent from the sidebar, menus, command palette, quick search, keyboard routing, sheets, and direct/deep-link entry.
-- Inventory services reject mutation when the company capability is disabled. Hiding UI alone is insufficient.
-- The same rule applies to every future optional module: one capability decision controls every entry point and service boundary.
+- A company has `is_inventory_enabled: Bool`. When `false`, the entire Inventory sidebar entry is hidden, the Stock Item and Stock Movement screens are unreachable, and `InventoryService` is constructed but no-op on its public methods.
+- When `true`, the company has `inventory_link_mode: enum { manual, autoPrompt, autoSilent }`.
+- The default is `autoPrompt`. `autoSilent` is opt-in. The user must explicitly enable it.
 
-## R-8. Inventory linkage is never inferred or silently incomplete
+## R-8. Auto-link inventory behavior is never silent by default
 
-- `manual` keeps ledger vouchers and stock movements separate.
-- Item-invoice mode is explicit: the user selects item, quantity, rate, party, and sales/purchase ledger; Avelo derives reviewable tax and valuation lines and posts accounting, item lines, and stock effects atomically.
-- `autoPrompt` may ship only when the prompt collects explicit item/quantity/direction inputs, records the user's decision, and handles edit, reversal, cancellation, restore, and audit consistently.
-- `autoSilent` may ship only after deterministic mapping, preview/consent, reversal, audit, and accountant acceptance are proved. Until then it must be unavailable in production UI.
-- Account-name matching or history-based item inference is forbidden.
+- In `autoPrompt` mode, after a successful `Sales` or `Purchase` voucher save, the UI presents a sheet: "Record stock movement for these items?". The user must click Yes / No / Don't ask again.
+- "Don't ask again" switches the company to `manual` mode and writes an audit event.
+- `autoSilent` mode is a separate, explicit opt-in, and the audit log records every auto-created stock movement.
 
-## R-9. Every meaningful mutation is audited atomically
+## R-9. Audit logging for every financially meaningful action
 
-- Every shipped financially or operationally meaningful mutation has an `AuditAction` and one immutable audit event in the same transaction.
-- The event records actor, action, entity, timestamp, before/after snapshots as applicable, and a reason where policy requires one.
-- The audited state must be known before the event is appended. Any later transaction failure rolls back both the mutation and the event.
-- Audit append failure fails the primary mutation; it is never swallowed.
-- The HMAC-linked chain detects mutation, deletion, insertion, reordering, and whole-chain replacement under the documented key/anchor model.
+- The following actions write to `audit_events` in the same transaction as the action itself: create company, create FY, close FY, create account, edit account, disable account, create voucher, edit voucher, reverse voucher, create stock item, record stock movement, post salary, post bank reconciliation match, restore from backup.
+- Each event stores: timestamp, actor (always "user" in MVP), action enum, entity type, entity id, JSON snapshot_before, JSON snapshot_after, and an optional reason.
+- Audit events are append-only. There is no UI path to delete or edit an audit event. The DB trigger rejects such updates.
+- Audit events never block the user's primary action. They live in the same transaction but are written last.
 
-## R-10. No silent deletion
+## R-10. No silent deletion, ever
 
-- Posted vouchers are reversed or cancelled with immutable reason, actor, timestamp, numbering, and linkage. Numbers are never reused.
-- Accounts and stock items are disabled or archived when history references them.
-- Stock corrections use linked opposite movements or deterministic replay, not row deletion.
-- Employees terminate through an end date and status, not destructive deletion.
+- Vouchers are never deleted. Reversal creates a paired voucher with the same lines flipped and a `reversal_of_id` pointer to the original. The original remains queryable.
+- Accounts are never hard-deleted. They are disabled (`is_active = 0`) and kept for historical reporting.
+- Stock movements are never deleted. A reversal movement of opposite sign cancels the original.
+- Employees are never deleted. Termination is `end_date` set on the employee record.
 
-## R-11. Posted-history edits follow fiscal policy
+## R-11. Reversal is the only edit mechanism for posted vouchers in a locked FY
 
-- An open-FY voucher may be edited only through the audited service path and must retain complete before/after evidence.
-- A locked-FY voucher is read-only. Correction uses the locked-period workflow defined by R-6.
-- A reversal, cancellation, or edit must update every dependent bill, cheque, item, stock, valuation, report, and audit record atomically or fail closed.
+- A voucher in a locked FY is read-only. To "change" it, the user reverses it and posts a corrected one in an open FY with a back-dated `date`.
+- A voucher in an open FY can be edited in place, but every edit writes a full audit snapshot.
 
-## R-12. Company data is isolated
+## R-12. Multi-company from day one, isolated files
 
-- One company maps to one encrypted SQLite file; financial tables do not live in the registry database.
-- All IDs referenced by a mutation must belong to the active company. Repositories and services validate ownership, and schema triggers enforce it where possible.
-- A transaction never spans two company databases. Cross-company consolidation is out of scope until explicitly designed.
+- Each company is one `.sqlite` file at `Application Support/Avelo/Companies/<uuid>.sqlite`.
+- A small `registry.sqlite` in `Application Support/Avelo/` lists known companies for the picker. It never holds financial data.
+- The app never opens two company databases in the same transaction. Cross-company reports are explicitly out of scope.
 
-## R-13. Reports are reproducible from stored entries
+## R-13. Reports are pure functions of stored entries
 
-- Authoritative report aggregation lives in SQL over stored vouchers, ledger lines, opening snapshots, workflow rows, and stock layers.
-- Swift may assemble DTOs and perform checked reconciliation, but it must not replace the report's query semantics with hidden mutable totals.
-- A disposable cache key includes company identity, FY/date/filter inputs, and a data-change token. Writes invalidate affected cache entries.
-- Every report exposes its filters and reconciles to the ledger or stock source appropriate to that report.
+- Every report query joins `entries` and `transactions` and computes balance on the fly.
+- There is no `balances` table. There is no `materialised_view`. A report for 5 years of data is recomputed on each request and is correct to the last transaction.
+- Report filters (date range, account, FY, voucher type) translate to SQL `WHERE` clauses. The Swift code does not loop over rows to compute totals.
 
-## R-14. The naming freeze is explicit, not imaginary
+## R-14. Naming freeze
 
-- Only symbols and identifiers explicitly listed in `Avelo_Naming_Freeze.md` are locked.
-- SQL table and column identifiers are governed by migrations plus `Avelo_Schema.md`.
-- A rename updates code, tests, migrations/compatibility policy, and the naming document in one change. Ad-hoc aliases are not a substitute.
+- All type, method, table, and column names are defined in `Avelo_Naming_Freeze.md`. Renaming requires updating the freeze document first. Ad-hoc renames in later passes are rejected.
 
-## R-15. Shipped paths are complete
+## R-15. No placeholders, no TODOs, no `fatalError("Not implemented")`
 
-- Shipped source contains no `TODO`, `FIXME`, placeholder success, or `fatalError("Not implemented")` path.
-- A deferred capability is absent from production entry points or returns a typed `AppError.featureUnavailable`; it is tracked on `Avelo_Release_Board.md`.
-- Release builds run with `-Xswiftc -warnings-as-errors`. Concurrency warnings and skipped tests are release failures unless explicitly approved and recorded.
+- Every file is complete. Every public method has a body.
+- If a feature is genuinely out of scope, it is documented in `Avelo_Module_Checklist.md` as "deferred to Phase N" and the corresponding public API is either absent or returns a typed `AppError.featureUnavailable`.
+- The Swift compiler must produce zero warnings on a clean build with `-Xfrontend -warn-concurrency -strict-concurrency=minimal` and `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES`.
 
-## R-16. SwiftUI state follows one lifecycle
+## R-16. SwiftUI lifecycle, @Observable ViewModels
 
-- Avelo targets macOS 14+ with SwiftUI and Observation (`@Observable`). View models and UI routers are `@MainActor`.
-- `ObservableObject`, `@Published`, `@EnvironmentObject`, singleton app state, and third-party UI frameworks are forbidden in shipped paths.
-- Background database work has an owned task/activity lifetime, reports progress where needed, and never publishes stale company context.
+- The app is SwiftUI on macOS 14, lifecycle `WindowGroup`, no `AppDelegate` unless platform forces it.
+- ViewModels use the `@Observable` macro and `@MainActor`. Services are plain `Sendable` classes or `actor`s.
+- `ObservableObject` and `@Published` are forbidden.
+- No third-party SwiftUI libraries.
 
-## R-17. Errors are typed and actionable
+## R-17. Errors are typed, not exceptions at the boundary
 
-- Service boundaries throw `AppError` or wrap lower-level errors immediately.
-- Views show an actionable banner, sheet, or global error host. Business failures are not silently discarded with `try?`.
-- Corrupt dates, enums, booleans, UUIDs, schema versions, required columns, and recovery material fail closed rather than becoming valid-looking defaults.
+- Services throw `AppError` (a structured enum with associated values for each failure mode). ViewModels catch and convert to a displayable `ErrorBanner.Model`. Views never `try?` silently.
 
-## R-18. Core accounting is keyboard-completable and accessible
+## R-18. Keyboard-first, mouse-tolerated
 
-- Every primary accounting action is keyboard-completable and exposes its shortcut in UI/help.
-- Voucher entry uses one canonical contract: plain Return advances or adds a line; Command-Return posts/saves; Tab and Shift-Tab traverse predictably; Escape cancels or backs out safely.
-- Context-specific bindings beat global bindings; ordinary text input wins unless the active editor explicitly owns a command.
-- Keyboard-only, VoiceOver, visible-focus, contrast, resizing, non-color status, and error-recovery acceptance are required for every shipped workflow.
-
-## R-19. Persistence evolves forward and restores fail closed
-
-- Schema migrations are ordered, forward-only, individually transactional, and recorded in both `PRAGMA user_version` and `avelo_migrations`.
-- The executable migration list and `SchemaVersion.current` are authoritative. `Avelo_Schema.md` must match them at release cut.
-- Backup manifests are versioned and checksummed. Restore stages changes, remaps every company-scoped table introduced by every supported schema version, recreates required triggers, and passes integrity, ownership, and foreign-key checks before publication.
-- Unknown future schema versions, wrong keys, partial files, unsupported manifests, and unmapped tables are rejected without replacing the original company.
-
-## R-20. “Implemented” is not “release-ready”
-
-- `Avelo_Release_Board.md` is the canonical readiness verdict. `Avelo_Status_Checklist.md` summarizes human state; `Avelo_Execution_Checklist.md` owns next actions and evidence.
-- A feature ships only after current-worktree automated proof plus all applicable accountant, operator, keyboard, accessibility, visual/document, and distribution acceptance.
-- Evidence records commit/worktree identity, date, machine/toolchain, command, result, skipped tests, and artifact identity. Old evidence is historical context, not current release proof.
-- Public production requires an approved distribution path, release metadata, signing/notarization or Mac App Store acceptance, clean-Mac install/launch proof, rollback artifacts, and an incident/support owner.
+- Every primary action has a keyboard shortcut. The shortcut is shown in the UI alongside the button label.
+- Tab order is explicit. The default `Tab` key behaviour is overridden where necessary to follow the data-entry flow.
+- `Enter` on a voucher amount adds a new line. `Cmd+Enter` saves. `Esc` cancels.

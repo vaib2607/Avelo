@@ -1,0 +1,206 @@
+{
+  "nodes": [
+    {
+      "id": "file:Scripts/benchmark.sh",
+      "type": "file",
+      "name": "benchmark.sh",
+      "filePath": "Scripts/benchmark.sh",
+      "summary": "Runs performance benchmarks for Avelo with configurable test modes (core, million-scale stress test variants) and environment isolation.",
+      "tags": ["build-script", "testing", "performance", "ci-cd"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Scripts/bootstrap.sh",
+      "type": "file",
+      "name": "bootstrap.sh",
+      "filePath": "Scripts/bootstrap.sh",
+      "summary": "Initial setup script that verifies toolchain (Xcode, Swift), builds debug package, runs tests, assembles signed app bundle, and guides developers through post-bootstrap steps.",
+      "tags": ["entry-point", "bootstrap", "build-script", "ci-cd"],
+      "complexity": "moderate",
+      "languageNotes": "Shell script with helper functions for logging and error handling; calls swiftw wrapper and bundle.sh."
+    },
+    {
+      "id": "function:Scripts/bootstrap.sh:log_step",
+      "type": "function",
+      "name": "log_step",
+      "filePath": "Scripts/bootstrap.sh",
+      "lineRange": [7, 9],
+      "summary": "Formats and prints a numbered progress step message to guide the bootstrap process.",
+      "tags": ["utility", "logging"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Scripts/bootstrap.sh:fail_with_hint",
+      "type": "function",
+      "name": "fail_with_hint",
+      "filePath": "Scripts/bootstrap.sh",
+      "lineRange": [11, 15],
+      "summary": "Exits with error code 1 and outputs an error message followed by an optional hint to stderr.",
+      "tags": ["utility", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Scripts/bootstrap.sh:require_command",
+      "type": "function",
+      "name": "require_command",
+      "filePath": "Scripts/bootstrap.sh",
+      "lineRange": [17, 23],
+      "summary": "Checks if a command exists in PATH; fails with hint if missing.",
+      "tags": ["utility", "validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Scripts/bundle.sh",
+      "type": "file",
+      "name": "bundle.sh",
+      "filePath": "Scripts/bundle.sh",
+      "summary": "Assembles the macOS application bundle with release/debug configuration, copying binary, resources, and entitlements, then code-signs the final artifact.",
+      "tags": ["build-script", "packaging", "deployment"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Scripts/bundle_selftest.sh",
+      "type": "file",
+      "name": "bundle_selftest.sh",
+      "filePath": "Scripts/bundle_selftest.sh",
+      "summary": "Validates the bundled app and runs its built-in self-test mechanism, capturing and reporting success/failure from the executable.",
+      "tags": ["testing", "validation", "build-script"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Scripts/launch_smoke.sh",
+      "type": "file",
+      "name": "launch_smoke.sh",
+      "filePath": "Scripts/launch_smoke.sh",
+      "summary": "Smoke test orchestrator that validates bundle integrity and executes the bundled app self-test.",
+      "tags": ["testing", "validation", "ci-cd"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Scripts/phase0_evidence.sh",
+      "type": "file",
+      "name": "phase0_evidence.sh",
+      "filePath": "Scripts/phase0_evidence.sh",
+      "summary": "Diagnostic utility that captures environment metadata (OS version, hardware, app build info, code signature status, Gatekeeper assessment) for audit and debugging.",
+      "tags": ["diagnostics", "testing", "audit"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Scripts/swift-env.sh",
+      "type": "file",
+      "name": "swift-env.sh",
+      "filePath": "Scripts/swift-env.sh",
+      "summary": "Environment configuration for isolated Swift/SwiftPM builds, setting up repo-local cache and home directories to avoid system permission issues.",
+      "tags": ["configuration", "build-system", "environment"],
+      "complexity": "simple",
+      "languageNotes": "Sourced by other scripts; exports environment variables and defines avelo_swift_permission_hint helper."
+    },
+    {
+      "id": "function:Scripts/swift-env.sh:avelo_swift_permission_hint",
+      "type": "function",
+      "name": "avelo_swift_permission_hint",
+      "filePath": "Scripts/swift-env.sh",
+      "lineRange": [35, 41],
+      "summary": "Prints helpful error message guiding developers to use repo-local Swift tooling when permission errors occur.",
+      "tags": ["utility", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Scripts/swiftw.sh",
+      "type": "file",
+      "name": "swiftw.sh",
+      "filePath": "Scripts/swiftw.sh",
+      "summary": "Wrapper for Swift compiler/package manager commands that enforces repo-local build environment, captures output, and hints users when permission errors arise.",
+      "tags": ["build-system", "wrapper", "entry-point"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Scripts/validate_bundle.sh",
+      "type": "file",
+      "name": "validate_bundle.sh",
+      "filePath": "Scripts/validate_bundle.sh",
+      "summary": "Validates that an macOS app bundle has all required files (executable, plist, resources), passes code-signature verification, and metadata integrity checks.",
+      "tags": ["testing", "validation", "build-script"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:Scripts/bootstrap.sh",
+      "target": "function:Scripts/bootstrap.sh:log_step",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Scripts/bootstrap.sh",
+      "target": "function:Scripts/bootstrap.sh:fail_with_hint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Scripts/bootstrap.sh",
+      "target": "function:Scripts/bootstrap.sh:require_command",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Scripts/swift-env.sh",
+      "target": "function:Scripts/swift-env.sh:avelo_swift_permission_hint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Scripts/bootstrap.sh",
+      "target": "file:Scripts/swiftw.sh",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Scripts/bootstrap.sh",
+      "target": "file:Scripts/bundle.sh",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Scripts/swiftw.sh",
+      "target": "file:Scripts/swift-env.sh",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Scripts/bundle_selftest.sh",
+      "target": "file:Scripts/validate_bundle.sh",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Scripts/launch_smoke.sh",
+      "target": "file:Scripts/validate_bundle.sh",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Scripts/launch_smoke.sh",
+      "target": "file:Scripts/bundle_selftest.sh",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Scripts/swiftw.sh",
+      "target": "function:Scripts/swift-env.sh:avelo_swift_permission_hint",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

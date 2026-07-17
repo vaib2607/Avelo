@@ -3,6 +3,7 @@ import XCTest
 
 final class FinancialYearServiceTests: XCTestCase {
 
+<<<<<<< HEAD
     func testCloseFinancialYearConfirmationCancelAbortsWithoutStateChange() throws {
         var confirmation = CloseFinancialYearConfirmationState()
         let closed = false
@@ -29,6 +30,8 @@ final class FinancialYearServiceTests: XCTestCase {
         XCTAssertTrue(closed)
     }
 
+=======
+>>>>>>> origin/main
     func testLockWritesAuditEvent() throws {
         let tc = try TestCompany.make()
         let service = FinancialYearService(db: tc.db, companyId: tc.companyId)
@@ -41,6 +44,7 @@ final class FinancialYearServiceTests: XCTestCase {
         XCTAssertEqual(events.count, 1)
         XCTAssertEqual(events.first?.entityId, tc.fy.id.uuidString)
         XCTAssertEqual(events.first?.reason, "period close")
+<<<<<<< HEAD
         XCTAssertNotNil(events.first?.snapshotBeforeJson)
         XCTAssertNotNil(events.first?.snapshotAfterJson)
     }
@@ -175,5 +179,7 @@ final class FinancialYearServiceTests: XCTestCase {
             }
             XCTAssertTrue(message.localizedCaseInsensitiveContains("overlapping financial years"))
         }
+=======
+>>>>>>> origin/main
     }
 }

@@ -56,15 +56,21 @@ public enum AppError: Error, Sendable, Equatable, Identifiable {
     public var id: String {
         switch self {
         case .validation(let e):  return "validation-\(e.code.rawValue)"
+<<<<<<< HEAD:Avelo/Core/Validation/AppError.swift
         case .recoveryKey(let e): return "recovery-key-\(e.identifier)"
+=======
+>>>>>>> origin/main:Mally/Core/Validation/AppError.swift
         case .database(let e):    return "database-\(e.message.hashValue)"
         case .featureUnavailable(let s): return "unavail-\(s.hashValue)"
         case .fileSystem(let s):   return "fs-\(s.hashValue)"
         case .unexpected(let s):   return "unexpected-\(s.hashValue)"
         case .businessRule(let s): return "biz-\(s.hashValue)"
+<<<<<<< HEAD:Avelo/Core/Validation/AppError.swift
         case .duplicateSalary(let s): return "salary-dup-\(s.hashValue)"
         case .groupHasChildren(let s): return "group-children-\(s.hashValue)"
         case .negativeStock(let s): return "negative-\(s.hashValue)"
+=======
+>>>>>>> origin/main:Mally/Core/Validation/AppError.swift
         case .notFound(let s):     return "404-\(s.hashValue)"
         }
     }

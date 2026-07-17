@@ -11,15 +11,21 @@ This document lists every file in the project and its role. Path is relative to 
 
 Authoritative product and engineering spec. Read these in order if you're new.
 
+<<<<<<< HEAD:Docs/Avelo_ASSEMBLY.md
 - `Avelo_Master_Product_Execution_Plan.md` — single product roadmap and dependency-ordered execution plan.
+=======
+>>>>>>> origin/main:ASSEMBLY.md
 - `Avelo_Master_PRD.md` — fields, screens, error strings, shortcuts.
 - `Avelo_Architecture.md` — layers, MVVM, `SQLiteDatabase` API.
 - `Avelo_Rules.md` — non-negotiables (offline, paise, double-entry, FY locks, audit immutability, reversal-not-delete).
 - `Avelo_Schema.md` — frozen SQLite schema.
 - `Avelo_Module_Checklist.md` — per-file completion tracker.
 - `Avelo_Naming_Freeze.md` — authoritative type / method / table / column names.
+<<<<<<< HEAD:Docs/Avelo_ASSEMBLY.md
 - `Avelo_Phase0_Manual_Acceptance.md` — artifact-bound accountant, operator, accessibility, print, and distribution acceptance required to close Phase 0.
 - `archive/` — historical source research retained for traceability, not active execution authority.
+=======
+>>>>>>> origin/main:ASSEMBLY.md
 
 ## Avelo/
 

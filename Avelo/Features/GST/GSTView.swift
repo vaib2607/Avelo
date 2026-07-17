@@ -62,8 +62,13 @@ private struct GSTBody: View {
                 title: "GST",
                 subtitle: "Offline tax summary, filing-ready views, and return exports in one focused workspace.",
                 hints: [
+<<<<<<< HEAD
                     .init(title: "GST", key: "⌘6"),
                     .init(title: "Refresh", key: "⌘R"),
+=======
+                    .init(title: "Summary", key: "⌘1"),
+                    .init(title: "Filing", key: "⌘2"),
+>>>>>>> origin/main
                     .init(title: "Export CSV", key: "⇧⌘E")
                 ],
                 primaryActionTitle: "Refresh",
@@ -76,9 +81,14 @@ private struct GSTBody: View {
                 DatePicker("To", selection: $vm.toDate, displayedComponents: .date)
                     .onChange(of: vm.toDate) { _, _ in vm.reload() }
                 Spacer()
+<<<<<<< HEAD
                 Button("Export CSV") { exportCSV() }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
                 Button("Export GSTR-1 (Invoices)") { exportGSTR1() }
+=======
+                Button("Export CSV") { vm.exportSummaryCSV() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+>>>>>>> origin/main
             }
             .padding(12)
             Divider()
@@ -95,7 +105,10 @@ private struct GSTBody: View {
                                 gstRow("IGST", s.igstPaise)
                                 gstRow("CGST", s.cgstPaise)
                                 gstRow("SGST", s.sgstPaise)
+<<<<<<< HEAD
                                 gstRow("CESS", s.cessPaise)
+=======
+>>>>>>> origin/main
                                 gstRow("Net payable", s.netPayablePaise)
                             }
                         } else {
@@ -112,7 +125,10 @@ private struct GSTBody: View {
                                 gstRow("IGST", filing.igstPaise)
                                 gstRow("CGST", filing.cgstPaise)
                                 gstRow("SGST", filing.sgstPaise)
+<<<<<<< HEAD
                                 gstRow("CESS", filing.cessPaise)
+=======
+>>>>>>> origin/main
                             }
                         } else {
                             Text("No filing view available.")
@@ -130,6 +146,7 @@ private struct GSTBody: View {
         }
     }
 
+<<<<<<< HEAD
     private func exportCSV() {
         Task {
             do {
@@ -160,6 +177,8 @@ private struct GSTBody: View {
         }
     }
 
+=======
+>>>>>>> origin/main
     @ViewBuilder
     private func gstRow(_ title: String, _ paise: Int64) -> some View {
         HStack {
@@ -197,6 +216,7 @@ public final class GSTViewModel {
         }
     }
 
+<<<<<<< HEAD
     /// Builds the GST summary CSV bytes for the current period. The view layer
     /// owns the save panel and writes the returned data to disk.
     public func summaryCSVData() throws -> Data {
@@ -218,5 +238,14 @@ public final class GSTViewModel {
             toDate: toDate,
             url: url
         )
+=======
+    public func exportSummaryCSV() {
+        do {
+            let svc = GSTService(db: db, companyId: companyId)
+            _ = try svc.exportGSTSummaryCSV(fromDate: fromDate, toDate: toDate)
+        } catch {
+            self.error = AppError.wrap(error)
+        }
+>>>>>>> origin/main
     }
 }

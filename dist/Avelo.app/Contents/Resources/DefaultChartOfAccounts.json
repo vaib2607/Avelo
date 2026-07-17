@@ -3,6 +3,7 @@
     { "code": "CAPITAL",         "name": "Capital Account",      "nature": "liabilities", "sort_order": 1 },
     { "code": "LOANS",           "name": "Loans (Liability)",    "nature": "liabilities", "sort_order": 2 },
     { "code": "CURRENT_LIAB",    "name": "Current Liabilities",  "nature": "liabilities", "sort_order": 3 },
+<<<<<<< HEAD
     { "code": "FIXED_ASSETS",    "name": "Fixed Assets",         "nature": "assets",      "sort_order": 4 },
     { "code": "INVESTMENTS",     "name": "Investments",          "nature": "assets",      "sort_order": 5 },
     { "code": "CURRENT_ASSETS",  "name": "Current Assets",       "nature": "assets",      "sort_order": 6 },
@@ -28,14 +29,33 @@
     { "code": "LOANS_ADVANCES_ASSET", "name": "Loans & Advances (Asset)", "nature": "assets", "sort_order": 26, "under": "CURRENT_ASSETS" },
     { "code": "STOCK_IN_HAND",   "name": "Stock-in-Hand",        "nature": "assets",      "sort_order": 27, "under": "CURRENT_ASSETS" },
     { "code": "SUNDRY_DEBTORS",  "name": "Sundry Debtors",       "nature": "assets",      "sort_order": 28, "under": "CURRENT_ASSETS" }
+=======
+    { "code": "DUTIES_TAXES",    "name": "Duties & Taxes",       "nature": "liabilities", "sort_order": 4 },
+    { "code": "FIXED_ASSETS",    "name": "Fixed Assets",         "nature": "assets",      "sort_order": 5 },
+    { "code": "INVESTMENTS",     "name": "Investments",          "nature": "assets",      "sort_order": 6 },
+    { "code": "CURRENT_ASSETS",  "name": "Current Assets",       "nature": "assets",      "sort_order": 7 },
+    { "code": "STOCK_IN_HAND",   "name": "Stock-in-Hand",        "nature": "assets",      "sort_order": 8 },
+    { "code": "BANK_ACCOUNTS",   "name": "Bank Accounts",        "nature": "assets",      "sort_order": 9 },
+    { "code": "DIRECT_INCOME",   "name": "Direct Income",        "nature": "income",      "sort_order": 10 },
+    { "code": "INDIRECT_INCOME", "name": "Indirect Income",      "nature": "income",      "sort_order": 11 },
+    { "code": "DIRECT_EXPENSE",  "name": "Direct Expenses",      "nature": "expense",     "sort_order": 12 },
+    { "code": "INDIRECT_EXPENSE","name": "Indirect Expenses",    "nature": "expense",     "sort_order": 13 }
+>>>>>>> origin/main
   ],
   "ledgers": [
     { "code": "OWNERS_CAPITAL",     "name": "Owner's Capital",        "under": "CAPITAL",         "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
     { "code": "PARTNERS_CAPITAL",   "name": "Partner's Capital",      "under": "CAPITAL",         "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+<<<<<<< HEAD
     { "code": "SECURED_LOAN",       "name": "Secured Loan",           "under": "SECURED_LOANS",   "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
     { "code": "UNSECURED_LOAN",     "name": "Unsecured Loan",         "under": "UNSECURED_LOANS", "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
     { "code": "SUNDRY_CREDITORS",   "name": "Sundry Creditors",       "under": "SUNDRY_CREDITORS", "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
     { "code": "SALARY_PAYABLE",     "name": "Salary Payable",         "under": "SUNDRY_CREDITORS", "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+=======
+    { "code": "SECURED_LOAN",       "name": "Secured Loan",           "under": "LOANS",           "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+    { "code": "UNSECURED_LOAN",     "name": "Unsecured Loan",         "under": "LOANS",           "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+    { "code": "SUNDRY_CREDITORS",   "name": "Sundry Creditors",       "under": "CURRENT_LIAB",    "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+    { "code": "SALARY_PAYABLE",     "name": "Salary Payable",         "under": "CURRENT_LIAB",    "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+>>>>>>> origin/main
     { "code": "CGST_INPUT",         "name": "CGST Input",             "under": "DUTIES_TAXES",    "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "CGST_OUTPUT",        "name": "CGST Output",            "under": "DUTIES_TAXES",    "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
     { "code": "SGST_INPUT",         "name": "SGST Input",             "under": "DUTIES_TAXES",    "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
@@ -48,12 +68,18 @@
     { "code": "BUILDING",           "name": "Building",               "under": "FIXED_ASSETS",    "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "COMPUTER",           "name": "Computer",               "under": "FIXED_ASSETS",    "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "VEHICLE",            "name": "Vehicle",                "under": "FIXED_ASSETS",    "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
+<<<<<<< HEAD
     { "code": "CASH_IN_HAND",       "name": "Cash-in-Hand",           "under": "CASH_IN_HAND",    "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "SUNDRY_DEBTORS",     "name": "Sundry Debtors",         "under": "SUNDRY_DEBTORS",  "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
+=======
+    { "code": "CASH_IN_HAND",       "name": "Cash-in-Hand",           "under": "CURRENT_ASSETS",  "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
+    { "code": "SUNDRY_DEBTORS",     "name": "Sundry Debtors",         "under": "CURRENT_ASSETS",  "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
+>>>>>>> origin/main
     { "code": "RAW_MATERIAL",       "name": "Raw Material",           "under": "STOCK_IN_HAND",   "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "FINISHED_GOODS",     "name": "Finished Goods",         "under": "STOCK_IN_HAND",   "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "BANK_HDFC",          "name": "HDFC Bank",              "under": "BANK_ACCOUNTS",   "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": true  },
     { "code": "BANK_SBI",           "name": "SBI Bank",               "under": "BANK_ACCOUNTS",   "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": true  },
+<<<<<<< HEAD
     { "code": "SALES",              "name": "Sales",                  "under": "SALES_ACCOUNTS",  "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
     { "code": "SERVICE_INCOME",     "name": "Service Income",         "under": "DIRECT_INCOME",   "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
     { "code": "DISCOUNT_RECEIVED",  "name": "Discount Received",      "under": "INDIRECT_INCOME", "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
@@ -61,6 +87,14 @@
     { "code": "PURCHASE",           "name": "Purchase",               "under": "PURCHASE_ACCOUNTS", "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "DIRECT_EXPENSES",    "name": "Direct Expenses",        "under": "DIRECT_EXPENSE",  "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "ROUND_OFF",          "name": "Round Off",              "under": "INDIRECT_EXPENSE","opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
+=======
+    { "code": "SALES",              "name": "Sales",                  "under": "DIRECT_INCOME",   "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+    { "code": "SERVICE_INCOME",     "name": "Service Income",         "under": "DIRECT_INCOME",   "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+    { "code": "DISCOUNT_RECEIVED",  "name": "Discount Received",      "under": "INDIRECT_INCOME", "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+    { "code": "INTEREST_RECEIVED",  "name": "Interest Received",      "under": "INDIRECT_INCOME", "opening_balance_paise": 0, "opening_balance_side": "credit", "is_bank_account": false },
+    { "code": "PURCHASE",           "name": "Purchase",               "under": "DIRECT_EXPENSE",  "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
+    { "code": "DIRECT_EXPENSES",    "name": "Direct Expenses",        "under": "DIRECT_EXPENSE",  "opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
+>>>>>>> origin/main
     { "code": "SALARY_EXPENSE",     "name": "Salary Expense",         "under": "INDIRECT_EXPENSE","opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "RENT_EXPENSE",       "name": "Rent Expense",           "under": "INDIRECT_EXPENSE","opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },
     { "code": "ELECTRICITY_EXPENSE","name": "Electricity Expense",     "under": "INDIRECT_EXPENSE","opening_balance_paise": 0, "opening_balance_side": "debit",  "is_bank_account": false },

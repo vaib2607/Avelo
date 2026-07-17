@@ -26,7 +26,10 @@ public enum ValidationErrorCode: String, CaseIterable, Sendable, Codable, Identi
     case stockMovementQuantityZero
     case stockMovementCostMismatch
     case quantityExceedsStock
+<<<<<<< HEAD:Avelo/Core/Validation/ValidationError.swift
     case arithmeticOverflow
+=======
+>>>>>>> origin/main:Mally/Core/Validation/ValidationError.swift
     case `internal`
 
     public var id: String { rawValue }
@@ -58,7 +61,10 @@ public enum ValidationErrorCode: String, CaseIterable, Sendable, Codable, Identi
         case .stockMovementQuantityZero:   return "Stock movement qty zero"
         case .stockMovementCostMismatch:   return "Stock movement cost mismatch"
         case .quantityExceedsStock:        return "Quantity exceeds stock"
+<<<<<<< HEAD:Avelo/Core/Validation/ValidationError.swift
         case .arithmeticOverflow:          return "Arithmetic overflow"
+=======
+>>>>>>> origin/main:Mally/Core/Validation/ValidationError.swift
         case .`internal`:                  return "Internal error"
         }
     }

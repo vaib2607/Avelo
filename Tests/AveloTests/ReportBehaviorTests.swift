@@ -30,7 +30,10 @@ final class ReportBehaviorTests: XCTestCase {
         try MigrationRunner().runMigrations(on: db)
 
         let companyId = UUID()
+<<<<<<< HEAD
         try AuditTestKeySupport.ensureKey(for: companyId)
+=======
+>>>>>>> origin/main
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO avelo_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
@@ -95,11 +98,16 @@ final class ReportBehaviorTests: XCTestCase {
 
         let debtorSale = try svc.post(draft: VoucherDraft(
             mode: .create,
+<<<<<<< HEAD
             voucherTypeCode: .sales,
             date: DateFormatters.parseDate("2024-06-01")!,
             partyAccountId: tc.debtorsId,
             billReferenceType: .newRef,
             billReferenceNumber: "INV-001",
+=======
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-06-01")!,
+>>>>>>> origin/main
             narration: "Debtor sale",
             lines: [
                 .init(accountId: tc.debtorsId, amountPaise: 15000, side: .debit),
@@ -132,11 +140,16 @@ final class ReportBehaviorTests: XCTestCase {
 
         let supplierBill = try svc.post(draft: VoucherDraft(
             mode: .create,
+<<<<<<< HEAD
             voucherTypeCode: .purchase,
             date: DateFormatters.parseDate("2024-09-01")!,
             partyAccountId: tc.creditorsId,
             billReferenceType: .newRef,
             billReferenceNumber: "BILL-001",
+=======
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-09-01")!,
+>>>>>>> origin/main
             narration: "Supplier bill",
             lines: [
                 .init(accountId: tc.purchaseId, amountPaise: 7000, side: .debit),
@@ -164,8 +177,13 @@ final class ReportBehaviorTests: XCTestCase {
 
         XCTAssertEqual(rows.count, 3)
         XCTAssertEqual(rows.map(\.narration), ["Debtor sale", "Rent payment", "GST collection"])
+<<<<<<< HEAD
         XCTAssertEqual(rows.map(\.totalDebitPaise), [15000, 20000, 1800])
         XCTAssertEqual(rows.map(\.totalCreditPaise), [15000, 20000, 1800])
+=======
+        XCTAssertEqual(rows.map(\.totalDebitPaise), [7500, 10000, 900])
+        XCTAssertEqual(rows.map(\.totalCreditPaise), [7500, 10000, 900])
+>>>>>>> origin/main
     }
 
     func testOutstandingRespectsDirectionAndAsOfBoundary() throws {
@@ -187,7 +205,10 @@ final class ReportBehaviorTests: XCTestCase {
         )
         XCTAssertEqual(receivablesAfterSale.rows.count, 1)
         XCTAssertEqual(receivablesAfterSale.rows.first?.partyName, "Sundry Debtors")
+<<<<<<< HEAD
         XCTAssertEqual(receivablesAfterSale.rows.first?.referenceNumber, "INV-001")
+=======
+>>>>>>> origin/main
         XCTAssertEqual(receivablesAfterSale.rows.first?.amountPaise, 15000)
         XCTAssertEqual(receivablesAfterSale.totalPaise, 15000)
 
@@ -197,12 +218,19 @@ final class ReportBehaviorTests: XCTestCase {
         )
         XCTAssertEqual(payablesAfterBill.rows.count, 1)
         XCTAssertEqual(payablesAfterBill.rows.first?.partyName, "Sundry Creditors")
+<<<<<<< HEAD
         XCTAssertEqual(payablesAfterBill.rows.first?.referenceNumber, "BILL-001")
+=======
+>>>>>>> origin/main
         XCTAssertEqual(payablesAfterBill.rows.first?.amountPaise, -7000)
         XCTAssertEqual(payablesAfterBill.totalPaise, -7000)
     }
 
+<<<<<<< HEAD
     func testBillWiseOutstandingConsumesReceiptsFIFOAndHonorsAgainstReference() throws {
+=======
+    func testOutstandingUsesBillWiseAllocationsAndAgeBuckets() throws {
+>>>>>>> origin/main
         let tc = try makeSeededCompany()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
 
@@ -227,6 +255,7 @@ final class ReportBehaviorTests: XCTestCase {
         _ = try svc.post(
             draft: VoucherDraft(
                 mode: .create,
+<<<<<<< HEAD
                 voucherTypeCode: .sales,
                 date: DateFormatters.parseDate("2024-04-05")!,
                 partyAccountId: tc.debtorsId,
@@ -284,6 +313,37 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(report.rows.first?.referenceNumber, "INV-002")
         XCTAssertEqual(report.rows.first?.amountPaise, 10000)
         XCTAssertEqual(report.totalPaise, 10000)
+=======
+                voucherTypeCode: .receipt,
+                date: DateFormatters.parseDate("2024-04-15")!,
+                partyAccountId: tc.debtorsId,
+                billReferenceType: .agstRef,
+                billReferenceNumber: "INV-001",
+                narration: "Partial settlement",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 20000, side: .debit),
+                    .init(accountId: tc.debtorsId, amountPaise: 20000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: VoucherService.WorkflowInputs(billAllocationKind: .agstRef, billAllocationNumber: "INV-001")
+        )
+
+        let outstanding = try ReportService(db: tc.db, companyId: tc.companyId).outstanding(
+            asOfDate: DateFormatters.parseDate("2024-05-20")!,
+            direction: .receivable
+        )
+
+        XCTAssertEqual(outstanding.rows.count, 1)
+        XCTAssertEqual(outstanding.totalPaise, 30000)
+        let row = try XCTUnwrap(outstanding.rows.first)
+        XCTAssertEqual(row.amountPaise, 30000)
+        XCTAssertEqual(row.age31to60Paise, 30000)
+        XCTAssertEqual(row.age0to30Paise, 0)
+        XCTAssertEqual(row.age61to90Paise, 0)
+        XCTAssertEqual(row.age90PlusPaise, 0)
+        XCTAssertEqual(row.ageInDays, 49)
+>>>>>>> origin/main
     }
 
     func testGstSummaryRespectsDateRangeAndBucketTotals() throws {
@@ -298,6 +358,7 @@ final class ReportBehaviorTests: XCTestCase {
         let outputByLabel = Dictionary(uniqueKeysWithValues: gst.output.map { ($0.label, $0.amountPaise) })
         XCTAssertEqual(outputByLabel["CGST OUTPUT"], 900)
         XCTAssertEqual(outputByLabel["SGST OUTPUT"], 900)
+<<<<<<< HEAD
         XCTAssertEqual(gst.outputTaxablePaise, 0)
         XCTAssertEqual(gst.inputTaxablePaise, 0)
         XCTAssertEqual(gst.outputTaxPaise, 1800)
@@ -493,6 +554,11 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(row.averageCostPaise, 200)
     }
 
+=======
+        XCTAssertEqual(gst.netPayablePaise, 1800)
+    }
+
+>>>>>>> origin/main
     func testReportDateBoundariesExcludeLaterActivity() throws {
         let tc = try makeSeededCompany()
         try seedActivity(tc)
@@ -519,6 +585,7 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(gstBeforeCollection.netPayablePaise, 0)
     }
 
+<<<<<<< HEAD
     func testTrialBalanceUsesActiveFinancialYearStartForMultiYearValidation() throws {
         let tc = try makeSeededCompany()
         let activity = try seedActivity(tc)
@@ -557,6 +624,8 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertFalse(trialBalance.rows.isEmpty, "The later FY should still produce a valid report snapshot")
     }
 
+=======
+>>>>>>> origin/main
     func testLedgerReportShowsRunningBalanceAndSourceVoucherLinkage() throws {
         let tc = try makeSeededCompany()
         let activity = try seedActivity(tc)
@@ -586,6 +655,7 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(ledger.rows[2].voucherNumber, activity.gstCollection.number)
     }
 
+<<<<<<< HEAD
     func testLedgerCacheInvalidatesWhenVoucherUpdatedWithoutChangingVoucherCount() throws {
         let tc = try makeSeededCompany()
         let activity = try seedActivity(tc)
@@ -616,6 +686,8 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(second.periodDebitPaise, 19000)
     }
 
+=======
+>>>>>>> origin/main
     func testDayBookRowsCarrySourceVoucherIdentityForDrillDown() throws {
         let tc = try makeSeededCompany()
         let activity = try seedActivity(tc)

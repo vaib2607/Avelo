@@ -3,6 +3,7 @@ import XCTest
 
 final class AuditCoverageTests: XCTestCase {
 
+<<<<<<< HEAD
     func testInventoryMasterAlterAndDisablePreserveBeforeAndAfterSnapshots() throws {
         let tc = try TestCompany.make()
         let service = InventoryService(db: tc.db, companyId: tc.companyId)
@@ -37,6 +38,8 @@ final class AuditCoverageTests: XCTestCase {
         XCTAssertEqual(try repository.list(filter: .init(companyId: tc.companyId, action: .accountGroupDeleted)).count, 1)
     }
 
+=======
+>>>>>>> origin/main
     func testVoucherLifecycleWritesAuditEvents() throws {
         let tc = try TestCompany.make()
         let service = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -77,6 +80,7 @@ final class AuditCoverageTests: XCTestCase {
         XCTAssertNotNil(reversedAudit.snapshotBeforeJson)
         XCTAssertNotNil(reversedAudit.snapshotAfterJson)
     }
+<<<<<<< HEAD
 
     func testStockMovementReversalWritesAuditEvent() throws {
         let tc = try TestCompany.make()
@@ -136,4 +140,6 @@ final class AuditCoverageTests: XCTestCase {
         XCTAssertNotNil(cancelledAudit.snapshotBeforeJson)
         XCTAssertNotNil(cancelledAudit.snapshotAfterJson)
     }
+=======
+>>>>>>> origin/main
 }

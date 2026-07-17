@@ -89,10 +89,18 @@ public struct AccountGroupRepository: Sendable {
     }
 
     static func rowToGroup(_ r: Row) throws -> AccountGroup {
+<<<<<<< HEAD:Avelo/Core/Repositories/AccountGroupRepository.swift
         let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_account_groups.id")
         let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_account_groups.company_id")
         let parentId = try UUIDParsing.optional(try r.checkedOptionalText("parent_group_id"), field: "avelo_account_groups.parent_group_id")
         let nature: AccountNature = try r.enumValue("nature")
+=======
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_account_groups.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_account_groups.company_id")
+        let parentId = try UUIDParsing.optional(r.optionalText("parent_group_id"), field: "avelo_account_groups.parent_group_id")
+        let natureRaw = r.text("nature")
+        let nature = AccountNature(rawValue: natureRaw) ?? .assets
+>>>>>>> origin/main:Mally/Core/Repositories/AccountGroupRepository.swift
         return AccountGroup(
             id: id,
             companyId: companyId,

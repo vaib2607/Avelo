@@ -75,8 +75,14 @@ public struct CompanyRepository: Sendable {
     }
 
     static func rowToCompany(_ r: Row) throws -> Company {
+<<<<<<< HEAD:Avelo/Core/Repositories/CompanyRepository.swift
         let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_companies.id")
         let mode: InventoryLinkMode = try r.enumValue("inventory_link_mode")
+=======
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_companies.id")
+        let modeRaw = r.text("inventory_link_mode")
+        let mode = InventoryLinkMode(rawValue: modeRaw) ?? .manual
+>>>>>>> origin/main:Mally/Core/Repositories/CompanyRepository.swift
         return Company(
             id: id,
             name: try r.requiredText("name"),

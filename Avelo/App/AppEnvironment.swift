@@ -17,6 +17,7 @@ public final class AppEnvironment {
     /// degrade (e.g. to a temporary directory). Surfaced to the user on launch.
     public var startupError: AppError?
 
+<<<<<<< HEAD
     /// A leftover autosaved voucher draft found for the just-opened company
     /// (AVL-P0-018). Drives the recovery prompt in `RootView`; "Resume"
     /// leaves this set so `NewVoucherSheet.setup()` can consume it once,
@@ -29,14 +30,19 @@ public final class AppEnvironment {
     /// time, including for every other `isBusy` state.
     public var migrationProgress: (completed: Int, total: Int)?
 
+=======
+>>>>>>> origin/main
     public let manager: DatabaseManager
     public let router: AppRouter
     public let keyboard: KeyboardRouter
     public let registry: RegistryRepository
     public let backupService: BackupService
+<<<<<<< HEAD
     public let shouldAutoOpenDemoCompany: Bool
     internal var onDemoCompanyCreatedForTesting: ((Company.ID) async throws -> Void)?
     private var accountTreeReloadTask: Task<Void, Never>?
+=======
+>>>>>>> origin/main
 
     @MainActor
     public init() {
@@ -47,7 +53,10 @@ public final class AppEnvironment {
         self.manager = bootstrap.stores.manager
         self.registry = RegistryRepository(db: bootstrap.stores.registryDb)
         self.backupService = BackupService(manager: bootstrap.stores.manager)
+<<<<<<< HEAD
         self.shouldAutoOpenDemoCompany = ProcessInfo.processInfo.environment["AVELO_OPEN_DEMO"] == "1"
+=======
+>>>>>>> origin/main
         self.startupError = bootstrap.error
     }
 
@@ -63,7 +72,10 @@ public final class AppEnvironment {
         self.keyboard = keyboard
         self.registry = registry
         self.backupService = backupService
+<<<<<<< HEAD
         self.shouldAutoOpenDemoCompany = ProcessInfo.processInfo.environment["AVELO_OPEN_DEMO"] == "1"
+=======
+>>>>>>> origin/main
         self.startupError = startupError
     }
 
@@ -76,6 +88,7 @@ public final class AppEnvironment {
     /// Application Support location by degrading to a temporary directory.
     /// Returns any degradation as an `AppError` instead of crashing.
     private static func makeStores() -> (stores: Stores, error: AppError?) {
+<<<<<<< HEAD
         var firstError: Error?
         // Tier 1: the normal Application Support location.
         do {
@@ -92,12 +105,24 @@ public final class AppEnvironment {
             }
         } catch {
             firstError = error
+=======
+        // Tier 1: the normal Application Support location.
+        if let appSupport = try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: true
+        ) {
+            let dir = appSupport.appendingPathComponent("Avelo", isDirectory: true)
+            if let stores = try? buildStores(in: dir) {
+                return (stores, nil)
+            }
+>>>>>>> origin/main
         }
 
         // Tier 2: a unique temporary directory. Data will not persist across
         // launches, but the app stays usable and the user is told why.
         let tempDir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("Avelo-\(UUID().uuidString)", isDirectory: true)
+<<<<<<< HEAD
         do {
             let stores = try buildStores(in: tempDir)
             let detail = firstError.map { " \($0.localizedDescription)" } ?? ""
@@ -105,11 +130,20 @@ public final class AppEnvironment {
             return (stores, AppError.database(.openFailed(msg)))
         } catch {
             firstError = error
+=======
+        if let stores = try? buildStores(in: tempDir) {
+            let msg = "Couldn't open Avelo's data folder, so a temporary location is being used. Any changes will NOT be saved when you quit. Check disk permissions and restart."
+            return (stores, AppError.database(.openFailed(msg)))
+>>>>>>> origin/main
         }
 
         // Tier 3: truly unrecoverable I/O environment. A clear, intentional
         // failure beats an opaque force-unwrap crash.
+<<<<<<< HEAD
         preconditionFailure("Avelo could not create a database in either Application Support or a temporary directory. \(firstError?.localizedDescription ?? "The filesystem is not writable.")")
+=======
+        preconditionFailure("Avelo could not create a database in either Application Support or a temporary directory. The filesystem is not writable.")
+>>>>>>> origin/main
     }
 
     private static func buildStores(in aveloDir: URL) throws -> Stores {
@@ -124,6 +158,7 @@ public final class AppEnvironment {
         if let startupError, globalError == nil {
             globalError = startupError
         }
+<<<<<<< HEAD
 
         if shouldAutoOpenDemoCompany, companyContext == nil {
             do {
@@ -244,10 +279,13 @@ public final class AppEnvironment {
         _ = try report.ledger(accountId: cash.id, financialYearId: fy.id, fromDate: fy.startDate, toDate: fy.endDate)
 
         await openCompany(company.id)
+=======
+>>>>>>> origin/main
     }
 
     public func openCompany(_ id: Company.ID) async {
         isBusy = true
+<<<<<<< HEAD
         defer { isBusy = false; migrationProgress = nil }
         do {
             let handle = try await manager.openCompany(id: id) { [weak self] completed, total in
@@ -255,10 +293,16 @@ public final class AppEnvironment {
                     self?.migrationProgress = (completed, total)
                 }
             }
+=======
+        defer { isBusy = false }
+        do {
+            let handle = try await manager.openCompany(id: id)
+>>>>>>> origin/main
             let fyRepo = FinancialYearRepository(db: handle.db)
             guard let fy = try fyRepo.findMostRecent(handle.companyId) else {
                 throw AppError.notFound("Financial year for company \(id.uuidString)")
             }
+<<<<<<< HEAD
             let featureSet = try CompanyRepository(db: handle.db).findById(handle.companyId)
                 .map(CompanyFeatureSet.init(company:)) ?? .defaults
             try AuditService(db: handle.db, companyId: handle.companyId).record(
@@ -268,10 +312,13 @@ public final class AppEnvironment {
                 reason: "Company opened in this window"
             )
             router.setFeatureSet(featureSet)
+=======
+>>>>>>> origin/main
             self.companyContext = CompanyContext(
                 companyId: handle.companyId,
                 companyName: handle.companyName,
                 financialYear: fy,
+<<<<<<< HEAD
                 database: handle.db,
                 featureSet: featureSet
             )
@@ -282,6 +329,13 @@ public final class AppEnvironment {
             // crash or quit while this company was open. Best-effort: a
             // lookup failure here must not block opening the company.
             self.pendingDraftRecovery = try? VoucherDraftRepository(db: handle.db).mostRecent(companyId: handle.companyId)
+=======
+                database: handle.db
+            )
+            self.accountTree = AccountTreeCache(companyId: handle.companyId, database: handle.db)
+            self.accountTree?.reload()
+            router.reset()
+>>>>>>> origin/main
             banner = BannerPayload(kind: .success("Company opened."), message: "Company opened.")
         } catch {
             globalError = AppError.wrap(error)
@@ -294,6 +348,7 @@ public final class AppEnvironment {
             guard let fy = try FinancialYearRepository(db: ctx.database).findById(id) else {
                 throw AppError.notFound("Financial year")
             }
+<<<<<<< HEAD
             guard fy.companyId == ctx.companyId else {
                 throw AppError.notFound("Financial year")
             }
@@ -303,10 +358,13 @@ public final class AppEnvironment {
                 entityId: fy.id.uuidString,
                 reason: "Switched from \(ctx.financialYear.label) to \(fy.label)"
             )
+=======
+>>>>>>> origin/main
             companyContext = CompanyContext(
                 companyId: ctx.companyId,
                 companyName: ctx.companyName,
                 financialYear: fy,
+<<<<<<< HEAD
                 database: ctx.database,
                 featureSet: ctx.featureSet
             )
@@ -323,12 +381,18 @@ public final class AppEnvironment {
                 guard self.companyContext?.companyId == expectedCompanyId,
                       self.companyContext?.financialYear.id == expectedFYId else { return }
             }
+=======
+                database: ctx.database
+            )
+            notifyDataChanged()
+>>>>>>> origin/main
             banner = BannerPayload(kind: .info("Financial year switched."), message: "Financial year switched.")
         } catch {
             globalError = AppError.wrap(error)
         }
     }
 
+<<<<<<< HEAD
     /// Re-reads the company's capability flags from the database and rebuilds
     /// `companyContext` with them. Call after any write that flips a flag
     /// (Settings' inventory toggle) so sidebar/menu/palette/keyboard gating
@@ -350,10 +414,14 @@ public final class AppEnvironment {
     public func closeCompany() {
         accountTreeReloadTask?.cancel()
         accountTreeReloadTask = nil
+=======
+    public func closeCompany() {
+>>>>>>> origin/main
         if let ctx = companyContext {
             Task { await manager.closeCompany(id: ctx.companyId) }
         }
         companyContext = nil
+<<<<<<< HEAD
         router.setFeatureSet(.defaults)
         accountTree = nil
         pendingDraftRecovery = nil
@@ -374,6 +442,12 @@ public final class AppEnvironment {
         }
     }
 
+=======
+        accountTree = nil
+        router.reset()
+    }
+
+>>>>>>> origin/main
     public func markAccountTreeDirty() {
         accountTree?.invalidate()
     }
@@ -411,6 +485,7 @@ public struct CompanyContext: Sendable {
     public let companyName: String
     public let financialYear: FinancialYear
     public let database: SQLiteDatabase
+<<<<<<< HEAD
     // AVL-P0-033: single source of truth for every UI surface (sidebar,
     // menus, command palette, keyboard routing, dashboard) that gates on a
     // capability, instead of each surface re-reading Company from the
@@ -420,11 +495,18 @@ public struct CompanyContext: Sendable {
     public var isInventoryEnabled: Bool { featureSet.inventory }
 
     public init(companyId: Company.ID, companyName: String, financialYear: FinancialYear, database: SQLiteDatabase, featureSet: CompanyFeatureSet = .defaults) {
+=======
+
+    public init(companyId: Company.ID, companyName: String, financialYear: FinancialYear, database: SQLiteDatabase) {
+>>>>>>> origin/main
         self.companyId = companyId
         self.companyName = companyName
         self.financialYear = financialYear
         self.database = database
+<<<<<<< HEAD
         self.featureSet = featureSet
+=======
+>>>>>>> origin/main
     }
 }
 

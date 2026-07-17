@@ -6,14 +6,22 @@ public struct BillOfMaterials: Identifiable, Hashable, Sendable, Codable {
     public let id: ID
     public let companyId: Company.ID
     public var assemblyItemId: InventoryItem.ID
+<<<<<<< HEAD
     public var outputQuantity: ExactQuantity
+=======
+    public var outputQuantity: Double
+>>>>>>> origin/main
     public let createdAt: Date
     public var updatedAt: Date
 
     public init(id: ID = UUID(),
                 companyId: Company.ID,
                 assemblyItemId: InventoryItem.ID,
+<<<<<<< HEAD
                 outputQuantity: ExactQuantity,
+=======
+                outputQuantity: Double = 1,
+>>>>>>> origin/main
                 createdAt: Date = Date(),
                 updatedAt: Date = Date()) {
         self.id = id
@@ -32,14 +40,22 @@ public struct BOMComponent: Identifiable, Hashable, Sendable, Codable {
     public let companyId: Company.ID
     public var bomId: BillOfMaterials.ID
     public var componentItemId: InventoryItem.ID
+<<<<<<< HEAD
     public var quantity: ExactQuantity
+=======
+    public var quantity: Double
+>>>>>>> origin/main
     public var lineOrder: Int
 
     public init(id: ID = UUID(),
                 companyId: Company.ID,
                 bomId: BillOfMaterials.ID,
                 componentItemId: InventoryItem.ID,
+<<<<<<< HEAD
                 quantity: ExactQuantity,
+=======
+                quantity: Double,
+>>>>>>> origin/main
                 lineOrder: Int = 0) {
         self.id = id
         self.companyId = companyId
@@ -49,6 +65,7 @@ public struct BOMComponent: Identifiable, Hashable, Sendable, Codable {
         self.lineOrder = lineOrder
     }
 }
+<<<<<<< HEAD
 
 /// Formats the decimal-only quantities accepted by BOM setup without ever
 /// round-tripping through `Double`. `ExactQuantity` reduces fractions (for
@@ -115,3 +132,5 @@ public enum BOMQuantityFormat {
         return result.overflow ? nil : result.partialValue
     }
 }
+=======
+>>>>>>> origin/main

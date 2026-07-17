@@ -2,6 +2,7 @@
 # Run from repo root.
 
 SRC_DIR := .
+<<<<<<< HEAD
 SWIFT := ./Scripts/swiftw.sh
 
 .PHONY: all setup dev build bundle verify validate-bundle launch-smoke bundle-selftest benchmark benchmark-million rc-local test net-check rule-audit board todo count help
@@ -25,6 +26,20 @@ bundle:
 
 verify: rule-audit test bundle validate-bundle bundle-selftest
 	@echo "Verification complete. Run './Scripts/launch_smoke.sh' from a normal local GUI session to confirm the bundled app opens cleanly."
+=======
+
+.PHONY: all build bundle validate-bundle launch-smoke bundle-selftest benchmark benchmark-million rc-local test net-check rule-audit board todo count help
+
+all: net-check build test
+
+# Swift Package Manager build
+build:
+	swift build 2>&1
+
+# Assemble a local .app bundle from the release binary
+bundle:
+	./Scripts/bundle.sh
+>>>>>>> origin/main
 
 validate-bundle:
 	./Scripts/validate_bundle.sh
@@ -41,11 +56,24 @@ benchmark:
 benchmark-million:
 	./Scripts/benchmark.sh million
 
+<<<<<<< HEAD
 rc-local: verify
 
 # Run full test suite
 test:
 	$(SWIFT) test 2>&1
+=======
+rc-local: rule-audit test
+	swift build -c release
+	./Scripts/bundle.sh
+	./Scripts/validate_bundle.sh
+	./Scripts/bundle_selftest.sh
+	@echo "Local RC proof complete. Run './Scripts/launch_smoke.sh' from a normal local GUI session to confirm bundled app launch."
+
+# Run full test suite
+test:
+	swift test 2>&1
+>>>>>>> origin/main
 
 # CRITICAL: Must be 0 for V1
 net-check:
@@ -104,6 +132,7 @@ rule-audit: net-check r16-check r15-check r4-check
 	@echo "Manual checks still needed: R-2, R-3, R-5, R-6, R-8, R-9, R-10, R-11, R-12, R-13, R-17, R-18"
 	@echo "See Docs/Avelo_Rules.md"
 
+<<<<<<< HEAD
 # Show canonical release board
 board:
 	@cat Docs/Avelo_Release_Board.md
@@ -137,3 +166,20 @@ help:
 	@echo "  board            Show the full task board"
 	@echo "  todo             Show incomplete task-board items"
 	@echo "  count            Count remaining task-board items"
+=======
+# Show full task board
+board:
+	@cat .agents/TASK_BOARD.md
+
+# Show only incomplete tasks
+todo:
+	@grep "^- \[ \]" .agents/TASK_BOARD.md
+
+# Count remaining
+count:
+	@echo "Remaining:"
+	@grep -c "^- \[ \]" .agents/TASK_BOARD.md || echo "0"
+
+help:
+	@echo "Targets: build | test | net-check | r16-check | r15-check | rule-audit | board | todo | count"
+>>>>>>> origin/main

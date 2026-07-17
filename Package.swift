@@ -26,7 +26,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "Avelo",
+<<<<<<< HEAD
             dependencies: ["CSQLCipher"],
+=======
+>>>>>>> origin/main
             path: "Avelo",
             exclude: [
                 "Avelo.entitlements",

@@ -3,6 +3,7 @@ import SwiftUI
 import AppKit
 #endif
 
+<<<<<<< HEAD
 struct OneShotSubmitGate {
     private(set) var isInFlight: Bool = false
 
@@ -17,11 +18,14 @@ struct OneShotSubmitGate {
     }
 }
 
+=======
+>>>>>>> origin/main
 public struct NewVoucherSheet: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @State private var vm: VoucherEditViewModel?
+<<<<<<< HEAD
     // A window can only have one AppKit-level sheet/alert presentation at a
     // time. This sheet already occupies that slot, so RootView's root-level
     // `.alert(item: env.globalError)` cannot present while this is open —
@@ -29,6 +33,8 @@ public struct NewVoucherSheet: View {
     // closes. Post/save errors must surface locally, on this same
     // presentation, instead of routing through the app-wide error channel.
     @State private var postError: AppError?
+=======
+>>>>>>> origin/main
     let initialType: VoucherType.Code
 
     public init(initialType: VoucherType.Code) {
@@ -37,12 +43,18 @@ public struct NewVoucherSheet: View {
 
     public var body: some View {
         NewVoucherEditor(vm: vm, initialType: initialType, onPost: post(vm:))
+<<<<<<< HEAD
             .frame(minWidth: 760, idealWidth: 780, minHeight: 700, idealHeight: 780)
             .environment(router)
             .task(id: env.companyContext?.companyId) { setup() }
             .alert(item: $postError) { err in
                 Alert(title: Text("Couldn't post voucher"), message: Text(err.localizedMessage), dismissButton: .default(Text("OK")))
             }
+=======
+            .frame(minWidth: 880, minHeight: 640)
+            .environment(router)
+            .task(id: env.companyContext?.companyId) { setup() }
+>>>>>>> origin/main
     }
 
     private func setup() {
@@ -54,6 +66,7 @@ public struct NewVoucherSheet: View {
         do {
             let model = VoucherEditViewModel(companyId: ctx.companyId, db: ctx.database,
                                              fyId: ctx.financialYear.id, initialType: initialType)
+<<<<<<< HEAD
             let svc = AccountService(db: ctx.database, companyId: ctx.companyId)
             let accounts = try svc.listActiveAccounts()
             let groups = try svc.listGroups()
@@ -71,6 +84,10 @@ public struct NewVoucherSheet: View {
                 model.loadFromRecoveredDraft(recovered)
                 env.pendingDraftRecovery = nil
             }
+=======
+            let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
+            model.load(accounts: accounts, initialDate: ctx.financialYear.startDate)
+>>>>>>> origin/main
             model.revalidate()
             vm = model
         } catch {
@@ -80,6 +97,7 @@ public struct NewVoucherSheet: View {
     }
 
     private func post(vm: VoucherEditViewModel) {
+<<<<<<< HEAD
         guard let ctx = env.companyContext else {
             postError = AppError.businessRule("No company is open — cannot post. Close this sheet, open a company, and try again.")
             return
@@ -102,12 +120,22 @@ public struct NewVoucherSheet: View {
                 _ = try svc.post(draft: vm.buildDraft(), in: ctx.financialYear, workflow: vm.buildWorkflowInputs())
             }
             vm.deleteDraft()
+=======
+        guard let ctx = env.companyContext else { return }
+        do {
+            let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
+            _ = try svc.post(draft: vm.buildDraft(), in: ctx.financialYear, workflow: vm.buildWorkflowInputs())
+>>>>>>> origin/main
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher posted.")
             router.presentedSheet = nil
         } catch {
+<<<<<<< HEAD
             postError = AppError.wrap(error)
+=======
+            env.showError(AppError.wrap(error))
+>>>>>>> origin/main
         }
     }
 }
@@ -128,6 +156,7 @@ private struct NewVoucherEditor: View {
     }
 }
 
+<<<<<<< HEAD
 /// Drives the Tally-style Enter cascade: Date -> Account/first line ledger ->
 /// its amount -> next blank line's ledger -> ... -> Narration.
 private enum VoucherField: Hashable {
@@ -139,11 +168,14 @@ private enum VoucherField: Hashable {
     case amount(UUID)
 }
 
+=======
+>>>>>>> origin/main
 @MainActor
 private struct NewVoucherBody: View {
     @Bindable var vm: VoucherEditViewModel
     let initialType: VoucherType.Code
     let onPost: (VoucherEditViewModel) -> Void
+<<<<<<< HEAD
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @State private var submitGate = OneShotSubmitGate()
@@ -177,11 +209,27 @@ private struct NewVoucherBody: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
             }
+=======
+    @Environment(AppRouter.self) private var router
+
+    var body: some View {
+        VStack(spacing: 0) {
+            topBar
+            Divider()
+            ScrollView { mainContent }
+                .onChange(of: vm.lines) { _, _ in vm.revalidate() }
+                .onChange(of: vm.partyAccountId) { _, _ in vm.revalidate() }
+                .onChange(of: vm.billReferenceType) { _, _ in vm.revalidate() }
+                .onChange(of: vm.billReferenceNumber) { _, _ in vm.revalidate() }
+                .onChange(of: vm.narration) { _, _ in vm.revalidate() }
+                .onChange(of: vm.date) { _, _ in vm.revalidate() }
+>>>>>>> origin/main
             Divider()
             bottomBar
         }
     }
 
+<<<<<<< HEAD
     private var voucherEditorScrollView: some View {
         ScrollView { mainContent }
             .onChange(of: vm.lines) { _, _ in voucherDraftDidChange() }
@@ -195,6 +243,8 @@ private struct NewVoucherBody: View {
             .onChange(of: vm.chequeDueDate) { _, _ in voucherAutosaveDidChange() }
     }
 
+=======
+>>>>>>> origin/main
     private var topBar: some View {
         VStack(spacing: 0) {
             ModuleChrome(
@@ -210,6 +260,7 @@ private struct NewVoucherBody: View {
             HStack {
                 Spacer()
                 Button("Paste TSV") { pasteTSV() }
+<<<<<<< HEAD
                 Button("Save Template") {
                     do {
                         try vm.saveTemplate(named: initialType.rawValue)
@@ -225,6 +276,11 @@ private struct NewVoucherBody: View {
                     }
                 }
                 Button { vm.deleteDraft(); router.presentedSheet = nil } label: {
+=======
+                Button("Save Template") { try? vm.saveTemplate(named: initialType.rawValue) }
+                Button("Load Template") { try? vm.loadTemplate(named: initialType.rawValue) }
+                Button { router.presentedSheet = nil } label: {
+>>>>>>> origin/main
                     Image(systemName: "xmark.circle.fill")
                 }
                 .buttonStyle(.plain)
@@ -237,6 +293,7 @@ private struct NewVoucherBody: View {
     private var mainContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             headerSection
+<<<<<<< HEAD
             if vm.singleEntryMode { accountSection }
             workflowSection
             if isItemInvoiceEligible { itemInvoiceToggle }
@@ -352,6 +409,23 @@ private struct NewVoucherBody: View {
                                   get: { focusedField == .party },
                                   set: { if $0 { focusedField = .party } }
                               ))
+=======
+            workflowSection
+            linesSection
+            if !vm.validationErrors.isEmpty { validationSection }
+            totalsSection
+        }
+        .padding(16)
+    }
+
+    private var headerSection: some View {
+        GroupBox("Header") {
+            Form {
+                DatePicker("Date", selection: $vm.date, displayedComponents: .date)
+                AccountPicker(selection: $vm.partyAccountId,
+                              accounts: vm.accounts,
+                              placeholder: "Party (optional)")
+>>>>>>> origin/main
                 Picker("Bill reference type", selection: $vm.billReferenceType) {
                     Text("None").tag(VoucherDraft.BillReferenceType?.none)
                     ForEach(VoucherDraft.BillReferenceType.allCases) { type in
@@ -359,6 +433,7 @@ private struct NewVoucherBody: View {
                     }
                 }
                 TextField("Bill reference number", text: $vm.billReferenceNumber)
+<<<<<<< HEAD
             }
             narrationField
         }
@@ -419,28 +494,44 @@ private struct NewVoucherBody: View {
                 Text(vm.accountSide == .debit ? "This ledger will be debited." : "This ledger will be credited.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+=======
+                TextField("Narration", text: $vm.narration, axis: .vertical)
+                    .lineLimit(2...4)
+>>>>>>> origin/main
             }
             .formStyle(.grouped)
         }
     }
 
     private var workflowSection: some View {
+<<<<<<< HEAD
         // TDS/TCS and post-dated workflows are deferred (VoucherService rejects
         // them outside the frozen schema), so only cheque details are exposed.
         VStack(alignment: .leading, spacing: 4) {
             sectionLabel("Cheque (optional)")
+=======
+        GroupBox("Workflow") {
+>>>>>>> origin/main
             Form {
                 TextField("Cheque number", text: $vm.chequeNumber)
                 DatePicker("Cheque due date", selection: Binding(
                     get: { vm.chequeDueDate ?? vm.date },
                     set: { vm.chequeDueDate = $0 }
                 ), displayedComponents: .date)
+<<<<<<< HEAD
+=======
+                TextField("TDS section code", text: $vm.tdsSectionCode)
+                TextField("TDS tax amount", text: $vm.tdsTaxAmount)
+                TextField("TCS section code", text: $vm.tcsSectionCode)
+                TextField("TCS tax amount", text: $vm.tcsTaxAmount)
+>>>>>>> origin/main
             }
             .formStyle(.grouped)
         }
     }
 
     private var linesSection: some View {
+<<<<<<< HEAD
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel(vm.singleEntryMode ? "Particulars (\(vm.particularsSide == .debit ? "Dr" : "Cr"))" : "Lines")
             HStack {
@@ -524,10 +615,51 @@ private struct NewVoucherBody: View {
             }
             .buttonStyle(.plain)
             .disabled(vm.lines.count <= (vm.singleEntryMode ? 1 : 2))
+=======
+        GroupBox("Lines") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Account").frame(maxWidth: .infinity, alignment: .leading)
+                    Text("Side").frame(width: 110, alignment: .leading)
+                    Text("Amount (₹)").frame(width: 160, alignment: .leading)
+                    Text("").frame(width: 32)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                ForEach($vm.lines) { line in
+                    lineRow(line: line)
+                }
+                Button { vm.addLine() } label: {
+                    Label("Add line", systemImage: "plus")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(8)
+        }
+    }
+
+    private func lineRow(line: Binding<VoucherEditViewModel.LineRow>) -> some View {
+        HStack {
+            AccountPicker(selection: line.accountId, accounts: vm.accounts)
+            Picker("", selection: line.side) {
+                Text("Debit").tag(LedgerSide.debit)
+                Text("Credit").tag(LedgerSide.credit)
+            }
+            .frame(width: 110)
+            .labelsHidden()
+            MoneyTextField(label: "", text: line.amount)
+                .frame(width: 160)
+            Button { vm.removeLine(line.wrappedValue.id) } label: {
+                Image(systemName: "minus.circle")
+            }
+            .buttonStyle(.plain)
+            .disabled(vm.lines.count <= 2)
+>>>>>>> origin/main
             .frame(width: 32)
         }
     }
 
+<<<<<<< HEAD
     /// Enter-on-amount cascade: grow the grid only when this line is
     /// actually filled in (repeatedly pressing Enter on an already-blank
     /// trailing line must not spam new blank rows — reported: entry menu
@@ -583,12 +715,32 @@ private struct NewVoucherBody: View {
 
     private var doubleEntryTotals: some View {
         let difference = (try? CheckedMath.subtract(vm.totalDebitPaise, vm.totalCreditPaise, context: "calculating new voucher sheet difference")) ?? 0
+=======
+    private var validationSection: some View {
+        GroupBox("Validation") {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(vm.validationErrors, id: \.code) { err in
+                    Text("• \(err.message)").foregroundStyle(.red)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+        }
+    }
+
+    private var totalsSection: some View {
+        let difference = vm.totalDebitPaise - vm.totalCreditPaise
+>>>>>>> origin/main
         return HStack {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text("Debit total: \(Currency.formatPaise(vm.totalDebitPaise))")
                 Text("Credit total: \(Currency.formatPaise(vm.totalCreditPaise))")
+<<<<<<< HEAD
                 Text(difference == 0 ? "Balanced" : "Difference: \(Currency.formatAbsolutePaise(difference))")
+=======
+                Text(difference == 0 ? "Balanced" : "Difference: \(Currency.formatPaise(abs(difference)))")
+>>>>>>> origin/main
                     .foregroundStyle(difference == 0 ? .green : .red)
             }
             .monospacedDigit()
@@ -598,6 +750,7 @@ private struct NewVoucherBody: View {
     private var bottomBar: some View {
         HStack {
             Spacer()
+<<<<<<< HEAD
             Button("Cancel") { vm.deleteDraft(); router.presentedSheet = nil }
                 .keyboardShortcut(.cancelAction)
             // Deliberately NOT gated on `vm.canPost`: a button disabled for
@@ -612,10 +765,19 @@ private struct NewVoucherBody: View {
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(submitGate.isInFlight)
+=======
+            Button("Cancel") { router.presentedSheet = nil }
+                .keyboardShortcut(.cancelAction)
+            Button("Post") { onPost(vm) }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(!vm.canPost)
+>>>>>>> origin/main
         }
         .padding(16)
     }
 
+<<<<<<< HEAD
     /// Always responds to ⌘Return: posts if valid, otherwise re-validates
     /// and surfaces the first error so the user knows why nothing happened.
     private func attemptSubmit() {
@@ -658,6 +820,8 @@ private struct NewVoucherBody: View {
         onPost(vm)
     }
 
+=======
+>>>>>>> origin/main
     private func pasteTSV() {
         #if canImport(AppKit)
         if let text = NSPasteboard.general.string(forType: .string) {
@@ -665,6 +829,7 @@ private struct NewVoucherBody: View {
         }
         #endif
     }
+<<<<<<< HEAD
 
     private func voucherDraftDidChange() {
         vm.revalidate()
@@ -742,4 +907,6 @@ internal func accountCreationSelection(before: Set<Account.ID>,
         return .none
     }
     return eligibility(created) ? .selected(created.id) : .rejected(created.id)
+=======
+>>>>>>> origin/main
 }

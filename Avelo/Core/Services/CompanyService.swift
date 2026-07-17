@@ -19,9 +19,6 @@ public final class CompanyService: Sendable {
     }
 
     public func update(_ company: Company) throws {
-        guard !company.isInventoryEnabled || company.inventoryLinkMode.isAvailableForProduction else {
-            throw AppError.businessRule("Automatic inventory linking is not available. Use manual stock movements or an explicit item invoice.")
-        }
         var c = company
         c.updatedAt = Date()
         try db.write { tx in
@@ -37,9 +34,6 @@ public final class CompanyService: Sendable {
     }
 
     public func setInventoryMode(enabled: Bool, linkMode: InventoryLinkMode) throws {
-        guard !enabled || linkMode.isAvailableForProduction else {
-            throw AppError.businessRule("Automatic inventory linking is not available. Use manual stock movements or an explicit item invoice.")
-        }
         guard var company = try current() else {
             throw AppError.notFound("Company")
         }
@@ -50,7 +44,7 @@ public final class CompanyService: Sendable {
         try db.write { tx in
             try CompanyRepository(db: tx).update(company)
             try AuditService(db: tx, companyId: audit.companyId).record(
-                action: .companyUpdated,
+                action: .inventoryModeChanged,
                 entityType: "company",
                 entityId: company.id.uuidString,
                 snapshotBefore: before,
@@ -91,53 +85,44 @@ public final class CompanyService: Sendable {
             endDate: fyInput.endDate,
             booksBeginDate: fyInput.booksBeginDate
         )
-        let companyKey = try manager.keyStore.generateKey()
-        let companyURL = try await manager.createCompanyFile(companyId: company.id, key: companyKey)
-        let sqliteFileName = companyURL.lastPathComponent
+        _ = try await manager.createCompanyFile(companyId: company.id)
 
-        do {
-            let db = try SQLiteDatabase(path: companyURL.path, key: companyKey)
-            defer { db.close() }
+        let db = try SQLiteDatabase(path: manager.companiesDirectory
+                                            .appendingPathComponent("\(company.id.uuidString).sqlite")
+                                            .path)
+        defer { db.close() }
 
-            try db.write { tx in
-                let companyRepo = CompanyRepository(db: tx)
-                let fyRepo = FinancialYearRepository(db: tx)
-                _ = try companyRepo.insert(company)
-                try fyRepo.insert(fy)
-                if seedDefaults {
-                    try SeedLoader().loadDefaults(into: tx,
-                                                  companyId: company.id,
-                                                  financialYearId: fy.id)
-                }
+        try db.write { tx in
+            let companyRepo = CompanyRepository(db: tx)
+            let fyRepo = FinancialYearRepository(db: tx)
+            _ = try companyRepo.insert(company)
+            try fyRepo.insert(fy)
+            try SeedLoader().loadDefaults(into: tx,
+                                          companyId: company.id,
+                                          financialYearId: fy.id)
 
-                let audit = AuditService(db: tx, companyId: company.id)
-                try audit.record(
-                    action: .companyCreated,
-                    entityType: "company",
-                    entityId: company.id.uuidString,
-                    snapshotAfter: company
-                )
-                try audit.record(
-                    action: .financialYearCreated,
-                    entityType: "financial_year",
-                    entityId: fy.id.uuidString,
-                    snapshotAfter: fy
-                )
-            }
-
-            let registryDatabase = try registryDb(manager: manager)
-            defer { registryDatabase.close() }
-            let registry = RegistryRepository(db: registryDatabase)
-            try registry.register(CompanyRegistryEntry(
-                id: company.id,
-                name: company.name,
-                sqliteFileName: sqliteFileName
-            ))
-            return company
-        } catch {
-            try? await manager.deleteCompanyFiles(id: company.id)
-            throw error
+            let audit = AuditService(db: tx, companyId: company.id)
+            try audit.record(
+                action: .companyCreated,
+                entityType: "company",
+                entityId: company.id.uuidString,
+                snapshotAfter: company
+            )
+            try audit.record(
+                action: .financialYearCreated,
+                entityType: "financial_year",
+                entityId: fy.id.uuidString,
+                snapshotAfter: fy
+            )
         }
+
+        let registry = RegistryRepository(db: try registryDb(manager: manager))
+        try registry.register(CompanyRegistryEntry(
+            id: company.id,
+            name: company.name,
+            sqliteFileName: "\(company.id.uuidString).sqlite"
+        ))
+        return company
     }
 
     static func registryDb(manager: DatabaseManager) throws -> SQLiteDatabase {

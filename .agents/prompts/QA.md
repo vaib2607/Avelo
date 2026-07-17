@@ -9,7 +9,11 @@ You represent the accountant user. Approach as: "Would a real accountant trust t
 
 ## STARTUP SEQUENCE
 1. git pull
+<<<<<<< HEAD
 2. cat Docs/Avelo_Release_Board.md && cat Docs/Avelo_Execution_Checklist.md
+=======
+2. cat .agents/TASK_BOARD.md
+>>>>>>> origin/main
 3. Check FLOW agent completed tasks — QA cannot start a flow until FLOW has reviewed it
 4. Pick unlocked [QA] tasks
 

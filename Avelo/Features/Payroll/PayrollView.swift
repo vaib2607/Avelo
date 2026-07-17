@@ -64,8 +64,14 @@ private struct PayrollBody: View {
                     title: "Payroll",
                     subtitle: "Employee masters and salary postings with a clear month-by-month register.",
                     hints: [
+<<<<<<< HEAD:Avelo/Features/Payroll/PayrollView.swift
                         .init(title: "Payroll", key: "⌘7"),
                         .init(title: "New employee", key: "⇧⌘E")
+=======
+                        .init(title: "Employees", key: "⌘1"),
+                        .init(title: "Post salary", key: "⌘P"),
+                        .init(title: "New employee", key: "⇧⌘N")
+>>>>>>> origin/main:Mally/Features/Payroll/PayrollView.swift
                     ],
                     primaryActionTitle: "New Employee",
                     primaryActionSystemImage: "plus",
@@ -81,6 +87,15 @@ private struct PayrollBody: View {
                     TableColumn("Name", value: \.name)
                     TableColumn("Designation") { e in
                         Text(e.designation ?? "—")
+<<<<<<< HEAD:Avelo/Features/Payroll/PayrollView.swift
+=======
+                    }
+                    TableColumn("Basic (₹)") { e in
+                        Text(Currency.formatPaise(e.basicPaise)).monospacedDigit()
+                    }
+                    TableColumn("HRA (₹)") { e in
+                        Text(Currency.formatPaise(e.hraPaise)).monospacedDigit()
+>>>>>>> origin/main:Mally/Features/Payroll/PayrollView.swift
                     }
                     TableColumn("Base Salary (₹)") { e in
                         Text(Currency.formatPaise(e.baseSalaryPaise)).monospacedDigit()

@@ -17,7 +17,10 @@ final class ProfitLossReconciliationTests: XCTestCase {
         try MigrationRunner().runMigrations(on: db)
 
         let companyId = UUID()
+<<<<<<< HEAD
         try AuditTestKeySupport.ensureKey(for: companyId)
+=======
+>>>>>>> origin/main
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO avelo_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
@@ -154,9 +157,13 @@ final class ProfitLossReconciliationTests: XCTestCase {
                 let amount = creditMovement - debitMovement
                     - (signedOpening < 0 ? -signedOpening : 0)
                     + (signedOpening > 0 ? signedOpening : 0)
+<<<<<<< HEAD
                 // Sales/Purchase Accounts are separate Tally primary groups
                 // that roll into direct income/expense, same as the app.
                 if groupCode == "DIRECT_INCOME" || groupCode == "SALES_ACCOUNTS" {
+=======
+                if groupCode == "DIRECT_INCOME" {
+>>>>>>> origin/main
                     expectedDirectIncome += amount
                 } else if groupCode == "INDIRECT_INCOME" {
                     expectedIndirectIncome += amount
@@ -165,7 +172,11 @@ final class ProfitLossReconciliationTests: XCTestCase {
                 let amount = debitMovement - creditMovement
                     + (signedOpening > 0 ? signedOpening : 0)
                     - (signedOpening < 0 ? -signedOpening : 0)
+<<<<<<< HEAD
                 if groupCode == "DIRECT_EXPENSE" || groupCode == "PURCHASE_ACCOUNTS" {
+=======
+                if groupCode == "DIRECT_EXPENSE" {
+>>>>>>> origin/main
                     expectedDirectExpense += amount
                 } else if groupCode == "INDIRECT_EXPENSE" {
                     expectedIndirectExpense += amount

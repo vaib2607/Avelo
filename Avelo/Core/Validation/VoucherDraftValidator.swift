@@ -2,54 +2,6 @@ import Foundation
 
 public struct VoucherDraftValidator: Sendable {
 
-    /// A transaction-scoped snapshot used by bulk posting. It eliminates
-    /// repeated reads without changing the validation data or decisions: the
-    /// caller creates it inside the same write transaction that posts the
-    /// vouchers, so financial-year and account state cannot change beneath
-    /// the batch.
-    struct BatchContext: Sendable {
-        private let financialYears: [FinancialYear]
-        private let accountsById: [Account.ID: Account]
-        private let company: Company
-        private let groups: [AccountGroup]
-        private let eligibilityPolicy: AccountEligibilityPolicy
-        let cashOrBankAccountIDs: Set<Account.ID>
-
-        init(financialYears: [FinancialYear],
-             accountsById: [Account.ID: Account],
-             company: Company,
-             groups: [AccountGroup],
-             eligibilityPolicy: AccountEligibilityPolicy,
-             cashOrBankAccountIDs: Set<Account.ID>) {
-            self.financialYears = financialYears
-            self.accountsById = accountsById
-            self.company = company
-            self.groups = groups
-            self.eligibilityPolicy = eligibilityPolicy
-            self.cashOrBankAccountIDs = cashOrBankAccountIDs
-        }
-
-        func financialYearId(containing date: Date) throws -> FinancialYear.ID? {
-            let matches = financialYears.filter { $0.contains(date: date) }
-            if matches.count > 1 {
-                let labels = matches.map(\.label).joined(separator: ", ")
-                throw AppError.businessRule("Overlapping financial years make date lookup ambiguous: \(labels)")
-            }
-            return matches.first?.id
-        }
-
-        func isLocked(financialYearId: FinancialYear.ID) -> Bool {
-            financialYears.first(where: { $0.id == financialYearId })?.isLocked ?? false
-        }
-
-        func eligibility(_ id: Account.ID, for context: AccountSelectionContext) -> AccountEligibility {
-            guard let account = accountsById[id] else {
-                return AccountEligibility(isEligible: false, rejectionReason: "Account is missing.")
-            }
-            return eligibilityPolicy.evaluate(account: account, for: context, company: company, groups: groups)
-        }
-    }
-
     public let db: SQLiteDatabase
     public let fiscalLockChecker: FiscalLockChecker
 
@@ -58,49 +10,10 @@ public struct VoucherDraftValidator: Sendable {
         self.fiscalLockChecker = fiscalLockChecker
     }
 
-    func makeBatchContext(companyId: Company.ID) throws -> BatchContext {
-        let financialYears = try FinancialYearRepository(db: db).listForCompany(companyId)
-        let accounts = try AccountRepository(db: db).listForCompany(companyId)
-        let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
-        guard let company = try CompanyRepository(db: db).findById(companyId) else {
-            throw AppError.notFound("Company")
-        }
-        let accountsById = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
-        let policy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
-        let cashOrBankAccountIDs = Set(accounts.lazy.filter {
-            policy.evaluate(account: $0, for: .bankReconciliation, company: company, groups: groups).isEligible
-        }.map(\.id))
-        return BatchContext(
-            financialYears: financialYears,
-            accountsById: accountsById,
-            company: company,
-            groups: groups,
-            eligibilityPolicy: policy,
-            cashOrBankAccountIDs: cashOrBankAccountIDs
-        )
-    }
-
     public func validate(_ draft: VoucherDraft,
                          companyId: Company.ID,
                          financialYearId: FinancialYear.ID,
-                         existingVoucherId: Voucher.ID? = nil,
-                         isSystemReversal: Bool = false) -> ValidationResult {
-        validate(
-            draft,
-            companyId: companyId,
-            financialYearId: financialYearId,
-            existingVoucherId: existingVoucherId,
-            isSystemReversal: isSystemReversal,
-            batchContext: nil
-        )
-    }
-
-    func validate(_ draft: VoucherDraft,
-                  companyId: Company.ID,
-                  financialYearId: FinancialYear.ID,
-                  existingVoucherId: Voucher.ID? = nil,
-                  isSystemReversal: Bool = false,
-                  batchContext: BatchContext?) -> ValidationResult {
+                         existingVoucherId: Voucher.ID? = nil) -> ValidationResult {
         var errors: [ValidationError] = []
 
         let filled = draft.filledLines
@@ -131,25 +44,16 @@ public struct VoucherDraftValidator: Sendable {
             ))
         }
 
-        do {
-            let totals = try draft.checkedTotals()
-            if totals.difference != 0 {
-                let dr = Currency.formatPaise(totals.debit, style: .indianGrouping)
-                let cr = Currency.formatPaise(totals.credit, style: .indianGrouping)
-                let diff = Currency.formatAbsolutePaise(totals.difference, style: .indianGrouping)
-                let larger = totals.difference > 0 ? "debit" : "credit"
-                errors.append(ValidationError(
-                    code: .voucherDebitCreditMismatch,
-                    field: "lines",
-                    message: "Debit total (\(dr)) does not match Credit total (\(cr)). Difference: \(diff) on \(larger) side.",
-                    suggestedFix: "Adjust amounts so debit equals credit."
-                ))
-            }
-        } catch {
+        if !draft.isBalanced {
+            let dr = Currency.formatPaise(draft.totalDebitPaise, style: .indianGrouping)
+            let cr = Currency.formatPaise(draft.totalCreditPaise, style: .indianGrouping)
+            let diff = Currency.formatPaise(abs(draft.differencePaise), style: .indianGrouping)
+            let larger = draft.differencePaise > 0 ? "debit" : "credit"
             errors.append(ValidationError(
-                code: .arithmeticOverflow,
+                code: .voucherDebitCreditMismatch,
                 field: "lines",
-                message: "Voucher totals overflow Int64 while validating debit and credit lines."
+                message: "Debit total (\(dr)) does not match Credit total (\(cr)). Difference: \(diff) on \(larger) side.",
+                suggestedFix: "Adjust amounts so debit equals credit."
             ))
         }
 
@@ -211,34 +115,8 @@ public struct VoucherDraftValidator: Sendable {
             break
         }
 
-        // A system reversal deliberately mirrors a previously valid voucher.
-        // Its cash/bank sides are therefore the inverse of the entry form's
-        // single-entry convention, while still requiring all normal balance,
-        // fiscal-year, and account checks below.
-        if filled.count >= 2 && !isSystemReversal {
-            do {
-                errors += try singleEntryVoucherErrors(
-                    for: draft,
-                    companyId: companyId,
-                    cashOrBankAccountIDs: batchContext?.cashOrBankAccountIDs
-                )
-            } catch {
-                errors.append(ValidationError(
-                    code: .internal,
-                    field: "lines",
-                    message: "Unable to validate cash/bank eligibility for this voucher."
-                ))
-            }
-        }
-
         do {
-            let fyId: FinancialYear.ID?
-            if let batchContext {
-                fyId = try batchContext.financialYearId(containing: draft.date)
-            } else {
-                fyId = try fyIdForDate(draft.date, companyId: companyId)
-            }
-            if let fyId {
+            if let fyId = try fyIdForDate(draft.date, companyId: companyId) {
                 if fyId != financialYearId {
                     errors.append(ValidationError(
                         code: .voucherDateOutsideFY,
@@ -262,13 +140,7 @@ public struct VoucherDraftValidator: Sendable {
         }
 
         do {
-            let isLocked: Bool
-            if let batchContext {
-                isLocked = batchContext.isLocked(financialYearId: financialYearId)
-            } else {
-                isLocked = try fiscalLockChecker.isLocked(financialYearId: financialYearId)
-            }
-            if isLocked {
+            if try fiscalLockChecker.isLocked(financialYearId: financialYearId) {
                 errors.append(ValidationError(
                     code: .voucherFYLocked,
                     field: "date",
@@ -286,52 +158,24 @@ public struct VoucherDraftValidator: Sendable {
         }
 
         for line in filled {
-            if let accountId = line.accountId {
+            if let acc = line.accountId {
                 do {
-                    let eligibility = try accountEligibility(
-                        accountId,
-                        for: .unrestrictedPosting,
-                        companyId: companyId,
-                        batchContext: batchContext
-                    )
-                    if !eligibility.isEligible {
+                    if try isAccountActive(acc, companyId: companyId) == false {
                         errors.append(ValidationError(
                             code: .voucherAccountInactive,
                             field: "lines",
-                            message: eligibility.rejectionReason ?? "Account is not eligible for posting."
+                            message: "Account is inactive."
                         ))
+                        break
                     }
                 } catch {
                     errors.append(ValidationError(
                         code: .internal,
                         field: "lines",
-                        message: "Unable to validate account eligibility."
+                        message: "Unable to validate account activity."
                     ))
+                    break
                 }
-            }
-        }
-
-        if let partyAccountId = draft.partyAccountId {
-            do {
-                let eligibility = try accountEligibility(
-                    partyAccountId,
-                    for: .voucherParty(draft.voucherTypeCode),
-                    companyId: companyId,
-                    batchContext: batchContext
-                )
-                if !eligibility.isEligible {
-                    errors.append(ValidationError(
-                        code: .voucherAccountInactive,
-                        field: "party",
-                        message: eligibility.rejectionReason ?? "Party account is not eligible for this voucher."
-                    ))
-                }
-            } catch {
-                errors.append(ValidationError(
-                    code: .internal,
-                    field: "party",
-                    message: "Unable to validate party account eligibility."
-                ))
             }
         }
 
@@ -342,86 +186,11 @@ public struct VoucherDraftValidator: Sendable {
         try fiscalLockChecker.financialYear(containing: date, companyId: companyId)
     }
 
-    private func accountEligibility(
-        _ id: Account.ID,
-        for context: AccountSelectionContext,
-        companyId: Company.ID,
-        batchContext: BatchContext?
-    ) throws -> AccountEligibility {
-        if let batchContext {
-            return batchContext.eligibility(id, for: context)
-        }
-        guard let company = try CompanyRepository(db: db).findById(companyId),
-              let account = try AccountRepository(db: db).findById(id) else {
-            return AccountEligibility(isEligible: false, rejectionReason: "Account is missing.")
-        }
-        let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
-        return try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
-            .evaluate(account: account, for: context, company: company, groups: groups)
-    }
-
-    private func singleEntryVoucherErrors(for draft: VoucherDraft,
-                                          companyId: Company.ID,
-                                          cashOrBankAccountIDs cachedCashOrBankAccountIDs: Set<Account.ID>? = nil) throws -> [ValidationError] {
-        guard [.payment, .receipt, .contra].contains(draft.voucherTypeCode) else {
-            return []
-        }
-
-        let cashOrBankAccountIDs: Set<Account.ID>
-        if let cachedCashOrBankAccountIDs {
-            cashOrBankAccountIDs = cachedCashOrBankAccountIDs
-        } else {
-            let accounts = try AccountRepository(db: db).listForCompany(companyId)
-            guard let company = try CompanyRepository(db: db).findById(companyId) else {
-                throw AppError.notFound("Company")
-            }
-            let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
-            let policy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
-            cashOrBankAccountIDs = Set(accounts.lazy.filter {
-                policy.evaluate(account: $0, for: .bankReconciliation, company: company, groups: groups).isEligible
-            }.map(\.id))
-        }
-        let lines = draft.filledLines
-        let cashOrBankLines = lines.filter {
-            $0.accountId.map { cashOrBankAccountIDs.contains($0) } ?? false
-        }
-
-        switch draft.voucherTypeCode {
-        case .payment, .receipt:
-            let accountSide: LedgerSide = draft.voucherTypeCode == .payment ? .credit : .debit
-            let particularsSide: LedgerSide = accountSide == .debit ? .credit : .debit
-            guard cashOrBankLines.count == 1,
-                  cashOrBankLines.first?.side == accountSide,
-                  lines.filter({ line in
-                      line.accountId.map { !cashOrBankAccountIDs.contains($0) } ?? false
-                  }).allSatisfy({ $0.side == particularsSide }) else {
-                return [singleEntryValidationError(
-                    "Payment requires one cash/bank credit ledger; Receipt requires one cash/bank debit ledger; particulars must be on the opposite side."
-                )]
-            }
-        case .contra:
-            let debitCount = lines.filter { $0.side == .debit }.count
-            let creditCount = lines.filter { $0.side == .credit }.count
-            guard cashOrBankLines.count == lines.count,
-                  debitCount == 1,
-                  creditCount >= 1 else {
-                return [singleEntryValidationError(
-                    "Contra vouchers require only cash/bank ledgers, with one destination ledger debited and one or more source ledgers credited."
-                )]
-            }
-        default:
-            break
-        }
-
-        return []
-    }
-
-    private func singleEntryValidationError(_ message: String) -> ValidationError {
-        ValidationError(
-            code: .internal,
-            field: "lines",
-            message: message,
-            suggestedFix: "Select cash/bank ledgers only where this voucher type allows them."
-        )
+    private func isAccountActive(_ id: Account.ID, companyId: Company.ID) throws -> Bool {
+        let v: Int64? = try db.queryOne(
+            "SELECT is_active FROM avelo_accounts WHERE id = ? AND company_id = ?",
+            bind: [.text(id.uuidString), .text(companyId.uuidString)]
+        ) { r in r.int("is_active") }
+        return (v ?? 0) != 0
     }
 }

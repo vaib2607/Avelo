@@ -18,18 +18,6 @@ public final class AccountService: Sendable {
         try repository.listForCompany(audit.companyId)
     }
 
-    public func listAccounts(limit: Int, offset: Int = 0) throws -> [Account] {
-        try repository.listForCompany(audit.companyId, limit: limit, offset: offset)
-    }
-
-    public func listAccounts(filter: AccountRepository.Filter) throws -> [Account] {
-        try repository.list(filter: filter)
-    }
-
-    public func countAccounts(filter: AccountRepository.Filter) throws -> Int {
-        try repository.count(filter: filter)
-    }
-
     public func listActiveAccounts() throws -> [Account] {
         try repository.listActiveForCompany(audit.companyId)
     }
@@ -43,17 +31,11 @@ public final class AccountService: Sendable {
     }
 
     public func findAccount(_ id: Account.ID) throws -> Account? {
-        guard let account = try repository.findById(id), account.companyId == audit.companyId else {
-            return nil
-        }
-        return account
+        try repository.findById(id)
     }
 
     public func findGroup(_ id: AccountGroup.ID) throws -> AccountGroup? {
-        guard let group = try groupRepository.findById(id), group.companyId == audit.companyId else {
-            return nil
-        }
-        return group
+        try groupRepository.findById(id)
     }
 
     public func createAccount(_ input: AccountInputValidator.Input) throws -> Account {
@@ -66,10 +48,6 @@ public final class AccountService: Sendable {
                 code: .accountGroupRequired, field: "group", message: "Group required."
             ))
         }
-        if input.openingBalancePaise != 0,
-           try FiscalLockChecker(db: db).hasAnyLockedYear(companyId: audit.companyId) {
-            throw AppError.businessRule("Financial year is locked; opening balance changes are not allowed.")
-        }
         let account = Account(
             companyId: audit.companyId,
             groupId: gid,
@@ -77,14 +55,7 @@ public final class AccountService: Sendable {
             name: input.name,
             openingBalancePaise: input.openingBalancePaise,
             openingBalanceSide: input.openingBalanceSide,
-            gstin: input.gstin,
-            mailingName: input.mailingName,
-            mailingAddress: input.mailingAddress,
-            stateCode: input.stateCode,
-            country: input.country,
-            gstRegistrationType: input.gstRegistrationType,
-            maintainBillwise: input.maintainBillwise,
-            creditPeriodDays: input.creditPeriodDays
+            gstin: input.gstin
         )
         try db.write { tx in
             let repo = AccountRepository(db: tx)
@@ -100,16 +71,7 @@ public final class AccountService: Sendable {
     }
 
     public func updateAccount(_ account: Account) throws {
-        guard account.companyId == audit.companyId else {
-            throw AppError.notFound("Account")
-        }
-        guard let before = try repository.findById(account.id), before.companyId == audit.companyId else {
-            throw AppError.notFound("Account")
-        }
-        if (before.openingBalancePaise != account.openingBalancePaise || before.openingBalanceSide != account.openingBalanceSide),
-           try FiscalLockChecker(db: db).hasAnyLockedYear(companyId: audit.companyId) {
-            throw AppError.businessRule("Financial year is locked; opening balance changes are not allowed.")
-        }
+        let before = try repository.findById(account.id)
         try db.write { tx in
             let repo = AccountRepository(db: tx)
             try repo.update(account)
@@ -124,7 +86,7 @@ public final class AccountService: Sendable {
     }
 
     public func disableAccount(_ id: Account.ID) throws {
-        guard let before = try repository.findById(id), before.companyId == audit.companyId else { throw AppError.notFound("Account") }
+        guard let before = try repository.findById(id) else { throw AppError.notFound("Account") }
         try db.write { tx in
             let repo = AccountRepository(db: tx)
             try repo.disable(id)
@@ -137,7 +99,7 @@ public final class AccountService: Sendable {
         }
     }
 
-    func markUsed(_ id: Account.ID) throws {
+    public func markUsed(_ id: Account.ID) throws {
         try repository.markUsed(id)
     }
 
@@ -152,103 +114,7 @@ public final class AccountService: Sendable {
             name: name,
             nature: nature
         )
-        try db.write { tx in
-            let repository = AccountGroupRepository(db: tx)
-            try validateGroupHierarchy(group, using: repository)
-            try repository.insert(group)
-            try AuditService(db: tx, companyId: audit.companyId).record(
-                action: .accountGroupCreated,
-                entityType: "account_group",
-                entityId: group.id.uuidString,
-                snapshotAfter: group
-            )
-        }
+        try groupRepository.insert(group)
         return group
-    }
-
-    public func updateGroup(_ group: AccountGroup) throws {
-        guard group.companyId == audit.companyId else {
-            throw AppError.notFound("Account group")
-        }
-        try db.write { tx in
-            let repository = AccountGroupRepository(db: tx)
-            guard let existing = try repository.findById(group.id), existing.companyId == audit.companyId else {
-                throw AppError.notFound("Account group")
-            }
-            try validateGroupHierarchy(group, using: repository)
-            try repository.update(group)
-            try AuditService(db: tx, companyId: audit.companyId).record(
-                action: .accountGroupUpdated,
-                entityType: "account_group",
-                entityId: group.id.uuidString,
-                snapshotBefore: existing,
-                snapshotAfter: group
-            )
-        }
-    }
-
-    private func validateGroupHierarchy(_ group: AccountGroup,
-                                        using repository: AccountGroupRepository) throws {
-        if let parentId = group.parentGroupId {
-            guard parentId != group.id else {
-                throw AppError.businessRule("A group cannot be its own parent.")
-            }
-            guard let parent = try repository.findById(parentId) else {
-                throw AppError.notFound("Account group")
-            }
-            guard parent.companyId == group.companyId else {
-                throw AppError.businessRule("Parent group must belong to the same company.")
-            }
-            guard parent.nature == group.nature else {
-                throw AppError.businessRule("Parent and child account groups must have the same nature.")
-            }
-        }
-
-        let children = try repository.listChildren(of: group.id)
-        if children.contains(where: { $0.companyId == group.companyId && $0.nature != group.nature }) {
-            throw AppError.businessRule("Parent and child account groups must have the same nature.")
-        }
-
-        let existingGroups = try repository.listForCompany(group.companyId)
-        var groupsById = Dictionary(uniqueKeysWithValues: existingGroups.map { ($0.id, $0) })
-        groupsById[group.id] = group
-
-        var ancestorId = group.parentGroupId
-        var visited: Set<AccountGroup.ID> = []
-        while let currentId = ancestorId {
-            if currentId == group.id {
-                throw AppError.businessRule("A group cannot be placed under one of its descendants.")
-            }
-            guard visited.insert(currentId).inserted else {
-                throw AppError.businessRule("Account-group hierarchy contains a cycle.")
-            }
-            guard let ancestor = groupsById[currentId] else {
-                throw AppError.businessRule("Account-group hierarchy references a group outside its company.")
-            }
-            ancestorId = ancestor.parentGroupId
-        }
-    }
-
-    public func deleteGroup(_ id: AccountGroup.ID) throws {
-        guard let group = try groupRepository.findById(id) else {
-            throw AppError.notFound("Account group")
-        }
-        let children = try groupRepository.listChildren(of: id)
-        if !children.isEmpty {
-            throw AppError.groupHasChildren("Cannot delete an account group that still has child groups.")
-        }
-        let ledgers = try repository.listLedgersForGroup(id)
-        if !ledgers.isEmpty {
-            throw AppError.groupHasChildren("Cannot delete an account group that still has ledger accounts.")
-        }
-        try db.write { tx in
-            try AccountGroupRepository(db: tx).delete(group.id)
-            try AuditService(db: tx, companyId: audit.companyId).record(
-                action: .accountGroupDeleted,
-                entityType: "account_group",
-                entityId: group.id.uuidString,
-                snapshotBefore: group
-            )
-        }
     }
 }

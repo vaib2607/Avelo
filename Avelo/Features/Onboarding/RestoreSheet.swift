@@ -61,7 +61,11 @@ public struct RestoreSheet: View {
                 let result = await NSPanelBridge.runOpen(panel)
                 if result == .OK, let url = panel.url {
                     let restore = RestoreService(manager: env.manager)
+<<<<<<< HEAD:Avelo/Features/Onboarding/RestoreSheet.swift
                     let restored = try await restore.restore(from: url, recoveryKey: suppliedRecoveryKey)
+=======
+                    let restored = try await restore.restore(from: url)
+>>>>>>> origin/main:Mally/Features/Onboarding/RestoreSheet.swift
                     await env.openCompany(restored.id)
                     env.notifyDataChanged()
                     env.showSuccess("Restored as new company.")

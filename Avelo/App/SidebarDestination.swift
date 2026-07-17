@@ -60,9 +60,14 @@ public enum SidebarDestination: String, CaseIterable, Identifiable, Hashable, Se
         }
     }
 
+<<<<<<< HEAD:Avelo/App/SidebarDestination.swift
     // AVL-P0-033: Inventory must disappear entirely (not just error out)
     // when the current company has inventory disabled.
     public static func visibleCases(isInventoryEnabled: Bool) -> [SidebarDestination] {
         isInventoryEnabled ? allCases : allCases.filter { $0 != .inventory }
+=======
+    public static var visibleCases: [SidebarDestination] {
+        allCases
+>>>>>>> origin/main:Mally/App/SidebarDestination.swift
     }
 }

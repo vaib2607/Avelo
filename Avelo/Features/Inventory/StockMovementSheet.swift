@@ -11,6 +11,9 @@ public struct StockMovementSheet: View {
     @State private var selectedUnit: String = ""
     @State private var rate: String = "0.00"
     @State private var date: Date = Date()
+    @State private var batchNumber: String = ""
+    @State private var manufactureDate: Date = Date()
+    @State private var expiryDate: Date = Date()
     @State private var notes: String = ""
     @State private var canSave: Bool = false
     @State private var item: InventoryItem?
@@ -36,6 +39,7 @@ public struct StockMovementSheet: View {
                     }
                 }
                 DatePicker("Date", selection: $date, displayedComponents: .date)
+<<<<<<< HEAD:Avelo/Features/Inventory/StockMovementSheet.swift
                 if let item {
                     Picker("Unit", selection: $selectedUnit) {
                         Text(item.unit).tag(item.unit)
@@ -44,6 +48,11 @@ public struct StockMovementSheet: View {
                         }
                     }
                 }
+=======
+                TextField("Batch number", text: $batchNumber)
+                DatePicker("Manufacture date", selection: $manufactureDate, displayedComponents: .date)
+                DatePicker("Expiry date", selection: $expiryDate, displayedComponents: .date)
+>>>>>>> origin/main:Mally/Features/Inventory/StockMovementSheet.swift
                 TextField("Quantity", text: $quantity)
                 MoneyTextField(label: "Rate (₹)", text: $rate)
                 TextField("Notes (optional)", text: $notes, axis: .vertical)
@@ -92,7 +101,13 @@ public struct StockMovementSheet: View {
                 itemId: itemId, date: date, type: type,
                 quantity: parsedQuantity,
                 ratePaise: Currency.parseRupeeInput(rate) ?? 0,
+<<<<<<< HEAD:Avelo/Features/Inventory/StockMovementSheet.swift
                 enteredUnit: selectedUnit.isEmpty ? nil : selectedUnit,
+=======
+                batchNumber: batchNumber.isEmpty ? nil : batchNumber,
+                manufactureDate: batchNumber.isEmpty ? nil : manufactureDate,
+                expiryDate: batchNumber.isEmpty ? nil : expiryDate,
+>>>>>>> origin/main:Mally/Features/Inventory/StockMovementSheet.swift
                 notes: notes.isEmpty ? nil : notes
             )
             env.showSuccess("Movement recorded.")

@@ -8,14 +8,11 @@ public struct PostSalarySheet: View {
 
     @State private var monthYear: Int = Calendar.current.component(.year, from: Date()) * 100
         + Calendar.current.component(.month, from: Date())
+    @State private var workingDays: String = "26"
+    @State private var paidDays: String = "26"
+    @State private var overtime: String = "0.00"
     @State private var deductions: String = "0.00"
     @State private var canSave: Bool = false
-    @State private var accounts: [Account] = []
-    @State private var company: Company?
-    @State private var groups: [AccountGroup] = []
-    @State private var eligibilityPolicy = AccountEligibilityPolicy()
-    @State private var salaryExpenseAccountId: Account.ID?
-    @State private var paymentAccountId: Account.ID?
 
     public init(employeeId: PayrollEmployee.ID) {
         self.employeeId = employeeId
@@ -33,28 +30,6 @@ public struct PostSalarySheet: View {
             Divider()
             Form {
                 HStack {
-                    Text("Salary Expense")
-                    Spacer()
-                    AccountPicker(
-                        selection: $salaryExpenseAccountId,
-                        accounts: accounts,
-                        placeholder: "Choose expense account…",
-                        eligibility: { eligibility($0, for: .payrollExpense) }
-                    )
-                        .frame(width: 260)
-                }
-                HStack {
-                    Text("Credit Account")
-                    Spacer()
-                    AccountPicker(
-                        selection: $paymentAccountId,
-                        accounts: accounts,
-                        placeholder: "Choose cash, bank, or payable…",
-                        eligibility: { eligibility($0, for: .payrollSettlement) }
-                    )
-                        .frame(width: 260)
-                }
-                HStack {
                     Text("Month / Year")
                     Spacer()
                     Picker("", selection: $monthYear) {
@@ -65,12 +40,13 @@ public struct PostSalarySheet: View {
                     .labelsHidden()
                     .frame(width: 180)
                 }
+                TextField("Working days", text: $workingDays)
+                TextField("Paid days", text: $paidDays)
+                MoneyTextField(label: "Overtime", text: $overtime)
                 MoneyTextField(label: "Deductions", text: $deductions)
             }
             .formStyle(.grouped)
-            .task { loadAccounts() }
-            .onChange(of: salaryExpenseAccountId) { _, _ in refresh() }
-            .onChange(of: paymentAccountId) { _, _ in refresh() }
+            .onChange(of: paidDays) { _, _ in refresh() }
             Divider()
             HStack {
                 Spacer()
@@ -86,7 +62,9 @@ public struct PostSalarySheet: View {
     }
 
     private func refresh() {
-        canSave = salaryExpenseAccountId != nil && paymentAccountId != nil
+        let wd = Int(workingDays) ?? 0
+        let pd = Int(paidDays) ?? 0
+        canSave = wd > 0 && pd > 0 && pd <= wd
     }
 
     private func generateMonthOptions() -> [Int] {
@@ -104,17 +82,13 @@ public struct PostSalarySheet: View {
 
     private func save() {
         guard let ctx = env.companyContext else { return }
-        guard let salaryExpenseAccountId, let paymentAccountId else {
-            env.showError(.businessRule("Choose the salary expense and credit accounts before posting salary."))
-            return
-        }
         do {
             _ = try PayrollService(db: ctx.database, companyId: ctx.companyId).postEntry(
                 employeeId: employeeId, monthYear: monthYear,
+                workingDays: Int(workingDays) ?? 0, paidDays: Int(paidDays) ?? 0,
+                overtimePaise: Currency.parseRupeeInput(overtime) ?? 0,
                 deductionsPaise: Currency.parseRupeeInput(deductions) ?? 0,
-                financialYearId: ctx.financialYear.id,
-                salaryExpenseAccountId: salaryExpenseAccountId,
-                paymentAccountId: paymentAccountId
+                financialYearId: ctx.financialYear.id
             )
             env.markAccountTreeDirty()
             env.showSuccess("Salary posted.")
@@ -122,31 +96,5 @@ public struct PostSalarySheet: View {
         } catch {
             env.showError(AppError.wrap(error))
         }
-    }
-
-    private func loadAccounts() {
-        guard let ctx = env.companyContext else { return }
-        do {
-            let loaded = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
-            company = try CompanyRepository(db: ctx.database).findById(ctx.companyId)
-            groups = try AccountGroupRepository(db: ctx.database).listForCompany(ctx.companyId)
-            eligibilityPolicy = try AccountEligibilityPolicy.loading(db: ctx.database, companyId: ctx.companyId)
-            accounts = loaded
-            salaryExpenseAccountId = salaryExpenseAccountId
-                ?? loaded.first(where: { $0.code == "SALARY_EXPENSE" })?.id
-                ?? loaded.first(where: { eligibility($0, for: .payrollExpense).isEligible })?.id
-            paymentAccountId = paymentAccountId
-                ?? loaded.first(where: { eligibility($0, for: .payrollSettlement).isEligible })?.id
-            refresh()
-        } catch {
-            env.showError(AppError.wrap(error))
-        }
-    }
-
-    private func eligibility(_ account: Account, for context: AccountSelectionContext) -> AccountEligibility {
-        guard let company else {
-            return AccountEligibility(isEligible: false, rejectionReason: "Company context is unavailable.")
-        }
-        return eligibilityPolicy.evaluate(account: account, for: context, company: company, groups: groups)
     }
 }

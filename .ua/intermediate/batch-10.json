@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "id": "pipeline:.github/workflows/swift.yml",
+      "type": "pipeline",
+      "name": "swift.yml",
+      "filePath": ".github/workflows/swift.yml",
+      "summary": "GitHub Actions CI/CD workflow for Swift project building and testing on macOS, triggered on push and pull requests to main branch.",
+      "tags": ["ci-cd", "infrastructure", "automation"],
+      "complexity": "simple",
+      "languageNotes": "Workflow contains unresolved merge conflict between two build strategies: Make-based bootstrap with verification vs. direct swift build and test commands."
+    },
+    {
+      "id": "step:.github/workflows/swift.yml:Bootstrap toolchain path",
+      "type": "step",
+      "name": "Bootstrap toolchain path",
+      "filePath": ".github/workflows/swift.yml",
+      "summary": "Runs make setup to bootstrap the toolchain environment.",
+      "tags": ["setup", "build-preparation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:.github/workflows/swift.yml:Run local proof set",
+      "type": "step",
+      "name": "Run local proof set",
+      "filePath": ".github/workflows/swift.yml",
+      "summary": "Executes make verify to run the local proof set verification.",
+      "tags": ["verification", "testing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:.github/workflows/swift.yml:Build",
+      "type": "step",
+      "name": "Build",
+      "filePath": ".github/workflows/swift.yml",
+      "summary": "Compiles the Swift project with verbose output.",
+      "tags": ["build", "compilation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:.github/workflows/swift.yml:Run tests",
+      "type": "step",
+      "name": "Run tests",
+      "filePath": ".github/workflows/swift.yml",
+      "summary": "Runs Swift test suite with verbose output.",
+      "tags": ["testing", "verification"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "pipeline:.github/workflows/swift.yml",
+      "target": "step:.github/workflows/swift.yml:Bootstrap toolchain path",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "pipeline:.github/workflows/swift.yml",
+      "target": "step:.github/workflows/swift.yml:Run local proof set",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "pipeline:.github/workflows/swift.yml",
+      "target": "step:.github/workflows/swift.yml:Build",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "pipeline:.github/workflows/swift.yml",
+      "target": "step:.github/workflows/swift.yml:Run tests",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    }
+  ]
+}

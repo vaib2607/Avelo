@@ -8,6 +8,7 @@ public struct AccountPicker: View {
     public var accounts: [Account]
     public var placeholder: String = "Choose account…"
     public var filter: ((Account) -> Bool)? = nil
+<<<<<<< HEAD
     public var eligibility: ((Account) -> AccountEligibility)? = nil
     public var isEditable: Bool = true
     public var onCreate: (() -> Void)? = nil
@@ -20,31 +21,46 @@ public struct AccountPicker: View {
     /// the picker focuses and opens itself — used to auto-advance into the
     /// next ledger field in a Tally-style Enter cascade.
     public var isFocusedExternally: Binding<Bool>? = nil
+=======
+    public var isEditable: Bool = true
+>>>>>>> origin/main
 
     @State private var isExpanded: Bool = false
     @State private var query: String = ""
     @State private var selectedIndex: Int = 0
+<<<<<<< HEAD
     @FocusState private var pickerButtonFocused: Bool
     @FocusState private var searchFieldFocused: Bool
+=======
+    @FocusState private var fieldFocused: Bool
+>>>>>>> origin/main
 
     public init(selection: Binding<Account.ID?>,
                 accounts: [Account],
                 placeholder: String = "Choose account…",
                 filter: ((Account) -> Bool)? = nil,
+<<<<<<< HEAD
                 eligibility: ((Account) -> AccountEligibility)? = nil,
                 isEditable: Bool = true,
                 onCreate: (() -> Void)? = nil,
                 onCommitSelection: (() -> Void)? = nil,
                 isFocusedExternally: Binding<Bool>? = nil) {
+=======
+                isEditable: Bool = true) {
+>>>>>>> origin/main
         self._selection = selection
         self.accounts = accounts
         self.placeholder = placeholder
         self.filter = filter
+<<<<<<< HEAD
         self.eligibility = eligibility
         self.isEditable = isEditable
         self.onCreate = onCreate
         self.onCommitSelection = onCommitSelection
         self.isFocusedExternally = isFocusedExternally
+=======
+        self.isEditable = isEditable
+>>>>>>> origin/main
     }
 
     public var body: some View {
@@ -58,11 +74,14 @@ public struct AccountPicker: View {
                     .foregroundStyle(selection == nil ? .secondary : .primary)
                     .lineLimit(1)
                 Spacer()
+<<<<<<< HEAD
                 if selectedEligibility?.isEligible == false {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .help(selectedEligibility?.rejectionReason ?? "This account is no longer eligible.")
                 }
+=======
+>>>>>>> origin/main
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -70,6 +89,7 @@ public struct AccountPicker: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.bordered)
+<<<<<<< HEAD
         .focusable()
         .focused($pickerButtonFocused)
         .onChange(of: pickerButtonFocused) { _, focused in
@@ -87,6 +107,9 @@ public struct AccountPicker: View {
         // matters most for filtered fields (for example cash/bank): an empty
         // eligible list must not also hide the Alt+C escape hatch.
         .disabled(!isEditable || (sortedAccounts.isEmpty && onCreate == nil))
+=======
+        .disabled(!isEditable || sortedAccounts.isEmpty)
+>>>>>>> origin/main
         .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
             popoverContent
         }
@@ -99,12 +122,15 @@ public struct AccountPicker: View {
         return placeholder
     }
 
+<<<<<<< HEAD
     private var selectedEligibility: AccountEligibility? {
         guard let id = selection,
               let account = accounts.first(where: { $0.id == id }) else { return nil }
         return eligibility?(account)
     }
 
+=======
+>>>>>>> origin/main
     @ViewBuilder
     private var popoverContent: some View {
         VStack(spacing: 0) {
@@ -112,8 +138,12 @@ public struct AccountPicker: View {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Type code or name…", text: $query)
                     .textFieldStyle(.plain)
+<<<<<<< HEAD
                     .focused($searchFieldFocused)
                     .onKeyPress("c", phases: .down, action: handleCreateAccountShortcut)
+=======
+                    .focused($fieldFocused)
+>>>>>>> origin/main
                     .onSubmit(pickSelected)
                     .onChange(of: query) { _, _ in selectedIndex = 0 }
             }
@@ -121,6 +151,7 @@ public struct AccountPicker: View {
             Divider()
             let matches = filteredAccounts
             if matches.isEmpty {
+<<<<<<< HEAD
                 VStack(spacing: 10) {
                     Text("No matching account").foregroundStyle(.secondary)
                     if onCreate != nil {
@@ -128,6 +159,9 @@ public struct AccountPicker: View {
                     }
                 }
                 .padding(16)
+=======
+                Text("No matching account").foregroundStyle(.secondary).padding(16)
+>>>>>>> origin/main
             } else {
                 ScrollViewReader { proxy in
                     List {
@@ -145,6 +179,7 @@ public struct AccountPicker: View {
                     }
                 }
             }
+<<<<<<< HEAD
             if onCreate != nil {
                 Divider()
                 Button(action: requestAccountCreation) {
@@ -157,6 +192,12 @@ public struct AccountPicker: View {
         }
         .frame(width: 360)
         .onAppear { searchFieldFocused = true }
+=======
+            moveKeys
+        }
+        .frame(width: 360)
+        .onAppear { fieldFocused = true }
+>>>>>>> origin/main
     }
 
     @ViewBuilder
@@ -202,6 +243,7 @@ public struct AccountPicker: View {
 
     private func pick(_ acc: Account) {
         selection = acc.id
+<<<<<<< HEAD
         closePopover()
         onCommitSelection?()
     }
@@ -226,10 +268,14 @@ public struct AccountPicker: View {
         isExpanded = false
         pickerButtonFocused = false
         searchFieldFocused = false
+=======
+        isExpanded = false
+>>>>>>> origin/main
     }
 
     /// All eligible accounts, recently-used first then by code.
     private var sortedAccounts: [Account] {
+<<<<<<< HEAD
         let filteredByLegacyClosure = filter.map { f in accounts.filter(f) } ?? accounts
         let base = eligibility.map { evaluate in
             filteredByLegacyClosure.filter { evaluate($0).isEligible }
@@ -238,6 +284,10 @@ public struct AccountPicker: View {
             let lhsRank = eligibility?(lhs).ranking ?? 0
             let rhsRank = eligibility?(rhs).ranking ?? 0
             if lhsRank != rhsRank { return lhsRank > rhsRank }
+=======
+        let base = filter.map { f in accounts.filter(f) } ?? accounts
+        return base.sorted { lhs, rhs in
+>>>>>>> origin/main
             switch (lhs.lastUsedAt, rhs.lastUsedAt) {
             case let (l?, r?) where l != r:
                 return l > r
@@ -257,6 +307,7 @@ public struct AccountPicker: View {
         guard !q.isEmpty else { return sortedAccounts }
         return sortedAccounts.filter {
             $0.code.lowercased().contains(q) || $0.name.lowercased().contains(q)
+<<<<<<< HEAD
         }.sorted { lhs, rhs in
             let lhsCodeExact = lhs.code.lowercased() == q
             let rhsCodeExact = rhs.code.lowercased() == q
@@ -275,6 +326,8 @@ public struct AccountPicker: View {
                 if lhs.code == rhs.code { return lhs.name < rhs.name }
                 return lhs.code < rhs.code
             }
+=======
+>>>>>>> origin/main
         }
     }
 }

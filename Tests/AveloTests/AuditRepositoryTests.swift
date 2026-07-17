@@ -3,6 +3,7 @@ import XCTest
 
 final class AuditRepositoryTests: XCTestCase {
 
+<<<<<<< HEAD
     func testAppendBatchWritesOneContinuousVerifiableChain() throws {
         let tc = try TestCompany.make()
         let repo = AuditRepository(db: tc.db)
@@ -66,6 +67,8 @@ final class AuditRepositoryTests: XCTestCase {
         XCTAssertEqual(count, 0)
     }
 
+=======
+>>>>>>> origin/main
     func testSearchTextMatchesActorReasonAndEntity() throws {
         let tc = try TestCompany.make()
         let repo = AuditRepository(db: tc.db)

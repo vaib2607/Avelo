@@ -2,7 +2,10 @@ import SwiftUI
 
 public struct ShortcutHelpSheet: View {
 
+<<<<<<< HEAD
     @Environment(AppEnvironment.self) private var env
+=======
+>>>>>>> origin/main
     @Environment(\.dismiss) private var dismiss
 
     public init() {}
@@ -19,6 +22,7 @@ public struct ShortcutHelpSheet: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+<<<<<<< HEAD
                     section("Navigation", rows: navigationRows)
 
                     section("Vouchers (function keys)", rows: voucherRows)
@@ -26,6 +30,71 @@ public struct ShortcutHelpSheet: View {
                     section("Reports (Cmd+Opt)", rows: reportRows)
 
                     section("Other", rows: otherRows)
+=======
+                    section("Navigation", rows: [
+                        ("Esc", "Back / cancel current action"),
+                        ("Return / Enter", "Drill down (open selected item)"),
+                        ("R", "Reload current view"),
+                        ("Cmd+1", "Open Dashboard"),
+                        ("Cmd+2", "Open Accounts"),
+                        ("Cmd+3", "Open Vouchers"),
+                        ("Cmd+4", "Open Reports"),
+                        ("Cmd+5", "Open Inventory"),
+                        ("Cmd+6", "Open GST"),
+                        ("Cmd+7", "Open Payroll"),
+                        ("Cmd+8", "Open Banking"),
+                        ("Cmd+9", "Open Audit log"),
+                        ("Cmd+0", "Open Settings"),
+                    ])
+
+                    section("Modules menu", rows: [
+                        ("Cmd+Shift+5", "Inventory"),
+                        ("Cmd+Shift+6", "GST"),
+                        ("Cmd+Shift+7", "Payroll"),
+                        ("Cmd+Shift+8", "Banking"),
+                        ("Cmd+Shift+9", "Audit"),
+                        ("Cmd+Shift+0", "Settings"),
+                    ])
+
+                    section("Vouchers (function keys)", rows: [
+                        ("F4", "New Contra voucher"),
+                        ("F5", "New Payment voucher"),
+                        ("F6", "New Receipt voucher"),
+                        ("F7", "New Journal voucher"),
+                        ("Cmd+K → Memo", "Journal-style memo entry"),
+                        ("F8", "New Sales voucher"),
+                        ("F9", "New Purchase voucher"),
+                        ("F10", "New Credit Note"),
+                        ("F11", "New Debit Note"),
+                    ])
+
+                    section("Reports (Cmd+Opt)", rows: [
+                        ("Cmd+Opt+1", "Trial Balance"),
+                        ("Cmd+Opt+2", "Profit & Loss"),
+                        ("Cmd+Opt+3", "Balance Sheet"),
+                        ("Cmd+Opt+4", "GST Summary"),
+                        ("Cmd+Opt+5", "Day Book"),
+                        ("Cmd+Opt+6", "Ledger"),
+                        ("Cmd+Opt+7", "Cash Book"),
+                        ("Cmd+Opt+8", "Bank Book"),
+                        ("Cmd+Opt+9", "Receivables"),
+                        ("Cmd+Opt+0", "Payables"),
+                    ])
+
+                    section("Other", rows: [
+                        ("Cmd+K", "Open command palette"),
+                        ("Cmd+/", "Quick search"),
+                        ("Cmd+,", "Show this shortcut help"),
+                        ("Company menu", "Open company info, backup, restore, and company-level actions"),
+                        ("Cmd+Shift+N", "New company"),
+                        ("Cmd+Shift+B", "Backup current company"),
+                        ("Cmd+Shift+R", "Restore backup"),
+                        ("Company → Inventory Settings", "Open inventory configuration"),
+                        ("Company → Payroll Settings", "Open payroll configuration"),
+                        ("Company → Lock FY", "Lock the active financial year"),
+                        ("Company → Close FY", "Close the active financial year"),
+                    ])
+>>>>>>> origin/main
                 }
                 .padding(16)
             }
@@ -33,6 +102,7 @@ public struct ShortcutHelpSheet: View {
         .frame(minWidth: 520, minHeight: 540)
     }
 
+<<<<<<< HEAD
     private var inventoryEnabled: Bool { env.companyContext?.isInventoryEnabled ?? false }
 
     private var navigationRows: [(String, String)] {
@@ -117,6 +187,8 @@ public struct ShortcutHelpSheet: View {
         return rows
     }
 
+=======
+>>>>>>> origin/main
     @ViewBuilder
     private func section(_ title: String, rows: [(String, String)]) -> some View {
         VStack(alignment: .leading, spacing: 6) {

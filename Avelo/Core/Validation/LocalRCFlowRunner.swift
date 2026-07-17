@@ -20,8 +20,13 @@ enum LocalRCFlowRunner {
             try? FileManager.default.removeItem(at: restoreRoot)
         }
 
+<<<<<<< HEAD
         let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
         let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot, keyStore: InMemoryCompanyKeyStore())
+=======
+        let manager = try DatabaseManager(appSupportDirectory: root)
+        let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot)
+>>>>>>> origin/main
 
         func requireDate(_ string: String) throws -> Date {
             guard let date = DateFormatters.parseDate(string) else {
@@ -64,6 +69,7 @@ enum LocalRCFlowRunner {
         let reportService = ReportService(db: ctx.database, companyId: ctx.companyId)
         let companyService = CompanyService(db: ctx.database, companyId: ctx.companyId, manager: manager)
 
+<<<<<<< HEAD
         try companyService.setInventoryMode(enabled: true, linkMode: .manual)
 
         let groups = try accountService.listGroups()
@@ -71,12 +77,23 @@ enum LocalRCFlowRunner {
         // parent (Avelo enforces leaf-only ledger posting).
         guard let sundryDebtors = groups.first(where: { $0.code == "SUNDRY_DEBTORS" }) else {
             throw AppError.notFound("Sundry Debtors group")
+=======
+        try companyService.setInventoryMode(enabled: true, linkMode: .autoPrompt)
+
+        let groups = try accountService.listGroups()
+        guard let currentAssets = groups.first(where: { $0.code == "CURRENT_ASSETS" }) else {
+            throw AppError.notFound("Current Assets group")
+>>>>>>> origin/main
         }
 
         let partyAccount = try accountService.createAccount(.init(
             code: "CUST_RC",
             name: "RC Customer",
+<<<<<<< HEAD
             groupId: sundryDebtors.id,
+=======
+            groupId: currentAssets.id,
+>>>>>>> origin/main
             openingBalancePaise: 0,
             openingBalanceSide: .debit,
             gstin: nil,
@@ -137,8 +154,13 @@ enum LocalRCFlowRunner {
         _ = try voucherService.post(draft: purchaseDraft, in: fy)
 
         let trialBalance = try reportService.trialBalance(asOfDate: fy.endDate, financialYearId: fy.id)
+<<<<<<< HEAD
         let totalDebits = try CheckedMath.sum(trialBalance.rows.map(\.debitPaise), context: "summing RC flow trial balance debits")
         let totalCredits = try CheckedMath.sum(trialBalance.rows.map(\.creditPaise), context: "summing RC flow trial balance credits")
+=======
+        let totalDebits = trialBalance.rows.reduce(Int64(0)) { $0 + $1.debitPaise }
+        let totalCredits = trialBalance.rows.reduce(Int64(0)) { $0 + $1.creditPaise }
+>>>>>>> origin/main
 
         _ = try reportService.profitAndLoss(
             fromDate: fy.startDate,
@@ -185,10 +207,14 @@ enum LocalRCFlowRunner {
             to: backupURL
         )
 
+<<<<<<< HEAD
         let restored = try await RestoreService(manager: restoreManager).restore(
             from: backupURL,
             recoveryKey: try manager.recoveryKey(for: ctx.companyId)
         )
+=======
+        let restored = try await RestoreService(manager: restoreManager).restore(from: backupURL)
+>>>>>>> origin/main
         let restoredHandle = try await restoreManager.openCompany(id: restored.id)
         defer { Task { await restoreManager.closeCompany(id: restored.id) } }
 
@@ -197,8 +223,13 @@ enum LocalRCFlowRunner {
         }
         let restoredReports = ReportService(db: restoredHandle.db, companyId: restored.id)
         let restoredTB = try restoredReports.trialBalance(asOfDate: restoredFY.endDate, financialYearId: restoredFY.id)
+<<<<<<< HEAD
         let restoredDebits = try CheckedMath.sum(restoredTB.rows.map(\.debitPaise), context: "summing restored RC flow trial balance debits")
         let restoredCredits = try CheckedMath.sum(restoredTB.rows.map(\.creditPaise), context: "summing restored RC flow trial balance credits")
+=======
+        let restoredDebits = restoredTB.rows.reduce(Int64(0)) { $0 + $1.debitPaise }
+        let restoredCredits = restoredTB.rows.reduce(Int64(0)) { $0 + $1.creditPaise }
+>>>>>>> origin/main
 
         let restoreAudit = try AuditRepository(db: restoredHandle.db).list(
             filter: .init(companyId: restored.id, action: .backupImported)

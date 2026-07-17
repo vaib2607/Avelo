@@ -1,0 +1,70 @@
+{
+  "nodes": [
+    {
+      "id": "document:.agents/logs/DEPLOY_LOG.md",
+      "type": "document",
+      "name": "DEPLOY_LOG.md",
+      "filePath": ".agents/logs/DEPLOY_LOG.md",
+      "summary": "Release deployment log documenting the v1.0-rc1 build decision, validation evidence, and deferred feature scope. Records all verification steps (build, tests, validation scripts) and proof of no blockers.",
+      "tags": ["deployment", "release-notes", "qa-summary", "documentation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:.agents/logs/FLOW_SCRIPTS.md",
+      "type": "document",
+      "name": "FLOW_SCRIPTS.md",
+      "filePath": ".agents/logs/FLOW_SCRIPTS.md",
+      "summary": "Test flow runbooks (RB-026 through RB-030) documenting manual QA procedures for company setup, switching, accounts, vouchers, financial year management, backup, and restore. Serves as the canonical test script reference.",
+      "tags": ["testing", "qa-procedures", "runbooks", "manual-testing"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:.agents/logs/QA_FINDINGS.md",
+      "type": "document",
+      "name": "QA_FINDINGS.md",
+      "filePath": ".agents/logs/QA_FINDINGS.md",
+      "summary": "Comprehensive QA findings report organized by functional area (Company Setup, Accounts, Voucher Operations, FY Lock, Reports, Backup/Restore). Verifies test coverage, documents test names, and confirms no blockers across all tested subsystems.",
+      "tags": ["qa-summary", "testing", "verification", "release-gates"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:.agents/logs/STRESS_SCRIPTS.md",
+      "type": "document",
+      "name": "STRESS_SCRIPTS.md",
+      "filePath": ".agents/logs/STRESS_SCRIPTS.md",
+      "summary": "Stress and soak test specifications covering voucher volume (1000 vouchers), report generation (50x repetition), company switch cycles (100x), and backup/restore cycles (20x). Documents verification results confirming stability and consistency.",
+      "tags": ["stress-testing", "performance", "qa-procedures", "testing"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:.agents/logs/QA_FINDINGS.md",
+      "target": "document:.agents/logs/FLOW_SCRIPTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "document:.agents/logs/QA_FINDINGS.md",
+      "target": "document:.agents/logs/STRESS_SCRIPTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:.agents/logs/DEPLOY_LOG.md",
+      "target": "document:.agents/logs/QA_FINDINGS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "document:.agents/logs/DEPLOY_LOG.md",
+      "target": "document:.agents/logs/STRESS_SCRIPTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

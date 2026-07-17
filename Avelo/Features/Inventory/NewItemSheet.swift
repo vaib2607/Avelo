@@ -8,13 +8,13 @@ public struct NewItemSheet: View {
     @State private var code: String = ""
     @State private var name: String = ""
     @State private var unit: String = "NOS"
-    @State private var alternateUnit: String = ""
-    @State private var baseUnitsPerAlternateUnit: String = ""
-    @State private var valuationMethod: ValuationMethod = .fifo
-    @State private var hsnCode: String = ""
-    @State private var gstRate: String = ""
-    @State private var gstCessRate: String = ""
-    @State private var gstTaxability: GSTTaxability = .taxable
+    @State private var stockGroup: String = ""
+    @State private var stockCategory: String = ""
+    @State private var godown: String = ""
+    @State private var openingQty: String = "0.000"
+    @State private var openingRate: String = "0.00"
+    @State private var gstRate: String = "0"
+    @State private var hsn: String = ""
     @State private var canSave: Bool = false
 
     public init() {}
@@ -32,28 +32,18 @@ public struct NewItemSheet: View {
             Form {
                 TextField("Code *", text: $code)
                 TextField("Name *", text: $name)
-                TextField("Base Unit", text: $unit)
-                TextField("Alternate Unit (optional)", text: $alternateUnit)
-                TextField("Base Units Per Alternate Unit", text: $baseUnitsPerAlternateUnit)
-                Picker("Valuation", selection: $valuationMethod) {
-                    ForEach(ValuationMethod.allCases) { method in
-                        Text(method.displayName).tag(method)
-                    }
-                }
-                TextField("HSN code (optional)", text: $hsnCode)
-                TextField("GST rate % (optional)", text: $gstRate)
-                TextField("Cess rate % (optional)", text: $gstCessRate)
-                Picker("GST taxability", selection: $gstTaxability) {
-                    ForEach(GSTTaxability.allCases) { t in
-                        Text(t.displayName).tag(t)
-                    }
-                }
+                TextField("Unit", text: $unit)
+                TextField("Stock group", text: $stockGroup)
+                TextField("Stock category", text: $stockCategory)
+                TextField("Godown", text: $godown)
+                TextField("Opening quantity", text: $openingQty)
+                MoneyTextField(label: "Opening rate (₹)", text: $openingRate)
+                TextField("GST rate (%)", text: $gstRate)
+                TextField("HSN/SAC", text: $hsn)
             }
             .formStyle(.grouped)
             .onChange(of: code) { _, _ in refresh() }
             .onChange(of: name) { _, _ in refresh() }
-            .onChange(of: alternateUnit) { _, _ in refresh() }
-            .onChange(of: baseUnitsPerAlternateUnit) { _, _ in refresh() }
             Divider()
             HStack {
                 Spacer()
@@ -65,45 +55,28 @@ public struct NewItemSheet: View {
             }
             .padding(16)
         }
-        .frame(minWidth: 480, minHeight: 320)
+        .frame(minWidth: 480, minHeight: 520)
     }
 
     private func refresh() {
         canSave = !code.trimmingCharacters(in: .whitespaces).isEmpty
             && !name.trimmingCharacters(in: .whitespaces).isEmpty
-            && alternateUomFieldsAreConsistent
-    }
-
-    private var alternateUomFieldsAreConsistent: Bool {
-        let alt = alternateUnit.trimmingCharacters(in: .whitespacesAndNewlines)
-        let ratio = baseUnitsPerAlternateUnit.trimmingCharacters(in: .whitespacesAndNewlines)
-        if alt.isEmpty && ratio.isEmpty { return true }
-        if alt.isEmpty || ratio.isEmpty { return false }
-        return (try? ExactQuantity.parse(decimal: ratio)) != nil
-    }
-
-    private func bps(from percentString: String) -> Int? {
-        let trimmed = percentString.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, let value = Decimal(string: trimmed) else { return nil }
-        return NSDecimalNumber(decimal: value * 100).intValue
     }
 
     private func save() {
         guard let ctx = env.companyContext else { return }
+        let qty = Double(openingQty) ?? 0
+        let rate = Currency.parseRupeeInput(openingRate) ?? 0
+        let gst = Double(gstRate) ?? 0
         do {
-            let alt = alternateUnit.trimmingCharacters(in: .whitespacesAndNewlines)
-            let ratio = baseUnitsPerAlternateUnit.trimmingCharacters(in: .whitespacesAndNewlines)
             _ = try InventoryService(db: ctx.database, companyId: ctx.companyId).createItem(
-                code: code,
-                name: name,
-                unit: unit,
-                alternateUnit: alt.isEmpty ? nil : alt,
-                baseUnitsPerAlternateUnit: ratio.isEmpty ? nil : try ExactQuantity.parse(decimal: ratio),
-                valuationMethod: valuationMethod,
-                hsnCode: hsnCode.trimmingCharacters(in: .whitespaces).isEmpty ? nil : hsnCode.trimmingCharacters(in: .whitespaces),
-                gstRateBps: bps(from: gstRate),
-                gstCessRateBps: bps(from: gstCessRate),
-                gstTaxability: gstTaxability
+                code: code, name: name, unit: unit,
+                openingQuantity: qty, openingRatePaise: rate,
+                gstRate: gst,
+                stockGroup: stockGroup.isEmpty ? nil : stockGroup,
+                stockCategory: stockCategory.isEmpty ? nil : stockCategory,
+                godown: godown.isEmpty ? nil : godown,
+                hsnSac: hsn.isEmpty ? nil : hsn
             )
             env.showSuccess("Item created.")
             router.presentedSheet = nil

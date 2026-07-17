@@ -23,7 +23,11 @@ public struct AccountsView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem {
             Button {
+<<<<<<< HEAD
                 AppActionRegistry.perform(.accountCreate, router: env.router)
+=======
+                env.router.present(.newAccount)
+>>>>>>> origin/main
             } label: {
                 Label("New Account", systemImage: "plus")
             }
@@ -84,6 +88,7 @@ private struct AccountsBody: View {
                 title: "Accounts",
                 subtitle: "Groups, ledgers, and account drill-downs with Tally-style master navigation.",
                 hints: [
+<<<<<<< HEAD
                     .init(title: "Accounts", key: "⌘3"),
                     .init(title: "New account", key: "⇧⌘A")
                 ],
@@ -100,11 +105,27 @@ private struct AccountsBody: View {
                 .buttonStyle(.borderless)
             }
             .padding(12)
+=======
+                    .init(title: "Groups", key: "⌘1"),
+                    .init(title: "Ledgers", key: "⌘2"),
+                    .init(title: "New account", key: "⇧⌘N")
+                ],
+                primaryActionTitle: "New Account",
+                primaryActionSystemImage: "plus",
+                primaryAction: { env.router.present(.newAccount) }
+            )
+            Text("Groups")
+                .font(.headline)
+                .padding(12)
+>>>>>>> origin/main
             List(selection: $vm.selectedGroupId) {
                 Section {
                     Button {
                         vm.selectedGroupId = nil
+<<<<<<< HEAD
                         vm.reloadFirstPage()
+=======
+>>>>>>> origin/main
                     } label: {
                         HStack {
                             Text("All groups")
@@ -114,6 +135,7 @@ private struct AccountsBody: View {
                     .buttonStyle(.plain)
                 }
                 Section("Groups") {
+<<<<<<< HEAD
                     ForEach(orderedGroups, id: \.group.id) { entry in
                         HStack {
                             Text(String(repeating: "  ", count: entry.depth) + entry.group.name)
@@ -130,12 +152,22 @@ private struct AccountsBody: View {
                             vm.selectedGroupId = entry.group.id
                             vm.reloadFirstPage()
                         }
+=======
+                    ForEach(vm.groups) { g in
+                        HStack {
+                            Text(g.name)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { vm.selectedGroupId = g.id }
+>>>>>>> origin/main
                     }
                 }
             }
         }
     }
 
+<<<<<<< HEAD
     /// Tally's List of Accounts shows groups as an indented tree (parent,
     /// then its children, depth-first), not the repository's flat
     /// sort-order listing.
@@ -153,6 +185,8 @@ private struct AccountsBody: View {
         return result
     }
 
+=======
+>>>>>>> origin/main
     @ViewBuilder
     private var accountsList: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -168,29 +202,46 @@ private struct AccountsBody: View {
             .padding(.top, 8)
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search accounts")
+<<<<<<< HEAD
                     .onChange(of: vm.query) { _, _ in vm.reloadFirstPage() }
                 Toggle("Show disabled", isOn: $vm.showDisabled)
                     .toggleStyle(.switch)
                     .onChange(of: vm.showDisabled) { _, _ in vm.reloadFirstPage() }
+=======
+                Toggle("Show disabled", isOn: $vm.showDisabled)
+                    .toggleStyle(.switch)
+>>>>>>> origin/main
                 Spacer()
             }
             .padding(12)
             List(vm.filtered) { account in
                 HStack {
                     VStack(alignment: .leading) {
+<<<<<<< HEAD
                         Text(account.name.capitalized).font(.headline)
+=======
+                        Text(account.name).font(.headline)
+>>>>>>> origin/main
                         Text(account.code).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Text(Currency.formatPaise(account.openingBalancePaise)).monospacedDigit()
                     Button {
+<<<<<<< HEAD
                         AppActionRegistry.perform(.accountAlter, context: AppActionContext(accountId: account.id), router: env.router)
+=======
+                        env.router.present(.editAccount(account.id))
+>>>>>>> origin/main
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
                     .buttonStyle(.borderless)
                     Button {
+<<<<<<< HEAD
                         AppActionRegistry.perform(.accountDrillDown, context: AppActionContext(accountId: account.id), router: env.router)
+=======
+                        env.router.openLedger(account.id)
+>>>>>>> origin/main
                     } label: {
                         Label("Ledger", systemImage: "list.bullet.rectangle")
                     }
@@ -209,12 +260,15 @@ private struct AccountsBody: View {
                 }
                 .contentShape(Rectangle())
             }
+<<<<<<< HEAD
             PaginationControls(
                 state: vm.pagination,
                 isLoading: vm.isLoading,
                 previous: { vm.previousPage() },
                 next: { vm.nextPage() }
             )
+=======
+>>>>>>> origin/main
         }
     }
 }

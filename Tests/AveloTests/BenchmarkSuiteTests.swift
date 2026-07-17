@@ -33,6 +33,7 @@ final class BenchmarkSuiteTests: XCTestCase {
     }
 
     private func makeManagedFixture() async throws -> (manager: DatabaseManager, companyId: UUID, companyName: String, rootURL: URL) {
+<<<<<<< HEAD
         let root = BenchmarkConfig.temporaryDirectory
             .appendingPathComponent("avelo-benchmark-managed-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -42,6 +43,16 @@ final class BenchmarkSuiteTests: XCTestCase {
         let companyURL = try await manager.createCompanyFile(companyId: companyId)
         let key = try XCTUnwrap(try manager.keyStore.retrieve(companyId: companyId))
         let db = try SQLiteDatabase(path: companyURL.path, key: key)
+=======
+        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("avelo-benchmark-managed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let manager = try DatabaseManager(appSupportDirectory: root)
+        let companyId = UUID()
+        let companyName = "Managed Benchmark Co"
+        let companyURL = try await manager.createCompanyFile(companyId: companyId)
+        let db = try SQLiteDatabase(path: companyURL.path)
+>>>>>>> origin/main
         defer { db.close() }
         _ = try TestCompany.seed(into: db, companyId: companyId, companyName: companyName)
         let entry = CompanyRegistryEntry(
@@ -259,12 +270,20 @@ final class BenchmarkSuiteTests: XCTestCase {
 
         let restoreRoot = rootURL.appendingPathComponent("restore", isDirectory: true)
         try FileManager.default.createDirectory(at: restoreRoot, withIntermediateDirectories: true)
+<<<<<<< HEAD
         let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot, keyStore: InMemoryCompanyKeyStore())
+=======
+        let restoreManager = try DatabaseManager(appSupportDirectory: restoreRoot)
+>>>>>>> origin/main
         defer { try? FileManager.default.removeItem(at: restoreRoot) }
         let restoreService = RestoreService(manager: restoreManager)
 
         let restore = try await BenchmarkClock.measureAsync("backup_restore") {
+<<<<<<< HEAD
             _ = try await restoreService.restore(from: backupURL, recoveryKey: try manager.recoveryKey(for: companyId))
+=======
+            _ = try await restoreService.restore(from: backupURL)
+>>>>>>> origin/main
         }
         suite.record(restore)
         BenchmarkClock.emit(restore)

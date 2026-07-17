@@ -27,6 +27,7 @@ final class ReportsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.ledger?.rows.first?.voucherId, try XCTUnwrap(vm.ledger?.rows.first?.voucherId))
     }
 
+<<<<<<< HEAD
     // AVL-P1-036 (Alt+N comparative columns): the comparative column must
     // reconcile exactly to what the same report returns standalone for that
     // prior period — no separate math, no drift.
@@ -120,6 +121,8 @@ final class ReportsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.comparativeBalanceSheet, standalone)
     }
 
+=======
+>>>>>>> origin/main
     func testLedgerSelectionWithoutAccountClearsLedgerResult() throws {
         let tc = try TestCompany.make()
         let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)

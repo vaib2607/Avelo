@@ -20,8 +20,8 @@ public struct DashboardView: View {
                 monthlyPLSection
                 recentVouchersSection
                 ModuleFooterBar(items: [
-                    .init(title: "Next", detail: "Press F4–F9 for a new voucher, or ⌘4 to switch to Reports."),
-                    .init(title: "Shortcut", detail: "F4–F9 and ⌃F8/⌃F9 map to the Tally voucher families."),
+                    .init(title: "Next", detail: "Press ⌘N for a new voucher or switch to Reports for drill-down."),
+                    .init(title: "Shortcut", detail: "F4-F11 map to the main voucher families."),
                     .init(title: "Context", detail: "Company, FY, and module are always shown above.")
                 ])
             }
@@ -47,8 +47,8 @@ public struct DashboardView: View {
                     quickButton("Journal", "F7", .newJournal, "book.closed")
                     quickButton("Sales", "F8", .newSales, "cart")
                     quickButton("Purchase", "F9", .newPurchase, "bag")
-                    quickButton("Credit Note", "⌃F8", .newCreditNote, "doc.badge.plus")
-                    quickButton("Debit Note", "⌃F9", .newDebitNote, "document.badge.minus")
+                    quickButton("Credit Note", "F10", .newCreditNote, "doc.badge.plus")
+                    quickButton("Debit Note", "F11", .newDebitNote, "document.badge.minus")
                 }
                 .padding(6)
             }
@@ -84,10 +84,13 @@ public struct DashboardView: View {
             title: "Dashboard",
             subtitle: "Your offline Tally-style control center for company context, quick entry, and live totals.",
             hints: [
-                .init(title: "Dashboard", key: "⌘1"),
-                .init(title: "Vouchers", key: "⌘2"),
-                .init(title: "Reports", key: "⌘4")
-            ]
+                .init(title: "Dashboard", key: "1"),
+                .init(title: "Reports", key: "4"),
+                .init(title: "New voucher", key: "⌘N")
+            ],
+            primaryActionTitle: "New Voucher",
+            primaryActionSystemImage: "plus",
+            primaryAction: { env.router.present(.newVoucher) }
         )
     }
 
@@ -101,9 +104,7 @@ public struct DashboardView: View {
             KPICard(title: "Month Sales",value: vm.monthSalesPaise,     accent: .purple)
             KPICard(title: "Month Purchases", value: vm.monthPurchasesPaise, accent: .pink)
             KPICard(title: "GST Payable",value: vm.gstPayablePaise,     accent: .red)
-            if env.companyContext?.isInventoryEnabled == true {
-                KPICard(title: "Stock Value",value: vm.stockValuePaise, accent: .teal)
-            }
+            KPICard(title: "Stock Value",value: vm.stockValuePaise,     accent: .teal)
         }
     }
 
@@ -115,7 +116,7 @@ public struct DashboardView: View {
                 Divider().frame(height: 40)
                 LabeledMoney(title: "At bank", paise: vm.bankBalancePaise)
                 Divider().frame(height: 40)
-                LabeledMoney(title: "Total", paise: cashPositionTotalPaise, bold: true)
+                LabeledMoney(title: "Total", paise: vm.cashBalancePaise + vm.bankBalancePaise, bold: true)
                 Spacer()
             }
             .padding(8)
@@ -138,10 +139,9 @@ public struct DashboardView: View {
                         Text(Currency.formatPaise(row.expensePaise)).monospacedDigit()
                     }
                     TableColumn("Net (₹)") { row in
-                        let net = monthlyNetPaise(for: row)
-                        Text(Currency.formatPaise(net))
+                        Text(Currency.formatPaise(row.incomePaise - row.expensePaise))
                             .monospacedDigit()
-                            .foregroundStyle(net >= 0 ? .green : .red)
+                            .foregroundStyle(row.incomePaise - row.expensePaise >= 0 ? .green : .red)
                     }
                 }
                 .frame(minHeight: 200)
@@ -173,22 +173,6 @@ public struct DashboardView: View {
     private func reload() {
         guard let ctx = env.companyContext else { return }
         vm.reload(ctx: ctx)
-    }
-
-    private var cashPositionTotalPaise: Int64 {
-        (try? CheckedMath.add(
-            vm.cashBalancePaise,
-            vm.bankBalancePaise,
-            context: "calculating dashboard cash position total"
-        )) ?? 0
-    }
-
-    private func monthlyNetPaise(for row: DashboardViewModel.MonthlyTotal) -> Int64 {
-        (try? CheckedMath.subtract(
-            row.incomePaise,
-            row.expensePaise,
-            context: "calculating dashboard monthly profit and loss net"
-        )) ?? 0
     }
 }
 
@@ -237,12 +221,7 @@ private struct AccountTreeStrip: View {
         var cr: Int64 = 0
         for ledger in t.allLedgers where ledger.isActive {
             let bal = ledger.balancePaise
-            if bal >= 0 {
-                dr = (try? CheckedMath.add(dr, bal, context: "summing dashboard live debit total")) ?? 0
-            } else {
-                let creditMagnitude = (try? CheckedMath.abs(bal, context: "calculating dashboard live credit magnitude")) ?? 0
-                cr = (try? CheckedMath.add(cr, creditMagnitude, context: "summing dashboard live credit total")) ?? 0
-            }
+            if bal >= 0 { dr += bal } else { cr += -bal }
         }
         return (dr, cr)
     }
@@ -253,13 +232,7 @@ private struct AccountTreeStrip: View {
         return GroupBox("Trial Balance (live)") {
             HStack(spacing: 16) {
                 Label {
-                    Text(
-                        cache.tree == nil
-                            ? "stale"
-                            : (balanced
-                                ? "balanced"
-                                : "off by \(Currency.formatAbsolutePaise((try? CheckedMath.subtract(t.debit, t.credit, context: "calculating dashboard trial balance difference")) ?? 0))")
-                    )
+                    Text(cache.tree == nil ? "stale" : (balanced ? "balanced" : "off by \(Currency.formatPaise(abs(t.debit - t.credit)))"))
                 } icon: {
                     Image(systemName: cache.tree == nil ? "exclamationmark.triangle"
                           : (balanced ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"))
@@ -274,7 +247,7 @@ private struct AccountTreeStrip: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Rebuild") { Task { await cache.reload() } }
+                Button("Rebuild") { cache.reload() }
                     .controlSize(.small)
             }
             .padding(6)

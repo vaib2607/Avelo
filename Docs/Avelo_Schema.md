@@ -1,23 +1,20 @@
 # Avelo Schema
 
-This is the human-readable persistence contract for the current converged company schema. Executable authority is `SchemaVersion.current`, `MigrationRunner.defaultMigrations`, and `MigrationV###`; this document must be updated in the same change. If prose and executable DDL differ, release is blocked until they converge.
-
-Current executable schema: **v22**.
+The frozen SQLite schema. Every table, column, type, constraint, and index is defined here. Migration scripts must produce a DB that matches this document exactly. Renames require updating this doc first.
 
 ## Conventions
 
 - All table names are prefixed `avelo_`.
 - All column names are `snake_case`.
-- UUIDs: `TEXT` in canonical 36-character form, generated and strictly decoded in Swift.
+- UUIDs: `TEXT` (lowercase 36-char, RFC 4122). Default to `lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || ...)` via a SQLite expression or generated in Swift.
 - Dates (calendar dates with no time): `TEXT` in `yyyy-MM-dd`.
 - Timestamps (events with time): `TEXT` in `yyyy-MM-ddTHH:mm:ss.SSSZ` (UTC ISO 8601).
 - Money: `INTEGER` storing **paise** (Int64 in Swift). Never `REAL`.
 - Booleans: `INTEGER` 0/1 with `CHECK(col IN (0,1))`.
-- Most entity tables have `id TEXT PRIMARY KEY`; snapshot/join tables may use a composite primary key, and `avelo_migrations` uses an integer version key.
-- Foreign-key delete behavior is table-specific. Durable financial history normally uses `RESTRICT`; scratch or dependent rows may use `CASCADE` only where the migration explicitly defines it.
+- Every table has a primary key `id TEXT NOT NULL PRIMARY KEY`.
+- Foreign keys use `REFERENCES avelo_xxx(id) ON DELETE RESTRICT` (we don't cascade financial data; we use R-10 reversal/disable instead).
 - All `TEXT` columns that must be non-empty have `CHECK(length(trim(col)) > 0)`.
-- Timestamps are written explicitly by the app unless the executable DDL states otherwise.
-- Legacy `REAL` BOM columns remain upgrade input only. Runtime BOM quantities use exact numerator/denominator columns introduced by v22.
+- All timestamps have default `strftime('%Y-%m-%dT%H:%M:%fZ','now')` written by the app, not by SQL.
 
 ## Foreign keys & pragmas
 
@@ -124,13 +121,6 @@ Only ledgers (not groups) are inserted here. The presence of a row in this table
 | is_active | INTEGER | NOT NULL DEFAULT 1, CHECK IN (0,1) |
 | is_bank_account | INTEGER | NOT NULL DEFAULT 0, CHECK IN (0,1) |
 | gstin | TEXT | nullable |
-| mailing_name | TEXT | nullable |
-| mailing_address | TEXT | nullable |
-| state_code | TEXT | nullable; GST state code is validated at the service boundary |
-| country | TEXT | nullable |
-| gst_registration_type | TEXT | nullable; decoded strictly to `GSTRegistrationType` when present |
-| maintain_billwise | INTEGER | NOT NULL DEFAULT 0, strict 0/1 decode |
-| credit_period_days | INTEGER | nullable |
 | last_used_at | TEXT | nullable |
 | created_at | TEXT | NOT NULL |
 | updated_at | TEXT | NOT NULL |
@@ -186,11 +176,6 @@ The header. The lines live in `avelo_ledger_lines`. There is no separate `transa
 | narration | TEXT | NOT NULL DEFAULT '' |
 | is_reversal | INTEGER | NOT NULL DEFAULT 0, CHECK IN (0,1) |
 | reversal_of_id | TEXT | nullable, FK avelo_vouchers(id) |
-| status | TEXT | NOT NULL DEFAULT 'open', CHECK IN (`open`, `cancelled`) |
-| cancelled_at | TEXT | nullable |
-| cancelled_by | TEXT | nullable |
-| cancellation_reason | TEXT | nullable |
-| cancellation_voucher_id | TEXT | nullable, FK avelo_vouchers(id) |
 | is_posted | INTEGER | NOT NULL DEFAULT 1, CHECK IN (0,1) (drafts are 0) |
 | total_paise | INTEGER | NOT NULL, CHECK(total_paise > 0) |
 | created_at | TEXT | NOT NULL |
@@ -202,8 +187,6 @@ Indexes:
 - `idx_avelo_vouchers_type` on `(voucher_type_code, date)`
 - `idx_avelo_vouchers_party` on `(party_account_id)`
 - `idx_avelo_vouchers_reversal` on `(reversal_of_id)`
-- `idx_avelo_vouchers_status` on `(status)`
-- `idx_avelo_vouchers_cancel_link` on `(cancellation_voucher_id)`
 - UNIQUE `(company_id, financial_year_id, voucher_type_code, number)`
 
 Trigger: enforce date falls within the FY:
@@ -261,7 +244,7 @@ END;
 | account_id | TEXT | NOT NULL, FK avelo_accounts(id) |
 | amount_paise | INTEGER | NOT NULL, CHECK(amount_paise > 0) |
 | side | TEXT | NOT NULL, CHECK(side IN ('debit','credit')) |
-| tax_code | TEXT | nullable, HSN/SAC code for invoice line display (AVL-P0-022), e.g. `7208`, `9983` — not a GST-ledger-account discriminator; that role is played by `Account.code` values (`IGST_OUTPUT`, `CGST_OUTPUT`, `SGST_OUTPUT`, `CESS`) on separate GST-liability accounts, read via `GSTService.voucherTaxBreakdown`/`gstr1InvoiceRows` |
+| tax_code | TEXT | nullable, e.g. `CGST_IN_9`, `SGST_IN_9`, `IGST_IN_18`, `CESS_1` |
 | cost_center | TEXT | nullable |
 | line_order | INTEGER | NOT NULL |
 
@@ -292,68 +275,13 @@ END;
 | code | TEXT | NOT NULL |
 | name | TEXT | NOT NULL |
 | unit | TEXT | NOT NULL, e.g. `KG`, `MT`, `PCS`, `L`, `M` |
-| alternate_unit | TEXT | nullable |
-| alt_unit_base_numerator | INTEGER | nullable; paired with denominator and > 0 when present |
-| alt_unit_base_denominator | INTEGER | nullable; paired with numerator and > 0 when present |
 | valuation_method | TEXT | NOT NULL DEFAULT 'fifo', CHECK(valuation_method IN ('fifo','weightedAverage')) |
 | is_active | INTEGER | NOT NULL DEFAULT 1, CHECK IN (0,1) |
-| hsn_code | TEXT | nullable |
-| gst_rate_bps | INTEGER | nullable; full GST rate in basis points |
-| gst_cess_rate_bps | INTEGER | nullable |
-| gst_taxability | TEXT | NOT NULL DEFAULT 'taxable', CHECK IN (`taxable`, `exempt`, `nilRated`) |
 | created_at | TEXT | NOT NULL |
 
 UNIQUE `(company_id, code)`.
 
-## 9. avelo_inventory_orders
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK avelo_companies(id) |
-| order_type | TEXT | NOT NULL, CHECK(order_type IN ('purchaseOrder','salesOrder')) |
-| number | TEXT | NOT NULL |
-| party_account_id | TEXT | NOT NULL, FK avelo_accounts(id) |
-| order_date | TEXT | NOT NULL, `yyyy-MM-dd` |
-| expected_date | TEXT | nullable |
-| status | TEXT | NOT NULL DEFAULT 'open', CHECK(status IN ('open','closed','cancelled')) |
-| created_at | TEXT | NOT NULL |
-| updated_at | TEXT | NOT NULL |
-
-UNIQUE `(company_id, order_type, number)`.
-
-## 10. avelo_inventory_order_lines
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK avelo_companies(id) |
-| order_id | TEXT | NOT NULL, FK avelo_inventory_orders(id) ON DELETE RESTRICT |
-| item_id | TEXT | NOT NULL, FK avelo_inventory_items(id) |
-| quantity | INTEGER | NOT NULL, CHECK(quantity > 0) |
-| fulfilled_quantity | INTEGER | NOT NULL DEFAULT 0, CHECK(fulfilled_quantity >= 0 AND fulfilled_quantity <= quantity) |
-| unit_rate_paise | INTEGER | NOT NULL DEFAULT 0, CHECK(unit_rate_paise >= 0) |
-| created_at | TEXT | NOT NULL |
-
-Indexes:
-- `idx_avelo_inventory_order_lines_order` on `(order_id)`
-- `idx_avelo_inventory_order_lines_item` on `(company_id, item_id)`
-
-## 11. avelo_inventory_reorder_levels
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK avelo_companies(id) |
-| item_id | TEXT | NOT NULL, FK avelo_inventory_items(id) |
-| minimum_quantity | INTEGER | NOT NULL, CHECK(minimum_quantity >= 0) |
-| reorder_quantity | INTEGER | NOT NULL, CHECK(reorder_quantity >= 0) |
-| created_at | TEXT | NOT NULL |
-| updated_at | TEXT | NOT NULL |
-
-UNIQUE `(company_id, item_id)`.
-
-## 12. avelo_stock_movements
+## 9. avelo_stock_movements
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -375,7 +303,7 @@ Indexes:
 - `idx_avelo_mov_company_date` on `(company_id, date)`
 - `idx_avelo_mov_voucher` on `(voucher_id)`
 
-## 13. avelo_payroll_employees
+## 10. avelo_payroll_employees
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -394,7 +322,7 @@ Indexes:
 
 UNIQUE `(company_id, code)`.
 
-## 14. avelo_payroll_entries
+## 11. avelo_payroll_entries
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -414,11 +342,9 @@ Indexes:
 - `idx_avelo_payroll_emp_period` on `(employee_id, year, month)`
 - `idx_avelo_payroll_company_period` on `(company_id, year, month)`
 
-## 15. avelo_audit_events
+## 12. avelo_audit_events
 
 Append-only. Triggers reject UPDATE and DELETE.
-
-The frozen persisted `AuditAction` values are listed in `Avelo_Naming_Freeze.md`. V23 widens the action CHECK for dedicated FY unlock/reopen, bank import/clear, account-group, inventory-order/reorder, BOM, voucher-template, GST-export, and invoice-PDF-export events. V25 adds dedicated cheque-bounce and cheque-representation actions. Both migrations preserve existing sequence and HMAC values.
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -432,14 +358,10 @@ The frozen persisted `AuditAction` values are listed in `Avelo_Naming_Freeze.md`
 | snapshot_before_json | TEXT | nullable |
 | snapshot_after_json | TEXT | nullable |
 | reason | TEXT | nullable |
-| sequence_number | INTEGER | NOT NULL, > 0 |
-| previous_chain_hmac | TEXT | nullable for first event; otherwise 64 hex characters |
-| chain_hmac | TEXT | NOT NULL, 64 hex characters |
 
 Indexes:
 - `idx_avelo_audit_entity` on `(company_id, entity_type, entity_id)`
 - `idx_avelo_audit_time` on `(company_id, timestamp)`
-- unique `idx_avelo_audit_sequence` on `(company_id, sequence_number)`
 
 Triggers:
 ```sql
@@ -452,7 +374,7 @@ BEFORE DELETE ON avelo_audit_events
 BEGIN SELECT RAISE(ABORT, 'Audit events are immutable'); END;
 ```
 
-## 16. avelo_voucher_sequences
+## 13. avelo_voucher_sequences
 
 Per (company, FY, type) counter. Updated atomically when a voucher is posted.
 
@@ -468,7 +390,7 @@ Per (company, FY, type) counter. Updated atomically when a voucher is posted.
 
 PRIMARY KEY `(company_id, financial_year_id, voucher_type_code)`.
 
-## 17. avelo_voucher_templates
+## 14. avelo_voucher_templates
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -483,7 +405,7 @@ PRIMARY KEY `(company_id, financial_year_id, voucher_type_code)`.
 
 UNIQUE `(company_id, name)`.
 
-## 18. avelo_bank_reconciliations
+## 15. avelo_bank_reconciliations
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -501,157 +423,7 @@ UNIQUE `(company_id, name)`.
 UNIQUE `(voucher_id)` — one reconciliation row per voucher.
 Index `idx_avelo_br_account_cleared` on `(bank_account_id, is_cleared)`.
 
-## 19. avelo_bank_statement_lines
-
-Raw imported bank statement lines were introduced in v4 so unmatched lines persist until later reconciliation. They remain part of the current schema and are protected by company-ownership and fiscal-lock policy.
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK |
-| bank_account_id | TEXT | NOT NULL, FK avelo_accounts(id) |
-| statement_date | TEXT | NOT NULL |
-| amount_paise | INTEGER | NOT NULL |
-| narration | TEXT | NOT NULL |
-| import_batch_id | TEXT | nullable |
-| imported_at | TEXT | NOT NULL |
-| matched_voucher_id | TEXT | nullable, FK avelo_vouchers(id) |
-| is_cleared | INTEGER | NOT NULL DEFAULT 0, CHECK IN (0,1) |
-| cleared_at | TEXT | nullable |
-
-Indexes:
-- `idx_avelo_bank_statement_lines_account_date` on `(bank_account_id, statement_date)`.
-- `idx_avelo_bank_statement_lines_clearance` on `(company_id, is_cleared, statement_date)`.
-- `idx_avelo_bank_statement_lines_matched_voucher` on `(matched_voucher_id)`.
-
-## 20. avelo_voucher_drafts
-
-Autosaved, in-progress "new voucher" entries (AVL-P0-018), added in V18. Deliberately outside the double-entry/audit model: a row here is never validated, never balanced, and never posted automatically. It exists only so a crash or quit does not silently discard everything the user typed, and is deleted the moment the user explicitly posts or cancels. Recovery only ever offers the most-recently-updated row for a company and never auto-posts it.
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK `avelo_companies(id)` ON DELETE CASCADE |
-| voucher_type_code | TEXT | NOT NULL |
-| date | TEXT | NOT NULL |
-| party_account_id | TEXT | nullable, no FK (scratch value only, re-validated on resume) |
-| account_ledger_id | TEXT | nullable, no FK; cash/bank ledger for recovered single-entry mode, re-validated on resume |
-| narration | TEXT | NOT NULL DEFAULT '' |
-| bill_reference_type | TEXT | nullable |
-| bill_reference_number | TEXT | nullable |
-| cheque_number | TEXT | nullable |
-| cheque_due_date | TEXT | nullable |
-| lines_json | TEXT | NOT NULL — JSON array of `{accountId, amount, side, taxCode?, costCenter?}` |
-| updated_at | TEXT | NOT NULL |
-
-Index: `idx_avelo_voucher_drafts_company` on `(company_id, updated_at)`.
-
-## 21. avelo_financial_year_opening_balances
-
-The carried opening snapshot published by FY close. It deliberately has no independent `id`; one account has at most one carried opening in a target FY.
-
-| Column | Type | Constraint |
-|---|---|---|
-| financial_year_id | TEXT | NOT NULL, FK FY ON DELETE CASCADE |
-| source_financial_year_id | TEXT | NOT NULL, FK FY ON DELETE CASCADE |
-| account_id | TEXT | NOT NULL, FK account ON DELETE CASCADE |
-| opening_balance_paise | INTEGER | NOT NULL |
-| opening_balance_side | TEXT | NOT NULL, CHECK IN (`debit`, `credit`) |
-| created_at | TEXT | NOT NULL |
-
-Primary key: `(financial_year_id, account_id)`. Index: `idx_avelo_fy_opening_balances_source`.
-
-## 22. avelo_bill_allocations
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK company RESTRICT |
-| voucher_id | TEXT | NOT NULL, FK voucher RESTRICT |
-| party_account_id | TEXT | NOT NULL, FK account RESTRICT |
-| kind | TEXT | NOT NULL, CHECK IN (`New Ref`, `Agst Ref`, `Advance`, `On Account`) |
-| reference_number | TEXT | nullable |
-| allocated_paise | INTEGER | NOT NULL, > 0 |
-| created_at | TEXT | NOT NULL |
-
-Ownership triggers require voucher and party to belong to `company_id`. Indexes cover voucher, party/reference, and party/kind lookup.
-
-## 23. avelo_cheques
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK company RESTRICT |
-| voucher_id | TEXT | NOT NULL UNIQUE, FK voucher RESTRICT |
-| cheque_number | TEXT | NOT NULL |
-| issue_date | TEXT | NOT NULL |
-| due_date | TEXT | nullable |
-| status | TEXT | NOT NULL, CHECK IN (`issued`, `deposited`, `cleared`, `bounced`, `cancelled`) |
-| bounced_reversal_voucher_id | TEXT | nullable, FK voucher RESTRICT |
-| represented_from_cheque_id | TEXT | nullable, self-FK RESTRICT |
-| created_at | TEXT | NOT NULL |
-
-Ownership triggers protect voucher, reversal, and re-presentation references. Indexes cover company/status/number and represented-from lineage.
-
-## 24. avelo_boms
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK company RESTRICT |
-| assembly_item_id | TEXT | NOT NULL UNIQUE, FK inventory item RESTRICT |
-| output_quantity | REAL | legacy v17 value retained for upgrade compatibility; not authoritative at runtime |
-| output_quantity_numerator | INTEGER | NOT NULL DEFAULT 1, > 0; authoritative v22 value |
-| output_quantity_denominator | INTEGER | NOT NULL DEFAULT 1, > 0; authoritative v22 value |
-| created_at | TEXT | NOT NULL |
-| updated_at | TEXT | NOT NULL |
-
-The assembly item must belong to the same company. `idx_avelo_boms_company_assembly` supports company lookup.
-
-## 25. avelo_bom_components
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK company RESTRICT |
-| bom_id | TEXT | NOT NULL, FK BOM ON DELETE CASCADE |
-| component_item_id | TEXT | NOT NULL, FK inventory item RESTRICT |
-| quantity | REAL | legacy v17 value retained for upgrade compatibility; not authoritative at runtime |
-| quantity_numerator | INTEGER | NOT NULL DEFAULT 1, > 0; authoritative v22 value |
-| quantity_denominator | INTEGER | NOT NULL DEFAULT 1, > 0; authoritative v22 value |
-| line_order | INTEGER | NOT NULL DEFAULT 0 |
-
-`idx_avelo_bom_components_unique_item` enforces one component item per BOM after v22 coalesces legacy duplicates. Company and order indexes support guarded reads.
-
-## 26. avelo_voucher_item_lines
-
-Structured item-invoice evidence introduced by v20. These rows supplement, not replace, the balanced ledger lines.
-
-| Column | Type | Constraint |
-|---|---|---|
-| id | TEXT | PK |
-| company_id | TEXT | NOT NULL, FK company RESTRICT |
-| voucher_id | TEXT | NOT NULL, FK voucher ON DELETE CASCADE |
-| item_id | TEXT | NOT NULL, FK item RESTRICT |
-| quantity | INTEGER | NOT NULL, > 0 |
-| rate_paise | INTEGER | NOT NULL, >= 0 |
-| taxable_value_paise | INTEGER | NOT NULL, >= 0 |
-| hsn_code | TEXT | nullable |
-| gst_rate_bps | INTEGER | nullable |
-| cgst_paise | INTEGER | NOT NULL DEFAULT 0 |
-| sgst_paise | INTEGER | NOT NULL DEFAULT 0 |
-| igst_paise | INTEGER | NOT NULL DEFAULT 0 |
-| cess_paise | INTEGER | NOT NULL DEFAULT 0 |
-| line_order | INTEGER | NOT NULL DEFAULT 0 |
-| created_at | TEXT | NOT NULL |
-
-Ownership trigger requires voucher and item to match `company_id`. Indexes cover voucher order and company/item. Restore currently omits this table from company-ID remapping; `AVL-P0-036` blocks release until that is fixed and proved.
-
-### GST state-code lookup (not a database table)
-
-Place of supply (AVL-P0-022) is derived from a GSTIN's leading two-digit state-code prefix (e.g. `27` = Maharashtra) rather than a separate address/state field on `Account`. The standard CBIC state-code table lives in `Avelo/Core/Validation/GSTStateCode.swift` as static Swift data, since the code list is fixed by statute and never changes at runtime.
-
-## 27. avelo_migrations
+## 16. avelo_migrations
 
 | Column | Type | Constraint |
 |---|---|---|
@@ -659,7 +431,7 @@ Place of supply (AVL-P0-022) is derived from a GSTIN's leading two-digit state-c
 | applied_at | TEXT | NOT NULL |
 | description | TEXT | NOT NULL |
 
-## 28. Registry DB tables (`avelo_registry.sqlite`)
+## 17. Registry DB tables (`avelo_registry.sqlite`)
 
 ### avelo_registry_companies
 
@@ -671,7 +443,7 @@ Place of supply (AVL-P0-022) is derived from a GSTIN's leading two-digit state-c
 | last_opened_at | TEXT | nullable |
 | created_at | TEXT | NOT NULL |
 
-## 29. Index summary (non-exhaustive human aid)
+## 18. Index summary (one place)
 
 ```
 idx_avelo_companies_name
@@ -682,21 +454,14 @@ idx_avelo_groups_parent
 idx_avelo_accounts_company
 idx_avelo_accounts_group
 idx_avelo_accounts_last_used
-idx_avelo_fy_opening_balances_source
 idx_avelo_vouchers_company_date
 idx_avelo_vouchers_fy
 idx_avelo_vouchers_type
 idx_avelo_vouchers_party
 idx_avelo_vouchers_reversal
-idx_avelo_vouchers_status
-idx_avelo_vouchers_cancel_link
 idx_avelo_lines_voucher
 idx_avelo_lines_account
 idx_avelo_lines_company_side
-idx_avelo_inventory_orders_company_status
-idx_avelo_inventory_order_lines_order
-idx_avelo_inventory_order_lines_item
-idx_avelo_inventory_reorder_company_item
 idx_avelo_mov_item_date
 idx_avelo_mov_company_date
 idx_avelo_mov_voucher
@@ -705,62 +470,12 @@ idx_avelo_payroll_company_period
 idx_avelo_audit_entity
 idx_avelo_audit_time
 idx_avelo_br_account_cleared
-idx_avelo_bank_statement_lines_account_date
-idx_avelo_bank_statement_lines_clearance
-idx_avelo_bank_statement_lines_matched_voucher
-idx_avelo_voucher_drafts_company
-idx_avelo_bill_allocations_voucher
-idx_avelo_bill_allocations_party_ref
-idx_avelo_bill_allocations_party_kind
-idx_avelo_cheques_company_status
-idx_avelo_cheques_represented_from
-idx_avelo_boms_company_assembly
-idx_avelo_bom_components_bom_order
-idx_avelo_bom_components_company_component
-idx_avelo_bom_components_unique_item
-idx_avelo_voucher_item_lines_voucher
-idx_avelo_voucher_item_lines_company_item
-idx_avelo_audit_sequence
-idx_avelo_registry_name
 ```
 
-## 30. Party profiles (`avelo_party_profiles`, v24)
+## 19. Migration policy
 
-Focused party meaning and credit policy live outside the base ledger row:
-
-| Column | Contract |
-|---|---|
-| `account_id` | Primary key and same-company account foreign key. |
-| `company_id` | Required company ownership boundary. |
-| `usage` | `customer`, `supplier`, or `both`; authoritative when present. |
-| `credit_limit_paise` | Optional non-negative checked `Int64` paise. |
-| `default_credit_period_days` | Optional non-negative integer days. |
-| `maintain_billwise` | Strict `0`/`1` flag. |
-| `created_at`, `updated_at` | Required ISO timestamps. |
-
-`idx_avelo_party_profiles_company_usage` supports company-scoped policy loading. Insert/update ownership triggers reject profiles whose account and company do not match. Restore remaps this table after accounts.
-
-## 31. Workspace configurations (`avelo_workspace_configurations`, v26)
-
-Per-company, per-workspace saved presentation settings (density, labels, columns, grid behavior, filters, grouping, comparisons, focus behavior, print/export defaults):
-
-| Column | Contract |
-|---|---|
-| `id` | UUID primary key. |
-| `company_id` | Required company ownership boundary; `ON DELETE RESTRICT` foreign key. |
-| `workspace_id` | Stable identifier from the compiled `WorkspaceIdentifier` whitelist; non-blank, at most 64 characters; unique per company. |
-| `format_version` | Payload format version, at least 1. Rows written by a newer format are ignored on load, never deleted. |
-| `payload_json` | Non-blank JSON-encoded `WorkspaceConfiguration`. Presentation metadata and validated stable identifiers only — never financial totals, balances, or SQL fragments. |
-| `created_at`, `updated_at` | Required ISO timestamps. |
-
-`idx_avelo_workspace_configurations_company` supports company-scoped loading. Restore remaps this table with the other company-scoped tables. Saving a configuration does not emit an audit event: presentation settings are not a financially meaningful mutation, and the CHECK-constrained audit action taxonomy is not extended for them.
-
-## 32. Migration policy
-
-- `SchemaVersion.current = 26` and `MigrationRunner.defaultMigrations` contains `MigrationV001` through `MigrationV026` in order.
-- `MigrationRunner` reads `PRAGMA user_version` and `avelo_migrations`, then applies each pending migration in its own `SQLiteDatabase.write` transaction.
-- Each migration is a `struct: Migration` with a numeric version, description, and `up(_ db: SQLiteDatabase) throws` body.
+- `SchemaVersion.current = 1` initially.
+- `MigrationRunner` reads `PRAGMA user_version`, compares to highest `avelo_migrations.version`, and applies missing migrations in order inside a single transaction.
+- Each migration is a `struct: Migration` with a numeric version, a description, and a `func up(db: SQLiteDatabase) throws` body.
 - Migrations are append-only. Never edit a past migration.
-- Fresh databases begin at v1 and converge through the same ordered migrations as upgraded databases. Fresh-create and representative historical fixtures must have identical v26 tables, columns, indexes, triggers, strict-decoding behavior, and restore coverage.
-- Every persistent change updates this document, schema-drift tests, restore/remap tables, backup/manifest compatibility, ownership and fiscal-lock triggers, and audit coverage as applicable.
-- Unknown future versions, unreadable schema versions, wrong keys, and migration/backfill failures stop before publishing a replacement database.
+- The first migration, `MigrationV001`, contains the full schema above as one `execute` call (so the DB is created in one shot on first launch).

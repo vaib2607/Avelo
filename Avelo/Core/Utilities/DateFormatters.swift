@@ -1,6 +1,7 @@
 import Foundation
 
 public enum DateFormatters {
+<<<<<<< HEAD
     /// Fixed reference calendar for accounting-day comparisons (financial-year
     /// containment, employment windows, bank-reconciliation date tolerance,
     /// ageing buckets). All date-only values are persisted through the
@@ -14,6 +15,8 @@ public enum DateFormatters {
         return cal
     }()
 
+=======
+>>>>>>> origin/main
     public static let isoDateFormatter: DateFormatter = {
         let df = DateFormatter()
         df.calendar = Calendar(identifier: .gregorian)
@@ -59,11 +62,29 @@ public enum DateFormatters {
         return df
     }()
 
+<<<<<<< HEAD
+=======
+    public static let gstPeriodFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.calendar = Calendar(identifier: .gregorian)
+        df.locale = Locale(identifier: "en_IN")
+        df.timeZone = TimeZone.current
+        df.dateFormat = "MM/yyyy"
+        return df
+    }()
+
+>>>>>>> origin/main
     public static let userDate: DateFormatter = displayDateFormatter
     public static let isoTimestamp: DateFormatter = isoTimestampFormatter
     public static let isoDate: DateFormatter = isoDateFormatter
     public static let gstReturn: DateFormatter = gstReturnFormatter
+<<<<<<< HEAD
 
+=======
+    public static let gstPeriod: DateFormatter = gstPeriodFormatter
+
+    public static func stringFromIsoDate(_ s: String) -> String { s }
+>>>>>>> origin/main
     public static func parseTimestamp(_ s: String) -> Date? {
         if s.isEmpty { return nil }
         return isoTimestampFormatter.date(from: s)
@@ -80,6 +101,12 @@ public enum DateFormatters {
     public static func formatDisplayDateTime(_ date: Date) -> String { displayDateTimeFormatter.string(from: date) }
     public static func formatIsoTimestamp(_ date: Date) -> String { isoTimestampFormatter.string(from: date) }
     public static func formatGstReturn(_ date: Date) -> String { gstReturnFormatter.string(from: date) }
+<<<<<<< HEAD
 
     public static func displayDate(_ date: Date) -> String { formatDisplayDate(date) }
+=======
+    public static func formatGstPeriod(_ date: Date) -> String { gstPeriodFormatter.string(from: date) }
+
+    public static func displayDate(_ date: Date) -> String { displayDateFormatter.string(from: date) }
+>>>>>>> origin/main
 }

@@ -54,11 +54,15 @@ public final class DashboardViewModel {
             bankBalancePaise = 0
             for bankAccount in accounts where bankAccount.isBankAccount {
                 let ledger = try report.ledger(accountId: bankAccount.id, financialYearId: fyId)
+<<<<<<< HEAD:Avelo/Features/Dashboard/DashboardViewModel.swift
                 bankBalancePaise = try CheckedMath.add(
                     bankBalancePaise,
                     ledger.closingBalancePaise,
                     context: "summing dashboard bank balances"
                 )
+=======
+                bankBalancePaise += ledger.closingBalancePaise
+>>>>>>> origin/main:Mally/Features/Dashboard/DashboardViewModel.swift
             }
             receivablesPaise = try report.outstanding(asOfDate: reportEndDate, direction: .receivables).totalPaise
             payablesPaise = try report.outstanding(asOfDate: reportEndDate, direction: .payables).totalPaise
@@ -66,12 +70,17 @@ public final class DashboardViewModel {
             let gst = try report.gstSummary(fromDate: ctx.financialYear.startDate, toDate: reportEndDate)
             gstPayablePaise = gst.netPayablePaise
 
+<<<<<<< HEAD:Avelo/Features/Dashboard/DashboardViewModel.swift
             if ctx.isInventoryEnabled {
                 let stock = try report.stockValuation(asOfDate: reportEndDate)
                 stockValuePaise = try CheckedMath.sum(stock.rows.map(\.valuePaise), context: "summing dashboard stock value")
             } else {
                 stockValuePaise = 0
             }
+=======
+            let stock = try report.stockValuation(asOfDate: reportEndDate)
+            stockValuePaise = stock.rows.reduce(Int64(0)) { $0 + $1.valuePaise }
+>>>>>>> origin/main:Mally/Features/Dashboard/DashboardViewModel.swift
 
             let monthStart = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: today)) ?? today
             if let id = accountId(for: "SALES") {

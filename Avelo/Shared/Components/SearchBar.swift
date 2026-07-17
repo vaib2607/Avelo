@@ -57,6 +57,7 @@ public struct SearchBar: View {
         .onChange(of: draftText) { _, newValue in
             debounceTask?.cancel()
             debounceTask = Task { @MainActor in
+<<<<<<< HEAD:Avelo/Shared/Components/SearchBar.swift
                 do {
                     try await Task.sleep(nanoseconds: 250_000_000)
                 } catch is CancellationError {
@@ -64,6 +65,9 @@ public struct SearchBar: View {
                 } catch {
                     return
                 }
+=======
+                try? await Task.sleep(nanoseconds: 250_000_000)
+>>>>>>> origin/main:Mally/Shared/Components/SearchBar.swift
                 guard !Task.isCancelled else { return }
                 text = newValue
             }

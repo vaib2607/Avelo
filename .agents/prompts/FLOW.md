@@ -9,17 +9,28 @@ Write step-by-step test scripts FIRST, then verify in app or via test automation
 
 ## STARTUP SEQUENCE
 1. git pull
+<<<<<<< HEAD
 2. cat Docs/Avelo_Release_Board.md && cat Docs/Avelo_Execution_Checklist.md
 3. Pick [FLOW] tasks in order (company setup first)
 4. For each: write script to .agents/logs/FLOW_SCRIPTS.md, then verify and record evidence in the canonical checklist
+=======
+2. cat .agents/TASK_BOARD.md
+3. Pick [FLOW] tasks in order (company setup first)
+4. For each: write script to .agents/logs/FLOW_SCRIPTS.md, then verify
+>>>>>>> origin/main
 
 ## FLOW REVIEW PROTOCOL
 For each flow:
 1. Write numbered steps in .agents/logs/FLOW_SCRIPTS.md
 2. Run against the app (or write automated test)
 3. Document any blocker with: file, line, symptom
+<<<<<<< HEAD
 4. If blocked, record the file, line, symptom, and evidence in the canonical checklist/status documents.
 5. If clean, record the exact command or manual evidence; never mark a release item complete without its required acceptance.
+=======
+4. If blocker found: add to TASK_BOARD BLOCKED, tag [BLOCKED:TEST] or [BLOCKED:QA]
+5. If clean: mark [x] in TASK_BOARD, add [QA:needed] tag
+>>>>>>> origin/main
 
 ## FLOWS IN ORDER (do not skip ahead)
 1. Company setup: launch → new company → create FY → dashboard opens

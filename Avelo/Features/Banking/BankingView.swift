@@ -17,6 +17,7 @@ public struct BankingView: View {
     public init() {}
 
     public var body: some View {
+<<<<<<< HEAD:Avelo/Features/Banking/BankingView.swift
         VStack(spacing: 0) {
             Picker("", selection: $section) {
                 ForEach(BankingSection.allCases) { s in
@@ -41,18 +42,55 @@ public struct BankingView: View {
                         Label("Import statement", systemImage: "tray.and.arrow.down")
                     }
                     .keyboardShortcut("i", modifiers: .command)
+=======
+        BankingContent(vm: vm)
+            .navigationTitle("Banking")
+            .toolbar {
+                ToolbarItem {
+                    Button { showImport = true } label: {
+                        Label("Import statement", systemImage: "tray.and.arrow.down")
+                    }
+>>>>>>> origin/main:Mally/Features/Banking/BankingView.swift
                 }
             }
-        }
-        .onAppear { setup() }
-        .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
-        .sheet(isPresented: $showImport) {
-            if let ctx = env.companyContext {
-                ImportStatementSheet(companyId: ctx.companyId, db: ctx.database, accounts: vm?.accounts ?? [])
+            .onAppear { setup() }
+            .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .sheet(isPresented: $showImport) {
+                if let ctx = env.companyContext {
+                    ImportStatementSheet(companyId: ctx.companyId, db: ctx.database, accounts: vm?.accounts ?? [])
+                }
             }
-        }
     }
 
+    private func setup() {
+        guard let ctx = env.companyContext else {
+            vm = nil
+            return
+        }
+        if vm == nil || vm?.companyId != ctx.companyId {
+            let model = BankingViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.reload()
+            vm = model
+        }
+    }
+}
+
+@MainActor
+private struct BankingContent: View {
+    let vm: BankingViewModel?
+
+    var body: some View {
+        if let vm {
+            BankingBody(vm: vm)
+        } else { ProgressView() }
+    }
+}
+
+@MainActor
+private struct BankingBody: View {
+    @Bindable var vm: BankingViewModel
+
+<<<<<<< HEAD:Avelo/Features/Banking/BankingView.swift
     private func setup() {
         guard let ctx = env.companyContext else {
             vm = nil
@@ -87,6 +125,8 @@ private struct BankingContent: View {
 private struct BankingBody: View {
     @Bindable var vm: BankingViewModel
 
+=======
+>>>>>>> origin/main:Mally/Features/Banking/BankingView.swift
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ModuleChrome(

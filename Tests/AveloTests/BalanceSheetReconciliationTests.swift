@@ -17,7 +17,10 @@ final class BalanceSheetReconciliationTests: XCTestCase {
         try MigrationRunner().runMigrations(on: db)
 
         let companyId = UUID()
+<<<<<<< HEAD
         try AuditTestKeySupport.ensureKey(for: companyId)
+=======
+>>>>>>> origin/main
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO avelo_companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
@@ -104,10 +107,14 @@ final class BalanceSheetReconciliationTests: XCTestCase {
         let assetSections = Dictionary(uniqueKeysWithValues: report.assets.map { ($0.title, $0.totalPaise) })
         let liabilitySections = Dictionary(uniqueKeysWithValues: report.liabilities.map { ($0.title, $0.totalPaise) })
 
+<<<<<<< HEAD
         // Section title is now the ledger's immediate leaf group ("Cash-in-Hand"),
         // not the non-leaf "Current Assets" ancestor, now that the seeded chart
         // mirrors Tally's Current Assets sub-group hierarchy.
         XCTAssertEqual(assetSections["Cash-in-Hand"], 30000)
+=======
+        XCTAssertEqual(assetSections["Current Assets"], 30000)
+>>>>>>> origin/main
         XCTAssertTrue(liabilitySections.isEmpty)
     }
 
@@ -188,6 +195,7 @@ final class BalanceSheetReconciliationTests: XCTestCase {
             }
         }
     }
+<<<<<<< HEAD
 
     func testBalanceSheetIncludesAssetGroupsOutsideTheDefaultCurrentAssetRoots() throws {
         let tc = try makeSeededCompany()
@@ -212,4 +220,6 @@ final class BalanceSheetReconciliationTests: XCTestCase {
         XCTAssertEqual(report.totalAssetsPaise, 1_000)
         XCTAssertTrue(report.assets.flatMap(\.rows).contains { $0.id == account.id })
     }
+=======
+>>>>>>> origin/main
 }

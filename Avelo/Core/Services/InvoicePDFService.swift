@@ -14,7 +14,10 @@ public final class InvoicePDFService: Sendable {
         let companyRepo = CompanyRepository(db: db)
         let accountRepo = AccountRepository(db: db)
         let lineRepo = LedgerLineRepository(db: db)
+<<<<<<< HEAD
         let inventoryRepo = InventoryRepository(db: db)
+=======
+>>>>>>> origin/main
 
         guard let voucher = try voucherRepo.findById(voucherId) else {
             throw AppError.notFound("Voucher")
@@ -30,6 +33,7 @@ public final class InvoicePDFService: Sendable {
         let party = try voucher.partyAccountId.flatMap { try accountRepo.findById($0) }
         let allAccounts = try accountRepo.listForCompany(voucher.companyId)
         let accountById = Dictionary(uniqueKeysWithValues: allAccounts.map { ($0.id, $0) })
+<<<<<<< HEAD
         let visibleTotalPaise = try TaxInvoicePDFView.validateVisibleLineTotals(
             voucher: voucher,
             lines: lines,
@@ -73,6 +77,8 @@ public final class InvoicePDFService: Sendable {
                 )
             }
         }
+=======
+>>>>>>> origin/main
 
         let view = TaxInvoicePDFView(
             frame: NSRect(x: 0, y: 0, width: 595.2, height: 841.8),
@@ -80,6 +86,7 @@ public final class InvoicePDFService: Sendable {
             voucher: voucher,
             party: party,
             lines: lines,
+<<<<<<< HEAD
             accountById: accountById,
             visibleTotalPaise: visibleTotalPaise,
             taxBreakdown: taxBreakdown,
@@ -105,11 +112,17 @@ public final class InvoicePDFService: Sendable {
             try? FileManager.default.removeItem(at: url)
             throw error
         }
+=======
+            accountById: accountById
+        )
+        return view.dataWithPDF(inside: view.bounds)
+>>>>>>> origin/main
     }
 }
 
 private final class TaxInvoicePDFView: NSView {
 
+<<<<<<< HEAD
     /// Whether a GSTIN-derivable recipient is in the same state as the
     /// supplier (CGST+SGST) or a different one (IGST). `nil` when the party
     /// has no GSTIN at all -- this pass covers registered (B2B) parties
@@ -129,39 +142,52 @@ private final class TaxInvoicePDFView: NSView {
         let valueDisplay: String
     }
 
+=======
+>>>>>>> origin/main
     private let company: Company
     private let voucher: Voucher
     private let party: Account?
     private let lines: [LedgerLine]
     private let accountById: [Account.ID: Account]
+<<<<<<< HEAD
     private let visibleTotalPaise: Int64
     private let taxBreakdown: GSTService.VoucherTaxBreakdown
     private let placeOfSupply: PlaceOfSupply?
     private let stockRows: [StockRow]
+=======
+>>>>>>> origin/main
 
     init(frame frameRect: NSRect,
          company: Company,
          voucher: Voucher,
          party: Account?,
          lines: [LedgerLine],
+<<<<<<< HEAD
          accountById: [Account.ID: Account],
          visibleTotalPaise: Int64,
          taxBreakdown: GSTService.VoucherTaxBreakdown,
          placeOfSupply: PlaceOfSupply?,
          stockRows: [StockRow]) {
+=======
+         accountById: [Account.ID: Account]) {
+>>>>>>> origin/main
         self.company = company
         self.voucher = voucher
         self.party = party
         self.lines = lines
         self.accountById = accountById
+<<<<<<< HEAD
         self.visibleTotalPaise = visibleTotalPaise
         self.taxBreakdown = taxBreakdown
         self.placeOfSupply = placeOfSupply
         self.stockRows = stockRows
+=======
+>>>>>>> origin/main
         super.init(frame: frameRect)
         autoresizesSubviews = false
     }
 
+<<<<<<< HEAD
     /// Derives place of supply by comparing GST state-code prefixes.
     /// Returns `nil` when the party has no GSTIN (unregistered/B2C party --
     /// explicitly out of scope for this pass). Does not reconcile against
@@ -177,6 +203,8 @@ private final class TaxInvoicePDFView: NSView {
         return .interState(supplierState: supplierState, partyState: partyState)
     }
 
+=======
+>>>>>>> origin/main
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         return nil
@@ -184,6 +212,7 @@ private final class TaxInvoicePDFView: NSView {
 
     override var isFlipped: Bool { false }
 
+<<<<<<< HEAD
     private var visibleLines: [(LedgerLine, Account)] {
         lines.compactMap { line -> (LedgerLine, Account)? in
             if let partyId = voucher.partyAccountId, line.accountId == partyId {
@@ -210,6 +239,8 @@ private final class TaxInvoicePDFView: NSView {
         )
     }
 
+=======
+>>>>>>> origin/main
     override func draw(_ dirtyRect: NSRect) {
         NSColor.white.setFill()
         dirtyRect.fill()
@@ -262,6 +293,7 @@ private final class TaxInvoicePDFView: NSView {
             drawText("Party: \(party.name)", x: margin + 180, y: cursorY - 18, font: .systemFont(ofSize: 11))
             if let gstin = party.gstin, !gstin.isEmpty {
                 drawText("Party GSTIN: \(gstin)", x: margin + 350, y: cursorY - 18, font: .systemFont(ofSize: 11))
+<<<<<<< HEAD
             } else {
                 drawText("Party GSTIN: Unregistered", x: margin + 350, y: cursorY - 18, font: .systemFont(ofSize: 11))
             }
@@ -277,14 +309,26 @@ private final class TaxInvoicePDFView: NSView {
         case nil:
             break
         }
+=======
+            }
+        }
+        advance(24)
+>>>>>>> origin/main
         if !voucher.narration.isEmpty {
             drawText("Narration: \(voucher.narration)", x: margin, y: cursorY - 18, font: .systemFont(ofSize: 11), width: pageWidth)
             advance(20)
         }
 
         let columns: [(String, CGFloat)] = [
+<<<<<<< HEAD
             ("Description", 300),
             ("HSN/SAC", 100),
+=======
+            ("Description", 220),
+            ("HSN/SAC", 80),
+            ("Qty", 50),
+            ("Rate", 80),
+>>>>>>> origin/main
             ("Amount", 90)
         ]
         let columnGap: CGFloat = 8
@@ -302,6 +346,17 @@ private final class TaxInvoicePDFView: NSView {
         linePath.stroke()
         advance(12)
 
+<<<<<<< HEAD
+=======
+        let visibleLines = lines.compactMap { line -> (LedgerLine, Account)? in
+            if let partyId = voucher.partyAccountId, line.accountId == partyId {
+                return nil
+            }
+            guard let account = accountById[line.accountId] else { return nil }
+            return (line, account)
+        }
+
+>>>>>>> origin/main
         for (line, account) in visibleLines {
             let rowHeight: CGFloat = 22
             x = margin
@@ -309,7 +364,15 @@ private final class TaxInvoicePDFView: NSView {
             x += columns[0].1 + columnGap
             drawText(line.taxCode ?? "", x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[1].1)
             x += columns[1].1 + columnGap
+<<<<<<< HEAD
             drawText(Currency.formatPaise(line.amountPaise), x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[2].1, alignment: .right)
+=======
+            drawText("", x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[2].1)
+            x += columns[2].1 + columnGap
+            drawText("", x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[3].1)
+            x += columns[3].1 + columnGap
+            drawText(Currency.formatPaise(line.amountPaise), x: x, y: cursorY - 16, font: .systemFont(ofSize: 10), width: columns[4].1, alignment: .right)
+>>>>>>> origin/main
             advance(rowHeight)
         }
 
@@ -321,6 +384,7 @@ private final class TaxInvoicePDFView: NSView {
         bottomPath.stroke()
         advance(18)
 
+<<<<<<< HEAD
         drawText("Total", x: bounds.width - margin - 180, y: cursorY - 18, font: .boldSystemFont(ofSize: 11), width: 100, alignment: .right)
         drawText(Currency.formatPaise(visibleTotalPaise), x: bounds.width - margin - 80, y: cursorY - 18, font: .boldSystemFont(ofSize: 11), width: 80, alignment: .right)
         advance(28)
@@ -388,6 +452,11 @@ private final class TaxInvoicePDFView: NSView {
         // IRN issuance, which conflicts with Avelo's R-1 (100% offline, zero
         // network calls). See Docs/Avelo_Release_Board.md AVL-P0-022 /
         // AVL-P1-008 -- revisit only if R-1 itself is ever revisited.
+=======
+        let totalPaise = visibleLines.reduce(Int64(0)) { $0 + $1.0.amountPaise }
+        drawText("Total", x: bounds.width - margin - 180, y: cursorY - 18, font: .boldSystemFont(ofSize: 11), width: 100, alignment: .right)
+        drawText(Currency.formatPaise(totalPaise), x: bounds.width - margin - 80, y: cursorY - 18, font: .boldSystemFont(ofSize: 11), width: 80, alignment: .right)
+>>>>>>> origin/main
         drawText("Generated by Avelo", x: margin, y: 22, font: .systemFont(ofSize: 9), color: .secondaryLabelColor)
     }
 }

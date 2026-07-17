@@ -70,6 +70,17 @@ struct AveloApp: App {
                     }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
 
+<<<<<<< HEAD
+=======
+                    Button("Inventory Settings…") {
+                        environment.router.present(.manageInventory)
+                    }
+
+                    Button("Payroll Settings…") {
+                        environment.router.present(.managePayroll)
+                    }
+
+>>>>>>> origin/main
                     Button("Lock Financial Year…") {
                         NotificationCenter.default.post(name: .aveloRequestLockFy, object: nil)
                     }
@@ -99,6 +110,7 @@ struct AveloApp: App {
                     }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
                 }
+<<<<<<< HEAD
                 // Canonical module shortcut scheme lives in `SidebarDestination.shortcut`.
                 // Keep this menu, `KeyboardMonitor`, and the sidebar labels in sync.
                 CommandMenu("Go") {
@@ -131,10 +143,52 @@ struct AveloApp: App {
                         Button("New Item…") { environment.router.present(.newItem) }
                             .keyboardShortcut("i", modifiers: [.command, .shift])
                     }
+=======
+                CommandMenu("Go") {
+                    Button("Dashboard") { environment.router.go(.dashboard) }
+                        .keyboardShortcut("1", modifiers: .command)
+                    Button("Accounts")  { environment.router.go(.accounts) }
+                        .keyboardShortcut("2", modifiers: .command)
+                    Button("Vouchers")  { environment.router.go(.vouchers) }
+                        .keyboardShortcut("3", modifiers: .command)
+                    Button("Reports")   { environment.router.go(.reports) }
+                        .keyboardShortcut("4", modifiers: .command)
+                    Button("Inventory") { environment.router.go(.inventory) }
+                        .keyboardShortcut("5", modifiers: .command)
+                    Button("Payroll")   { environment.router.go(.payroll) }
+                        .keyboardShortcut("6", modifiers: .command)
+                    Button("Banking")   { environment.router.go(.banking) }
+                        .keyboardShortcut("7", modifiers: .command)
+                    Button("Audit")     { environment.router.go(.audit) }
+                        .keyboardShortcut("8", modifiers: .command)
+                    Button("Settings")  { environment.router.go(.settings) }
+                        .keyboardShortcut("9", modifiers: .command)
+                }
+                CommandMenu("Modules") {
+                    Button("Inventory") { environment.router.go(.inventory) }
+                        .keyboardShortcut("5", modifiers: [.command, .shift])
+                    Button("GST") { environment.router.go(.gst) }
+                        .keyboardShortcut("6", modifiers: [.command, .shift])
+                    Button("Payroll") { environment.router.go(.payroll) }
+                        .keyboardShortcut("7", modifiers: [.command, .shift])
+                    Button("Banking") { environment.router.go(.banking) }
+                        .keyboardShortcut("8", modifiers: [.command, .shift])
+                    Button("Audit") { environment.router.go(.audit) }
+                        .keyboardShortcut("9", modifiers: [.command, .shift])
+                    Button("Settings") { environment.router.go(.settings) }
+                        .keyboardShortcut("0", modifiers: [.command, .shift])
+                }
+                CommandMenu("Masters") {
+                    Button("New Account…") { environment.router.present(.newAccount) }
+                        .keyboardShortcut("a", modifiers: [.command, .shift])
+                    Button("New Item…") { environment.router.present(.newItem) }
+                        .keyboardShortcut("i", modifiers: [.command, .shift])
+>>>>>>> origin/main
                     Button("New Employee…") { environment.router.present(.newEmployee) }
                         .keyboardShortcut("e", modifiers: [.command, .shift])
                     Button("New Financial Year…") { environment.router.present(.newFinancialYear) }
                         .keyboardShortcut("y", modifiers: [.command, .shift])
+<<<<<<< HEAD
                     Divider()
                     Button("New Cost Centre…") { environment.router.present(.newCostCentre) }
                     Button("New Cost Category…") { environment.router.present(.newCostCategory) }
@@ -152,13 +206,43 @@ struct AveloApp: App {
                 }
                 CommandMenu("Reports") {
                     actionButton(.trialBalanceDisplay, environment: environment)
+=======
+                }
+                CommandMenu("Voucher") {
+                    Button("Contra (F4)")     { environment.router.present(.newContra) }
+                    Button("Payment (F5)")    { environment.router.present(.newPayment) }
+                    Button("Receipt (F6)")    { environment.router.present(.newReceipt) }
+                    Button("Journal (F7)")    { environment.router.present(.newJournal) }
+                    Button("Memo")            { environment.router.present(.newJournal) }
+                    Button("Sales (F8)")      { environment.router.present(.newSales) }
+                    Button("Purchase (F9)")   { environment.router.present(.newPurchase) }
+                    Button("Credit Note") { environment.router.present(.newCreditNote) }
+                    Button("Debit Note")  { environment.router.present(.newDebitNote) }
+                    Button("Purchase Order") { environment.router.present(.newPurchaseOrder) }
+                    Button("Sales Order") { environment.router.present(.newSalesOrder) }
+                    Button("Receipt Note") { environment.router.present(.newReceiptNote) }
+                    Button("Delivery Note") { environment.router.present(.newDeliveryNote) }
+                    Button("Physical Stock") { environment.router.present(.newPhysicalStock) }
+                    Button("Stock Journal") { environment.router.present(.newStockJournal) }
+                    Button("Rejection In") { environment.router.present(.newRejectionIn) }
+                    Button("Rejection Out") { environment.router.present(.newRejectionOut) }
+                }
+                CommandMenu("Reports") {
+                    Button("Trial Balance") { environment.router.openReport(.trialBalance) }
+                        .keyboardShortcut("1", modifiers: [.command, .option])
+>>>>>>> origin/main
                     Button("Profit & Loss") { environment.router.openReport(.profitLoss) }
                         .keyboardShortcut("2", modifiers: [.command, .option])
                     Button("Balance Sheet") { environment.router.openReport(.balanceSheet) }
                         .keyboardShortcut("3", modifiers: [.command, .option])
                     Button("GST Summary") { environment.router.openReport(.gstSummary) }
                         .keyboardShortcut("4", modifiers: [.command, .option])
+<<<<<<< HEAD
                     actionButton(.dayBookDisplay, environment: environment)
+=======
+                    Button("Day Book") { environment.router.openReport(.dayBook) }
+                        .keyboardShortcut("5", modifiers: [.command, .option])
+>>>>>>> origin/main
                     Button("Ledger") { environment.router.openReport(.ledger) }
                         .keyboardShortcut("6", modifiers: [.command, .option])
                     Button("Cash Book") { environment.router.openReport(.cashBook) }
@@ -170,6 +254,7 @@ struct AveloApp: App {
                     Button("Payables") { environment.router.openReport(.payables) }
                         .keyboardShortcut("0", modifiers: [.command, .option])
                     Button("Outstanding") { environment.router.openReport(.outstanding) }
+<<<<<<< HEAD
                     if environment.companyContext?.isInventoryEnabled == true {
                         Button("Stock Summary") { environment.router.openReport(.stockValuation) }
                         Button("Stock Movement") { environment.router.openReport(.stockMovement) }
@@ -182,12 +267,19 @@ struct AveloApp: App {
                         Button("Stock Ageing") { environment.router.openReport(.stockAgeing) }
                             .keyboardShortcut("2", modifiers: [.command, .option, .shift])
                     }
+=======
+                    Button("Stock Summary") { environment.router.openReport(.stockValuation) }
+                    Button("Stock Movement") { environment.router.openReport(.stockMovement) }
+                    Button("Stock Register") { environment.router.openReport(.stockRegister) }
+                    Button("GST Filing Views") { environment.router.openReport(.gstFiling) }
+>>>>>>> origin/main
                 }
             }
         }
     }
 }
 
+<<<<<<< HEAD
 /// Menu button for a global-shortcut action in `AppActionRegistry`.
 @ViewBuilder
 private func actionButton(_ id: AppActionID, environment: AppEnvironment) -> some View {
@@ -215,6 +307,8 @@ private func voucherActionButton(_ type: VoucherType.Code, environment: AppEnvir
     }
 }
 
+=======
+>>>>>>> origin/main
 extension Notification.Name {
     public static let aveloRequestNewCompany = Notification.Name("avelo.request.newCompany")
     public static let aveloRequestOpenCompany = Notification.Name("avelo.request.openCompany")

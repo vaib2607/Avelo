@@ -1,12 +1,18 @@
 import Foundation
 
 public final class VoucherTemplateService: Sendable {
+<<<<<<< HEAD
     public let db: SQLiteDatabase
+=======
+>>>>>>> origin/main
     public let repository: VoucherTemplateRepository
     public let companyId: Company.ID
 
     public init(db: SQLiteDatabase, companyId: Company.ID) {
+<<<<<<< HEAD
         self.db = db
+=======
+>>>>>>> origin/main
         self.repository = VoucherTemplateRepository(db: db)
         self.companyId = companyId
     }
@@ -24,6 +30,7 @@ public final class VoucherTemplateService: Sendable {
                                        name: name,
                                        voucherTypeCode: draft.voucherTypeCode,
                                        templateLinesJSON: String(data: encodedLines, encoding: .utf8) ?? "[]")
+<<<<<<< HEAD
         try db.write { tx in
             let repository = VoucherTemplateRepository(db: tx)
             let before = try repository.find(companyId: companyId, name: name)
@@ -46,11 +53,18 @@ public final class VoucherTemplateService: Sendable {
                 snapshotAfter: saved
             )
         }
+=======
+        try repository.upsert(template)
+>>>>>>> origin/main
     }
 
     public func load(name: String) throws -> VoucherDraft? {
         guard let template = try repository.find(companyId: companyId, name: name) else { return nil }
+<<<<<<< HEAD
         let decoded = try JSONDecoder().decode([TemplateLineDTO].self, from: Data(template.templateLinesJSON.utf8))
+=======
+        let decoded = (try? JSONDecoder().decode([TemplateLineDTO].self, from: Data(template.templateLinesJSON.utf8))) ?? []
+>>>>>>> origin/main
         return VoucherDraft(mode: .create,
                             voucherTypeCode: template.voucherTypeCode,
                             date: Date(),

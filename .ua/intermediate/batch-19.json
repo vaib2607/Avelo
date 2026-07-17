@@ -1,0 +1,578 @@
+{
+  "nodes": [
+    {
+      "id": "config:.claude-flow/daemon-state.json",
+      "type": "config",
+      "name": "daemon-state.json",
+      "filePath": ".claude-flow/daemon-state.json",
+      "summary": "Claude Code daemon state tracking worker metrics including run counts, success/failure rates, average durations, and scheduled execution times for map, audit, optimize, consolidate, and test-gap workers.",
+      "tags": ["configuration", "daemon", "metrics", "monitoring"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.claude-flow/harness-active-policy.json",
+      "type": "config",
+      "name": "harness-active-policy.json",
+      "filePath": ".claude-flow/harness-active-policy.json",
+      "summary": "Active Claude Code harness policy configuration defining behavioral parameters and constraints for the development environment.",
+      "tags": ["configuration", "harness", "policy"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.claude-flow/neural/stats.json",
+      "type": "config",
+      "name": "stats.json",
+      "filePath": ".claude-flow/neural/stats.json",
+      "summary": "Neural network statistics and training metrics collected during Claude Code harness execution.",
+      "tags": ["configuration", "neural", "machine-learning"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.claude/proven-config.json",
+      "type": "config",
+      "name": "proven-config.json",
+      "filePath": ".claude/proven-config.json",
+      "summary": "Proven configuration manifest for Ruflo framework with policy parameters, benchmark corpus, performance metrics, and multi-platform compatibility declaration.",
+      "tags": ["configuration", "framework", "deployment", "validation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.claude/settings.local.json",
+      "type": "config",
+      "name": "settings.local.json",
+      "filePath": ".claude/settings.local.json",
+      "summary": "Local Claude Code environment settings overriding project-wide configuration.",
+      "tags": ["configuration", "environment", "local"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Avelo/Resources/Seed/DefaultChartOfAccounts.json",
+      "type": "config",
+      "name": "DefaultChartOfAccounts.json",
+      "filePath": "Avelo/Resources/Seed/DefaultChartOfAccounts.json",
+      "summary": "Seed data defining the default chart of accounts with Indian standard account groups and ledger structures for new Avelo companies.",
+      "tags": ["configuration", "accounting", "seed-data", "initialization"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.ua/knowledge-graph.json",
+      "type": "config",
+      "name": "knowledge-graph.json",
+      "filePath": ".ua/knowledge-graph.json",
+      "summary": "Generated knowledge graph containing all project nodes, edges, architectural layers, and guided learning tours representing the Avelo codebase structure and relationships.",
+      "tags": ["configuration", "knowledge-graph", "metadata", "architecture"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:.claude-flow/daemon.pid",
+      "type": "file",
+      "name": "daemon.pid",
+      "filePath": ".claude-flow/daemon.pid",
+      "summary": "Process identifier file tracking the running Claude Code daemon instance.",
+      "tags": ["infrastructure", "process-management"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.claude/.proven-config-version",
+      "type": "file",
+      "name": ".proven-config-version",
+      "filePath": ".claude/.proven-config-version",
+      "summary": "Version marker for the proven configuration state.",
+      "tags": ["configuration", "version-control"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Avelo/Avelo.entitlements",
+      "type": "file",
+      "name": "Avelo.entitlements",
+      "filePath": "Avelo/Avelo.entitlements",
+      "summary": "macOS app entitlements configuration declaring required system capabilities for Avelo including file access and security sandbox settings.",
+      "tags": ["infrastructure", "macos", "security", "entitlements"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.ua/.understandignore",
+      "type": "file",
+      "name": ".understandignore",
+      "filePath": ".ua/.understandignore",
+      "summary": "Ignore rules for the Understand-Anything knowledge-graph scanner specifying files and directories to exclude from analysis.",
+      "tags": ["infrastructure", "analysis-control", "build-system"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.ua/tmp/build_graph.mjs",
+      "type": "file",
+      "name": "build_graph.mjs",
+      "filePath": ".ua/tmp/build_graph.mjs",
+      "summary": "Knowledge-graph builder utility that parses Swift symbol definitions, constructs file and class nodes, derives architectural layers, and generates guided learning tours for the Avelo codebase.",
+      "tags": ["tooling", "code-analysis", "graph-construction"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:.ua/tmp/build_graph.mjs:prefixFor",
+      "type": "function",
+      "name": "prefixFor",
+      "filePath": ".ua/tmp/build_graph.mjs",
+      "lineRange": [15, 21],
+      "summary": "Maps file category to node type prefix (document, config, pipeline, service, table, schema, or file).",
+      "tags": ["utility", "mapping", "node-type"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:.ua/tmp/build_graph.mjs:complexity",
+      "type": "function",
+      "name": "complexity",
+      "filePath": ".ua/tmp/build_graph.mjs",
+      "lineRange": [22, 22],
+      "summary": "Classifies file complexity as simple, moderate, or complex based on line count thresholds.",
+      "tags": ["utility", "classification"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:.ua/tmp/build_graph.mjs:tags",
+      "type": "function",
+      "name": "tags",
+      "filePath": ".ua/tmp/build_graph.mjs",
+      "lineRange": [23, 38],
+      "summary": "Generates semantic tags for files based on category and path patterns, limiting to 5 tags per file.",
+      "tags": ["utility", "tagging", "classification"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:.ua/tmp/build_graph.mjs:summary",
+      "type": "function",
+      "name": "summary",
+      "filePath": ".ua/tmp/build_graph.mjs",
+      "lineRange": [39, 56],
+      "summary": "Generates descriptive summaries for files based on category and path patterns with Avelo-specific conventions.",
+      "tags": ["utility", "summarization"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:.ua/tmp/build_graph.mjs:addEdge",
+      "type": "function",
+      "name": "addEdge",
+      "filePath": ".ua/tmp/build_graph.mjs",
+      "lineRange": [57, 60],
+      "summary": "Adds a directed graph edge with source, target, type, weight, and optional label, skipping self-references.",
+      "tags": ["utility", "graph-construction"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:.ua/tmp/build_graph.mjs:layerFor",
+      "type": "function",
+      "name": "layerFor",
+      "filePath": ".ua/tmp/build_graph.mjs",
+      "lineRange": [132, 141],
+      "summary": "Maps file paths to architectural layer assignments for application shell, features, services, persistence, models, tests, and documentation.",
+      "tags": ["utility", "architecture", "layering"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:.ua/tmp/generate-batch-9.js",
+      "type": "file",
+      "name": "generate-batch-9.js",
+      "filePath": ".ua/tmp/generate-batch-9.js",
+      "summary": "Batch 9 semantic analysis generator providing detailed class and function summaries for core database, service, and cache modules used in knowledge-graph construction.",
+      "tags": ["tooling", "code-generation", "analysis"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:.ua/tmp/validate.cjs",
+      "type": "file",
+      "name": "validate.cjs",
+      "filePath": ".ua/tmp/validate.cjs",
+      "summary": "Knowledge-graph validator that checks node integrity, edge connectivity, layer assignments, and tour references, reporting structural issues and warnings.",
+      "tags": ["tooling", "validation", "quality-assurance"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:orchestrator.py",
+      "type": "file",
+      "name": "orchestrator.py",
+      "filePath": "orchestrator.py",
+      "summary": "Autonomous development pipeline orchestrator triggering FLOW and TEST agents via local LLM, executing builds and tests, logging results, and managing errors.",
+      "tags": ["automation", "orchestration", "ci-cd"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:orchestrator.py:ask_local_llm",
+      "type": "function",
+      "name": "ask_local_llm",
+      "filePath": "orchestrator.py",
+      "lineRange": [16, 32],
+      "summary": "Sends a prompt to a local Ollama LLM instance and returns the response, with error handling for connection failures.",
+      "tags": ["utility", "llm-integration", "api-client"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:orchestrator.py:run_command",
+      "type": "function",
+      "name": "run_command",
+      "filePath": "orchestrator.py",
+      "lineRange": [34, 38],
+      "summary": "Executes a shell command and returns the exit code and combined stdout/stderr output.",
+      "tags": ["utility", "shell-execution"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:orchestrator.py:read_file",
+      "type": "function",
+      "name": "read_file",
+      "filePath": "orchestrator.py",
+      "lineRange": [40, 43],
+      "summary": "Reads and returns the complete contents of a file as a string.",
+      "tags": ["utility", "file-io"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:orchestrator.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "orchestrator.py",
+      "lineRange": [45, 82],
+      "summary": "Orchestrates autonomous pipeline execution including FLOW agent prompt, test execution, logging, and error handling.",
+      "tags": ["entry-point", "orchestration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Package.swift",
+      "type": "file",
+      "name": "Package.swift",
+      "filePath": "Package.swift",
+      "summary": "Swift Package Manager manifest declaring Avelo executable, test targets, SQLCipher C module dependency, and resource includes for the macOS application.",
+      "tags": ["build-system", "swift-pm", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Tests/AveloTests/BenchmarkSupport.swift",
+      "type": "file",
+      "name": "BenchmarkSupport.swift",
+      "filePath": "Tests/AveloTests/BenchmarkSupport.swift",
+      "summary": "Benchmark utilities providing environment-driven configuration, nanosecond-precision timing, resident memory measurement, and thermal-state monitoring for performance regression tests.",
+      "tags": ["test-support", "benchmarking", "performance-measurement"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkConfig",
+      "type": "class",
+      "name": "BenchmarkConfig",
+      "filePath": "Tests/AveloTests/BenchmarkSupport.swift",
+      "lineRange": [4, 44],
+      "summary": "Enumeration of environment-driven benchmark configuration properties including enabled flags, voucher counts, output directories, and scorecard mode.",
+      "tags": ["configuration", "benchmark", "test-support"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkResult",
+      "type": "class",
+      "name": "BenchmarkResult",
+      "filePath": "Tests/AveloTests/BenchmarkSupport.swift",
+      "lineRange": [47, 53],
+      "summary": "Sendable struct capturing benchmark results including name, elapsed time, resident memory, and thermal state.",
+      "tags": ["data-model", "benchmark"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock",
+      "type": "class",
+      "name": "BenchmarkClock",
+      "filePath": "Tests/AveloTests/BenchmarkSupport.swift",
+      "lineRange": [55, 99],
+      "summary": "Enumeration providing synchronous and async benchmark measurement with nanosecond precision, resident-byte tracking via Darwin mach APIs, and result emission.",
+      "tags": ["utility", "benchmarking", "performance-measurement"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock.measure",
+      "type": "function",
+      "name": "measure",
+      "filePath": "Tests/AveloTests/BenchmarkSupport.swift",
+      "lineRange": [56, 68],
+      "summary": "Measures synchronous block execution with nanosecond precision and resident memory, returning a BenchmarkResult.",
+      "tags": ["benchmarking", "performance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock.measureAsync",
+      "type": "function",
+      "name": "measureAsync",
+      "filePath": "Tests/AveloTests/BenchmarkSupport.swift",
+      "lineRange": [70, 82],
+      "summary": "Measures asynchronous block execution with nanosecond precision and resident memory, returning a BenchmarkResult.",
+      "tags": ["benchmarking", "performance", "async"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock.currentResidentBytes",
+      "type": "function",
+      "name": "currentResidentBytes",
+      "filePath": "Tests/AveloTests/BenchmarkSupport.swift",
+      "lineRange": [84, 94],
+      "summary": "Queries Darwin mach APIs to obtain the current process resident memory in bytes.",
+      "tags": ["utility", "memory-measurement", "system-api"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock.emit",
+      "type": "function",
+      "name": "emit",
+      "filePath": "Tests/AveloTests/BenchmarkSupport.swift",
+      "lineRange": [96, 98],
+      "summary": "Prints a formatted benchmark result with timing, resident memory, and thermal state.",
+      "tags": ["utility", "output"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Scripts/benchmark_diff.py",
+      "type": "file",
+      "name": "benchmark_diff.py",
+      "filePath": "Scripts/benchmark_diff.py",
+      "summary": "Benchmark comparison utility that reads before/after JSON results and reports duration delta percentages for each metric, identifying performance regressions.",
+      "tags": ["tooling", "benchmarking", "performance-analysis"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:Avelo/Resources/SQL/schema_v1.sql:avelo_companies",
+      "type": "table",
+      "name": "avelo_companies",
+      "filePath": "Avelo/Resources/SQL/schema_v1.sql",
+      "summary": "Core companies table storing organization identity, address, tax identifiers (GSTIN, PAN), base currency, and inventory configuration with constraints on currency and field lengths.",
+      "tags": ["database", "schema", "core-entity", "accounting"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:Avelo/Resources/SQL/schema_v1.sql:avelo_financial_years",
+      "type": "table",
+      "name": "avelo_financial_years",
+      "filePath": "Avelo/Resources/SQL/schema_v1.sql",
+      "summary": "Financial years scoped to companies with start/end dates, lock/close flags, and non-overlapping constraint enforced via trigger.",
+      "tags": ["database", "schema", "financial-period", "accounting"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:Avelo/Resources/SQL/schema_v1.sql:avelo_account_groups",
+      "type": "table",
+      "name": "avelo_account_groups",
+      "filePath": "Avelo/Resources/SQL/schema_v1.sql",
+      "summary": "Hierarchical account grouping with nature classification (assets/liabilities/income/expense), parent references, and company isolation.",
+      "tags": ["database", "schema", "hierarchy", "accounting"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:Avelo/Resources/SQL/schema_v1.sql:avelo_accounts",
+      "type": "table",
+      "name": "avelo_accounts",
+      "filePath": "Avelo/Resources/SQL/schema_v1.sql",
+      "summary": "Ledger accounts with opening balances, debit/credit side, bank-account flag, and GSTIN for GST tracking.",
+      "tags": ["database", "schema", "ledger", "accounting"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:.github/ISSUE_TEMPLATE/bug_report.md",
+      "type": "document",
+      "name": "bug_report.md",
+      "filePath": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "summary": "GitHub issue template for reporting Avelo defects with sections for summary, reproduction steps, expected results, and environment details.",
+      "tags": ["documentation", "issue-template", "bug-reporting"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:.github/ISSUE_TEMPLATE/feature_request.md",
+      "type": "document",
+      "name": "feature_request.md",
+      "filePath": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "summary": "GitHub issue template for requesting new Avelo features with sections for description, use case, and acceptance criteria.",
+      "tags": ["documentation", "issue-template", "feature-planning"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:.github/PULL_REQUEST_TEMPLATE.md",
+      "type": "document",
+      "name": "PULL_REQUEST_TEMPLATE.md",
+      "filePath": ".github/PULL_REQUEST_TEMPLATE.md",
+      "summary": "GitHub pull request template establishing conventions for change descriptions, related issues, and release-readiness checklist.",
+      "tags": ["documentation", "pr-template", "workflow"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:Docs/archive/Tally_Master_Study_Guide.md",
+      "type": "document",
+      "name": "Tally_Master_Study_Guide.md",
+      "filePath": "Docs/archive/Tally_Master_Study_Guide.md",
+      "summary": "Comprehensive reference guide documenting Tally accounting software master data concepts, field definitions, and conventions for use in Avelo parity and feature mapping.",
+      "tags": ["documentation", "reference", "accounting", "tally-parity"],
+      "complexity": "complex"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:.ua/tmp/build_graph.mjs",
+      "target": "function:.ua/tmp/build_graph.mjs:prefixFor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:.ua/tmp/build_graph.mjs",
+      "target": "function:.ua/tmp/build_graph.mjs:complexity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:.ua/tmp/build_graph.mjs",
+      "target": "function:.ua/tmp/build_graph.mjs:tags",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:.ua/tmp/build_graph.mjs",
+      "target": "function:.ua/tmp/build_graph.mjs:summary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:.ua/tmp/build_graph.mjs",
+      "target": "function:.ua/tmp/build_graph.mjs:addEdge",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:.ua/tmp/build_graph.mjs",
+      "target": "function:.ua/tmp/build_graph.mjs:layerFor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Tests/AveloTests/BenchmarkSupport.swift",
+      "target": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Tests/AveloTests/BenchmarkSupport.swift",
+      "target": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Tests/AveloTests/BenchmarkSupport.swift",
+      "target": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock",
+      "target": "function:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock.measure",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock",
+      "target": "function:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock.measureAsync",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock",
+      "target": "function:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock.currentResidentBytes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock",
+      "target": "function:Tests/AveloTests/BenchmarkSupport.swift:BenchmarkClock.emit",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:orchestrator.py",
+      "target": "function:orchestrator.py:ask_local_llm",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:orchestrator.py",
+      "target": "function:orchestrator.py:run_command",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:orchestrator.py",
+      "target": "function:orchestrator.py:read_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:orchestrator.py",
+      "target": "function:orchestrator.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:.ua/tmp/build_graph.mjs",
+      "target": "config:.ua/knowledge-graph.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:.ua/tmp/validate.cjs",
+      "target": "config:.ua/knowledge-graph.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Package.swift",
+      "target": "file:Avelo/Avelo.entitlements",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:Package.swift",
+      "target": "file:Tests/AveloTests/BenchmarkSupport.swift",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.claude/settings.local.json",
+      "target": "config:.claude/proven-config.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:Avelo/Resources/Seed/DefaultChartOfAccounts.json",
+      "target": "table:Avelo/Resources/SQL/schema_v1.sql:avelo_account_groups",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:Docs/archive/Tally_Master_Study_Guide.md",
+      "target": "config:Avelo/Resources/Seed/DefaultChartOfAccounts.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

@@ -22,6 +22,7 @@ public final class VoucherEditViewModel {
     public var tcsTaxAmount: String = ""
     public var lines: [LineRow] = [LineRow()]
 
+<<<<<<< HEAD
     // MARK: - Narration recall (AVL-P2-012, Ctrl+R)
     public var narrationSuggestions: [String] = []
 
@@ -120,11 +121,14 @@ public final class VoucherEditViewModel {
         )) ?? 0
     }
 
+=======
+>>>>>>> origin/main
     public let mode: VoucherDraft.Mode
     public let companyId: Company.ID
     public let db: SQLiteDatabase
     public let fyId: FinancialYear.ID
 
+<<<<<<< HEAD
     /// Identity of this entry's autosaved draft row (AVL-P0-018). Stable for
     /// the lifetime of one "new voucher" sheet so repeated autosaves upsert
     /// the same row instead of accumulating one per keystroke pause; replaced
@@ -133,11 +137,16 @@ public final class VoucherEditViewModel {
     public private(set) var draftId: UUID = UUID()
     private var autosaveTask: Task<Void, Never>?
 
+=======
+>>>>>>> origin/main
     public init(companyId: Company.ID, db: SQLiteDatabase, fyId: FinancialYear.ID, initialType: VoucherType.Code, existingId: Voucher.ID? = nil) {
         self.companyId = companyId
         self.db = db
         self.fyId = fyId
+<<<<<<< HEAD
         self.company = try? CompanyRepository(db: db).findById(companyId)
+=======
+>>>>>>> origin/main
         if let eid = existingId {
             self.mode = .edit(originalVoucherId: eid)
                 self.draft = VoucherDraft(
@@ -182,6 +191,7 @@ public final class VoucherEditViewModel {
         }
     }
 
+<<<<<<< HEAD
     public func load(accounts: [Account], groups: [AccountGroup] = [], initialDate: Date) {
         self.accounts = accounts
         self.groups = groups
@@ -195,11 +205,16 @@ public final class VoucherEditViewModel {
                 message: "Failed to load account eligibility: \(AppError.wrap(error).localizedMessage)"
             )])
         }
+=======
+    public func load(accounts: [Account], initialDate: Date) {
+        self.accounts = accounts
+>>>>>>> origin/main
         if case .edit(let vid) = mode {
             do {
                 let svc = VoucherService(db: db, companyId: companyId)
                 if let existing = try svc.findById(vid) {
                     self.draft = try svc.loadDraft(from: vid)
+<<<<<<< HEAD
                     let workflow = try AccountingWorkflowsRepository(db: db).workflowInputs(for: vid)
                     self.narration = existing.narration
                     self.date = existing.date
@@ -208,6 +223,13 @@ public final class VoucherEditViewModel {
                     self.billReferenceNumber = draft.billReferenceNumber ?? ""
                     self.chequeNumber = workflow.chequeNumber ?? ""
                     self.chequeDueDate = workflow.chequeDueDate
+=======
+                    self.narration = existing.narration
+                    self.date = existing.date
+                    self.partyAccountId = existing.partyAccountId
+                    self.billReferenceType = existing.partyAccountId != nil ? .agstRef : nil
+                    self.billReferenceNumber = existing.number
+>>>>>>> origin/main
                     let lines = try svc.lines(for: vid)
                     self.lines = lines.enumerated().map { (idx, l) in
                         LineRow(
@@ -227,6 +249,7 @@ public final class VoucherEditViewModel {
         }
     }
 
+<<<<<<< HEAD
     /// Reloads the complete semantic account context after inline creation,
     /// regrouping, activation changes, or party-profile edits. Account rows,
     /// ancestor groups, company features, and explicit profiles must change as
@@ -249,6 +272,10 @@ public final class VoucherEditViewModel {
             }
         }
         lines.append(row)
+=======
+    public func addLine() {
+        lines.append(LineRow())
+>>>>>>> origin/main
     }
 
     public func pasteTSV(_ text: String) {
@@ -285,6 +312,7 @@ public final class VoucherEditViewModel {
         }
     }
 
+<<<<<<< HEAD
     // MARK: - Draft autosave and crash recovery (AVL-P0-018)
     //
     // Only `.create` mode autosaves. An `.edit` session's underlying voucher
@@ -450,11 +478,14 @@ public final class VoucherEditViewModel {
         )
     }
 
+=======
+>>>>>>> origin/main
     public func removeLine(_ id: UUID) {
         lines.removeAll(where: { $0.id == id })
     }
 
     public var totalDebitPaise: Int64 {
+<<<<<<< HEAD
         (try? CheckedMath.sum(
             lines.lazy.filter { $0.side == .debit }.map { Currency.parseRupeeInput($0.amount) ?? 0 },
             context: "summing voucher editor debit lines"
@@ -474,6 +505,18 @@ public final class VoucherEditViewModel {
         }
         return totalDebitPaise == totalCreditPaise && totalDebitPaise > 0
     }
+=======
+        lines.filter { $0.side == .debit }
+            .reduce(Int64(0)) { $0 + (Currency.parseRupeeInput($1.amount) ?? 0) }
+    }
+
+    public var totalCreditPaise: Int64 {
+        lines.filter { $0.side == .credit }
+            .reduce(Int64(0)) { $0 + (Currency.parseRupeeInput($1.amount) ?? 0) }
+    }
+
+    public var isBalanced: Bool { totalDebitPaise == totalCreditPaise && totalDebitPaise > 0 }
+>>>>>>> origin/main
 
     public func buildDraft() -> VoucherDraft {
         var d = draft
@@ -482,6 +525,7 @@ public final class VoucherEditViewModel {
         d.billReferenceType = billReferenceType
         d.billReferenceNumber = billReferenceNumber.isEmpty ? nil : billReferenceNumber
         d.narration = narration
+<<<<<<< HEAD
         if singleEntryMode {
             // Account line first (as Tally displays it), then particulars with
             // the side forced — the composed voucher balances by construction.
@@ -508,6 +552,8 @@ public final class VoucherEditViewModel {
             d.lines = composed
             return d
         }
+=======
+>>>>>>> origin/main
         d.lines = lines.enumerated().map { (idx, row) in
             VoucherDraft.Line(
                 accountId: row.accountId,
@@ -534,6 +580,7 @@ public final class VoucherEditViewModel {
         workflow.billAllocationNumber = billReferenceNumber.isEmpty ? nil : billReferenceNumber
         workflow.chequeNumber = chequeNumber.isEmpty ? nil : chequeNumber
         workflow.chequeDueDate = chequeDueDate
+<<<<<<< HEAD
         // AVL-P0 live bug: Currency.parseRupeeInput("") returns 0, not nil —
         // VoucherService.post(draft:in:workflow:) gates ALL posting on
         // tdsTaxPaise/tcsTaxPaise being nil (TDS/TCS is deferred outside the
@@ -545,6 +592,12 @@ public final class VoucherEditViewModel {
         workflow.tdsTaxPaise = tdsTaxAmount.isEmpty ? nil : Currency.parseRupeeInput(tdsTaxAmount)
         workflow.tcsSectionCode = tcsSectionCode.isEmpty ? nil : tcsSectionCode
         workflow.tcsTaxPaise = tcsTaxAmount.isEmpty ? nil : Currency.parseRupeeInput(tcsTaxAmount)
+=======
+        workflow.tdsSectionCode = tdsSectionCode.isEmpty ? nil : tdsSectionCode
+        workflow.tdsTaxPaise = Currency.parseRupeeInput(tdsTaxAmount)
+        workflow.tcsSectionCode = tcsSectionCode.isEmpty ? nil : tcsSectionCode
+        workflow.tcsTaxPaise = Currency.parseRupeeInput(tcsTaxAmount)
+>>>>>>> origin/main
         return workflow
     }
 
@@ -572,6 +625,7 @@ private extension Array {
         indices.contains(index) ? self[index] : nil
     }
 }
+<<<<<<< HEAD
 
 private struct DraftLineDTO: Codable {
     let accountId: String?
@@ -580,3 +634,5 @@ private struct DraftLineDTO: Codable {
     let taxCode: String?
     let costCenter: String?
 }
+=======
+>>>>>>> origin/main

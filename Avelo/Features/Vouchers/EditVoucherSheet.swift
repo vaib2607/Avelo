@@ -4,12 +4,16 @@ public struct EditVoucherSheet: View {
 
     @Environment(AppEnvironment.self) private var env
     let voucherId: Voucher.ID
+<<<<<<< HEAD
     @State private var payload: VoucherEditPayload?
     // Same fix as NewVoucherSheet: a window can only have one AppKit-level
     // sheet/alert presentation at a time, and this sheet already occupies
     // it, so RootView's root-level `.alert(item: env.globalError)` cannot
     // present while this sheet is open — errors must surface locally.
     @State private var saveError: AppError?
+=======
+    @State private var voucher: Voucher?
+>>>>>>> origin/main
 
     public init(voucherId: Voucher.ID) {
         self.voucherId = voucherId
@@ -17,21 +21,32 @@ public struct EditVoucherSheet: View {
 
     public var body: some View {
         Group {
+<<<<<<< HEAD
             if let payload {
                 EditVoucherEditor(payload: payload, saveError: $saveError)
+=======
+            if let voucher {
+                EditVoucherEditor(voucher: voucher)
+>>>>>>> origin/main
             } else {
                 ProgressView()
             }
         }
+<<<<<<< HEAD
         .frame(minWidth: 760, idealWidth: 780, minHeight: 700, idealHeight: 780)
         .task(id: env.companyContext?.companyId) { loadVoucher() }
         .alert(item: $saveError) { err in
             Alert(title: Text("Couldn't save voucher"), message: Text(err.localizedMessage), dismissButton: .default(Text("OK")))
         }
+=======
+        .frame(minWidth: 880, minHeight: 640)
+        .task(id: env.companyContext?.companyId) { loadVoucher() }
+>>>>>>> origin/main
     }
 
     private func loadVoucher() {
         guard let ctx = env.companyContext else {
+<<<<<<< HEAD
             payload = nil
             return
         }
@@ -47,6 +62,18 @@ public struct EditVoucherSheet: View {
             payload = VoucherEditPayload(voucher: found, financialYear: financialYear, lines: lines)
         } catch {
             payload = nil
+=======
+            voucher = nil
+            return
+        }
+        do {
+            guard let found = try VoucherService(db: ctx.database, companyId: ctx.companyId).findById(voucherId) else {
+                throw AppError.notFound("Voucher")
+            }
+            voucher = found
+        } catch {
+            voucher = nil
+>>>>>>> origin/main
             env.showError(AppError.wrap(error))
         }
     }
@@ -56,6 +83,7 @@ private struct EditVoucherEditor: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @State private var vm: VoucherEditViewModel?
+<<<<<<< HEAD
     let payload: VoucherEditPayload
     @Binding var saveError: AppError?
 
@@ -68,6 +96,12 @@ private struct EditVoucherEditor: View {
                 LockedVoucherCorrectionView(payload: payload)
             }
         }
+=======
+    let voucher: Voucher
+
+    var body: some View {
+        EditInner(vm: vm, voucherNumber: voucher.number, onSave: save(vm:))
+>>>>>>> origin/main
             .environment(router)
             .task(id: env.companyContext?.companyId) { setup() }
     }
@@ -81,19 +115,31 @@ private struct EditVoucherEditor: View {
         do {
             let model = VoucherEditViewModel(
                 companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id,
+<<<<<<< HEAD
                 initialType: payload.voucher.voucherTypeCode, existingId: payload.voucher.id
             )
             let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
             model.load(accounts: accounts, initialDate: payload.voucher.date)
+=======
+                initialType: voucher.voucherTypeCode, existingId: voucher.id
+            )
+            let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
+            model.load(accounts: accounts, initialDate: ctx.financialYear.startDate)
+>>>>>>> origin/main
             model.revalidate()
             vm = model
         } catch {
             vm = nil
+<<<<<<< HEAD
             saveError = AppError.wrap(error)
+=======
+            env.showError(AppError.wrap(error))
+>>>>>>> origin/main
         }
     }
 
     private func save(vm: VoucherEditViewModel) {
+<<<<<<< HEAD
         guard let ctx = env.companyContext else {
             saveError = AppError.businessRule("No company is open — cannot save. Close this sheet, open a company, and try again.")
             return
@@ -106,11 +152,18 @@ private struct EditVoucherEditor: View {
                 in: ctx.financialYear,
                 workflow: vm.buildWorkflowInputs()
             )
+=======
+        guard let ctx = env.companyContext else { return }
+        do {
+            let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
+            _ = try svc.edit(voucher.id, with: vm.buildDraft(), in: ctx.financialYear)
+>>>>>>> origin/main
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher updated.")
             router.presentedSheet = nil
         } catch {
+<<<<<<< HEAD
             saveError = AppError.wrap(error)
         }
     }
@@ -133,6 +186,10 @@ enum VoucherCorrectionPolicy {
             return .reversalOnly
         }
         return .editInPlace
+=======
+            env.showError(AppError.wrap(error))
+        }
+>>>>>>> origin/main
     }
 }
 
@@ -152,6 +209,7 @@ private struct EditInner: View {
     }
 }
 
+<<<<<<< HEAD
 /// Same Tally-style Enter cascade as NewVoucherSheet's VoucherField, minus
 /// the single-entry Account field (edit mode is always double-entry lines).
 private enum EditVoucherField: Hashable {
@@ -162,13 +220,18 @@ private enum EditVoucherField: Hashable {
     case amount(UUID)
 }
 
+=======
+>>>>>>> origin/main
 @MainActor
 private struct EditVoucherBody: View {
     @Bindable var vm: VoucherEditViewModel
     let voucherNumber: String
     let onSave: (VoucherEditViewModel) -> Void
     @Environment(AppRouter.self) private var router
+<<<<<<< HEAD
     @FocusState private var focusedField: EditVoucherField?
+=======
+>>>>>>> origin/main
 
     var body: some View {
         VStack(spacing: 0) {
@@ -180,10 +243,13 @@ private struct EditVoucherBody: View {
                 .onChange(of: vm.narration) { _, _ in vm.revalidate() }
                 .onChange(of: vm.date) { _, _ in vm.revalidate() }
             Divider()
+<<<<<<< HEAD
             totalsSection
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             Divider()
+=======
+>>>>>>> origin/main
             bottomBar
         }
     }
@@ -214,10 +280,15 @@ private struct EditVoucherBody: View {
             headerSection
             linesSection
             if !vm.validationErrors.isEmpty { validationSection }
+<<<<<<< HEAD
+=======
+            totalsSection
+>>>>>>> origin/main
         }
         .padding(16)
     }
 
+<<<<<<< HEAD
     private var isContra: Bool { vm.draft.voucherTypeCode == .contra }
 
     private var headerSection: some View {
@@ -282,10 +353,37 @@ private struct EditVoucherBody: View {
                 .buttonStyle(.plain)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+=======
+    private var headerSection: some View {
+        GroupBox("Header") {
+            Form {
+                DatePicker("Date", selection: $vm.date, displayedComponents: .date)
+                AccountPicker(selection: $vm.partyAccountId,
+                              accounts: vm.accounts,
+                              placeholder: "Party (optional)")
+                TextField("Narration", text: $vm.narration, axis: .vertical)
+                    .lineLimit(2...4)
+            }
+            .formStyle(.grouped)
+        }
+    }
+
+    private var linesSection: some View {
+        GroupBox("Lines") {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach($vm.lines) { line in
+                    lineRow(line: line)
+                }
+                Button { vm.addLine() } label: { Label("Add line", systemImage: "plus") }
+                    .buttonStyle(.bordered)
+            }
+            .padding(8)
+>>>>>>> origin/main
         }
     }
 
     private func lineRow(line: Binding<VoucherEditViewModel.LineRow>) -> some View {
+<<<<<<< HEAD
         let lineId = line.wrappedValue.id
         return HStack {
             AccountPicker(selection: line.accountId,
@@ -295,12 +393,17 @@ private struct EditVoucherBody: View {
                               get: { focusedField == .line(lineId) },
                               set: { if $0 { focusedField = .line(lineId) } }
                           ))
+=======
+        HStack {
+            AccountPicker(selection: line.accountId, accounts: vm.accounts)
+>>>>>>> origin/main
             Picker("", selection: line.side) {
                 Text("Debit").tag(LedgerSide.debit)
                 Text("Credit").tag(LedgerSide.credit)
             }
             .frame(width: 110)
             .labelsHidden()
+<<<<<<< HEAD
             MoneyTextField(label: "", text: line.amount, onCommit: {
                 advanceFocusAfterAmount(lineId: lineId)
             }, isFocusedExternally: Binding(
@@ -309,11 +412,16 @@ private struct EditVoucherBody: View {
             ))
                 .frame(width: 160)
             Button { vm.removeLine(lineId) } label: { Image(systemName: "minus.circle") }
+=======
+            MoneyTextField(label: "", text: line.amount).frame(width: 160)
+            Button { vm.removeLine(line.wrappedValue.id) } label: { Image(systemName: "minus.circle") }
+>>>>>>> origin/main
                 .buttonStyle(.plain)
                 .disabled(vm.lines.count <= 2)
         }
     }
 
+<<<<<<< HEAD
     /// Mirrors NewVoucherSheet's advanceFocusAfterAmount — grow the grid
     /// only when this line is genuinely filled, then focus the next empty
     /// line's ledger field (or the freshly-added one).
@@ -360,16 +468,35 @@ private struct EditVoucherBody: View {
             if let row = vm.lines.first(where: { $0.accountId == nil }) ?? vm.lines.first {
                 focusedField = row.accountId == nil ? .line(row.id) : .amount(row.id)
             }
+=======
+    private var validationSection: some View {
+        GroupBox("Validation") {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(vm.validationErrors, id: \.code) { err in
+                    Text("• \(err.message)").foregroundStyle(.red)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+>>>>>>> origin/main
         }
     }
 
     private var totalsSection: some View {
+<<<<<<< HEAD
         let difference = (try? CheckedMath.subtract(vm.totalDebitPaise, vm.totalCreditPaise, context: "calculating edit voucher sheet difference")) ?? 0
+=======
+        let difference = vm.totalDebitPaise - vm.totalCreditPaise
+>>>>>>> origin/main
         return HStack {
             Spacer()
             Text("Debit: \(Currency.formatPaise(vm.totalDebitPaise))").monospacedDigit()
             Text("Credit: \(Currency.formatPaise(vm.totalCreditPaise))").monospacedDigit()
+<<<<<<< HEAD
             Text(difference == 0 ? "Balanced" : "Difference: \(Currency.formatAbsolutePaise(difference))")
+=======
+            Text(difference == 0 ? "Balanced" : "Difference: \(Currency.formatPaise(abs(difference)))")
+>>>>>>> origin/main
                 .foregroundStyle(difference == 0 ? .green : .red)
         }
     }
@@ -378,6 +505,7 @@ private struct EditVoucherBody: View {
         HStack {
             Spacer()
             Button("Cancel") { router.presentedSheet = nil }.keyboardShortcut(.cancelAction)
+<<<<<<< HEAD
             // Not gated on `vm.canPost` — same fix as NewVoucherSheet's Post
             // button (see its comment): a disabled button swallows both the
             // click and the keyboard shortcut with zero feedback. `⌘Return`
@@ -386,10 +514,17 @@ private struct EditVoucherBody: View {
             Button("Save") { attemptSave() }
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
+=======
+            Button("Save") { onSave(vm) }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(!vm.canPost)
+>>>>>>> origin/main
         }
         .padding(16)
     }
 }
+<<<<<<< HEAD
 
 private struct LockedVoucherCorrectionView: View {
     @Environment(AppEnvironment.self) private var env
@@ -482,3 +617,5 @@ private struct LockedVoucherCorrectionView: View {
         }
     }
 }
+=======
+>>>>>>> origin/main

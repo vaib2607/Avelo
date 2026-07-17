@@ -12,6 +12,7 @@ public final class VouchersViewModel {
     public var typeFilter: Set<VoucherType.Code> = []
     public var fromDate: Date?
     public var toDate: Date?
+<<<<<<< HEAD
     public var pagination = PaginationState()
     public var isLoading: Bool = false
     public var error: AppError?
@@ -26,13 +27,20 @@ public final class VouchersViewModel {
         get { pagination.offset }
         set { pagination.offset = max(0, newValue) }
     }
+=======
+    public var isLoading: Bool = false
+    public var error: AppError?
+>>>>>>> origin/main
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase
     public let fyId: FinancialYear.ID?
+<<<<<<< HEAD
     internal var onResultsReady: (@Sendable () async -> Void)?
     private var reloadTask: Task<Void, Never>?
     private var reloadGeneration: UUID = UUID()
+=======
+>>>>>>> origin/main
 
     public init(companyId: Company.ID, db: SQLiteDatabase, fyId: FinancialYear.ID?) {
         self.companyId = companyId
@@ -43,21 +51,31 @@ public final class VouchersViewModel {
 
     public func reload() {
         isLoading = true
+<<<<<<< HEAD
         reloadTask?.cancel()
         let generation = UUID()
         reloadGeneration = generation
         error = nil
+=======
+>>>>>>> origin/main
         let db = db
         let companyId = companyId
         let fyId = fyId
         let fromDate = fromDate
         let toDate = toDate
+<<<<<<< HEAD
         let limit = limit
         let offset = offset
         let typeFilter = typeFilter
         let query = query
         let baseFilter = filter
         reloadTask = Task.detached { [weak self] in
+=======
+        let typeFilter = typeFilter
+        let query = query
+        let baseFilter = filter
+        Task.detached {
+>>>>>>> origin/main
             do {
                 let svc = VoucherService(db: db, companyId: companyId)
                 let acct = AccountService(db: db, companyId: companyId)
@@ -68,6 +86,7 @@ public final class VouchersViewModel {
                 f.toDate = toDate
                 f.voucherTypeCodes = typeFilter
                 f.searchText = query.isEmpty ? nil : query
+<<<<<<< HEAD
                 f.limit = limit
                 f.offset = offset
                 let vouchers = try svc.list(filter: f)
@@ -84,6 +103,17 @@ public final class VouchersViewModel {
             } catch {
                 await MainActor.run { [weak self] in
                     guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
+=======
+                let vouchers = try svc.list(filter: f)
+                let accounts = try acct.listActiveAccounts()
+                await MainActor.run {
+                    self.vouchers = vouchers
+                    self.accounts = accounts
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+>>>>>>> origin/main
                     self.error = AppError.wrap(error)
                     self.isLoading = false
                 }
@@ -91,6 +121,7 @@ public final class VouchersViewModel {
         }
     }
 
+<<<<<<< HEAD
     public func reloadFirstPage() {
         pagination.reset()
         reload()
@@ -142,4 +173,9 @@ public final class VouchersViewModel {
     public func recordInvoicePDFSaved(voucherId: Voucher.ID, url: URL) throws {
         try InvoicePDFService(db: db).recordExportSaved(voucherId: voucherId, url: url)
     }
+=======
+    public func accountName(_ id: Account.ID) -> String {
+        accounts.first(where: { $0.id == id })?.name ?? id.uuidString.prefix(8) + "…"
+    }
+>>>>>>> origin/main
 }

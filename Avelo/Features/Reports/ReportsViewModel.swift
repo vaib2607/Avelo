@@ -17,13 +17,17 @@ public final class ReportsViewModel {
     public var ledger: ReportResult.LedgerReport?
     public var outstanding: ReportResult.OutstandingReport?
     public var stockValuation: ReportResult.StockValuationReport?
+<<<<<<< HEAD
     public var cashFlow: ReportResult.CashFlowStatement?
     public var stockAgeing: ReportResult.StockAgeingReport?
+=======
+>>>>>>> origin/main
     public var stockMovements: [StockMovement] = []
     public var stockRegisterRows: [StockRegisterRow] = []
     public var ledgerAccountId: Account.ID?
     public var cashBankAccountId: Account.ID?
     public var accounts: [Account] = []
+<<<<<<< HEAD
     public var cashBankAccounts: [Account] = []
     public var isLoading: Bool = false
     public var error: AppError?
@@ -37,6 +41,11 @@ public final class ReportsViewModel {
     public var comparativeProfitLoss: ReportResult.ProfitLoss?
     public var comparativeBalanceSheet: ReportResult.BalanceSheet?
 
+=======
+    public var isLoading: Bool = false
+    public var error: AppError?
+
+>>>>>>> origin/main
     public let companyId: Company.ID
     public let db: SQLiteDatabase
     public let fyId: FinancialYear.ID?
@@ -53,6 +62,7 @@ public final class ReportsViewModel {
         do {
             let svc = ReportService(db: db, companyId: companyId)
             accounts = try AccountService(db: db, companyId: companyId).listActiveAccounts()
+<<<<<<< HEAD
             guard let company = try CompanyRepository(db: db).findById(companyId) else {
                 throw AppError.notFound("Company")
             }
@@ -80,6 +90,15 @@ public final class ReportsViewModel {
                 comparativeBalanceSheet = comparativeEnabled
                     ? try svc.balanceSheet(asOfDate: priorYear(asOf), financialYearId: fyId)
                     : nil
+=======
+            switch selection {
+            case .trialBalance:
+                trialBalance = try svc.trialBalance(asOfDate: asOf, financialYearId: fyId).rows
+            case .profitLoss:
+                profitLoss = try svc.profitAndLoss(fromDate: fromDate, toDate: toDate, financialYearId: fyId)
+            case .balanceSheet:
+                balanceSheet = try svc.balanceSheet(asOfDate: asOf, financialYearId: fyId)
+>>>>>>> origin/main
             case .gstSummary:
                 gstSummary = try svc.gstSummary(fromDate: fromDate, toDate: toDate)
             case .dayBook:
@@ -92,7 +111,11 @@ public final class ReportsViewModel {
                 }
             case .cashBook, .bankBook:
                 if cashBankAccountId == nil {
+<<<<<<< HEAD
                     cashBankAccountId = cashBankAccounts.first?.id
+=======
+                    cashBankAccountId = accounts.first(where: { codeMatchesCashBank($0.code) })?.id
+>>>>>>> origin/main
                 }
                 if let aid = cashBankAccountId {
                     ledger = try svc.ledger(accountId: aid, financialYearId: fyId, fromDate: fromDate, toDate: toDate)
@@ -131,16 +154,20 @@ public final class ReportsViewModel {
                 outstanding = try svc.outstanding(asOfDate: asOf, direction: .receivables)
             case .stockValuation:
                 stockValuation = try svc.stockValuation(asOfDate: asOf)
+<<<<<<< HEAD
             case .cashFlow:
                 cashFlow = try svc.cashFlow(fromDate: fromDate, toDate: toDate)
             case .stockAgeing:
                 stockAgeing = try svc.stockAgeing(asOfDate: asOf)
+=======
+>>>>>>> origin/main
             }
         } catch {
             self.error = AppError.wrap(error)
         }
     }
 
+<<<<<<< HEAD
     public func toggleComparative() {
         comparativeEnabled.toggle()
         reload()
@@ -150,6 +177,12 @@ public final class ReportsViewModel {
         Calendar(identifier: .gregorian).date(byAdding: .year, value: -1, to: date) ?? date
     }
 
+=======
+    private func codeMatchesCashBank(_ code: String) -> Bool {
+        let upper = code.uppercased()
+        return upper.contains("CASH") || upper.contains("BANK")
+    }
+>>>>>>> origin/main
 }
 
 public struct StockRegisterRow: Identifiable, Hashable, Sendable {

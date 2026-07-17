@@ -4,11 +4,19 @@ public struct SidebarView: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
+<<<<<<< HEAD
+=======
+    @Environment(WindowState.self) private var windowState
+>>>>>>> origin/main
 
     public init() {}
 
     public var body: some View {
         @Bindable var router = router
+<<<<<<< HEAD
+=======
+        @Bindable var windowState = windowState
+>>>>>>> origin/main
 
         List(selection: $router.selection) {
             Section("Workspace") {
@@ -37,7 +45,11 @@ public struct SidebarView: View {
                 .padding(.vertical, 4)
             }
             Section("Modules") {
+<<<<<<< HEAD
                 ForEach(SidebarDestination.visibleCases(isInventoryEnabled: env.companyContext?.isInventoryEnabled ?? false)) { dest in
+=======
+                ForEach(SidebarDestination.visibleCases) { dest in
+>>>>>>> origin/main
                     NavigationLink(value: dest) {
                         HStack {
                             Label(dest.title, systemImage: dest.systemImage)
@@ -57,6 +69,18 @@ public struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .navigationTitle("Avelo")
+<<<<<<< HEAD
+=======
+        .toolbar {
+            ToolbarItem {
+                Button {
+                    windowState.toggleSidebar()
+                } label: {
+                    Image(systemName: "sidebar.left")
+                }
+            }
+        }
+>>>>>>> origin/main
     }
 
     private var currentCompanyName: String {

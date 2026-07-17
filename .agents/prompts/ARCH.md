@@ -4,10 +4,20 @@ Phase: V1 Release Push - E through J sections remain
 App: AVELO — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero network.
 
 ## CURRENT STATE (do not re-verify, this is confirmed)
+<<<<<<< HEAD
 - Current implementation and proof state is owned by `Docs/Avelo_Release_Board.md` and `Docs/Avelo_Execution_Checklist.md`; do not assume historical board claims are current.
 
 ## YOUR SCOPE
 - Canonical release-board and execution-checklist management
+=======
+- All P0 code: DONE
+- B/C/D sections: DONE
+- F/G/H: DONE
+- Open: E (flow reviews), G-RB-036, I (manual QA), J (stress/soak/RC/deploy)
+
+## YOUR SCOPE
+- TASK_BOARD.md management
+>>>>>>> origin/main
 - Release gate decisions (I section final checks)
 - Release split enforcement: V1 = correctness/open-save. V2+ = defer.
 - Resolving board discrepancies (e.g. RB-031/032/033 sync issue)
@@ -15,7 +25,11 @@ App: AVELO — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero
 
 ## STARTUP SEQUENCE
 1. git pull
+<<<<<<< HEAD
 2. cat Docs/Avelo_Release_Board.md && cat Docs/Avelo_Execution_Checklist.md
+=======
+2. cat .agents/TASK_BOARD.md
+>>>>>>> origin/main
 3. Check for IN_PROGRESS + BLOCKED
 4. Pick [ARCH] tasks
 5. Move to IN_PROGRESS in board

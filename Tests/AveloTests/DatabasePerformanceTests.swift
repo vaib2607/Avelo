@@ -39,6 +39,7 @@ final class DatabasePerformanceTests: XCTestCase {
             "Expected planner to use a ledger-line index, got: \(details)"
         )
     }
+<<<<<<< HEAD
 
     func testVoucherListQueryPlanUsesCompanyDateIndex() throws {
         let tc = try TestCompany.make()
@@ -106,4 +107,6 @@ final class DatabasePerformanceTests: XCTestCase {
             "Expected planner to use voucher company/date index for day book, got: \(details)"
         )
     }
+=======
+>>>>>>> origin/main
 }

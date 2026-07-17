@@ -78,7 +78,11 @@ public enum InventoryLinkMode: String, CaseIterable, Sendable, Codable, Identifi
         switch self {
         case .manual:     return "Stock and accounting are completely separate. You record stock movements yourself."
         case .autoPrompt: return "After a sales or purchase voucher, Avelo asks if you want to record a stock movement."
+<<<<<<< HEAD:Avelo/Core/Models/Company.swift
         case .autoSilent: return "Avelo records stock movements automatically on sales or purchase. Corrections are recorded as reversal movements."
+=======
+        case .autoSilent: return "Avelo records stock movements automatically on sales or purchase. You can edit or delete them."
+>>>>>>> origin/main:Mally/Core/Models/Company.swift
         }
     }
 }

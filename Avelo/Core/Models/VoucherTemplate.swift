@@ -1,6 +1,10 @@
 import Foundation
 
+<<<<<<< HEAD
 public struct VoucherTemplate: Identifiable, Hashable, Sendable, Codable {
+=======
+public struct VoucherTemplate: Identifiable, Hashable, Sendable {
+>>>>>>> origin/main
     public typealias ID = UUID
 
     public let id: ID

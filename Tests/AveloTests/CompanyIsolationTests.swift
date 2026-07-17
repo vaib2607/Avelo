@@ -45,6 +45,7 @@ final class CompanyIsolationTests: XCTestCase {
             XCTAssertEqual(validation.code, .voucherAccountInactive)
         }
     }
+<<<<<<< HEAD
 
     func testVoucherInsertTriggerRejectsForeignFinancialYear() throws {
         let db = try SQLiteDatabase(path: ":memory:")
@@ -217,4 +218,6 @@ final class CompanyIsolationTests: XCTestCase {
             XCTAssertTrue(validation.message.localizedCaseInsensitiveContains("another company"))
         }
     }
+=======
+>>>>>>> origin/main
 }

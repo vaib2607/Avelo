@@ -50,12 +50,20 @@ public struct VoucherNumberGenerator: Sendable {
                     .text(typeCode.rawValue)
                 ]
             )
+<<<<<<< HEAD:Avelo/Core/Utilities/VoucherNumberGenerator.swift
             return (firstN...lastN).map { formatNumber(prefix: prefix, fyShort: fyShort, n: $0, padding: padding) }
+=======
+            return formatNumber(prefix: prefix, fyShort: fyShort, n: nextN, padding: padding)
+>>>>>>> origin/main:Mally/Core/Utilities/VoucherNumberGenerator.swift
         } else {
             prefix = typeCode.defaultPrefix
             padding = typeCode.defaultPadding
             try db.execute(
+<<<<<<< HEAD:Avelo/Core/Utilities/VoucherNumberGenerator.swift
                 "INSERT INTO avelo_voucher_sequences (company_id, financial_year_id, voucher_type_code, last_number, prefix, suffix, padding) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+=======
+                "INSERT INTO avelo_voucher_sequences (company_id, financial_year_id, voucher_type_code, last_number, prefix, suffix, padding) VALUES (?, ?, ?, 1, ?, NULL, ?)",
+>>>>>>> origin/main:Mally/Core/Utilities/VoucherNumberGenerator.swift
                 [
                     .text(companyId.uuidString),
                     .text(financialYearId.uuidString),
@@ -65,7 +73,11 @@ public struct VoucherNumberGenerator: Sendable {
                     .integer(Int64(padding))
                 ]
             )
+<<<<<<< HEAD:Avelo/Core/Utilities/VoucherNumberGenerator.swift
             return (1...count).map { formatNumber(prefix: prefix, fyShort: fyShort, n: $0, padding: padding) }
+=======
+            return formatNumber(prefix: prefix, fyShort: fyShort, n: 1, padding: padding)
+>>>>>>> origin/main:Mally/Core/Utilities/VoucherNumberGenerator.swift
         }
     }
 

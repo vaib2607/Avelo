@@ -76,32 +76,16 @@ public struct VoucherDraft: Sendable, Hashable {
     }
 
     public var totalDebitPaise: Int64 {
-        (try? checkedTotals().debit) ?? 0
+        lines.filter { $0.side == EntrySide.debit }.reduce(0) { $0 + $1.amountPaise }
     }
 
     public var totalCreditPaise: Int64 {
-        (try? checkedTotals().credit) ?? 0
+        lines.filter { $0.side == EntrySide.credit }.reduce(0) { $0 + $1.amountPaise }
     }
 
-    public var differencePaise: Int64 { (try? checkedTotals().difference) ?? 0 }
+    public var differencePaise: Int64 { totalDebitPaise - totalCreditPaise }
 
-    public func checkedTotals() throws -> (debit: Int64, credit: Int64, difference: Int64) {
-        let debit = try CheckedMath.sum(
-            lines.lazy.filter { $0.side == .debit }.map(\.amountPaise),
-            context: "summing voucher draft debit lines"
-        )
-        let credit = try CheckedMath.sum(
-            lines.lazy.filter { $0.side == .credit }.map(\.amountPaise),
-            context: "summing voucher draft credit lines"
-        )
-        let difference = try CheckedMath.subtract(debit, credit, context: "calculating voucher draft difference")
-        return (debit, credit, difference)
-    }
-
-    public var isBalanced: Bool {
-        guard let totals = try? checkedTotals() else { return false }
-        return totals.difference == 0
-    }
+    public var isBalanced: Bool { differencePaise == 0 }
 
     public var filledLines: [Line] {
         lines.filter { $0.accountId != nil && $0.amountPaise > 0 }

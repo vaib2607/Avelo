@@ -16,7 +16,6 @@ public final class CompanyHandle: @unchecked Sendable {
 }
 
 public final actor DatabaseManager {
-    public typealias DatabaseOpener = @Sendable (_ path: String, _ key: Data?) throws -> SQLiteDatabase
 
     public let appSupportDirectory: URL
     public let companiesDirectory: URL
@@ -24,16 +23,9 @@ public final actor DatabaseManager {
 
     private var openHandles: [Company.ID: CompanyHandle] = [:]
     private var registryDb: SQLiteDatabase?
-    public nonisolated let keyStore: CompanyKeyStoring
-    private let databaseOpener: DatabaseOpener
 
-    public init(appSupportDirectory: URL,
-                keyStore: CompanyKeyStoring = CompanyKeyStore(),
-                databaseOpener: @escaping DatabaseOpener = { path, key in try SQLiteDatabase(path: path, key: key) }) throws {
+    public init(appSupportDirectory: URL) throws {
         self.appSupportDirectory = appSupportDirectory
-        self.keyStore = keyStore
-        self.databaseOpener = databaseOpener
-        AuditChainKeyProvider.registerStore(keyStore)
         let companiesURL = appSupportDirectory.appendingPathComponent("Companies", isDirectory: true)
         self.companiesDirectory = companiesURL
         let registryURL = appSupportDirectory.appendingPathComponent("avelo_registry.sqlite")
@@ -42,13 +34,10 @@ public final actor DatabaseManager {
         let fm = FileManager.default
         try fm.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)
         try fm.createDirectory(at: companiesURL, withIntermediateDirectories: true)
-        try BackupExclusion.apply(to: appSupportDirectory)
-        try BackupExclusion.apply(to: companiesURL)
 
         let reg = try SQLiteDatabase(path: registryURL.path)
         do {
             try reg.execute(Self.registrySchemaSQL)
-            try BackupExclusion.apply(to: registryURL)
         } catch {
             AveloOpsLogger.error("registry schema init failed: \(error.localizedDescription, privacy: .public)")
             throw error
@@ -74,13 +63,13 @@ public final actor DatabaseManager {
     public func listCompanies() throws -> [CompanyRegistryEntry] {
         guard let reg = registryDb else { return [] }
         return try reg.query("SELECT id, name, sqlite_file_name, last_opened_at, created_at FROM avelo_registry_companies ORDER BY name COLLATE NOCASE") { row in
-            let lastOpened = try row.optionalTimestamp("last_opened_at")
+            let lastOpened: Date? = row.optionalText("last_opened_at").flatMap { DateFormatters.parseTimestamp($0) }
             return CompanyRegistryEntry(
-                id: try UUIDParsing.required(row.requiredText("id"), field: "avelo_registry_companies.id"),
-                name: try row.requiredText("name"),
-                sqliteFileName: try row.requiredText("sqlite_file_name"),
+                id: try UUIDParsing.required(row.text("id"), field: "avelo_registry_companies.id"),
+                name: row.text("name"),
+                sqliteFileName: row.text("sqlite_file_name"),
                 lastOpenedAt: lastOpened,
-                createdAt: try row.timestamp("created_at")
+                createdAt: row.timestamp("created_at")
             )
         }
     }
@@ -91,7 +80,16 @@ public final actor DatabaseManager {
 
     public func registerCompany(_ entry: CompanyRegistryEntry) throws {
         guard let reg = registryDb else { throw AppError.database(.openFailed("registry not open")) }
-        try RegistryRepository(db: reg).register(entry)
+        try reg.execute(
+            "INSERT OR REPLACE INTO avelo_registry_companies (id, name, sqlite_file_name, last_opened_at, created_at) VALUES (?, ?, ?, ?, ?)",
+            [
+                .text(entry.id.uuidString),
+                .text(entry.name),
+                .text(entry.sqliteFileName),
+                .optionalTimestamp(entry.lastOpenedAt),
+                .timestamp(entry.createdAt)
+            ]
+        )
     }
 
     public func unregisterCompany(id: UUID) throws {
@@ -107,66 +105,26 @@ public final actor DatabaseManager {
         )
     }
 
-    public func createCompanyFile(companyId: UUID, key: Data? = nil) throws -> URL {
+    public func createCompanyFile(companyId: UUID) throws -> URL {
         let url = companiesDirectory.appendingPathComponent("\(companyId.uuidString).sqlite")
-        let companyKey = try key ?? keyStore.generateKey()
-        let fm = FileManager.default
-
-        do {
-            try keyStore.store(key: companyKey, companyId: companyId)
-            let db = try databaseOpener(url.path, companyKey)
-            defer { db.close() }
-            try MigrationRunner().runMigrations(on: db)
-            try BackupExclusion.apply(to: url)
-            try applyBackupExclusionIfPresent(to: walURL(for: url))
-            try applyBackupExclusionIfPresent(to: shmURL(for: url))
-            return url
-        } catch {
-            try? keyStore.delete(companyId: companyId)
-
-            let walURL = URL(fileURLWithPath: url.path + "-wal")
-            let shmURL = URL(fileURLWithPath: url.path + "-shm")
-            if fm.fileExists(atPath: walURL.path) {
-                try? fm.removeItem(at: walURL)
-            }
-            if fm.fileExists(atPath: shmURL.path) {
-                try? fm.removeItem(at: shmURL)
-            }
-            if fm.fileExists(atPath: url.path) {
-                try? fm.removeItem(at: url)
-            }
-            throw error
-        }
+        let db = try SQLiteDatabase(path: url.path)
+        defer { db.close() }
+        try MigrationRunner().runMigrations(on: db)
+        return url
     }
 
-    private func walURL(for url: URL) -> URL {
-        URL(fileURLWithPath: url.path + "-wal")
-    }
-
-    private func shmURL(for url: URL) -> URL {
-        URL(fileURLWithPath: url.path + "-shm")
-    }
-
-    private func applyBackupExclusionIfPresent(to url: URL) throws {
-        if FileManager.default.fileExists(atPath: url.path) {
-            try BackupExclusion.apply(to: url)
-        }
-    }
-
-    public func openCompany(id: UUID,
-                            onMigrationProgress: (@Sendable (_ completed: Int, _ total: Int) -> Void)? = nil) throws -> CompanyHandle {
+    public func openCompany(id: UUID) throws -> CompanyHandle {
         if let existing = openHandles[id] { return existing }
         let url = try companyFileURL(id: id)
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             throw AppError.notFound("Company file not found: \(url.lastPathComponent)")
         }
-        let key = try LegacyKeyMigrationService(keyStore: keyStore).migrateIfNeeded(companyId: id, fileURL: url)
-        let db = try databaseOpener(url.path, key)
-        let current = try db.userVersion()
+        let db = try SQLiteDatabase(path: url.path)
+        let current = db.userVersion()
         if current < SchemaVersion.current.rawValue {
             do {
-                try MigrationRunner().runMigrations(on: db, onProgress: onMigrationProgress)
+                try MigrationRunner().runMigrations(on: db)
             } catch {
                 AveloOpsLogger.error("migration failed for company \(id.uuidString, privacy: .public)")
                 throw error
@@ -178,7 +136,6 @@ public final actor DatabaseManager {
         guard let entry = try RegistryRepository(db: reg).findById(id) else {
             throw AppError.notFound("Registry entry missing for company \(id.uuidString)")
         }
-        try AuditRepository(db: db).verifyIntegrity(companyId: id)
         let handle = CompanyHandle(companyId: id, companyName: entry.name, db: db)
         openHandles[id] = handle
         try touchLastOpened(id: id)
@@ -217,8 +174,7 @@ public final actor DatabaseManager {
             return legacyURL
         }
 
-        let sqliteFileName = entry.sqliteFileName
-        let registeredURL = companiesDirectory.appendingPathComponent(sqliteFileName)
+        let registeredURL = companiesDirectory.appendingPathComponent(entry.sqliteFileName)
         if fm.fileExists(atPath: registeredURL.path) {
             return registeredURL
         }
@@ -227,21 +183,17 @@ public final actor DatabaseManager {
         }
 
         throw AppError.notFound(
-            "Company file missing. Expected \(sqliteFileName). Re-link or restore the company file before opening it."
+            "Company file missing. Expected \(entry.sqliteFileName). Re-link or restore the company file before opening it."
         )
     }
 
     public func deleteCompanyFiles(id: UUID) throws {
         closeCompany(id: id)
         let fm = FileManager.default
+
+        let primaryURL = try companyFileURL(id: id)
         let legacyURL = companiesDirectory.appendingPathComponent("\(id.uuidString).sqlite")
-        var urls: Set<URL> = [legacyURL]
-        if let primaryURL = try? companyFileURL(id: id) {
-            urls.insert(primaryURL)
-        } else if let reg = registryDb,
-                  let entry = try RegistryRepository(db: reg).findById(id) {
-            urls.insert(companiesDirectory.appendingPathComponent(entry.sqliteFileName))
-        }
+        let urls = Set([primaryURL, legacyURL])
 
         for url in urls {
             let walURL = URL(fileURLWithPath: url.path + "-wal")
@@ -256,20 +208,5 @@ public final actor DatabaseManager {
                 try fm.removeItem(at: url)
             }
         }
-        if let reg = registryDb {
-            try RegistryRepository(db: reg).unregister(id: id)
-        }
-        try keyStore.delete(companyId: id)
-    }
-
-    public func storeRecoveryKey(_ recoveryKey: String, for companyId: Company.ID) throws {
-        try keyStore.store(key: RecoveryKeyCodec.decode(recoveryKey), companyId: companyId)
-    }
-
-    public func recoveryKey(for companyId: Company.ID) throws -> String {
-        guard let key = try keyStore.retrieve(companyId: companyId) else {
-            throw AppError.database(.missingEncryptionKey("Company encryption key is missing."))
-        }
-        return RecoveryKeyCodec.encode(key)
     }
 }

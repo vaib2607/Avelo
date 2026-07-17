@@ -61,7 +61,10 @@ public struct RootView: View {
         .task {
             await env.bootstrap()
             keyboardBridge.attach(router: router)
+<<<<<<< HEAD
             keyboardBridge.attach(isInventoryEnabled: { [weak env] in env?.companyContext?.isInventoryEnabled ?? false })
+=======
+>>>>>>> origin/main
         }
         .alert(item: Binding(
             get: { env.globalError },
@@ -71,6 +74,7 @@ public struct RootView: View {
                   message: Text(err.localizedMessage),
                   dismissButton: .default(Text("OK")) { env.globalError = nil })
         }
+<<<<<<< HEAD
         .alert(item: Binding(
             get: { env.pendingDraftRecovery },
             set: { env.pendingDraftRecovery = $0 }
@@ -92,6 +96,8 @@ public struct RootView: View {
                 }
             )
         }
+=======
+>>>>>>> origin/main
         .onReceive(NotificationCenter.default.publisher(for: .aveloRequestNewCompany)) { _ in
             router.present(.newCompany)
         }
@@ -150,6 +156,7 @@ public struct RootView: View {
         case .vouchers:  VouchersView()
         case .accounts:  AccountsView()
         case .reports:   ReportsView()
+<<<<<<< HEAD
         case .inventory:
             // AVL-P0-033 defense in depth: sidebar/menu/palette/keyboard
             // already exclude Inventory when disabled, so this should be
@@ -161,6 +168,9 @@ public struct RootView: View {
                 ContentUnavailableView("Inventory is disabled", systemImage: "shippingbox",
                                        description: Text("Enable inventory for this company in Settings to use this module."))
             }
+=======
+        case .inventory: InventoryView()
+>>>>>>> origin/main
         case .gst:       GSTView()
         case .payroll:   PayrollView()
         case .banking:   BankingView()
@@ -180,17 +190,27 @@ public struct RootView: View {
         case .preferences:          PreferencesSheet()
         case .companyInfo:
             if let ctx = env.companyContext,
+<<<<<<< HEAD
                let company = loadCompanyInfo(ctx) {
+=======
+               let company = try? CompanyRepository(db: ctx.database).findById(ctx.companyId) {
+>>>>>>> origin/main
                 CompanyInfoSheet(company: company)
             }
         case .newVoucher, .newJournal, .newPayment, .newReceipt,
              .newContra, .newPurchase, .newSales,
+<<<<<<< HEAD
+=======
+             .newPurchaseOrder, .newSalesOrder, .newReceiptNote, .newDeliveryNote,
+             .newPhysicalStock, .newStockJournal, .newRejectionIn, .newRejectionOut,
+>>>>>>> origin/main
              .newCreditNote, .newDebitNote:
             NewVoucherSheet(initialType: sheet.initialVoucherType)
         case .editVoucher(let id):  EditVoucherSheet(voucherId: id)
         case .reverseVoucher(let id): ReverseVoucherSheet(voucherId: id)
         case .newAccount:           NewAccountSheet()
         case .editAccount(let id):  NewAccountSheet(existing: id)
+<<<<<<< HEAD
         case .newGroup:             GroupMasterSheet()
         case .editGroup(let id):    GroupMasterSheet(existing: id)
         case .newFinancialYear:     NewFinancialYearSheet()
@@ -234,6 +254,15 @@ extension VoucherType.Code {
         case .debitNote:   return .newDebitNote
         case .opening, .payroll:
             return .newJournal
+=======
+        case .newFinancialYear:     NewFinancialYearSheet()
+        case .newEmployee:          NewEmployeeSheet()
+        case .newItem:              NewItemSheet()
+        case .lockFinancialYear(let id): LockFinancialYearSheet(fyId: id)
+        case .closeFinancialYear(let id): CloseFinancialYearSheet(fyId: id)
+        case .manageInventory:      ManageInventorySheet()
+        case .managePayroll:        ManagePayrollSheet()
+>>>>>>> origin/main
         }
     }
 }
@@ -248,6 +277,17 @@ extension RouterSheet {
         case .newContra:       return .contra
         case .newPurchase:     return .purchase
         case .newSales:        return .sales
+<<<<<<< HEAD
+=======
+        case .newPurchaseOrder:return .purchaseOrder
+        case .newSalesOrder:   return .salesOrder
+        case .newReceiptNote:  return .receiptNote
+        case .newDeliveryNote: return .deliveryNote
+        case .newPhysicalStock:return .physicalStock
+        case .newStockJournal: return .stockJournal
+        case .newRejectionIn:  return .rejectionIn
+        case .newRejectionOut: return .rejectionOut
+>>>>>>> origin/main
         case .newCreditNote:   return .creditNote
         case .newDebitNote:    return .debitNote
         default:               return .journal

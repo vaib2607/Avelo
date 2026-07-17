@@ -153,13 +153,18 @@ final class MalformedUUIDHandlingTests: XCTestCase {
         }
     }
 
+<<<<<<< HEAD
     func testStockMovementDecoderRejectsMalformedVoucherId() throws {
+=======
+    func testInventoryItemDecoderRejectsMalformedLinkedAccountId() throws {
+>>>>>>> origin/main
         let db = try SQLiteDatabase(path: ":memory:")
 
         XCTAssertThrowsError(try db.queryOne(
             """
             SELECT '\(UUID().uuidString)' AS id,
                    '\(UUID().uuidString)' AS company_id,
+<<<<<<< HEAD
                    '\(UUID().uuidString)' AS item_id,
                    'bad-voucher-id' AS voucher_id,
                    '2024-04-01' AS date,
@@ -173,6 +178,24 @@ final class MalformedUUIDHandlingTests: XCTestCase {
             """
         ) { try InventoryRepository.rowToMovement($0) }) { error in
             assertInvalidUUID(error, field: "avelo_stock_movements.voucher_id", raw: "bad-voucher-id")
+=======
+                   'ITEM-1' AS code,
+                   'Item' AS name,
+                   'Nos' AS unit,
+                   'fifo' AS valuation_method,
+                   1 AS is_active,
+                   0 AS opening_quantity,
+                   0 AS opening_rate_paise,
+                   0 AS gst_rate,
+                   NULL AS barcode,
+                   NULL AS hsn_sac,
+                   0 AS is_archived,
+                   'bad-linked-account-id' AS linked_account_id,
+                   '2024-04-01T00:00:00Z' AS created_at
+            """
+        ) { try InventoryRepository.rowToItem($0) }) { error in
+            assertInvalidUUID(error, field: "avelo_inventory_items.linked_account_id", raw: "bad-linked-account-id")
+>>>>>>> origin/main
         }
     }
 
@@ -191,6 +214,17 @@ final class MalformedUUIDHandlingTests: XCTestCase {
                    10000 AS gross_paise,
                    0 AS deductions_paise,
                    10000 AS net_paise,
+<<<<<<< HEAD
+=======
+                   30 AS working_days,
+                   30 AS paid_days,
+                   10000 AS basic_paise,
+                   0 AS hra_paise,
+                   0 AS other_allowances_paise,
+                   0 AS overtime_paise,
+                   0 AS pf_applicable,
+                   0 AS esi_applicable,
+>>>>>>> origin/main
                    '2024-04-01T00:00:00Z' AS posted_at
             """
         ) { try PayrollRepository.rowToEntry($0) }) { error in
@@ -198,12 +232,17 @@ final class MalformedUUIDHandlingTests: XCTestCase {
         }
     }
 
+<<<<<<< HEAD
     func testBankReconciliationDecoderRejectsMalformedAccountId() throws {
+=======
+    func testBankStatementLineDecoderRejectsMalformedAccountId() throws {
+>>>>>>> origin/main
         let db = try SQLiteDatabase(path: ":memory:")
 
         XCTAssertThrowsError(try db.queryOne(
             """
             SELECT '\(UUID().uuidString)' AS id,
+<<<<<<< HEAD
                    '\(UUID().uuidString)' AS company_id,
                    'bad-bank-account-id' AS bank_account_id,
                    '\(UUID().uuidString)' AS voucher_id,
@@ -359,6 +398,25 @@ final class MalformedUUIDHandlingTests: XCTestCase {
 
         XCTAssertThrowsError(try RegistryRepository(db: db).listCompanies()) { error in
             assertRowRead(error, equals: "invalid timestamp value for column last_opened_at")
+=======
+                   'bad-bank-account-id' AS account_id,
+                   '2024-04-01' AS date,
+                   10000 AS amount_paise,
+                   'Statement' AS narration,
+                   0 AS is_cleared
+            """
+        ) { r in
+            BankReconciliationRepository.StatementLine(
+                id: try UUIDParsing.required(r.text("id"), field: "avelo_bank_statement_lines.id"),
+                accountId: try UUIDParsing.required(r.text("account_id"), field: "avelo_bank_statement_lines.account_id"),
+                date: r.date("date"),
+                amountPaise: r.int("amount_paise"),
+                narration: r.text("narration"),
+                isCleared: r.bool("is_cleared")
+            )
+        }) { error in
+            assertInvalidUUID(error, field: "avelo_bank_statement_lines.account_id", raw: "bad-bank-account-id")
+>>>>>>> origin/main
         }
     }
 
@@ -368,6 +426,7 @@ final class MalformedUUIDHandlingTests: XCTestCase {
         }
         XCTAssertEqual(message, "Invalid UUID in \(field): \(raw)", file: file, line: line)
     }
+<<<<<<< HEAD
 
     private func assertRowRead(_ error: Error, equals expected: String, file: StaticString = #filePath, line: UInt = #line) {
         guard case AppError.database(.rowReadFailed(let message)) = error else {
@@ -375,4 +434,6 @@ final class MalformedUUIDHandlingTests: XCTestCase {
         }
         XCTAssertEqual(message, expected, file: file, line: line)
     }
+=======
+>>>>>>> origin/main
 }

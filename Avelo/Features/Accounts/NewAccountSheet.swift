@@ -10,14 +10,8 @@ public struct NewAccountSheet: View {
     @State private var opening: String = "0.00"
     @State private var openingSide: OpeningBalanceSide = .debit
     @State private var gstin: String = ""
-    @State private var mailingName: String = ""
-    @State private var mailingAddress: String = ""
-    @State private var stateCode: String = ""
-    @State private var country: String = "India"
-    @State private var registrationType: GSTRegistrationType?
-    @State private var maintainBillwise: Bool = false
-    @State private var creditPeriod: String = ""
     @State private var groups: [AccountGroup] = []
+    @State private var canSave: Bool = false
     @State private var existingAccount: Account?
     private let existingId: Account.ID?
 
@@ -38,59 +32,37 @@ public struct NewAccountSheet: View {
             .padding(16)
             Divider()
             Form {
-                Section {
-                    TextField("Code *", text: $code)
-                    TextField("Name *", text: $name)
-                    Picker("Group *", selection: $groupId) {
-                        Text("—").tag(AccountGroup.ID?.none)
-                        ForEach(leafGroups) { g in
-                            Text("\(g.code) — \(g.name)").tag(Optional(g.id))
-                        }
-                    }
-                    MoneyTextField(label: "Opening balance", text: $opening)
-                    Picker("Opening side", selection: $openingSide) {
-                        Text("Dr").tag(OpeningBalanceSide.debit)
-                        Text("Cr").tag(OpeningBalanceSide.credit)
+                TextField("Code *", text: $code)
+                TextField("Name *", text: $name)
+                Picker("Group *", selection: $groupId) {
+                    Text("—").tag(AccountGroup.ID?.none)
+                    ForEach(leafGroups) { g in
+                        Text("\(g.code) — \(g.name)").tag(Optional(g.id))
                     }
                 }
-                Section("Mailing Details") {
-                    TextField("Mailing name", text: $mailingName)
-                    TextField("Address", text: $mailingAddress, axis: .vertical)
-                        .lineLimit(2...4)
-                    Picker("State", selection: $stateCode) {
-                        Text("—").tag("")
-                        ForEach(GSTStateCode.table.sorted(by: { $0.value < $1.value }), id: \.key) { code, name in
-                            Text("\(name) (\(code))").tag(code)
-                        }
-                    }
-                    TextField("Country", text: $country)
+                MoneyTextField(label: "Opening balance", text: $opening)
+                Picker("Opening side", selection: $openingSide) {
+                    Text("Dr").tag(OpeningBalanceSide.debit)
+                    Text("Cr").tag(OpeningBalanceSide.credit)
                 }
-                Section("Statutory") {
-                    Picker("GST registration type", selection: $registrationType) {
-                        Text("—").tag(GSTRegistrationType?.none)
-                        ForEach(GSTRegistrationType.allCases) { t in
-                            Text(t.displayName).tag(Optional(t))
-                        }
-                    }
-                    TextField("GSTIN (optional)", text: $gstin)
-                        .textCase(.uppercase)
-                }
-                Section("Billing") {
-                    Toggle("Maintain balances bill-by-bill", isOn: $maintainBillwise)
-                    TextField("Default credit period (days)", text: $creditPeriod)
-                }
+                TextField("GSTIN (optional)", text: $gstin)
+                    .textCase(.uppercase)
             }
             .formStyle(.grouped)
+            .onChange(of: code) { _, _ in refresh() }
+            .onChange(of: name) { _, _ in refresh() }
+            .onChange(of: groupId) { _, _ in refresh() }
+            .onChange(of: opening) { _, _ in refresh() }
+            .onChange(of: openingSide) { _, _ in refresh() }
             Divider()
             HStack {
                 Spacer()
                 Button("Cancel") { router.presentedSheet = nil }
                     .keyboardShortcut(.cancelAction)
-                // Not gated on `canSave` — see NewVoucherSheet.bottomBar for
-                // why a validation-disabled button must still respond.
-                Button("Save") { attemptSave() }
+                Button("Save") { save() }
+                    .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!canSave)
             }
             .padding(16)
         }
@@ -120,58 +92,36 @@ public struct NewAccountSheet: View {
                 opening = Currency.formatAmountInput(paise: account.openingBalancePaise)
                 openingSide = account.openingBalanceSide
                 gstin = account.gstin ?? ""
-                mailingName = account.mailingName ?? ""
-                mailingAddress = account.mailingAddress ?? ""
-                stateCode = account.stateCode ?? ""
-                country = account.country ?? "India"
-                registrationType = account.gstRegistrationType
-                maintainBillwise = account.maintainBillwise ?? false
-                creditPeriod = account.creditPeriodDays.map(String.init) ?? ""
             }
         } catch {
             env.showError(AppError.wrap(error))
         }
+        refresh()
     }
 
-    private func makeInput() -> AccountInputValidator.Input {
-        AccountInputValidator.Input(
+    private func refresh() {
+        let paise = Currency.parseRupeeInput(opening) ?? 0
+        let input = AccountInputValidator.Input(
             code: code, name: name, groupId: groupId,
-            openingBalancePaise: Currency.parseRupeeInput(opening) ?? 0,
-            openingBalanceSide: openingSide,
-            gstin: gstin,
-            mailingName: mailingName.isEmpty ? nil : mailingName,
-            mailingAddress: mailingAddress.isEmpty ? nil : mailingAddress,
-            stateCode: stateCode.isEmpty ? nil : stateCode,
-            country: country.isEmpty ? nil : country,
-            gstRegistrationType: registrationType,
-            maintainBillwise: maintainBillwise,
-            creditPeriodDays: creditPeriod.isEmpty ? nil : Int(creditPeriod),
-            existingAccountId: existingId
+            openingBalancePaise: paise, openingBalanceSide: openingSide,
+            gstin: gstin, existingAccountId: existingId
         )
-    }
-
-    /// Returns validation errors for the current form, or nil if there's no
-    /// open company to validate against (form disabled in that case anyway).
-    private func validationErrors() -> [ValidationError]? {
-        guard let ctx = env.companyContext else { return nil }
-        let result = AccountInputValidator(db: ctx.database).validate(makeInput(), companyId: ctx.companyId)
-        if case .invalid(let errs) = result { return errs }
-        return []
-    }
-
-    /// Always responds to ⌘Return: saves if valid, otherwise surfaces the
-    /// first validation error so the user knows why nothing happened.
-    private func attemptSave() {
-        if let first = validationErrors()?.first {
-            env.showError(AppError.validation(first))
-            return
+        guard let ctx = env.companyContext else { canSave = false; return }
+        let result = AccountInputValidator(db: ctx.database).validate(input, companyId: ctx.companyId)
+        switch result {
+        case .valid: canSave = true
+        case .invalid: canSave = false
         }
-        save()
     }
 
     private func save() {
         guard let ctx = env.companyContext else { return }
-        let input = makeInput()
+        let paise = Currency.parseRupeeInput(opening) ?? 0
+        let input = AccountInputValidator.Input(
+            code: code, name: name, groupId: groupId,
+            openingBalancePaise: paise, openingBalanceSide: openingSide,
+            gstin: gstin, existingAccountId: existingId
+        )
         do {
             let service = AccountService(db: ctx.database, companyId: ctx.companyId)
             if let existing = existingAccount {
@@ -182,13 +132,6 @@ public struct NewAccountSheet: View {
                 updated.openingBalancePaise = input.openingBalancePaise
                 updated.openingBalanceSide = input.openingBalanceSide
                 updated.gstin = input.gstin
-                updated.mailingName = input.mailingName
-                updated.mailingAddress = input.mailingAddress
-                updated.stateCode = input.stateCode
-                updated.country = input.country
-                updated.gstRegistrationType = input.gstRegistrationType
-                updated.maintainBillwise = input.maintainBillwise
-                updated.creditPeriodDays = input.creditPeriodDays
                 updated.updatedAt = Date()
                 try service.updateAccount(updated)
                 env.showSuccess("Account updated.")

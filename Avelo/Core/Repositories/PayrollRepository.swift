@@ -12,7 +12,17 @@ public struct PayrollRepository: Sendable {
 
     public func findEmployeeById(_ id: PayrollEmployee.ID) throws -> PayrollEmployee? {
         try db.queryOne(
+<<<<<<< HEAD:Avelo/Core/Repositories/PayrollRepository.swift
             "SELECT \(Self.employeeColumns) FROM avelo_payroll_employees WHERE id = ?",
+=======
+            """
+            SELECT id, company_id, code, name, designation, pan, bank_account_id, base_salary_paise,
+                   basic_paise, hra_paise, other_allowances_paise, bank_account, ifsc,
+                   pf_applicable, esi_applicable,
+                   is_active, joined_on, end_date, created_at
+            FROM avelo_payroll_employees WHERE id = ?
+            """,
+>>>>>>> origin/main:Mally/Core/Repositories/PayrollRepository.swift
             bind: [.text(id.uuidString)]
         ) { try Self.rowToEmployee($0) }
     }
@@ -23,7 +33,14 @@ public struct PayrollRepository: Sendable {
 
     public func listEmployeesForCompany(_ companyId: Company.ID, includeInactive: Bool = false) throws -> [PayrollEmployee] {
         let sql = """
+<<<<<<< HEAD:Avelo/Core/Repositories/PayrollRepository.swift
             SELECT \(Self.employeeColumns)
+=======
+            SELECT id, company_id, code, name, designation, pan, bank_account_id, base_salary_paise,
+                   basic_paise, hra_paise, other_allowances_paise, bank_account, ifsc,
+                   pf_applicable, esi_applicable,
+                   is_active, joined_on, end_date, created_at
+>>>>>>> origin/main:Mally/Core/Repositories/PayrollRepository.swift
             FROM avelo_payroll_employees
             WHERE company_id = ?\(includeInactive ? "" : " AND is_active = 1")
             ORDER BY code COLLATE NOCASE
@@ -40,8 +57,10 @@ public struct PayrollRepository: Sendable {
             """
             INSERT INTO avelo_payroll_employees
             (id, company_id, code, name, designation, pan, bank_account_id, base_salary_paise,
+             basic_paise, hra_paise, other_allowances_paise, bank_account, ifsc,
+             pf_applicable, esi_applicable,
              is_active, joined_on, end_date, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(e.id.uuidString),
@@ -52,6 +71,13 @@ public struct PayrollRepository: Sendable {
                 .optionalText(e.pan),
                 .optionalText(e.bankAccountId?.uuidString),
                 .integer(e.baseSalaryPaise),
+                .integer(e.basicPaise),
+                .integer(e.hraPaise),
+                .integer(e.otherAllowancesPaise),
+                .optionalText(e.bankAccount),
+                .optionalText(e.ifsc),
+                .bool(e.pfApplicable),
+                .bool(e.esiApplicable),
                 .bool(e.isActive),
                 .date(e.joinedOn),
                 .optionalDate(e.endDate),
@@ -65,7 +91,11 @@ public struct PayrollRepository: Sendable {
             """
             UPDATE avelo_payroll_employees SET
                 code = ?, name = ?, designation = ?, pan = ?, bank_account_id = ?,
-                base_salary_paise = ?, is_active = ?, joined_on = ?, end_date = ?
+                base_salary_paise = ?,
+                basic_paise = ?, hra_paise = ?, other_allowances_paise = ?,
+                bank_account = ?, ifsc = ?,
+                pf_applicable = ?, esi_applicable = ?,
+                is_active = ?, joined_on = ?, end_date = ?
             WHERE id = ?
             """,
             [
@@ -75,6 +105,13 @@ public struct PayrollRepository: Sendable {
                 .optionalText(e.pan),
                 .optionalText(e.bankAccountId?.uuidString),
                 .integer(e.baseSalaryPaise),
+                .integer(e.basicPaise),
+                .integer(e.hraPaise),
+                .integer(e.otherAllowancesPaise),
+                .optionalText(e.bankAccount),
+                .optionalText(e.ifsc),
+                .bool(e.pfApplicable),
+                .bool(e.esiApplicable),
                 .bool(e.isActive),
                 .date(e.joinedOn),
                 .optionalDate(e.endDate),
@@ -102,8 +139,9 @@ public struct PayrollRepository: Sendable {
             """
             INSERT INTO avelo_payroll_entries
             (id, company_id, employee_id, financial_year_id, voucher_id, month, year,
-             gross_paise, deductions_paise, net_paise, posted_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             working_days, paid_days, basic_paise, hra_paise, other_allowances_paise, overtime_paise,
+             gross_paise, deductions_paise, net_paise, pf_applicable, esi_applicable, posted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(e.id.uuidString),
@@ -113,9 +151,17 @@ public struct PayrollRepository: Sendable {
                 .optionalText(e.voucherId?.uuidString),
                 .integer(Int64(e.month)),
                 .integer(Int64(e.year)),
+                .real(Double(e.workingDays)),
+                .real(Double(e.paidDays)),
+                .integer(e.basicPaise),
+                .integer(e.hraPaise),
+                .integer(e.otherAllowancesPaise),
+                .integer(e.overtimePaise),
                 .integer(e.grossPaise),
                 .integer(e.deductionsPaise),
                 .integer(e.netPaise),
+                .bool(e.pfApplicable),
+                .bool(e.esiApplicable),
                 .timestamp(e.postedAt)
             ]
         )
@@ -152,12 +198,20 @@ public struct PayrollRepository: Sendable {
 
     public func listEntries(filter: EntryFilter) throws -> [PayrollEntry] {
         var sql = """
+<<<<<<< HEAD:Avelo/Core/Repositories/PayrollRepository.swift
             SELECT e.id, e.company_id, e.employee_id, e.financial_year_id, e.voucher_id, e.month, e.year,
                    e.gross_paise, e.deductions_paise, e.net_paise, e.posted_at,
                    p.code AS employee_code, p.name AS employee_name
             FROM avelo_payroll_entries e
             JOIN avelo_payroll_employees p ON p.id = e.employee_id
             WHERE e.company_id = ?
+=======
+            SELECT id, company_id, employee_id, financial_year_id, voucher_id, month, year,
+                   working_days, paid_days, basic_paise, hra_paise, other_allowances_paise, overtime_paise,
+                   gross_paise, deductions_paise, net_paise, pf_applicable, esi_applicable, posted_at
+            FROM avelo_payroll_entries
+            WHERE company_id = ?
+>>>>>>> origin/main:Mally/Core/Repositories/PayrollRepository.swift
         """
         var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
         if let empId = filter.employeeId {
@@ -169,6 +223,7 @@ public struct PayrollRepository: Sendable {
             bind.append(.text(fyId.uuidString))
         }
         if let my = filter.monthYear {
+<<<<<<< HEAD:Avelo/Core/Repositories/PayrollRepository.swift
             sql += " AND e.year = ? AND e.month = ?"
             bind.append(.integer(Int64(my.year)))
             bind.append(.integer(Int64(my.month)))
@@ -178,6 +233,17 @@ public struct PayrollRepository: Sendable {
         }
         if let m = filter.month, filter.monthYear == nil {
             sql += " AND e.month = ?"
+=======
+            sql += " AND year = ? AND month = ?"
+            bind.append(.integer(Int64(my.year)))
+            bind.append(.integer(Int64(my.month)))
+        } else if let y = filter.year {
+            sql += " AND year = ?"
+            bind.append(.integer(Int64(y)))
+        }
+        if let m = filter.month, filter.monthYear == nil {
+            sql += " AND month = ?"
+>>>>>>> origin/main:Mally/Core/Repositories/PayrollRepository.swift
             bind.append(.integer(Int64(m)))
         }
         sql += " ORDER BY e.year DESC, e.month DESC, e.posted_at DESC LIMIT ? OFFSET ?"
@@ -187,6 +253,7 @@ public struct PayrollRepository: Sendable {
     }
 
     static func rowToEmployee(_ r: Row) throws -> PayrollEmployee {
+<<<<<<< HEAD:Avelo/Core/Repositories/PayrollRepository.swift
         let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_payroll_employees.id")
         let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_payroll_employees.company_id")
         let bank = try UUIDParsing.optional(try r.checkedOptionalText("bank_account_id"), field: "avelo_payroll_employees.bank_account_id")
@@ -203,21 +270,54 @@ public struct PayrollRepository: Sendable {
             joinedOn: try r.requiredDate("joined_on"),
             endDate: try r.checkedOptionalDate("end_date"),
             createdAt: try r.timestamp("created_at")
+=======
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_payroll_employees.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_payroll_employees.company_id")
+        let bank = try UUIDParsing.optional(r.optionalText("bank_account_id"), field: "avelo_payroll_employees.bank_account_id")
+        return PayrollEmployee(
+            id: id,
+            companyId: companyId,
+            employeeCode: r.text("code"),
+            name: r.text("name"),
+            designation: r.optionalText("designation"),
+            pan: r.optionalText("pan"),
+            bankAccount: r.optionalText("bank_account"),
+            ifsc: r.optionalText("ifsc"),
+            bankAccountId: bank,
+            basicPaise: r.int("basic_paise"),
+            hraPaise: r.int("hra_paise"),
+            otherAllowancesPaise: r.int("other_allowances_paise"),
+            pfApplicable: r.bool("pf_applicable"),
+            esiApplicable: r.bool("esi_applicable"),
+            isActive: r.bool("is_active"),
+            joinedOn: r.date("joined_on"),
+            endDate: r.optionalDate("end_date"),
+            createdAt: r.timestamp("created_at")
+>>>>>>> origin/main:Mally/Core/Repositories/PayrollRepository.swift
         )
     }
 
     static func rowToEntry(_ r: Row) throws -> PayrollEntry {
+<<<<<<< HEAD:Avelo/Core/Repositories/PayrollRepository.swift
         let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_payroll_entries.id")
         let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_payroll_entries.company_id")
         let employeeId = try UUIDParsing.required(r.requiredText("employee_id"), field: "avelo_payroll_entries.employee_id")
         let fyId = try UUIDParsing.required(r.requiredText("financial_year_id"), field: "avelo_payroll_entries.financial_year_id")
         let voucherId = try UUIDParsing.optional(try r.checkedOptionalText("voucher_id"), field: "avelo_payroll_entries.voucher_id")
+=======
+        let id = try UUIDParsing.required(r.text("id"), field: "avelo_payroll_entries.id")
+        let companyId = try UUIDParsing.required(r.text("company_id"), field: "avelo_payroll_entries.company_id")
+        let employeeId = try UUIDParsing.required(r.text("employee_id"), field: "avelo_payroll_entries.employee_id")
+        let fyId = try UUIDParsing.required(r.text("financial_year_id"), field: "avelo_payroll_entries.financial_year_id")
+        let voucherId = try UUIDParsing.optional(r.optionalText("voucher_id"), field: "avelo_payroll_entries.voucher_id")
+>>>>>>> origin/main:Mally/Core/Repositories/PayrollRepository.swift
         return PayrollEntry(
             id: id,
             companyId: companyId,
             employeeId: employeeId,
             financialYearId: fyId,
             voucherId: voucherId,
+<<<<<<< HEAD:Avelo/Core/Repositories/PayrollRepository.swift
             month: Int(try r.requiredInt("month")),
             year: Int(try r.requiredInt("year")),
             grossPaise: try r.requiredInt("gross_paise"),
@@ -226,6 +326,22 @@ public struct PayrollRepository: Sendable {
             employeeCode: try r.requiredText("employee_code"),
             employeeName: try r.requiredText("employee_name"),
             postedAt: try r.timestamp("posted_at")
+=======
+            month: Int(r.int("month")),
+            year: Int(r.int("year")),
+            grossPaise: r.int("gross_paise"),
+            deductionsPaise: r.int("deductions_paise"),
+            netPaise: r.int("net_paise"),
+            workingDays: r.real("working_days"),
+            paidDays: r.real("paid_days"),
+            basicPaise: r.int("basic_paise"),
+            hraPaise: r.int("hra_paise"),
+            otherAllowancesPaise: r.int("other_allowances_paise"),
+            overtimePaise: r.int("overtime_paise"),
+            pfApplicable: r.bool("pf_applicable"),
+            esiApplicable: r.bool("esi_applicable"),
+            postedAt: r.timestamp("posted_at")
+>>>>>>> origin/main:Mally/Core/Repositories/PayrollRepository.swift
         )
     }
 }

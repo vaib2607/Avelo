@@ -15,9 +15,12 @@ public final class AuditViewModel {
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase
+<<<<<<< HEAD
     internal var onResultsReady: (@Sendable () async -> Void)?
     private var reloadTask: Task<Void, Never>?
     private var reloadGeneration: UUID = UUID()
+=======
+>>>>>>> origin/main
 
     public init(companyId: Company.ID, db: SQLiteDatabase) {
         self.companyId = companyId
@@ -26,17 +29,24 @@ public final class AuditViewModel {
 
     public func reload() {
         isLoading = true
+<<<<<<< HEAD
         reloadTask?.cancel()
         let generation = UUID()
         reloadGeneration = generation
         error = nil
+=======
+>>>>>>> origin/main
         let db = db
         let companyId = companyId
         let query = query
         let entityTypeFilter = entityTypeFilter
         let fromDate = fromDate
         let toDate = toDate
+<<<<<<< HEAD
         reloadTask = Task.detached { [weak self] in
+=======
+        Task.detached {
+>>>>>>> origin/main
             do {
                 let repo = AuditRepository(db: db)
                 var f = AuditRepository.Filter(companyId: companyId, limit: 1000)
@@ -45,15 +55,23 @@ public final class AuditViewModel {
                 f.fromDate = fromDate
                 f.toDate = toDate
                 let events = try repo.list(filter: f)
+<<<<<<< HEAD
                 await self?.onResultsReady?()
                 await MainActor.run { [weak self] in
                     guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
+=======
+                await MainActor.run {
+>>>>>>> origin/main
                     self.events = events
                     self.isLoading = false
                 }
             } catch {
+<<<<<<< HEAD
                 await MainActor.run { [weak self] in
                     guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
+=======
+                await MainActor.run {
+>>>>>>> origin/main
                     self.error = AppError.wrap(error)
                     self.isLoading = false
                 }

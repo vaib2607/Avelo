@@ -34,6 +34,7 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
     case backupImported
     case companySwitched
     case financialYearSwitched
+<<<<<<< HEAD:Avelo/Core/Models/AuditEvent.swift
     case bankStatementImported
     case bankStatementLineCleared
     case inventoryOrderCreated
@@ -45,6 +46,23 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
     case voucherTemplateSaved
     case gstReportExported
     case invoicePDFExported
+=======
+    case inventoryModeChanged
+    case fyUnlocked
+    case inventoryEnabled
+    case itemCreated
+    case itemUpdated
+    case itemArchived
+    case itemAccountLinked
+    case stockMoved
+    case employeeCreated
+    case employeeUpdated
+    case employeeDeactivated
+    case payrollEntryPosted
+    case bankStatementImported
+    case bankStatementLineCleared
+    case bankReconciled
+>>>>>>> origin/main:Mally/Core/Models/AuditEvent.swift
 
     public var id: String { rawValue }
 
@@ -83,6 +101,7 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
         case .backupImported:           return "Backup imported"
         case .companySwitched:          return "Company switched"
         case .financialYearSwitched:    return "Financial year switched"
+<<<<<<< HEAD:Avelo/Core/Models/AuditEvent.swift
         case .bankStatementImported:    return "Bank statement imported"
         case .bankStatementLineCleared: return "Bank statement line cleared"
         case .inventoryOrderCreated:    return "Inventory order created"
@@ -94,6 +113,22 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
         case .voucherTemplateSaved:     return "Voucher template saved"
         case .gstReportExported:        return "GST report exported"
         case .invoicePDFExported:       return "Invoice PDF exported"
+=======
+        case .inventoryModeChanged:     return "Inventory mode changed"
+        case .inventoryEnabled:         return "Inventory enabled"
+        case .itemCreated:              return "Item created"
+        case .itemUpdated:              return "Item updated"
+        case .itemArchived:             return "Item archived"
+        case .itemAccountLinked:        return "Item account linked"
+        case .stockMoved:               return "Stock moved"
+        case .employeeCreated:          return "Employee created"
+        case .employeeUpdated:          return "Employee updated"
+        case .employeeDeactivated:      return "Employee deactivated"
+        case .payrollEntryPosted:       return "Payroll entry posted"
+        case .bankStatementImported:    return "Bank statement imported"
+        case .bankStatementLineCleared: return "Bank statement line cleared"
+        case .bankReconciled:           return "Bank reconciled"
+>>>>>>> origin/main:Mally/Core/Models/AuditEvent.swift
         }
     }
 }

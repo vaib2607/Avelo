@@ -20,33 +20,30 @@ public struct VouchersView: View {
         return "\(company)-\(env.dataRevision)"
     }
 
-    static func filterDateFallback(_ date: Date?) -> Date {
-        date ?? Date()
-    }
-
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem {
             Menu {
-                newVoucherButton(.journal)
-                newVoucherButton(.payment)
-                newVoucherButton(.receipt)
-                newVoucherButton(.contra)
-                newVoucherButton(.purchase)
-                newVoucherButton(.sales)
+                Button("New Journal") { env.router.present(.newJournal) }
+                Button("New Payment") { env.router.present(.newPayment) }
+                Button("New Receipt") { env.router.present(.newReceipt) }
+                Button("New Contra")  { env.router.present(.newContra) }
+                Button("New Purchase"){ env.router.present(.newPurchase) }
+                Button("New Sales")   { env.router.present(.newSales) }
                 Divider()
-                newVoucherButton(.creditNote)
-                newVoucherButton(.debitNote)
+                Button("New Purchase Order") { env.router.present(.newPurchaseOrder) }
+                Button("New Sales Order") { env.router.present(.newSalesOrder) }
+                Button("New Receipt Note") { env.router.present(.newReceiptNote) }
+                Button("New Delivery Note") { env.router.present(.newDeliveryNote) }
+                Button("New Physical Stock") { env.router.present(.newPhysicalStock) }
+                Button("New Stock Journal") { env.router.present(.newStockJournal) }
+                Button("New Rejection In") { env.router.present(.newRejectionIn) }
+                Button("New Rejection Out") { env.router.present(.newRejectionOut) }
+                Button("New Credit Note") { env.router.present(.newCreditNote) }
+                Button("New Debit Note")  { env.router.present(.newDebitNote) }
             } label: {
                 Label("New", systemImage: "plus")
             }
-        }
-    }
-
-    @ViewBuilder
-    private func newVoucherButton(_ type: VoucherType.Code) -> some View {
-        if let action = AppActionRegistry.action(for: .voucherCreate(type)) {
-            Button(action.title) { AppActionRegistry.perform(.voucherCreate(type), router: env.router) }
         }
     }
 
@@ -96,7 +93,7 @@ private struct VouchersBody: View {
                 ],
                 primaryActionTitle: "New Sales",
                 primaryActionSystemImage: "plus",
-                primaryAction: { AppActionRegistry.perform(.voucherCreate(.sales), router: env.router) }
+                primaryAction: { env.router.present(.newSales) }
             )
             filterBar
             Divider()
@@ -106,20 +103,14 @@ private struct VouchersBody: View {
                     message: "Press F5 for Payment, F6 for Receipt, F7 for Journal, F4 for Contra — or use the New menu above.",
                     systemImage: "doc.text",
                     actionTitle: "New Journal",
-                    action: { AppActionRegistry.perform(.voucherCreate(.journal), router: env.router) }
+                    action: { env.router.present(.newJournal) }
                 )
             } else {
                 voucherTable
             }
-            PaginationControls(
-                state: vm.pagination,
-                isLoading: vm.isLoading,
-                previous: { vm.previousPage() },
-                next: { vm.nextPage() }
-            )
             ModuleFooterBar(items: [
                 .init(title: "Next", detail: "Use Edit or Reverse on any row to continue the workflow."),
-                .init(title: "Shortcut", detail: "F4–F9 and ⌃F8/⌃F9 open the Tally voucher entry screens."),
+                .init(title: "Shortcut", detail: "F4-F11 open the common voucher entry screens."),
                 .init(title: "Filter", detail: "Use the Type button to narrow by voucher family.")
             ])
         }
@@ -128,7 +119,7 @@ private struct VouchersBody: View {
     @ViewBuilder
     private var voucherTable: some View {
         VStack(spacing: 0) {
-            Table(vm.vouchers, selection: $vm.selectedVoucherId) {
+            Table(vm.vouchers) {
                 TableColumn("Date") { v in
                     Text(DateFormatters.userDate.string(from: v.date))
                 }
@@ -136,7 +127,7 @@ private struct VouchersBody: View {
                 TableColumn("Type", value: \.voucherTypeCode.rawValue)
                 TableColumn("Party") { v in
                     if let pid = v.partyAccountId {
-                        Text(vm.accountName(pid).capitalized)
+                        Text(vm.accountName(pid))
                     } else { Text("—").foregroundStyle(.secondary) }
                 }
                 TableColumn("Narration") { v in
@@ -154,64 +145,13 @@ private struct VouchersBody: View {
                     }
                 }
                 TableColumn("Actions") { v in
-                    let context = AppActionContext(voucher: v)
                     HStack {
-                        Button("Edit") { AppActionRegistry.perform(.voucherAlter, context: context, router: env.router) }
-                            .disabled(!AppActionRegistry.availability(for: .voucherAlter, in: context).isAvailable)
-                        Button("Reverse") { AppActionRegistry.perform(.voucherReverse, context: context, router: env.router) }
-                            .disabled(!AppActionRegistry.availability(for: .voucherReverse, in: context).isAvailable)
-                        // No ⌥2 keyboard shortcut here: Table has no row
-                        // selection binding, so a global shortcut would be
-                        // ambiguous across rows. Mouse-only until selection
-                        // state is added (tracked with AVL-P1-044).
-                        Button("Duplicate") { duplicate(v) }
-                            .disabled(!AppActionRegistry.availability(for: .voucherDuplicate, in: context).isAvailable)
-                        if AppActionRegistry.availability(for: .voucherExportPDF, in: context).isAvailable {
-                            Button("Export PDF…") { exportInvoicePDF(v) }
-                        }
+                        Button("Edit") { env.router.present(.editVoucher(v.id)) }
+                            .disabled(v.isReversal)
+                        Button("Reverse") { env.router.present(.reverseVoucher(v.id)) }
+                            .disabled(v.isReversal)
                     }
                 }
-            }
-            .onKeyPress(.pageUp) { vm.selectPrevious(); return .handled }
-            .onKeyPress(.pageDown) { vm.selectNext(); return .handled }
-        }
-        // AVL-P2-013 (Ctrl+I insert while browsing): opens a new voucher
-        // without touching vm.query/typeFilter/fromDate/toDate/pagination —
-        // the list's filter/scroll state is untouched because this never
-        // calls reload()/reloadFirstPage().
-        .background {
-            Button("") { AppActionRegistry.perform(.voucherCreate(.journal), router: env.router) }
-                .keyboardShortcut("i", modifiers: [.control])
-                .hidden()
-        }
-    }
-
-    /// AVL-P2-011 (Alt+2 duplicate): preloads a fresh `NewVoucherSheet` with
-    /// the source voucher's lines via the same `pendingDraftRecovery` hook
-    /// draft-crash-recovery uses — no new persistence path, no
-    /// `avelo_voucher_drafts` row, a brand-new voucher number on save.
-    private func duplicate(_ voucher: Voucher) {
-        guard let ctx = env.companyContext, let sheet = AppActionRegistry.creationSheet(for: voucher.voucherTypeCode) else { return }
-        do {
-            let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
-            let lines = try svc.lines(for: voucher.id)
-            env.pendingDraftRecovery = VoucherEditViewModel.duplicateDraft(from: voucher, lines: lines)
-            env.router.present(sheet)
-        } catch {
-            env.showError(AppError.wrap(error))
-        }
-    }
-
-    private func exportInvoicePDF(_ voucher: Voucher) {
-        Task {
-            do {
-                let data = try vm.invoicePDFData(voucherId: voucher.id)
-                if let url = try await NSPanelBridge.saveData(data, suggestedName: "\(voucher.number).pdf") {
-                    try vm.recordInvoicePDFSaved(voucherId: voucher.id, url: url)
-                    env.showSuccess("Invoice PDF exported to \(url.lastPathComponent).")
-                }
-            } catch {
-                env.showError(AppError.wrap(error))
             }
         }
     }
@@ -221,7 +161,6 @@ private struct VouchersBody: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 SearchBar(text: $vm.query, placeholder: "Search by narration / number / party…")
-                    .onChange(of: vm.query) { _, _ in vm.reloadFirstPage() }
                 Button { showTypeFilter.toggle() } label: {
                     Label("Type", systemImage: "line.3.horizontal.decrease.circle")
                 }
@@ -239,11 +178,11 @@ private struct VouchersBody: View {
                         }
                         Divider()
                         DatePicker("From", selection: Binding(
-                            get: { VouchersView.filterDateFallback(vm.fromDate) },
+                            get: { vm.fromDate ?? Date.distantPast },
                             set: { vm.fromDate = $0 }
                         ), displayedComponents: .date)
                         DatePicker("To", selection: Binding(
-                            get: { VouchersView.filterDateFallback(vm.toDate) },
+                            get: { vm.toDate ?? Date.distantFuture },
                             set: { vm.toDate = $0 }
                         ), displayedComponents: .date)
                         Button("Clear dates") {
@@ -254,7 +193,7 @@ private struct VouchersBody: View {
                     .padding(12)
                     .frame(minWidth: 260)
                 }
-                Button("Apply") { vm.reloadFirstPage() }
+                Button("Apply") { vm.reload() }
                     .buttonStyle(.bordered)
             }
         }

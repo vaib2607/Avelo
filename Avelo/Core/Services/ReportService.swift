@@ -35,10 +35,16 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId, fromDate: fromDate, toDate: toDate, accountId: accountId)
         let key = ReportCache.Key(companyId: companyId, reportType: "ledger", financialYearId: financialYearId, fromDate: fromDate, toDate: toDate, accountId: accountId)
         if let cached: ReportResult.LedgerReport = try Self.cache.value(for: key, db: db) { return cached }
+<<<<<<< HEAD
         let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.ledgerReport(filter: f, accountId: accountId)
         try ReconciliationCheck.verifyLedger(report, db: db, companyId: companyId, accountId: accountId, fromDate: fromDate, toDate: toDate)
         try Self.cache.store(report, for: key, changeToken: changeToken)
+=======
+        let report = try repository.ledgerReport(filter: f, accountId: accountId)
+        try ReconciliationCheck.verifyLedger(report, db: db, companyId: companyId, accountId: accountId, fromDate: fromDate, toDate: toDate)
+        try Self.cache.store(report, for: key, db: db)
+>>>>>>> origin/main
         return report
     }
 
@@ -46,6 +52,7 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "trial_balance", financialYearId: financialYearId, toDate: asOfDate)
         if let cached: ReportResult.TrialBalance = try Self.cache.value(for: key, db: db) { return cached }
+<<<<<<< HEAD
         let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.trialBalance(asOfDate: asOfDate, filter: f)
         try ReconciliationCheck.verifyTrialBalance(report)
@@ -53,6 +60,12 @@ public final class ReportService: Sendable {
             ?? (try FinancialYearRepository(db: db).findMostRecent(companyId)?.startDate)
         try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, fromDate: startDate, toDate: asOfDate)
         try Self.cache.store(report, for: key, changeToken: changeToken)
+=======
+        let report = try repository.trialBalance(asOfDate: asOfDate, filter: f)
+        try ReconciliationCheck.verifyTrialBalance(report)
+        try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, toDate: asOfDate)
+        try Self.cache.store(report, for: key, db: db)
+>>>>>>> origin/main
         return report
     }
 
@@ -60,10 +73,16 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "profit_loss", financialYearId: financialYearId, fromDate: fromDate, toDate: toDate)
         if let cached: ReportResult.ProfitLoss = try Self.cache.value(for: key, db: db) { return cached }
+<<<<<<< HEAD
         let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.profitAndLoss(fromDate: fromDate, toDate: toDate, filter: f)
         try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, fromDate: fromDate, toDate: toDate)
         try Self.cache.store(report, for: key, changeToken: changeToken)
+=======
+        let report = try repository.profitAndLoss(fromDate: fromDate, toDate: toDate, filter: f)
+        try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, fromDate: fromDate, toDate: toDate)
+        try Self.cache.store(report, for: key, db: db)
+>>>>>>> origin/main
         return report
     }
 
@@ -71,10 +90,16 @@ public final class ReportService: Sendable {
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "balance_sheet", financialYearId: financialYearId, toDate: asOfDate)
         if let cached: ReportResult.BalanceSheet = try Self.cache.value(for: key, db: db) { return cached }
+<<<<<<< HEAD
         let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.balanceSheet(asOfDate: asOfDate, filter: f)
         try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, toDate: asOfDate)
         try Self.cache.store(report, for: key, changeToken: changeToken)
+=======
+        let report = try repository.balanceSheet(asOfDate: asOfDate, filter: f)
+        try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, toDate: asOfDate)
+        try Self.cache.store(report, for: key, db: db)
+>>>>>>> origin/main
         return report
     }
 
@@ -94,11 +119,15 @@ public final class ReportService: Sendable {
     }
 
     public func stockValuation(asOfDate: Date) throws -> ReportResult.StockValuationReport {
+<<<<<<< HEAD
         try requireInventoryEnabled()
+=======
+>>>>>>> origin/main
         let f = makeFilter()
         return try repository.stockValuation(asOfDate: asOfDate, filter: f)
     }
 
+<<<<<<< HEAD
     public func cashFlow(fromDate: Date, toDate: Date) throws -> ReportResult.CashFlowStatement {
         let f = makeFilter()
         return try repository.cashFlow(fromDate: fromDate, toDate: toDate, filter: f)
@@ -119,6 +148,11 @@ public final class ReportService: Sendable {
             throw AppError.featureUnavailable("Inventory is disabled for this company.")
         }
     }
+=======
+    public static func invalidateCache(companyId: Company.ID) {
+        cache.invalidate(companyId: companyId)
+    }
+>>>>>>> origin/main
 }
 
 private final class ReportCache: @unchecked Sendable {
@@ -132,13 +166,19 @@ private final class ReportCache: @unchecked Sendable {
     }
 
     private struct Entry {
+<<<<<<< HEAD
         let changeToken: String
         let value: Any
         var lastUsedAt: Int
+=======
+        let voucherCount: Int64
+        let value: Any
+>>>>>>> origin/main
     }
 
     private let lock = NSLock()
     private var entries: [Key: Entry] = [:]
+<<<<<<< HEAD
     private var useCounter: Int = 0
     private let maxEntries = 128
 
@@ -160,6 +200,24 @@ private final class ReportCache: @unchecked Sendable {
         useCounter &+= 1
         entries[key] = Entry(changeToken: token, value: value, lastUsedAt: useCounter)
         evictIfNeeded()
+=======
+
+    func value<T>(for key: Key, db: SQLiteDatabase) throws -> T? {
+        let count = try voucherCount(db: db, companyId: key.companyId)
+        lock.lock()
+        defer { lock.unlock() }
+        guard let entry = entries[key], entry.voucherCount == count else {
+            entries.removeValue(forKey: key)
+            return nil
+        }
+        return entry.value as? T
+    }
+
+    func store<T>(_ value: T, for key: Key, db: SQLiteDatabase) throws {
+        let count = try voucherCount(db: db, companyId: key.companyId)
+        lock.lock()
+        entries[key] = Entry(voucherCount: count, value: value)
+>>>>>>> origin/main
         lock.unlock()
     }
 
@@ -169,6 +227,7 @@ private final class ReportCache: @unchecked Sendable {
         lock.unlock()
     }
 
+<<<<<<< HEAD
     func changeToken(db: SQLiteDatabase, companyId: Company.ID) throws -> String {
         try db.queryOne(
             """
@@ -185,6 +244,13 @@ private final class ReportCache: @unchecked Sendable {
     private func evictIfNeeded() {
         guard entries.count > maxEntries, let victim = entries.min(by: { $0.value.lastUsedAt < $1.value.lastUsedAt }) else { return }
         entries.removeValue(forKey: victim.key)
+=======
+    private func voucherCount(db: SQLiteDatabase, companyId: Company.ID) throws -> Int64 {
+        try db.queryOne(
+            "SELECT COUNT(*) AS c FROM avelo_vouchers WHERE company_id = ? AND is_posted = 1",
+            bind: [.text(companyId.uuidString)]
+        ) { $0.int("c") } ?? 0
+>>>>>>> origin/main
     }
 }
 
@@ -204,8 +270,13 @@ public enum ReconciliationCheck {
         let totals = try LedgerLineRepository(db: db).aggregate(
             filter: .init(companyId: companyId, accountId: accountId, fromDate: fromDate, toDate: toDate)
         )
+<<<<<<< HEAD
         let rowDebits = try CheckedMath.sum(report.rows.map(\.debitPaise), context: "summing ledger debit rows")
         let rowCredits = try CheckedMath.sum(report.rows.map(\.creditPaise), context: "summing ledger credit rows")
+=======
+        let rowDebits = report.rows.reduce(Int64(0)) { $0 + $1.debitPaise }
+        let rowCredits = report.rows.reduce(Int64(0)) { $0 + $1.creditPaise }
+>>>>>>> origin/main
         guard totals.debitPaise == rowDebits,
               totals.creditPaise == rowCredits else {
             throw AppError.database(.schemaMismatch("Ledger report does not reconcile to paise."))

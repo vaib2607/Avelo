@@ -54,6 +54,7 @@ fi
 BENCH_HOME="$ROOT_DIR/.build/benchmark-home-$MODE"
 SCRATCH_DIR="$BENCH_HOME/.scratch-$MODE"
 rm -rf "$BENCH_HOME/.tmp" "$BENCH_HOME/.cache/clang/ModuleCache"
+<<<<<<< HEAD
 mkdir -p "$BENCH_HOME/.cache/clang/ModuleCache" "$BENCH_HOME/.swiftpm" "$BENCH_HOME/.tmp" "$BENCH_HOME/Desktop" "$SCRATCH_DIR"
 
 HOME="$BENCH_HOME" \
@@ -62,6 +63,13 @@ XDG_CACHE_HOME="$BENCH_HOME/.cache" \
 CLANG_MODULE_CACHE_PATH="$BENCH_HOME/.cache/clang/ModuleCache" \
 AVELO_BENCHMARK_OUTPUT_DIR="$BENCH_HOME/Desktop" \
 AVELO_BENCHMARK_TMP_DIR="$BENCH_HOME/.tmp" \
+=======
+mkdir -p "$BENCH_HOME/.cache/clang/ModuleCache" "$BENCH_HOME/.swiftpm" "$BENCH_HOME/.tmp" "$SCRATCH_DIR"
+
+HOME="$BENCH_HOME" \
+XDG_CACHE_HOME="$BENCH_HOME/.cache" \
+CLANG_MODULE_CACHE_PATH="$BENCH_HOME/.cache/clang/ModuleCache" \
+>>>>>>> origin/main
 AVELO_BENCHMARK="${AVELO_BENCHMARK:-1}" \
 AVELO_BENCHMARK_MILLION="${AVELO_BENCHMARK_MILLION:-$MILLION}" \
 AVELO_BENCHMARK_MILLION_BATCHED="${AVELO_BENCHMARK_MILLION_BATCHED:-$MILLION_BATCHED}" \

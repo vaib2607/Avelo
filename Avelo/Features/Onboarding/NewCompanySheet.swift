@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import AppKit
+=======
+>>>>>>> origin/main
 import SwiftUI
 
 public struct NewCompanySheet: View {
@@ -6,8 +9,11 @@ public struct NewCompanySheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @State private var vm = OnboardingViewModel()
+<<<<<<< HEAD
     @State private var createdRecoveryKey: String?
     @State private var recoveryAcknowledged: Bool = false
+=======
+>>>>>>> origin/main
 
     public init() {}
 
@@ -23,7 +29,10 @@ public struct NewCompanySheet: View {
                     fySection
                     chartSection
                     inventorySection
+<<<<<<< HEAD
                     recoverySection
+=======
+>>>>>>> origin/main
                 }
                 .padding(20)
             }
@@ -56,7 +65,10 @@ public struct NewCompanySheet: View {
                 Image(systemName: "xmark.circle.fill")
             }
             .buttonStyle(.plain)
+<<<<<<< HEAD
             .disabled(createdRecoveryKey != nil && !recoveryAcknowledged)
+=======
+>>>>>>> origin/main
         }
         .padding(16)
     }
@@ -112,6 +124,7 @@ public struct NewCompanySheet: View {
         card(title: "Inventory") {
             Toggle("Enable inventory", isOn: $vm.enableInventory)
             if vm.enableInventory {
+<<<<<<< HEAD
                 Text("Ledger vouchers do not change stock automatically. Use explicit item invoices or manual stock movements.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -136,6 +149,12 @@ public struct NewCompanySheet: View {
                     copyRecoveryKey(createdRecoveryKey)
                 }
                 Toggle("I've saved this recovery key", isOn: $recoveryAcknowledged)
+=======
+                Picker("Link mode", selection: $vm.inventoryMode) {
+                    Text("Manual").tag(InventoryLinkMode.manual)
+                    Text("Auto-prompt").tag(InventoryLinkMode.autoPrompt)
+                }
+>>>>>>> origin/main
             }
         }
     }
@@ -181,6 +200,7 @@ public struct NewCompanySheet: View {
     private var footer: some View {
         HStack {
             Spacer()
+<<<<<<< HEAD
             Button(createdRecoveryKey == nil ? "Cancel" : "Close") { router.presentedSheet = nil }
                 .keyboardShortcut(.cancelAction)
                 .disabled(createdRecoveryKey != nil && !recoveryAcknowledged)
@@ -188,12 +208,23 @@ public struct NewCompanySheet: View {
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
                 .disabled(!vm.canCreate || createdRecoveryKey != nil || env.isBusy)
+=======
+            Button("Cancel") { router.presentedSheet = nil }
+                .keyboardShortcut(.cancelAction)
+            Button("Create") { create() }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(!vm.canCreate)
+>>>>>>> origin/main
         }
         .padding(16)
     }
 
     private func create() {
+<<<<<<< HEAD
         guard !env.isBusy else { return }
+=======
+>>>>>>> origin/main
         env.isBusy = true
         Task {
             defer { env.isBusy = false }
@@ -221,21 +252,33 @@ public struct NewCompanySheet: View {
                 if vm.enableInventory {
                     if let ctx = env.companyContext {
                         let svc = CompanyService(db: ctx.database, companyId: ctx.companyId, manager: env.manager)
+<<<<<<< HEAD
                         try svc.setInventoryMode(enabled: true, linkMode: .manual)
                     }
                 }
                 env.notifyDataChanged()
                 createdRecoveryKey = try await env.manager.recoveryKey(for: company.id)
                 env.showSuccess("Company created. Save the recovery key before closing.")
+=======
+                        try svc.setInventoryMode(enabled: true, linkMode: vm.inventoryMode)
+                    }
+                }
+                env.notifyDataChanged()
+                env.showSuccess("Company created.")
+                router.presentedSheet = nil
+>>>>>>> origin/main
             } catch {
                 env.showError(AppError.wrap(error))
             }
         }
     }
+<<<<<<< HEAD
 
     private func copyRecoveryKey(_ recoveryKey: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         _ = pasteboard.setString(recoveryKey, forType: .string)
     }
+=======
+>>>>>>> origin/main
 }

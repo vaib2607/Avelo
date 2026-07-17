@@ -2,6 +2,7 @@ import XCTest
 @testable import Avelo
 
 final class VoucherServiceTests: XCTestCase {
+<<<<<<< HEAD
     func testPurchaseVoucherAndBatchUseExplicitDualRolePartyProfile() throws {
         let tc = try TestCompany.make()
         try PartyProfileRepository(db: tc.db).upsert(PartyProfile(
@@ -41,6 +42,8 @@ final class VoucherServiceTests: XCTestCase {
         }
         return value
     }
+=======
+>>>>>>> origin/main
 
     private func movement(_ db: SQLiteDatabase, account: Account.ID) throws -> (dr: Int64, cr: Int64) {
         let r = try db.queryOne(
@@ -54,6 +57,7 @@ final class VoucherServiceTests: XCTestCase {
         return (r?.0 ?? 0, r?.1 ?? 0)
     }
 
+<<<<<<< HEAD
     private func billAllocation(_ db: SQLiteDatabase, for voucherId: Voucher.ID) throws -> (kind: String, reference: String?, amount: Int64)? {
         try db.queryOne(
             """
@@ -85,6 +89,8 @@ final class VoucherServiceTests: XCTestCase {
         }
     }
 
+=======
+>>>>>>> origin/main
     func testBalancedPostPersistsWithEqualDebitCredit() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -107,6 +113,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.0, totals?.1)
     }
 
+<<<<<<< HEAD
     func testLegacyAutoPromptModeDoesNotExposeIncompleteInventoryPrompt() throws {
         let tc = try TestCompany.make()
         try tc.db.execute(
@@ -126,6 +133,8 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertNil(result.inventoryPrompt)
     }
 
+=======
+>>>>>>> origin/main
     func testPostBatchPersistsAllVouchersInOneBalancedBatch() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -151,6 +160,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.2, 25)
     }
 
+<<<<<<< HEAD
     func testPostBatchMaintainsContinuousAuditChainAcrossChunks() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -273,6 +283,8 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(nextSequence, 501)
     }
 
+=======
+>>>>>>> origin/main
     func testUnbalancedPostThrows() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -288,6 +300,7 @@ final class VoucherServiceTests: XCTestCase {
         }
     }
 
+<<<<<<< HEAD
     func testSalesVoucherAutoAddsDebitRoundOffForSmallGSTRoundingDifference() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -393,6 +406,8 @@ final class VoucherServiceTests: XCTestCase {
         }
     }
 
+=======
+>>>>>>> origin/main
     func testReverseNetsAccountsToZeroMovement() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -423,6 +438,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertNotNil(try repo.findById(tc.salesId)?.lastUsedAt)
     }
 
+<<<<<<< HEAD
     func testVoucherNumbersAreUniqueAcrossSequentialPosts() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -588,11 +604,17 @@ final class VoucherServiceTests: XCTestCase {
         let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
             .createAccount(.init(code: "DEBTOR_A", name: "Debtor A", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
 
+=======
+    func testWorkflowInputsPersistBillChequeAndTaxRecords() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+>>>>>>> origin/main
         let posted = try svc.post(
             draft: VoucherDraft(
                 mode: .create,
                 voucherTypeCode: .sales,
                 date: DateFormatters.parseDate("2024-06-01")!,
+<<<<<<< HEAD
                 partyAccountId: debtor.id,
                 billReferenceType: .newRef,
                 billReferenceNumber: "INV-77",
@@ -634,6 +656,14 @@ final class VoucherServiceTests: XCTestCase {
                 narration: "Deferred workflow test",
                 lines: [
                     .init(accountId: tc.customerId, amountPaise: 118000, side: .debit),
+=======
+                partyAccountId: tc.salesId,
+                billReferenceType: .newRef,
+                billReferenceNumber: "INV-77",
+                narration: "Workflow test",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 118000, side: .debit),
+>>>>>>> origin/main
                     .init(accountId: tc.salesId, amountPaise: 100000, side: .credit),
                     .init(accountId: tc.rentId, amountPaise: 18000, side: .credit)
                 ]
@@ -649,6 +679,7 @@ final class VoucherServiceTests: XCTestCase {
                 tcsSectionCode: "206C",
                 tcsTaxPaise: 3000
             )
+<<<<<<< HEAD
         )) { error in
             guard case AppError.featureUnavailable(let message) = error else {
                 return XCTFail("Expected featureUnavailable, got \(error)")
@@ -790,6 +821,38 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(allocation.kind, BillAllocationKind.newRef.rawValue)
         XCTAssertEqual(allocation.reference, "INV-NEW")
         XCTAssertEqual(allocation.amount, 120000)
+=======
+        ).voucher
+
+        let allocations = try tc.db.queryOne(
+            "SELECT kind, reference_number, allocated_paise FROM avelo_bill_allocations WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { ($0.text("kind"), $0.optionalText("reference_number"), $0.int("allocated_paise")) }
+        XCTAssertEqual(allocations?.0, BillAllocationKind.newRef.rawValue)
+        XCTAssertEqual(allocations?.1, "INV-77")
+        XCTAssertEqual(allocations?.2, 118000)
+
+        let cheque = try tc.db.queryOne(
+            "SELECT cheque_number, status FROM avelo_cheques WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { ($0.text("cheque_number"), $0.text("status")) }
+        XCTAssertEqual(cheque?.0, "CHQ-123")
+        XCTAssertEqual(cheque?.1, ChequeStatus.deposited.rawValue)
+
+        let tds = try tc.db.queryOne(
+            "SELECT section_code, tax_paise FROM avelo_tds_records WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { ($0.text("section_code"), $0.int("tax_paise")) }
+        XCTAssertEqual(tds?.0, "194C")
+        XCTAssertEqual(tds?.1, 5000)
+
+        let tcs = try tc.db.queryOne(
+            "SELECT section_code, tax_paise FROM avelo_tcs_records WHERE voucher_id = ?",
+            bind: [.text(posted.id.uuidString)]
+        ) { ($0.text("section_code"), $0.int("tax_paise")) }
+        XCTAssertEqual(tcs?.0, "206C")
+        XCTAssertEqual(tcs?.1, 3000)
+>>>>>>> origin/main
     }
 
     func testEditInLockedFinancialYearThrows() throws {
@@ -813,6 +876,7 @@ final class VoucherServiceTests: XCTestCase {
         }
     }
 
+<<<<<<< HEAD
     func testValidateAccumulatesAllInactiveAccountErrors() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -859,6 +923,8 @@ final class VoucherServiceTests: XCTestCase {
         }
     }
 
+=======
+>>>>>>> origin/main
     func testPostInLockedFinancialYearThrows() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -899,6 +965,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(reversal.reversalOfId, posted.voucher.id)
     }
 
+<<<<<<< HEAD
     func testReverseMirrorsBillAllocationForSettlement() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -1084,6 +1151,8 @@ final class VoucherServiceTests: XCTestCase {
         }
     }
 
+=======
+>>>>>>> origin/main
     func testVoucherCannotBeReversedTwice() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -1102,6 +1171,7 @@ final class VoucherServiceTests: XCTestCase {
         }
     }
 
+<<<<<<< HEAD
     func testCancelMarksVoucherCancelledAndCreatesLinkedReversal() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -1198,6 +1268,8 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertNotEqual(first.voucher.number, second.voucher.number)
     }
 
+=======
+>>>>>>> origin/main
     func testVoucherDeleteDoesNotCascadeLedgerLinesSilently() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)

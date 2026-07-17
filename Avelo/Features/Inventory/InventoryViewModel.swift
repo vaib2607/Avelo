@@ -8,6 +8,7 @@ public final class InventoryViewModel {
     public var items: [InventoryItem] = []
     public var query: String = ""
     public var includeArchived: Bool = false
+<<<<<<< HEAD
     public var pagination = PaginationState()
     public var isLoading: Bool = false
     public var error: AppError?
@@ -27,6 +28,13 @@ public final class InventoryViewModel {
     internal var onResultsReady: (@Sendable () async -> Void)?
     private var reloadTask: Task<Void, Never>?
     private var reloadGeneration: UUID = UUID()
+=======
+    public var isLoading: Bool = false
+    public var error: AppError?
+
+    public let companyId: Company.ID
+    public let db: SQLiteDatabase
+>>>>>>> origin/main
 
     public init(companyId: Company.ID, db: SQLiteDatabase) {
         self.companyId = companyId
@@ -35,6 +43,7 @@ public final class InventoryViewModel {
 
     public func reload() {
         isLoading = true
+<<<<<<< HEAD
         reloadTask?.cancel()
         let generation = UUID()
         reloadGeneration = generation
@@ -67,6 +76,21 @@ public final class InventoryViewModel {
             } catch {
                 await MainActor.run { [weak self] in
                     guard let self, self.reloadGeneration == generation, !Task.isCancelled else { return }
+=======
+        let db = db
+        let companyId = companyId
+        let includeArchived = includeArchived
+        Task.detached {
+            do {
+                let items = try InventoryService(db: db, companyId: companyId)
+                    .listItems(includeArchived: includeArchived)
+                await MainActor.run {
+                    self.items = items
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+>>>>>>> origin/main
                     self.error = AppError.wrap(error)
                     self.isLoading = false
                 }
@@ -75,6 +99,7 @@ public final class InventoryViewModel {
     }
 
     public var filtered: [InventoryItem] {
+<<<<<<< HEAD
         items
     }
 
@@ -91,17 +116,33 @@ public final class InventoryViewModel {
     public func nextPage() {
         pagination.goNext()
         reload()
+=======
+        guard !query.isEmpty else { return items }
+        return items.filter {
+            $0.name.localizedCaseInsensitiveContains(query)
+                || $0.code.localizedCaseInsensitiveContains(query)
+        }
+>>>>>>> origin/main
     }
 
     public func archive(_ id: InventoryItem.ID) {
         let db = db
         let companyId = companyId
+<<<<<<< HEAD
         Task.detached { [weak self] in
             do {
                 try InventoryService(db: db, companyId: companyId).archiveItem(id)
                 await self?.reload()
             } catch {
                 await MainActor.run { [weak self] in self?.error = AppError.wrap(error) }
+=======
+        Task.detached {
+            do {
+                try InventoryService(db: db, companyId: companyId).archiveItem(id)
+                await self.reload()
+            } catch {
+                await MainActor.run { self.error = AppError.wrap(error) }
+>>>>>>> origin/main
             }
         }
     }

@@ -3,6 +3,7 @@ import XCTest
 
 final class IndianFinancialYearTests: XCTestCase {
 
+<<<<<<< HEAD
     /// UTC-anchored date at noon, matching the fixed reference frame
     /// `IndianFinancialYear` uses internally (AVL-P0-023: FY detection must
     /// not depend on the device's ambient system timezone). Building this
@@ -15,6 +16,14 @@ final class IndianFinancialYearTests: XCTestCase {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         return cal.date(from: c)!
+=======
+    /// System-timezone gregorian date at noon (DST/offset-robust), matching the
+    /// calendar `IndianFinancialYear.fyLabel` uses internally.
+    private func localDate(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        var c = DateComponents()
+        c.year = y; c.month = m; c.day = d; c.hour = 12
+        return Calendar(identifier: .gregorian).date(from: c)!
+>>>>>>> origin/main
     }
 
     private func utcComponents(_ date: Date) -> DateComponents {
@@ -54,6 +63,7 @@ final class IndianFinancialYearTests: XCTestCase {
         XCTAssertNil(IndianFinancialYear.startYear(fromLabel: "garbage"))
     }
 
+<<<<<<< HEAD
     /// AVL-P0-023 regression: FY detection is anchored to a fixed UTC
     /// reference frame, not the device's ambient system timezone. Before the
     /// fix, `fyLabel`/`start`/`end` extracted year/month using
@@ -78,6 +88,8 @@ final class IndianFinancialYearTests: XCTestCase {
         XCTAssertEqual(utc.component(.month, from: IndianFinancialYear.start(for: justAfterMidnightApril1UTC)), 4)
     }
 
+=======
+>>>>>>> origin/main
     func testDetectReturnsConsistentLabelAndBounds() {
         let fy = IndianFinancialYear.detect(now: localDate(2024, 6, 15))
         XCTAssertEqual(fy.label, "2024-25")

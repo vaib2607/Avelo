@@ -1,0 +1,69 @@
+{
+  "nodes": [
+    {
+      "id": "config:.claude-flow/metrics/backup.json",
+      "type": "config",
+      "name": "backup.json",
+      "filePath": ".claude-flow/metrics/backup.json",
+      "summary": "Tracks backup state for Claude Flow daemon persistence, recording timestamp, rotation status, and whether backups were skipped due to database unavailability.",
+      "tags": ["monitoring", "backup", "telemetry", "daemon"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.claude-flow/metrics/codebase-map.json",
+      "type": "config",
+      "name": "codebase-map.json",
+      "filePath": ".claude-flow/metrics/codebase-map.json",
+      "summary": "Records the detected project structure including presence of configuration files (Claude config, Claude Flow config) and absence of Node/TypeScript configs, indicating a Swift/native project.",
+      "tags": ["project-structure", "detection", "telemetry", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.claude-flow/metrics/consolidation.json",
+      "type": "config",
+      "name": "consolidation.json",
+      "filePath": ".claude-flow/metrics/consolidation.json",
+      "summary": "Logs pattern consolidation and memory distillation metrics from the Claude Flow intelligence pipeline, tracking deduplication, embedding generation, and pattern promotion across namespaces.",
+      "tags": ["intelligence", "memory-management", "distillation", "telemetry"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.claude-flow/metrics/harness-loop.json",
+      "type": "config",
+      "name": "harness-loop.json",
+      "filePath": ".claude-flow/metrics/harness-loop.json",
+      "summary": "Comprehensive harness loop configuration tracking flywheel state, lineage generation history, mutation axis effectiveness, and neural champion configuration for continuous improvement of Claude Flow's reasoning pipeline.",
+      "tags": ["harness", "optimization", "neural", "configuration", "telemetry"],
+      "complexity": "moderate",
+      "languageNotes": "Tracks multi-axis hyperparameter tuning (alpha, subjectWeight, mmrLambda, bodyWeight, typePenaltyFactor) for ranking function optimization across generations."
+    },
+    {
+      "id": "config:.claude-flow/metrics/performance.json",
+      "type": "config",
+      "name": "performance.json",
+      "filePath": ".claude-flow/metrics/performance.json",
+      "summary": "System performance metrics capturing memory usage, process uptime, cache hit rates, and average response times for Claude Flow daemon operations.",
+      "tags": ["performance", "monitoring", "memory", "telemetry"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.claude-flow/metrics/security-audit.json",
+      "type": "config",
+      "name": "security-audit.json",
+      "filePath": ".claude-flow/metrics/security-audit.json",
+      "summary": "Security posture assessment verifying environment file protection, gitignore presence, and absence of hardcoded secrets, with low-risk classification.",
+      "tags": ["security", "audit", "compliance", "telemetry"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.claude-flow/metrics/test-gaps.json",
+      "type": "config",
+      "name": "test-gaps.json",
+      "filePath": ".claude-flow/metrics/test-gaps.json",
+      "summary": "Test coverage analysis tracking presence of test directories and test gap identification for the Avelo Swift project.",
+      "tags": ["testing", "coverage", "analysis", "telemetry"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": []
+}
