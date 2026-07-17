@@ -9,7 +9,6 @@ extension ReportRepository {
             .init(accountCode: "CGST_OUTPUT", sign: 1),
             .init(accountCode: "SGST_OUTPUT", sign: 1),
             .init(accountCode: "IGST_OUTPUT", sign: 1),
-            .init(accountCode: "CESS",        sign: 1),
             .init(accountCode: "CGST_INPUT",  sign: -1),
             .init(accountCode: "SGST_INPUT",  sign: -1),
             .init(accountCode: "IGST_INPUT",  sign: -1)
@@ -19,11 +18,15 @@ extension ReportRepository {
             for: Array(accountsByCode.values.map(\.id)),
             companyId: filter.companyId,
             fromDate: fromDate,
-            toDate: toDate
+            toDate: toDate,
+            financialYearId: filter.financialYearId,
+            voucherTypeCodes: filter.voucherTypeCodes
         )
         var output: [ReportResult.GstBucket] = []
         var input: [ReportResult.GstBucket] = []
         var net: Int64 = 0
+        var outputTax: Int64 = 0
+        var inputTax: Int64 = 0
         for c in codes {
             let acct = accountsByCode[c.accountCode]
             guard let acct else { continue }
@@ -36,22 +39,82 @@ extension ReportRepository {
             let label = "\(c.accountCode.replacingOccurrences(of: "_", with: " "))"
             let bucket = ReportResult.GstBucket(id: label, label: label, amountPaise: netAmt)
             if c.sign > 0 { output.append(bucket) } else { input.append(bucket) }
+            if c.sign > 0 {
+                outputTax = try CheckedMath.add(outputTax, netAmt, context: "summing GST output tax")
+            } else {
+                inputTax = try CheckedMath.add(inputTax, netAmt, context: "summing GST input tax")
+            }
             net = try CheckedMath.add(
                 net,
                 try CheckedMath.multiply(netAmt, Int64(c.sign), context: "calculating GST summary net payable"),
                 context: "summing GST summary net payable"
             )
         }
+        var cessSQL = """
+            SELECT
+                COALESCE(SUM(CASE WHEN v.voucher_type_code IN ('sales', 'creditNote') AND l.side = 'credit' THEN l.amount_paise ELSE 0 END), 0) AS output_cess,
+                COALESCE(SUM(CASE WHEN v.voucher_type_code IN ('purchase', 'debitNote') AND l.side = 'debit' THEN l.amount_paise ELSE 0 END), 0) AS input_cess
+            FROM avelo_ledger_lines l
+            JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
+            JOIN avelo_accounts a ON a.id = l.account_id AND a.company_id = l.company_id
+            WHERE l.company_id = ? AND a.code = 'CESS' AND v.is_posted = 1
+              AND v.date BETWEEN ? AND ?
+            """
+        var cessBind: [SQLValue] = [.text(filter.companyId.uuidString), .date(fromDate), .date(toDate)]
+        if let financialYearId = filter.financialYearId {
+            cessSQL += " AND v.financial_year_id = ?"
+            cessBind.append(.text(financialYearId.uuidString))
+        }
+        if !filter.voucherTypeCodes.isEmpty {
+            let placeholders = Array(repeating: "?", count: filter.voucherTypeCodes.count).joined(separator: ",")
+            cessSQL += " AND v.voucher_type_code IN (\(placeholders))"
+            cessBind.append(contentsOf: filter.voucherTypeCodes.sorted { $0.rawValue < $1.rawValue }.map { .text($0.rawValue) })
+        }
+        let cess = try db.queryOne(cessSQL, bind: cessBind) { ($0.int("output_cess"), $0.int("input_cess")) } ?? (0, 0)
+        output.append(.init(id: "CESS", label: "CESS", amountPaise: cess.0))
+        input.append(.init(id: "CESS_INPUT", label: "CESS INPUT", amountPaise: cess.1))
+        outputTax = try CheckedMath.add(outputTax, cess.0, context: "summing GST output CESS")
+        inputTax = try CheckedMath.add(inputTax, cess.1, context: "summing GST input CESS")
+        net = try CheckedMath.add(net, cess.0, context: "summing GST output CESS")
+        net = try CheckedMath.subtract(net, cess.1, context: "summing GST input CESS")
+
+        var taxableSQL = """
+            SELECT
+                COALESCE(SUM(CASE WHEN v.voucher_type_code = 'sales' THEN l.taxable_value_paise ELSE 0 END), 0) AS output_taxable,
+                COALESCE(SUM(CASE WHEN v.voucher_type_code = 'purchase' THEN l.taxable_value_paise ELSE 0 END), 0) AS input_taxable
+            FROM avelo_voucher_item_lines l
+            JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
+            WHERE l.company_id = ? AND v.is_posted = 1
+              AND v.date BETWEEN ? AND ?
+            """
+        var taxableBind: [SQLValue] = [.text(filter.companyId.uuidString), .date(fromDate), .date(toDate)]
+        if let financialYearId = filter.financialYearId {
+            taxableSQL += " AND v.financial_year_id = ?"
+            taxableBind.append(.text(financialYearId.uuidString))
+        }
+        if !filter.voucherTypeCodes.isEmpty {
+            let placeholders = Array(repeating: "?", count: filter.voucherTypeCodes.count).joined(separator: ",")
+            taxableSQL += " AND v.voucher_type_code IN (\(placeholders))"
+            taxableBind.append(contentsOf: filter.voucherTypeCodes.sorted { $0.rawValue < $1.rawValue }.map { .text($0.rawValue) })
+        }
+        let taxable = try db.queryOne(taxableSQL, bind: taxableBind) { ($0.int("output_taxable"), $0.int("input_taxable")) } ?? (0, 0)
         return ReportResult.GstSummary(
-            fromDate: fromDate, toDate: toDate,
-            output: output, input: input, netPayablePaise: net
+            fromDate: fromDate,
+            toDate: toDate,
+            output: output,
+            input: input,
+            outputTaxablePaise: taxable.0,
+            inputTaxablePaise: taxable.1,
+            outputTaxPaise: outputTax,
+            inputTaxPaise: inputTax,
+            netPayablePaise: net
         )
     }
 
     // MARK: - Day Book
 
     public func dayBook(fromDate: Date, toDate: Date, filter: ReportResult.ReportFilter) throws -> [ReportResult.DayBookRow] {
-        let sql = """
+        var sql = """
             SELECT v.id, v.created_at, v.number, v.voucher_type_code, v.narration,
                    pa.name AS party_name,
                    COALESCE(SUM(CASE WHEN l.side = 'debit' THEN l.amount_paise ELSE 0 END), 0) AS total_debit,
@@ -59,11 +122,22 @@ extension ReportRepository {
             FROM avelo_vouchers v
             LEFT JOIN avelo_accounts pa ON pa.id = v.party_account_id
             LEFT JOIN avelo_ledger_lines l ON l.voucher_id = v.id AND l.company_id = v.company_id
-            WHERE v.company_id = ? AND v.date BETWEEN ? AND ?
+            WHERE v.company_id = ? AND v.is_posted = 1 AND v.date BETWEEN ? AND ?
             GROUP BY v.id, v.created_at, v.number, v.voucher_type_code, v.narration, pa.name
             ORDER BY v.date ASC, v.created_at ASC, v.number ASC
         """
-        return try db.query(sql, bind: [.text(filter.companyId.uuidString), .date(fromDate), .date(toDate)]) { r in
+        var bind: [SQLValue] = [.text(filter.companyId.uuidString), .date(fromDate), .date(toDate)]
+        if let financialYearId = filter.financialYearId {
+            sql = sql.replacingOccurrences(of: "WHERE v.company_id = ? AND v.is_posted = 1", with: "WHERE v.company_id = ? AND v.financial_year_id = ? AND v.is_posted = 1")
+            bind.insert(.text(financialYearId.uuidString), at: 1)
+        }
+        if !filter.voucherTypeCodes.isEmpty {
+            let placeholders = Array(repeating: "?", count: filter.voucherTypeCodes.count).joined(separator: ",")
+            sql = sql.replacingOccurrences(of: "WHERE v.company_id = ?", with: "WHERE v.company_id = ? AND v.voucher_type_code IN (\(placeholders))")
+            let insertionIndex = filter.financialYearId == nil ? 1 : 2
+            bind.insert(contentsOf: filter.voucherTypeCodes.sorted { $0.rawValue < $1.rawValue }.map { .text($0.rawValue) }, at: insertionIndex)
+        }
+        return try db.query(sql, bind: bind) { r in
             return ReportResult.DayBookRow(
                 id: try UUIDParsing.required(r.requiredText("id"), field: "report.day_book.voucher_id"),
                 timestamp: try r.timestamp("created_at"),
@@ -110,8 +184,7 @@ extension ReportRepository {
 
     private func outstandingEvents(asOfDate: Date,
                                    filter: ReportResult.ReportFilter) throws -> [BillAllocationEvent] {
-        try db.query(
-            """
+        var sql = """
             SELECT
                 ba.id,
                 ba.company_id,
@@ -132,11 +205,21 @@ extension ReportRepository {
             JOIN avelo_ledger_lines l ON l.voucher_id = ba.voucher_id
                 AND l.company_id = ba.company_id
                 AND l.account_id = ba.party_account_id
-            WHERE ba.company_id = ?
+            WHERE ba.company_id = ? AND v.is_posted = 1
               AND v.date <= ?
-            ORDER BY v.date ASC, v.created_at ASC, v.number ASC, ba.created_at ASC, ba.id ASC
-            """,
-            bind: [.text(filter.companyId.uuidString), .date(asOfDate)]
+            """
+        var bind: [SQLValue] = [.text(filter.companyId.uuidString), .date(asOfDate)]
+        if let financialYearId = filter.financialYearId {
+            sql += " AND v.financial_year_id = ?"
+            bind.append(.text(financialYearId.uuidString))
+        }
+        if !filter.voucherTypeCodes.isEmpty {
+            let placeholders = Array(repeating: "?", count: filter.voucherTypeCodes.count).joined(separator: ",")
+            sql += " AND v.voucher_type_code IN (\(placeholders))"
+            bind.append(contentsOf: filter.voucherTypeCodes.sorted { $0.rawValue < $1.rawValue }.map { .text($0.rawValue) })
+        }
+        sql += " ORDER BY v.date ASC, v.created_at ASC, v.number ASC, ba.created_at ASC, ba.id ASC"
+        return try db.query(sql, bind: bind
         ) { row in
             let allocation = try BillAllocation(
                 id: UUIDParsing.required(row.requiredText("id"), field: "report.outstanding.bill_allocation_id"),
@@ -270,10 +353,10 @@ extension ReportRepository {
                        WHEN movement_type = 'out' THEN -total_value_paise
                        ELSE 0 END), 0) AS value_paise
             FROM avelo_stock_movements
-            WHERE item_id IN (\(placeholders)) AND date <= ?
+            WHERE company_id = ? AND item_id IN (\(placeholders)) AND date <= ?
             GROUP BY item_id
         """
-        var ageingBind: [SQLValue] = [.date(asOfDate), .date(asOfDate), .date(asOfDate), .date(asOfDate)]
+        var ageingBind: [SQLValue] = [.date(asOfDate), .date(asOfDate), .date(asOfDate), .date(asOfDate), .text(filter.companyId.uuidString)]
         ageingBind.append(contentsOf: bind)
         var rowsByItem: [InventoryItem.ID: ReportResult.StockAgeingRow] = [:]
         _ = try db.query(sql, bind: ageingBind) { row in

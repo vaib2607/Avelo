@@ -67,7 +67,8 @@ extension ReportRepository {
             for: raws.map { $0.0 },
             companyId: filter.companyId,
             fromDate: fromDate,
-            toDate: toDate
+            toDate: toDate,
+            financialYearId: filter.financialYearId
         )
         var rows: [ReportResult.TrialBalanceRow] = []
         var sectionTotal: Int64 = 0
@@ -94,7 +95,8 @@ extension ReportRepository {
             sectionTotal = try CheckedMath.add(sectionTotal, absNet, context: "summing profit and loss section total")
             rows.append(ReportResult.TrialBalanceRow(
                 id: id, accountCode: code, accountName: name, groupPath: gcode,
-                debitPaise: 0, creditPaise: 0
+                debitPaise: nature == .expense && absNet > 0 ? absNet : (nature == .income && absNet < 0 ? try CheckedMath.abs(absNet, context: "calculating income debit row") : 0),
+                creditPaise: nature == .income && absNet > 0 ? absNet : (nature == .expense && absNet < 0 ? try CheckedMath.abs(absNet, context: "calculating expense credit row") : 0)
             ))
         }
         return ReportResult.ProfitLossSection(title: rootCodes.joined(separator: "/"), rows: rows, totalPaise: sectionTotal)
@@ -122,10 +124,8 @@ extension ReportRepository {
         let groups = try AccountGroupRepository(db: db).listForCompany(filter.companyId)
         let groupById: [UUID: AccountGroup] = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
 
-        let assetCodes = ["FIXED_ASSETS", "INVESTMENTS", "CURRENT_ASSETS", "STOCK_IN_HAND", "BANK_ACCOUNTS"]
-        let liabilityCodes = ["CAPITAL", "LOANS", "CURRENT_LIAB", "DUTIES_TAXES"]
-        let assetSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .assets, rootCodes: assetCodes, groupById: groupById, openingContext: openingContext)
-        let liabSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .liabilities, rootCodes: liabilityCodes, groupById: groupById, openingContext: openingContext)
+        let assetSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .assets, rootCodes: nil, groupById: groupById, openingContext: openingContext)
+        let liabSections = try bsSections(filter: filter, asOfDate: asOfDate, nature: .liabilities, rootCodes: nil, groupById: groupById, openingContext: openingContext)
         let totalAssets = try CheckedMath.sum(assetSections.map(\.totalPaise), context: "summing balance sheet assets")
         let totalLiab = try CheckedMath.sum(liabSections.map(\.totalPaise), context: "summing balance sheet liabilities")
         let equity = try CheckedMath.subtract(totalAssets, totalLiab, context: "calculating balance sheet equity")
@@ -144,10 +144,12 @@ extension ReportRepository {
     private func bsSections(filter: ReportResult.ReportFilter,
                             asOfDate: Date,
                             nature: AccountNature,
-                            rootCodes: [String],
+                            rootCodes: [String]?,
                             groupById: [AccountGroup.ID: AccountGroup],
                             openingContext: FinancialYearOpeningContext?) throws -> [ReportResult.BalanceSheetSection] {
-        let groupIds = groupsWithNature(nature: nature, rootCodes: rootCodes, allGroups: Array(groupById.values))
+        let groupIds = rootCodes == nil
+            ? Array(groupById.values.filter { $0.nature == nature }.map(\.id))
+            : groupsWithNature(nature: nature, rootCodes: rootCodes ?? [], allGroups: Array(groupById.values))
         let placeholders = Array(repeating: "?", count: groupIds.count).joined(separator: ",")
         var sql = """
             SELECT a.id, a.code, a.name, a.opening_balance_paise AS ob, a.opening_balance_side AS obs,
@@ -176,7 +178,8 @@ extension ReportRepository {
             for: raws.map { $0.0 },
             companyId: filter.companyId,
             fromDate: openingContext?.financialYear.startDate,
-            toDate: asOfDate
+            toDate: asOfDate,
+            financialYearId: filter.financialYearId
         )
         var byGname: [String: [ReportResult.TrialBalanceRow]] = [:]
         var totals: [String: Int64] = [:]
@@ -231,17 +234,28 @@ extension ReportRepository {
     }
 
     public func cashFlow(fromDate: Date, toDate: Date, filter: ReportResult.ReportFilter) throws -> ReportResult.CashFlowStatement {
-        let sql = """
+        guard let company = try CompanyRepository(db: db).findById(filter.companyId) else {
+            throw AppError.notFound("Company")
+        }
+        let groups = try AccountGroupRepository(db: db).listForCompany(filter.companyId)
+        let accounts = try AccountRepository(db: db).listForCompany(filter.companyId)
+        let policy = try AccountEligibilityPolicy.loading(db: db, companyId: filter.companyId)
+        let cashBankIDs = accounts.filter {
+            policy.evaluate(account: $0, for: .bankReconciliation, company: company, groups: groups).isEligible
+        }.map(\.id)
+        guard !cashBankIDs.isEmpty else {
+            return ReportResult.CashFlowStatement(fromDate: fromDate, toDate: toDate, rows: [], operatingNetPaise: 0, investingNetPaise: 0, financingNetPaise: 0, netCashFlowPaise: 0)
+        }
+        let cashPlaceholders = Array(repeating: "?", count: cashBankIDs.count).joined(separator: ",")
+        var sql = """
             WITH cash_lines AS (
                 SELECT l.voucher_id, l.side, l.amount_paise
                 FROM avelo_ledger_lines l
-                JOIN avelo_accounts a ON a.id = l.account_id
-                JOIN avelo_vouchers v ON v.id = l.voucher_id
+                JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
                 WHERE l.company_id = ?
-                  AND v.company_id = ?
                   AND v.is_posted = 1
                   AND v.date BETWEEN ? AND ?
-                  AND (UPPER(a.code) LIKE '%CASH%' OR UPPER(a.code) LIKE '%BANK%')
+                  AND l.account_id IN (\(cashPlaceholders))
             )
             SELECT a.code,
                    a.name,
@@ -254,25 +268,27 @@ extension ReportRepository {
                        ELSE 0 END), 0) AS outflow
             FROM cash_lines cl
             JOIN avelo_ledger_lines l ON l.voucher_id = cl.voucher_id AND l.company_id = ?
-            JOIN avelo_accounts a ON a.id = l.account_id
-            JOIN avelo_account_groups g ON g.id = a.group_id
-            WHERE NOT (UPPER(a.code) LIKE '%CASH%' OR UPPER(a.code) LIKE '%BANK%')
+            JOIN avelo_accounts a ON a.id = l.account_id AND a.company_id = l.company_id
+            JOIN avelo_account_groups g ON g.id = a.group_id AND g.company_id = a.company_id
+            WHERE a.id NOT IN (\(cashPlaceholders))
             GROUP BY a.id, a.code, a.name, g.nature
             HAVING inflow != 0 OR outflow != 0
             ORDER BY g.nature, a.code
         """
+        var bind: [SQLValue] = [.text(filter.companyId.uuidString), .date(fromDate), .date(toDate)]
+        bind.append(contentsOf: cashBankIDs.map { .text($0.uuidString) })
+        if let financialYearId = filter.financialYearId {
+            sql = sql.replacingOccurrences(of: "AND v.date BETWEEN ? AND ?", with: "AND v.financial_year_id = ? AND v.date BETWEEN ? AND ?")
+            bind.insert(.text(financialYearId.uuidString), at: 1)
+        }
+        bind.append(.text(filter.companyId.uuidString))
+        bind.append(contentsOf: cashBankIDs.map { .text($0.uuidString) })
         var operating: Int64 = 0
         var investing: Int64 = 0
         var financing: Int64 = 0
         let rows = try db.query(
             sql,
-            bind: [
-                .text(filter.companyId.uuidString),
-                .text(filter.companyId.uuidString),
-                .date(fromDate),
-                .date(toDate),
-                .text(filter.companyId.uuidString)
-            ]
+            bind: bind
         ) { row in
             let nature: AccountNature = try row.enumValue("nature")
             let section: ReportResult.CashFlowRow.Section

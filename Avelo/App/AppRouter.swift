@@ -31,7 +31,12 @@ public final class AppRouter {
             }
         }
     }
-    public private(set) var isInventoryEnabled: Bool = false
+    public private(set) var featureSet: CompanyFeatureSet = .defaults
+    /// Bumped whenever capabilities change or the company context resets.
+    /// Views/widgets that cache action availability observe this to discard
+    /// stale state instead of each watching individual flags.
+    public private(set) var capabilityRevision: Int = 0
+    public var isInventoryEnabled: Bool { featureSet.inventory }
 
     public init() {}
 
@@ -41,6 +46,7 @@ public final class AppRouter {
         presentedAlert = nil
         pendingLedgerAccountId = nil
         pendingReportSelection = nil
+        capabilityRevision &+= 1
     }
 
     public func go(_ destination: SidebarDestination) {
@@ -66,8 +72,18 @@ public final class AppRouter {
     }
 
     public func setInventoryEnabled(_ enabled: Bool) {
-        isInventoryEnabled = enabled
-        if !enabled {
+        var updated = featureSet
+        updated.inventory = enabled
+        setFeatureSet(updated)
+    }
+
+    /// Swaps in the new capability set and evicts any route, pending report,
+    /// or sheet that a lost capability no longer permits.
+    public func setFeatureSet(_ newValue: CompanyFeatureSet) {
+        let changed = featureSet != newValue
+        featureSet = newValue
+        if changed { capabilityRevision &+= 1 }
+        if !newValue.inventory {
             if selection == .inventory { selection = .dashboard }
             if pendingReportSelection?.requiresInventory == true { pendingReportSelection = nil }
             if presentedSheet?.requiresInventory == true { presentedSheet = nil }

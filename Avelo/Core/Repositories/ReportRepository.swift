@@ -22,7 +22,9 @@ public struct ReportRepository: Sendable {
         for accountIds: [Account.ID],
         companyId: Company.ID,
         fromDate: Date? = nil,
-        toDate: Date? = nil
+        toDate: Date? = nil,
+        financialYearId: FinancialYear.ID? = nil,
+        voucherTypeCodes: Set<VoucherType.Code> = []
     ) throws -> [Account.ID: MovementTotals] {
         guard !accountIds.isEmpty else { return [:] }
         let placeholders = Array(repeating: "?", count: accountIds.count).joined(separator: ",")
@@ -31,8 +33,9 @@ public struct ReportRepository: Sendable {
                    COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
                    COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
             FROM avelo_ledger_lines l
-            JOIN avelo_vouchers v ON v.id = l.voucher_id
+            JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
             WHERE l.company_id = ? AND l.account_id IN (\(placeholders))
+              AND v.is_posted = 1
         """
         var bind: [SQLValue] = [.text(companyId.uuidString)]
         for id in accountIds {
@@ -45,6 +48,15 @@ public struct ReportRepository: Sendable {
         if let toDate {
             sql += " AND v.date <= ?"
             bind.append(.date(toDate))
+        }
+        if let financialYearId {
+            sql += " AND v.financial_year_id = ?"
+            bind.append(.text(financialYearId.uuidString))
+        }
+        if !voucherTypeCodes.isEmpty {
+            let placeholders = Array(repeating: "?", count: voucherTypeCodes.count).joined(separator: ",")
+            sql += " AND v.voucher_type_code IN (\(placeholders))"
+            bind.append(contentsOf: voucherTypeCodes.sorted { $0.rawValue < $1.rawValue }.map { .text($0.rawValue) })
         }
         sql += " GROUP BY l.account_id"
         var out: [Account.ID: MovementTotals] = [:]
@@ -73,8 +85,9 @@ public struct ReportRepository: Sendable {
             SELECT v.id AS vid, v.date AS vdate, v.number AS vnum, v.voucher_type_code AS vtype,
                    v.narration AS vnarration, l.amount_paise AS amt, l.side AS lside, l.line_order AS ord
             FROM avelo_ledger_lines l
-            JOIN avelo_vouchers v ON v.id = l.voucher_id
+            JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
             WHERE l.company_id = ? AND l.account_id = ?
+              AND v.is_posted = 1
         """
         var bind: [SQLValue] = [.text(filter.companyId.uuidString), .text(accountId.uuidString)]
         if let fy = filter.financialYearId {
@@ -88,6 +101,11 @@ public struct ReportRepository: Sendable {
         if let to = filter.toDate {
             sql += " AND v.date <= ?"
             bind.append(.date(to))
+        }
+        if !filter.voucherTypeCodes.isEmpty {
+            let placeholders = Array(repeating: "?", count: filter.voucherTypeCodes.count).joined(separator: ",")
+            sql += " AND v.voucher_type_code IN (\(placeholders))"
+            bind.append(contentsOf: filter.voucherTypeCodes.sorted { $0.rawValue < $1.rawValue }.map { .text($0.rawValue) })
         }
         sql += " ORDER BY v.date ASC, v.created_at ASC, l.line_order ASC"
 
@@ -192,7 +210,8 @@ public struct ReportRepository: Sendable {
             for: raws.map(\.id),
             companyId: filter.companyId,
             fromDate: movementFromDate,
-            toDate: asOfDate
+            toDate: asOfDate,
+            financialYearId: filter.financialYearId
         )
 
         var rows: [ReportResult.TrialBalanceRow] = []
@@ -257,7 +276,8 @@ public struct ReportRepository: Sendable {
             let priorMovements = try movementTotals(
                 for: [account.id],
                 companyId: filter.companyId,
-                toDate: DateFormatters.utcCalendar.date(byAdding: .day, value: -1, to: financialYear.startDate)
+                toDate: DateFormatters.utcCalendar.date(byAdding: .day, value: -1, to: financialYear.startDate),
+                financialYearId: nil
             )[account.id]
             return try CheckedMath.subtract(
                 try CheckedMath.add(

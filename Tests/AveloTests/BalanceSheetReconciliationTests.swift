@@ -188,4 +188,28 @@ final class BalanceSheetReconciliationTests: XCTestCase {
             }
         }
     }
+
+    func testBalanceSheetIncludesAssetGroupsOutsideTheDefaultCurrentAssetRoots() throws {
+        let tc = try makeSeededCompany()
+        let group = try XCTUnwrap(
+            AccountGroupRepository(db: tc.db).listForCompany(tc.companyId).first { $0.code == "MISC_EXPENSES_ASSET" }
+        )
+        let account = try AccountService(db: tc.db, companyId: tc.companyId).createAccount(.init(
+            code: "DEFERRED_ASSET",
+            name: "Deferred Asset",
+            groupId: group.id,
+            openingBalancePaise: 1_000,
+            openingBalanceSide: .debit,
+            gstin: nil,
+            existingAccountId: nil
+        ))
+
+        let report = try ReportService(db: tc.db, companyId: tc.companyId).balanceSheet(
+            asOfDate: tc.fy.endDate,
+            financialYearId: tc.fy.id
+        )
+
+        XCTAssertEqual(report.totalAssetsPaise, 1_000)
+        XCTAssertTrue(report.assets.flatMap(\.rows).contains { $0.id == account.id })
+    }
 }

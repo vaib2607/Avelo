@@ -63,7 +63,8 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_voucher_sequences",
             "avelo_voucher_templates",
             "avelo_voucher_types",
-            "avelo_vouchers"
+            "avelo_vouchers",
+            "avelo_workspace_configurations"
         ]
 
         XCTAssertEqual(try userTables(in: db), expected)
@@ -237,6 +238,15 @@ final class SchemaDriftTests: XCTestCase {
             "credit_limit_paise",
             "default_credit_period_days",
             "maintain_billwise",
+            "created_at",
+            "updated_at"
+        ])
+        XCTAssertEqual(try columns("avelo_workspace_configurations", in: db), [
+            "id",
+            "company_id",
+            "workspace_id",
+            "format_version",
+            "payload_json",
             "created_at",
             "updated_at"
         ])
@@ -477,7 +487,8 @@ final class SchemaDriftTests: XCTestCase {
 
         try MigrationRunner().runMigrations(on: db)
 
-        XCTAssertEqual(try db.userVersion(), 25)
+        let userVersion = try db.userVersion()
+        XCTAssertEqual(userVersion, SchemaVersion.current.rawValue)
         try AuditRepository(db: db).verifyIntegrity(companyId: fixture.companyId)
         try AuditService(db: db, companyId: fixture.companyId).record(
             action: .chequeBounced,

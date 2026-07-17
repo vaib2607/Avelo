@@ -225,22 +225,34 @@ public enum ReportResult {
         public let toDate: Date
         public let output: [GstBucket]
         public let input: [GstBucket]
+        public let outputTaxablePaise: Int64
+        public let inputTaxablePaise: Int64
+        public let outputTaxPaise: Int64
+        public let inputTaxPaise: Int64
         public let netPayablePaise: Int64
 
-        public var outputTaxablePaise: Int64 { output.first?.amountPaise ?? 0 }
-        public var outputTaxPaise: Int64 { output.dropFirst().first?.amountPaise ?? 0 }
-        public var inputTaxablePaise: Int64 { input.first?.amountPaise ?? 0 }
-        public var inputTaxPaise: Int64 { input.dropFirst().first?.amountPaise ?? 0 }
         public var igstPaise: Int64 { output.last(where: { $0.label.contains("IGST") })?.amountPaise ?? 0 }
         public var cgstPaise: Int64 { output.last(where: { $0.label.contains("CGST") })?.amountPaise ?? 0 }
         public var sgstPaise: Int64 { output.last(where: { $0.label.contains("SGST") })?.amountPaise ?? 0 }
         public var cessPaise: Int64 { output.last(where: { $0.label.contains("CESS") })?.amountPaise ?? 0 }
 
-        public init(fromDate: Date, toDate: Date, output: [GstBucket], input: [GstBucket], netPayablePaise: Int64) {
+        public init(fromDate: Date,
+                    toDate: Date,
+                    output: [GstBucket],
+                    input: [GstBucket],
+                    outputTaxablePaise: Int64 = 0,
+                    inputTaxablePaise: Int64 = 0,
+                    outputTaxPaise: Int64 = 0,
+                    inputTaxPaise: Int64 = 0,
+                    netPayablePaise: Int64) {
             self.fromDate = fromDate
             self.toDate = toDate
             self.output = output
             self.input = input
+            self.outputTaxablePaise = outputTaxablePaise
+            self.inputTaxablePaise = inputTaxablePaise
+            self.outputTaxPaise = outputTaxPaise
+            self.inputTaxPaise = inputTaxPaise
             self.netPayablePaise = netPayablePaise
         }
     }

@@ -241,6 +241,23 @@ trg_avelo_party_profiles_company_insert
 trg_avelo_party_profiles_company_update
 ```
 
+The following v26 identifiers are frozen:
+
+```text
+CompanyFeatureSet
+WorkspaceIdentifier
+WorkspaceConfiguration
+avelo_workspace_configurations
+id
+company_id
+workspace_id
+format_version
+payload_json
+created_at
+updated_at
+idx_avelo_workspace_configurations_company
+```
+
 Repository method names are not globally frozen by this file. Public renames still require call-site and test updates, but persistence compatibility is governed by SQL identifiers below.
 
 ## 6. Service names

@@ -259,20 +259,21 @@ public final class AppEnvironment {
             guard let fy = try fyRepo.findMostRecent(handle.companyId) else {
                 throw AppError.notFound("Financial year for company \(id.uuidString)")
             }
-            let inventoryEnabled = try CompanyRepository(db: handle.db).findById(handle.companyId)?.isInventoryEnabled ?? false
+            let featureSet = try CompanyRepository(db: handle.db).findById(handle.companyId)
+                .map(CompanyFeatureSet.init(company:)) ?? .defaults
             try AuditService(db: handle.db, companyId: handle.companyId).record(
                 action: .companySwitched,
                 entityType: "company",
                 entityId: handle.companyId.uuidString,
                 reason: "Company opened in this window"
             )
-            router.setInventoryEnabled(inventoryEnabled)
+            router.setFeatureSet(featureSet)
             self.companyContext = CompanyContext(
                 companyId: handle.companyId,
                 companyName: handle.companyName,
                 financialYear: fy,
                 database: handle.db,
-                isInventoryEnabled: inventoryEnabled
+                featureSet: featureSet
             )
             self.accountTree = AccountTreeCache(companyId: handle.companyId, database: handle.db, financialYearId: fy.id)
             await self.accountTree?.reload()
@@ -307,7 +308,7 @@ public final class AppEnvironment {
                 companyName: ctx.companyName,
                 financialYear: fy,
                 database: ctx.database,
-                isInventoryEnabled: ctx.isInventoryEnabled
+                featureSet: ctx.featureSet
             )
             accountTree = AccountTreeCache(companyId: ctx.companyId, database: ctx.database, financialYearId: fy.id)
             notifyDataChanged()
@@ -328,20 +329,21 @@ public final class AppEnvironment {
         }
     }
 
-    /// Re-reads `Company.isInventoryEnabled` from the database and rebuilds
-    /// `companyContext` with it. Call after any write that flips the flag
+    /// Re-reads the company's capability flags from the database and rebuilds
+    /// `companyContext` with them. Call after any write that flips a flag
     /// (Settings' inventory toggle) so sidebar/menu/palette/keyboard gating
     /// (AVL-P0-033) reacts immediately instead of only on next company open.
     public func refreshCompanyFlags() {
         guard let ctx = companyContext else { return }
-        let inventoryEnabled = ((try? CompanyRepository(db: ctx.database).findById(ctx.companyId)) ?? nil)?.isInventoryEnabled ?? false
-        router.setInventoryEnabled(inventoryEnabled)
+        let featureSet = ((try? CompanyRepository(db: ctx.database).findById(ctx.companyId)) ?? nil)
+            .map(CompanyFeatureSet.init(company:)) ?? .defaults
+        router.setFeatureSet(featureSet)
         companyContext = CompanyContext(
             companyId: ctx.companyId,
             companyName: ctx.companyName,
             financialYear: ctx.financialYear,
             database: ctx.database,
-            isInventoryEnabled: inventoryEnabled
+            featureSet: featureSet
         )
     }
 
@@ -352,7 +354,7 @@ public final class AppEnvironment {
             Task { await manager.closeCompany(id: ctx.companyId) }
         }
         companyContext = nil
-        router.setInventoryEnabled(false)
+        router.setFeatureSet(.defaults)
         accountTree = nil
         pendingDraftRecovery = nil
         router.reset()
@@ -410,17 +412,19 @@ public struct CompanyContext: Sendable {
     public let financialYear: FinancialYear
     public let database: SQLiteDatabase
     // AVL-P0-033: single source of truth for every UI surface (sidebar,
-    // menus, command palette, keyboard routing, dashboard) that must hide
-    // Inventory when this company has it disabled, instead of each surface
-    // re-reading Company from the database independently.
-    public let isInventoryEnabled: Bool
+    // menus, command palette, keyboard routing, dashboard) that gates on a
+    // capability, instead of each surface re-reading Company from the
+    // database independently.
+    public let featureSet: CompanyFeatureSet
 
-    public init(companyId: Company.ID, companyName: String, financialYear: FinancialYear, database: SQLiteDatabase, isInventoryEnabled: Bool = false) {
+    public var isInventoryEnabled: Bool { featureSet.inventory }
+
+    public init(companyId: Company.ID, companyName: String, financialYear: FinancialYear, database: SQLiteDatabase, featureSet: CompanyFeatureSet = .defaults) {
         self.companyId = companyId
         self.companyName = companyName
         self.financialYear = financialYear
         self.database = database
-        self.isInventoryEnabled = isInventoryEnabled
+        self.featureSet = featureSet
     }
 }
 

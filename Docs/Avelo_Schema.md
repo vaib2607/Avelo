@@ -740,12 +740,27 @@ Focused party meaning and credit policy live outside the base ledger row:
 
 `idx_avelo_party_profiles_company_usage` supports company-scoped policy loading. Insert/update ownership triggers reject profiles whose account and company do not match. Restore remaps this table after accounts.
 
-## 31. Migration policy
+## 31. Workspace configurations (`avelo_workspace_configurations`, v26)
 
-- `SchemaVersion.current = 25` and `MigrationRunner.defaultMigrations` contains `MigrationV001` through `MigrationV025` in order.
+Per-company, per-workspace saved presentation settings (density, labels, columns, grid behavior, filters, grouping, comparisons, focus behavior, print/export defaults):
+
+| Column | Contract |
+|---|---|
+| `id` | UUID primary key. |
+| `company_id` | Required company ownership boundary; `ON DELETE RESTRICT` foreign key. |
+| `workspace_id` | Stable identifier from the compiled `WorkspaceIdentifier` whitelist; non-blank, at most 64 characters; unique per company. |
+| `format_version` | Payload format version, at least 1. Rows written by a newer format are ignored on load, never deleted. |
+| `payload_json` | Non-blank JSON-encoded `WorkspaceConfiguration`. Presentation metadata and validated stable identifiers only — never financial totals, balances, or SQL fragments. |
+| `created_at`, `updated_at` | Required ISO timestamps. |
+
+`idx_avelo_workspace_configurations_company` supports company-scoped loading. Restore remaps this table with the other company-scoped tables. Saving a configuration does not emit an audit event: presentation settings are not a financially meaningful mutation, and the CHECK-constrained audit action taxonomy is not extended for them.
+
+## 32. Migration policy
+
+- `SchemaVersion.current = 26` and `MigrationRunner.defaultMigrations` contains `MigrationV001` through `MigrationV026` in order.
 - `MigrationRunner` reads `PRAGMA user_version` and `avelo_migrations`, then applies each pending migration in its own `SQLiteDatabase.write` transaction.
 - Each migration is a `struct: Migration` with a numeric version, description, and `up(_ db: SQLiteDatabase) throws` body.
 - Migrations are append-only. Never edit a past migration.
-- Fresh databases begin at v1 and converge through the same ordered migrations as upgraded databases. Fresh-create and representative historical fixtures must have identical v25 tables, columns, indexes, triggers, strict-decoding behavior, and restore coverage.
+- Fresh databases begin at v1 and converge through the same ordered migrations as upgraded databases. Fresh-create and representative historical fixtures must have identical v26 tables, columns, indexes, triggers, strict-decoding behavior, and restore coverage.
 - Every persistent change updates this document, schema-drift tests, restore/remap tables, backup/manifest compatibility, ownership and fiscal-lock triggers, and audit coverage as applicable.
 - Unknown future versions, unreadable schema versions, wrong keys, and migration/backfill failures stop before publishing a replacement database.

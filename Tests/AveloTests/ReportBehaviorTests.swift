@@ -298,7 +298,32 @@ final class ReportBehaviorTests: XCTestCase {
         let outputByLabel = Dictionary(uniqueKeysWithValues: gst.output.map { ($0.label, $0.amountPaise) })
         XCTAssertEqual(outputByLabel["CGST OUTPUT"], 900)
         XCTAssertEqual(outputByLabel["SGST OUTPUT"], 900)
+        XCTAssertEqual(gst.outputTaxablePaise, 0)
+        XCTAssertEqual(gst.inputTaxablePaise, 0)
+        XCTAssertEqual(gst.outputTaxPaise, 1800)
+        XCTAssertEqual(gst.inputTaxPaise, 0)
         XCTAssertEqual(gst.netPayablePaise, 1800)
+    }
+
+    func testProfitLossRowsCarryTheAmountsShownByTheirSectionTotals() throws {
+        let tc = try makeSeededCompany()
+        try seedActivity(tc)
+
+        let report = try ReportService(db: tc.db, companyId: tc.companyId).profitAndLoss(
+            fromDate: tc.fy.startDate,
+            toDate: tc.fy.endDate,
+            financialYearId: tc.fy.id
+        )
+
+        let sales = try XCTUnwrap(report.directIncome.rows.first { $0.id == tc.salesId })
+        XCTAssertEqual(sales.debitPaise, 0)
+        XCTAssertEqual(sales.creditPaise, 25000)
+
+        let rent = try XCTUnwrap(report.indirectExpense.rows.first { $0.id == tc.rentId })
+        XCTAssertEqual(rent.debitPaise, 20000)
+        XCTAssertEqual(rent.creditPaise, 0)
+        XCTAssertEqual(report.directIncome.rows.reduce(0) { $0 + $1.creditPaise - $1.debitPaise }, report.directIncome.totalPaise)
+        XCTAssertEqual(report.indirectExpense.rows.reduce(0) { $0 + $1.debitPaise - $1.creditPaise }, report.indirectExpense.totalPaise)
     }
 
     func testGstSummaryCsvUsesSharedPaiseFormatter() throws {
