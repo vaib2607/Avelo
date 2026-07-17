@@ -123,6 +123,78 @@ final class AppEnvironmentFlowTests: XCTestCase {
         XCTAssertNotNil(events.first?.reason)
     }
 
+    // Unit E / multi-window investigation, 2026-07-16: two independent
+    // AppEnvironment/DatabaseManager pairs against the same app-support
+    // root (matching what two real windows would produce) previously
+    // failed here — envB.openCompany(beta.id) didn't resolve to beta's own
+    // context. Root cause: CompanyService.create wrote the registry row
+    // through a freshly-opened SQLiteDatabase on the registry file instead
+    // of DatabaseManager's own long-lived registryDb connection, so a
+    // second manager's registry reads could race the first manager's
+    // out-of-band write. Fixed by routing the write through
+    // DatabaseManager.registerCompany(_:), the actor's own connection.
+    func testTwoIndependentEnvironmentsOnSharedStorageDoNotLeakCompanyContext() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let managerA = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
+        let registryDbA = try await SQLiteDatabase(path: managerA.registryPath)
+        defer { registryDbA.close() }
+        let envA = AppEnvironment(
+            manager: managerA,
+            router: AppRouter(),
+            keyboard: KeyboardRouter(),
+            registry: RegistryRepository(db: registryDbA),
+            backupService: BackupService(manager: managerA)
+        )
+
+        let managerB = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
+        let registryDbB = try await SQLiteDatabase(path: managerB.registryPath)
+        defer { registryDbB.close() }
+        let envB = AppEnvironment(
+            manager: managerB,
+            router: AppRouter(),
+            keyboard: KeyboardRouter(),
+            registry: RegistryRepository(db: registryDbB),
+            backupService: BackupService(manager: managerB)
+        )
+
+        let alpha = try await CompanyService.create(
+            companyInput: .init(name: "Window Alpha Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: managerA
+        )
+        let beta = try await CompanyService.create(
+            companyInput: .init(name: "Window Beta Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: managerB
+        )
+
+        await envA.openCompany(alpha.id)
+        await envB.openCompany(beta.id)
+
+        let ctxA = try XCTUnwrap(envA.companyContext)
+        let ctxB = try XCTUnwrap(envB.companyContext)
+        XCTAssertEqual(ctxA.companyId, alpha.id)
+        XCTAssertEqual(ctxA.companyName, "Window Alpha Co")
+        XCTAssertEqual(ctxB.companyId, beta.id)
+        XCTAssertEqual(ctxB.companyName, "Window Beta Co")
+        XCTAssertNotEqual(ctxA.companyId, ctxB.companyId)
+    }
+
     func testOpeningSecondCompanyResetsRouterAndSwapsVisibleContext() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

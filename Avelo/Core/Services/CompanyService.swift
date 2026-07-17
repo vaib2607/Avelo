@@ -125,10 +125,15 @@ public final class CompanyService: Sendable {
                 )
             }
 
-            let registryDatabase = try registryDb(manager: manager)
-            defer { registryDatabase.close() }
-            let registry = RegistryRepository(db: registryDatabase)
-            try registry.register(CompanyRegistryEntry(
+            // Route the write through the actor's own long-lived registry
+            // connection (registerCompany) instead of opening a second,
+            // freshly-created SQLiteDatabase on the same file. Two
+            // independent connections to the same registry file — one for
+            // this write, another held by DatabaseManager for reads like
+            // openCompany/companyFileURL — is the root cause behind the
+            // "second window doesn't see a just-created company" bug found
+            // during the Unit E multi-window investigation.
+            try await manager.registerCompany(CompanyRegistryEntry(
                 id: company.id,
                 name: company.name,
                 sqliteFileName: sqliteFileName
@@ -138,9 +143,5 @@ public final class CompanyService: Sendable {
             try? await manager.deleteCompanyFiles(id: company.id)
             throw error
         }
-    }
-
-    static func registryDb(manager: DatabaseManager) throws -> SQLiteDatabase {
-        try SQLiteDatabase(path: manager.registryPath)
     }
 }
