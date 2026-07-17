@@ -3,6 +3,40 @@ import XCTest
 
 final class AuditCoverageTests: XCTestCase {
 
+    func testInventoryMasterAlterAndDisablePreserveBeforeAndAfterSnapshots() throws {
+        let tc = try TestCompany.make()
+        let service = InventoryService(db: tc.db, companyId: tc.companyId)
+        var item = try service.createItem(code: "AUD-ITEM", name: "Before", unit: "Nos")
+        item.name = "After"
+
+        try service.updateItem(item)
+        try service.archiveItem(item.id)
+
+        let repository = AuditRepository(db: tc.db)
+        let updates = try repository.list(filter: .init(companyId: tc.companyId, action: .stockItemUpdated))
+        XCTAssertEqual(updates.count, 1)
+        XCTAssertNotNil(updates.first?.snapshotBeforeJson)
+        XCTAssertNotNil(updates.first?.snapshotAfterJson)
+        let disables = try repository.list(filter: .init(companyId: tc.companyId, action: .stockItemDisabled))
+        XCTAssertEqual(disables.count, 1)
+        XCTAssertNotNil(disables.first?.snapshotBeforeJson)
+        XCTAssertNotNil(disables.first?.snapshotAfterJson)
+    }
+
+    func testAccountGroupLifecycleWritesDedicatedAuditEvents() throws {
+        let tc = try TestCompany.make()
+        let service = AccountService(db: tc.db, companyId: tc.companyId)
+        var group = try service.createGroup(code: "AUD-GRP", name: "Audit Group", nature: .assets)
+        group.name = "Audit Group Updated"
+        try service.updateGroup(group)
+        try service.deleteGroup(group.id)
+
+        let repository = AuditRepository(db: tc.db)
+        XCTAssertEqual(try repository.list(filter: .init(companyId: tc.companyId, action: .accountGroupCreated)).count, 1)
+        XCTAssertEqual(try repository.list(filter: .init(companyId: tc.companyId, action: .accountGroupUpdated)).count, 1)
+        XCTAssertEqual(try repository.list(filter: .init(companyId: tc.companyId, action: .accountGroupDeleted)).count, 1)
+    }
+
     func testVoucherLifecycleWritesAuditEvents() throws {
         let tc = try TestCompany.make()
         let service = VoucherService(db: tc.db, companyId: tc.companyId)

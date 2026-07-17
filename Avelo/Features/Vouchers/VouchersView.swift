@@ -214,7 +214,10 @@ private struct VouchersBody: View {
         Task {
             do {
                 let data = try vm.invoicePDFData(voucherId: voucher.id)
-                _ = try await NSPanelBridge.saveData(data, suggestedName: "\(voucher.number).pdf")
+                if let url = try await NSPanelBridge.saveData(data, suggestedName: "\(voucher.number).pdf") {
+                    try vm.recordInvoicePDFSaved(voucherId: voucher.id, url: url)
+                    env.showSuccess("Invoice PDF exported to \(url.lastPathComponent).")
+                }
             } catch {
                 env.showError(AppError.wrap(error))
             }

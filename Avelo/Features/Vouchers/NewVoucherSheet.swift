@@ -60,7 +60,7 @@ public struct NewVoucherSheet: View {
             // Tally: Contra/Payment/Receipt enter in single-entry mode.
             model.singleEntryMode = [.contra, .payment, .receipt].contains(initialType)
             model.load(accounts: accounts, groups: groups, initialDate: ctx.financialYear.startDate)
-            if initialType == .sales || initialType == .purchase {
+            if ctx.isInventoryEnabled && (initialType == .sales || initialType == .purchase) {
                 model.items = (try? InventoryService(db: ctx.database, companyId: ctx.companyId).listItems()) ?? []
             }
             // Consume a pending draft recovery (AVL-P0-018) exactly once: if
@@ -132,6 +132,8 @@ private struct NewVoucherEditor: View {
 /// its amount -> next blank line's ledger -> ... -> Narration.
 private enum VoucherField: Hashable {
     case date
+    case party
+    case narration
     case accountLedger
     case line(UUID)
     case amount(UUID)
@@ -273,6 +275,7 @@ private struct NewVoucherBody: View {
                 AccountPicker(selection: $vm.salesOrPurchaseLedgerId,
                               accounts: vm.accounts,
                               placeholder: initialType == .sales ? "Sales ledger…" : "Purchase ledger…",
+                              eligibility: { vm.eligibility($0, for: initialType == .sales ? .salesLedger : .purchaseLedger) },
                               onCreate: { beginAccountCreation(for: .salesOrPurchaseLedger) })
                 HStack {
                     Text("Item").frame(maxWidth: .infinity, alignment: .leading)
@@ -343,7 +346,12 @@ private struct NewVoucherBody: View {
                 AccountPicker(selection: $vm.partyAccountId,
                               accounts: vm.accounts,
                               placeholder: "Party (optional)",
-                              onCreate: { beginAccountCreation(for: .party) })
+                              eligibility: { vm.eligibility($0, for: .voucherParty(initialType)) },
+                              onCreate: { beginAccountCreation(for: .party) },
+                              isFocusedExternally: Binding(
+                                  get: { focusedField == .party },
+                                  set: { if $0 { focusedField = .party } }
+                              ))
                 Picker("Bill reference type", selection: $vm.billReferenceType) {
                     Text("None").tag(VoucherDraft.BillReferenceType?.none)
                     ForEach(VoucherDraft.BillReferenceType.allCases) { type in
@@ -361,6 +369,7 @@ private struct NewVoucherBody: View {
         HStack(alignment: .top) {
             TextField("Narration", text: $vm.narration, axis: .vertical)
                 .lineLimit(2...4)
+                .focused($focusedField, equals: .narration)
             narrationRecallMenu
         }
     }
@@ -393,7 +402,7 @@ private struct NewVoucherBody: View {
                 AccountPicker(selection: $vm.accountLedgerId,
                               accounts: vm.accounts,
                               placeholder: isContra ? "Destination cash/bank ledger…" : "Cash/Bank ledger…",
-                              filter: accountLedgerEligibility,
+                              eligibility: { vm.eligibility($0, for: .voucherPrimaryCashBank(initialType)) },
                               onCreate: {
                                   beginAccountCreation(
                                       for: .accountLedger,
@@ -483,7 +492,7 @@ private struct NewVoucherBody: View {
         return HStack {
             AccountPicker(selection: line.accountId,
                           accounts: vm.accounts,
-                          filter: particularsFilter,
+                          eligibility: { vm.eligibility($0, for: .voucherParticular(initialType)) },
                           onCreate: {
                               beginAccountCreation(
                                   for: .line(lineId),
@@ -623,9 +632,23 @@ private struct NewVoucherBody: View {
         if vm.canPost {
             postOnce()
         } else if let first = vm.validationErrors.first {
+            focus(first)
             env.showError(AppError.validation(first))
         } else {
             env.showError(AppError.businessRule("This voucher isn't ready to post yet — check the required fields above."))
+        }
+    }
+
+    private func focus(_ error: ValidationError) {
+        switch error.field {
+        case "date": focusedField = .date
+        case "party", "partyAccountId": focusedField = .party
+        case "narration": focusedField = .narration
+        case "accountLedgerId": focusedField = .accountLedger
+        default:
+            if let row = vm.lines.first(where: { $0.accountId == nil }) ?? vm.lines.first {
+                focusedField = row.accountId == nil ? .line(row.id) : .amount(row.id)
+            }
         }
     }
 
@@ -663,10 +686,10 @@ private struct NewVoucherBody: View {
 
     private func finishAccountCreation() {
         defer { resetAccountCreationRequest() }
-        guard let ctx = env.companyContext, let target = accountCreationTarget else { return }
+        guard env.companyContext != nil, let target = accountCreationTarget else { return }
         do {
-            let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
-            vm.accounts = accounts
+            try vm.reloadAccountContext()
+            let accounts = vm.accounts
             switch accountCreationSelection(
                 before: accountIDsBeforeCreation,
                 accounts: accounts,

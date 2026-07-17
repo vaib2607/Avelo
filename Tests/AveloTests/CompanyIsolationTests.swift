@@ -210,10 +210,11 @@ final class CompanyIsolationTests: XCTestCase {
                 ]
             )
         ) { error in
-            guard case AppError.notFound(let entity) = error else {
-                return XCTFail("Expected notFound, got \(error)")
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected validation, got \(error)")
             }
-            XCTAssertEqual(entity, "Account")
+            XCTAssertEqual(validation.code, .voucherAccountInactive)
+            XCTAssertTrue(validation.message.localizedCaseInsensitiveContains("another company"))
         }
     }
 }

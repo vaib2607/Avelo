@@ -104,18 +104,18 @@ rule-audit: net-check r16-check r15-check r4-check
 	@echo "Manual checks still needed: R-2, R-3, R-5, R-6, R-8, R-9, R-10, R-11, R-12, R-13, R-17, R-18"
 	@echo "See Docs/Avelo_Rules.md"
 
-# Show full task board
+# Show canonical release board
 board:
-	@cat .agents/TASK_BOARD.md
+	@cat Docs/Avelo_Release_Board.md
 
-# Show only incomplete tasks
+# Show current executable queue
 todo:
-	@grep "^- \[ \]" .agents/TASK_BOARD.md
+	@cat Docs/Avelo_Execution_Checklist.md
 
-# Count remaining
+# Count current queue entries
 count:
 	@echo "Remaining:"
-	@grep -c "^- \[ \]" .agents/TASK_BOARD.md || echo "0"
+	@rg -c "\| (Implementation remaining|Open|Manual acceptance remaining) \|" Docs/Avelo_Execution_Checklist.md || echo "0"
 
 help:
 	@echo "Top-level targets:"

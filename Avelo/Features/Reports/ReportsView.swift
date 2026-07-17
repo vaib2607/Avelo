@@ -12,6 +12,7 @@ public struct ReportsView: View {
             .navigationTitle("Reports")
             .onAppear { setup(); consumePendingLedger() }
             .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .onChange(of: env.companyContext?.isInventoryEnabled) { _, _ in enforceCapabilitySelection() }
             .onChange(of: env.dataRevision) { _, _ in setup(); vm?.reload() }
             .onChange(of: env.router.pendingLedgerAccountId) { _, _ in consumePendingLedger() }
     }
@@ -29,6 +30,7 @@ public struct ReportsView: View {
             model.reload()
             vm = model
         }
+        enforceCapabilitySelection()
         consumePendingReportSelection()
     }
 
@@ -44,14 +46,28 @@ public struct ReportsView: View {
 
     private func consumePendingReportSelection() {
         guard let selection = env.router.pendingReportSelection, let vm else { return }
-        vm.selection = selection
+        vm.selection = ReportSelection.permitted(
+            selection,
+            isInventoryEnabled: env.companyContext?.isInventoryEnabled ?? false
+        )
         if selection == .ledger, vm.ledgerAccountId == nil, let first = vm.accounts.first?.id {
             vm.ledgerAccountId = first
         }
         if (selection == .cashBook || selection == .bankBook), vm.cashBankAccountId == nil {
-            vm.cashBankAccountId = vm.accounts.first(where: { $0.code.uppercased().contains("CASH") || $0.code.uppercased().contains("BANK") })?.id
+            vm.cashBankAccountId = vm.cashBankAccounts.first?.id
         }
         vm.reload()
         env.router.pendingReportSelection = nil
+    }
+
+    private func enforceCapabilitySelection() {
+        guard let vm else { return }
+        let permitted = ReportSelection.permitted(
+            vm.selection,
+            isInventoryEnabled: env.companyContext?.isInventoryEnabled ?? false
+        )
+        guard vm.selection != permitted else { return }
+        vm.selection = permitted
+        vm.reload()
     }
 }

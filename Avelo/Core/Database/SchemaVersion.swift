@@ -23,8 +23,11 @@ public enum SchemaVersion: Int, CaseIterable, Sendable, Comparable {
     case v20 = 20
     case v21 = 21
     case v22 = 22
+    case v23 = 23
+    case v24 = 24
+    case v25 = 25
 
-    public static let current: SchemaVersion = .v22
+    public static let current: SchemaVersion = .v25
 
     public static func < (lhs: SchemaVersion, rhs: SchemaVersion) -> Bool {
         lhs.rawValue < rhs.rawValue

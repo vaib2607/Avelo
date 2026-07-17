@@ -68,8 +68,34 @@ public final class ItemInvoiceService: Sendable {
         guard let company = try CompanyRepository(db: db).findById(companyId) else {
             throw AppError.notFound("Company")
         }
-        guard let party = try accountRepo.findById(partyAccountId), party.companyId == companyId else {
+        guard company.isInventoryEnabled else {
+            throw AppError.featureUnavailable("Inventory is disabled for this company.")
+        }
+        guard let party = try accountRepo.findById(partyAccountId) else {
             throw AppError.notFound("Party account")
+        }
+        let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
+        let policy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
+        let partyEligibility = policy.evaluate(
+            account: party,
+            for: .itemInvoiceParty(voucherTypeCode),
+            company: company,
+            groups: groups
+        )
+        guard partyEligibility.isEligible else {
+            throw AppError.validation(.init(code: .voucherAccountInactive, field: "partyAccountId", message: partyEligibility.rejectionReason ?? "Party account is not eligible for this invoice."))
+        }
+        guard let tradeLedger = try accountRepo.findById(salesOrPurchaseLedgerId) else {
+            throw AppError.notFound("Sales or purchase ledger")
+        }
+        let tradeEligibility = policy.evaluate(
+            account: tradeLedger,
+            for: voucherTypeCode == .sales ? .salesLedger : .purchaseLedger,
+            company: company,
+            groups: groups
+        )
+        guard tradeEligibility.isEligible else {
+            throw AppError.validation(.init(code: .voucherAccountInactive, field: "salesOrPurchaseLedgerId", message: tradeEligibility.rejectionReason ?? "Trade ledger is not eligible for this invoice."))
         }
         let inventoryRepo = InventoryRepository(db: db)
 

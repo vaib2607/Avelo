@@ -86,6 +86,39 @@ final class BankReconciliationServiceTests: XCTestCase {
         XCTAssertEqual(tolerant.matched.first?.voucherId, posted.voucher.id)
         XCTAssertEqual(tolerant.unmatchedStatement.count, 0)
         XCTAssertEqual(tolerant.bankBalancePaise, -10_000)
+        let imports = try AuditRepository(db: tc.db).list(
+            filter: .init(companyId: tc.companyId, action: .bankStatementImported)
+        )
+        XCTAssertEqual(imports.count, 1)
+        XCTAssertNotNil(imports.first?.snapshotAfterJson)
+    }
+
+    func testStatementImportUsesCentralBankAccountEligibilityPolicy() throws {
+        let tc = try TestCompany.make()
+        let service = BankReconciliationService(db: tc.db, companyId: tc.companyId)
+        let entry = BankReconciliationService.StatementEntry(
+            id: UUID(),
+            companyId: tc.companyId,
+            accountId: tc.rentId,
+            date: DateFormatters.parseDate("2024-06-03")!,
+            amountPaise: -10_000,
+            narration: "Must not import against an expense ledger",
+            isCleared: false
+        )
+
+        XCTAssertThrowsError(try service.importStatement(accountId: tc.rentId, entries: [entry])) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected account-eligibility validation, got \(error)")
+            }
+            XCTAssertEqual(validation.field, "accountId")
+        }
+        XCTAssertEqual(
+            try BankReconciliationRepository(db: tc.db).statementLines(
+                accountId: tc.rentId,
+                asOf: DateFormatters.parseDate("2024-06-30")!
+            ).count,
+            0
+        )
     }
 
     func testReconcileDoesNotTrapOnInt64MinStatementAmount() throws {
@@ -136,6 +169,36 @@ final class BankReconciliationServiceTests: XCTestCase {
 
         let reloaded = try XCTUnwrap(repo.statementLines(accountId: tc.cashId, asOf: DateFormatters.parseDate("2024-06-30")!).first)
         XCTAssertTrue(reloaded.isCleared)
+        let clears = try AuditRepository(db: tc.db).list(
+            filter: .init(companyId: tc.companyId, action: .bankStatementLineCleared)
+        )
+        XCTAssertEqual(clears.count, 1)
+        XCTAssertEqual(clears.first?.entityId, line.id.uuidString)
+        XCTAssertNotNil(clears.first?.snapshotBeforeJson)
+        XCTAssertNotNil(clears.first?.snapshotAfterJson)
+    }
+
+    func testClearStatementLineRollsBackWhenAuditInsertFails() throws {
+        let tc = try TestCompany.make()
+        let repo = BankReconciliationRepository(db: tc.db)
+        try repo.insertStatementLine(
+            companyId: tc.companyId,
+            accountId: tc.cashId,
+            date: DateFormatters.parseDate("2024-06-03")!,
+            amountPaise: -10_000,
+            narration: "Must remain uncleared"
+        )
+        let line = try XCTUnwrap(repo.statementLines(accountId: tc.cashId, asOf: DateFormatters.parseDate("2024-06-30")!).first)
+        try tc.db.execute(
+            "CREATE TRIGGER test_reject_clear_audit BEFORE INSERT ON avelo_audit_events WHEN NEW.action = 'bankStatementLineCleared' BEGIN SELECT RAISE(ABORT, 'test audit failure'); END;"
+        )
+
+        XCTAssertThrowsError(
+            try BankReconciliationService(db: tc.db, companyId: tc.companyId).clearStatementLine(id: line.id)
+        )
+
+        let reloaded = try XCTUnwrap(repo.statementLines(accountId: tc.cashId, asOf: DateFormatters.parseDate("2024-06-30")!).first)
+        XCTAssertFalse(reloaded.isCleared)
     }
 
     func testRestoringV3BackupMigratesAndBankingWorksAfterOpen() async throws {

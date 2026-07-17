@@ -6,13 +6,20 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
     case financialYearCreated
     case financialYearLocked
     case financialYearClosed
+    case financialYearUnlocked
+    case financialYearReopened
     case accountCreated
     case accountUpdated
     case accountDisabled
+    case accountGroupCreated
+    case accountGroupUpdated
+    case accountGroupDeleted
     case voucherPosted
     case voucherEdited
     case voucherReversed
     case voucherCancelled
+    case chequeBounced
+    case chequeRepresented
     case openingBalancePosted
     case stockItemCreated
     case stockItemUpdated
@@ -27,6 +34,17 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
     case backupImported
     case companySwitched
     case financialYearSwitched
+    case bankStatementImported
+    case bankStatementLineCleared
+    case inventoryOrderCreated
+    case inventoryOrderFulfilled
+    case inventoryOrderStatusChanged
+    case inventoryReorderLevelSet
+    case billOfMaterialsCreated
+    case billOfMaterialsUpdated
+    case voucherTemplateSaved
+    case gstReportExported
+    case invoicePDFExported
 
     public var id: String { rawValue }
 
@@ -37,13 +55,20 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
         case .financialYearCreated:     return "Financial year created"
         case .financialYearLocked:      return "Financial year locked"
         case .financialYearClosed:      return "Financial year closed"
+        case .financialYearUnlocked:    return "Financial year unlocked"
+        case .financialYearReopened:    return "Financial year reopened"
         case .accountCreated:           return "Account created"
         case .accountUpdated:           return "Account updated"
         case .accountDisabled:          return "Account disabled"
+        case .accountGroupCreated:      return "Account group created"
+        case .accountGroupUpdated:      return "Account group updated"
+        case .accountGroupDeleted:      return "Account group deleted"
         case .voucherPosted:            return "Voucher posted"
         case .voucherEdited:            return "Voucher edited"
         case .voucherReversed:          return "Voucher reversed"
         case .voucherCancelled:         return "Voucher cancelled"
+        case .chequeBounced:            return "Cheque bounced"
+        case .chequeRepresented:        return "Cheque re-presented"
         case .openingBalancePosted:     return "Opening balances posted"
         case .stockItemCreated:         return "Stock item created"
         case .stockItemUpdated:         return "Stock item updated"
@@ -58,6 +83,17 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
         case .backupImported:           return "Backup imported"
         case .companySwitched:          return "Company switched"
         case .financialYearSwitched:    return "Financial year switched"
+        case .bankStatementImported:    return "Bank statement imported"
+        case .bankStatementLineCleared: return "Bank statement line cleared"
+        case .inventoryOrderCreated:    return "Inventory order created"
+        case .inventoryOrderFulfilled:  return "Inventory order fulfilled"
+        case .inventoryOrderStatusChanged: return "Inventory order status changed"
+        case .inventoryReorderLevelSet: return "Reorder level set"
+        case .billOfMaterialsCreated:   return "Bill of materials created"
+        case .billOfMaterialsUpdated:   return "Bill of materials updated"
+        case .voucherTemplateSaved:     return "Voucher template saved"
+        case .gstReportExported:        return "GST report exported"
+        case .invoicePDFExported:       return "Invoice PDF exported"
         }
     }
 }

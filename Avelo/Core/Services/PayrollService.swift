@@ -32,11 +32,7 @@ public final class PayrollService: Sendable {
                                bankAccountId: Account.ID? = nil,
                                baseSalaryPaise: Int64) throws -> PayrollEmployee {
         if let bankAccountId {
-            guard let bankAccount = try AccountRepository(db: db).findById(bankAccountId),
-                  bankAccount.companyId == companyId,
-                  bankAccount.isActive else {
-                throw AppError.validation(.init(code: .voucherAccountInactive, field: "bankAccountId", message: "Employee bank account must belong to this company and be active."))
-            }
+            try requireEligibleAccount(bankAccountId, for: .bankReconciliation, field: "bankAccountId")
         }
         let employee = PayrollEmployee(
             companyId: companyId,
@@ -70,11 +66,7 @@ public final class PayrollService: Sendable {
             throw AppError.notFound("Employee")
         }
         if let bankAccountId = employee.bankAccountId {
-            guard let bankAccount = try AccountRepository(db: db).findById(bankAccountId),
-                  bankAccount.companyId == companyId,
-                  bankAccount.isActive else {
-                throw AppError.validation(.init(code: .voucherAccountInactive, field: "bankAccountId", message: "Employee bank account must belong to this company and be active."))
-            }
+            try requireEligibleAccount(bankAccountId, for: .bankReconciliation, field: "bankAccountId")
         }
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
@@ -83,6 +75,7 @@ public final class PayrollService: Sendable {
                 action: .payrollEmployeeUpdated,
                 entityType: "payroll_employee",
                 entityId: employee.id.uuidString,
+                snapshotBefore: existing,
                 snapshotAfter: employee
             )
         }
@@ -95,10 +88,13 @@ public final class PayrollService: Sendable {
         try db.write { tx in
             let repo = PayrollRepository(db: tx)
             try repo.deactivateEmployee(id)
+            guard let deactivated = try repo.findEmployee(id: id) else { throw AppError.notFound("Employee") }
             try AuditService(db: tx, companyId: companyId).record(
                 action: .payrollEmployeeTerminated,
                 entityType: "payroll_employee",
-                entityId: id.uuidString
+                entityId: id.uuidString,
+                snapshotBefore: employee,
+                snapshotAfter: deactivated
             )
         }
     }
@@ -154,16 +150,8 @@ public final class PayrollService: Sendable {
             throw AppError.validation(errs[0])
         }
         try FiscalLockChecker(db: db).assertOpen(financialYearId: financialYear.id)
-        guard let expenseAccount = try AccountRepository(db: db).findById(salaryExpenseAccountId),
-              expenseAccount.companyId == companyId,
-              expenseAccount.isActive else {
-            throw AppError.notFound("Salary expense account")
-        }
-        guard let paymentAccount = try AccountRepository(db: db).findById(paymentAccountId),
-              paymentAccount.companyId == companyId,
-              paymentAccount.isActive else {
-            throw AppError.notFound("Payroll payment account")
-        }
+        try requireEligibleAccount(salaryExpenseAccountId, for: .payrollExpense, field: "salaryExpenseAccountId")
+        try requireEligibleAccount(paymentAccountId, for: .payrollSettlement, field: "paymentAccountId")
         let voucherDate = try salaryVoucherDate(month: month, year: year, financialYearId: financialYear.id)
         let voucherId = UUID()
         let now = Date()
@@ -269,6 +257,30 @@ public final class PayrollService: Sendable {
         let entry: PayrollEntry
         let voucher: Voucher
         let lines: [LedgerLine]
+    }
+
+    private func requireEligibleAccount(
+        _ accountId: Account.ID,
+        for context: AccountSelectionContext,
+        field: String
+    ) throws {
+        guard let company = try CompanyRepository(db: db).findById(companyId),
+              let account = try AccountRepository(db: db).findById(accountId) else {
+            throw AppError.validation(.init(code: .voucherAccountInactive, field: field, message: "Account is missing."))
+        }
+        let eligibility = try AccountEligibilityPolicy.loading(db: db, companyId: companyId).evaluate(
+            account: account,
+            for: context,
+            company: company,
+            groups: try AccountGroupRepository(db: db).listForCompany(companyId)
+        )
+        guard eligibility.isEligible else {
+            throw AppError.validation(.init(
+                code: .voucherAccountInactive,
+                field: field,
+                message: eligibility.rejectionReason ?? "Account is not eligible for this payroll field."
+            ))
+        }
     }
 
     private func salaryVoucherDate(month: Int, year: Int, financialYearId: FinancialYear.ID) throws -> Date {

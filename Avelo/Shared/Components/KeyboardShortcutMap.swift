@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 public enum KeyboardShortcutID: String, CaseIterable, Sendable {
@@ -55,6 +56,61 @@ public enum KeyboardShortcuts {
         if s.modifiers.contains(.shift)   { parts.append("⇧") }
         parts.append(s.key.displayString)
         return parts.joined()
+    }
+
+    /// Physical-key translation used by the AppKit event monitor. Keeping it
+    /// beside the displayed shortcut definitions prevents another private
+    /// monitor-owned map from becoming the de facto command source.
+    public static func command(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> KeyboardCommand? {
+        let flags = modifiers.intersection(.deviceIndependentFlagsMask)
+        let command = flags.contains(.command)
+        let shift = flags.contains(.shift)
+        let option = flags.contains(.option)
+        let control = flags.contains(.control)
+
+        if command && !shift && !option && !control {
+            switch keyCode {
+            case 18: return .openDashboard
+            case 19: return .openVouchers
+            case 20: return .openAccounts
+            case 21: return .openReports
+            case 23: return .openInventory
+            case 22: return .openGST
+            case 26: return .openPayroll
+            case 28: return .openBanking
+            case 25: return .openAudit
+            case 29: return .openSettings
+            case 40: return .commandPalette
+            case 44: return .quickSearch
+            case 43: return .showShortcutHelp
+            default: return nil
+            }
+        }
+        if control && !command && !shift && !option {
+            switch keyCode {
+            case 100: return .newVoucher(.creditNote)
+            case 101: return .newVoucher(.debitNote)
+            default: return nil
+            }
+        }
+        guard !command, !shift, !option, !control else { return nil }
+        switch keyCode {
+        case 53: return .goBack
+        case 36, 76: return .drillDown
+        case 118: return .newVoucher(.contra)
+        case 96: return .newVoucher(.payment)
+        case 97: return .newVoucher(.receipt)
+        case 98: return .newVoucher(.journal)
+        case 100: return .newVoucher(.sales)
+        case 101: return .newVoucher(.purchase)
+        case 15: return .reload
+        default: return nil
+        }
+    }
+
+    public static func isVoucherSwitch(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        guard case .newVoucher = command(keyCode: keyCode, modifiers: modifiers) else { return false }
+        return true
     }
 }
 

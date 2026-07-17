@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct ShortcutHelpSheet: View {
 
+    @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
 
     public init() {}
@@ -18,21 +19,7 @@ public struct ShortcutHelpSheet: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    section("Navigation", rows: [
-                        ("Esc", "Back / cancel current action"),
-                        ("Return / Enter", "Drill down (open selected item)"),
-                        ("R", "Reload current view"),
-                        ("Cmd+1", "Open Dashboard"),
-                        ("Cmd+2", "Open Vouchers"),
-                        ("Cmd+3", "Open Accounts"),
-                        ("Cmd+4", "Open Reports"),
-                        ("Cmd+5", "Open Inventory"),
-                        ("Cmd+6", "Open GST"),
-                        ("Cmd+7", "Open Payroll"),
-                        ("Cmd+8", "Open Banking"),
-                        ("Cmd+9", "Open Audit log"),
-                        ("Cmd+0", "Open Settings"),
-                    ])
+                    section("Navigation", rows: navigationRows)
 
                     section("Vouchers (function keys)", rows: [
                         ("F4", "New Contra voucher"),
@@ -46,39 +33,74 @@ public struct ShortcutHelpSheet: View {
                         ("⌃F9", "New Debit Note"),
                     ])
 
-                    section("Reports (Cmd+Opt)", rows: [
-                        ("Cmd+Opt+1", "Trial Balance"),
-                        ("Cmd+Opt+2", "Profit & Loss"),
-                        ("Cmd+Opt+3", "Balance Sheet"),
-                        ("Cmd+Opt+4", "GST Summary"),
-                        ("Cmd+Opt+5", "Day Book"),
-                        ("Cmd+Opt+6", "Ledger"),
-                        ("Cmd+Opt+7", "Cash Book"),
-                        ("Cmd+Opt+8", "Bank Book"),
-                        ("Cmd+Opt+9", "Receivables"),
-                        ("Cmd+Opt+0", "Payables"),
-                        ("Cmd+Opt+Shift+1", "Cash Flow"),
-                        ("Cmd+Opt+Shift+2", "Stock Ageing"),
-                    ])
+                    section("Reports (Cmd+Opt)", rows: reportRows)
 
-                    section("Other", rows: [
-                        ("Cmd+K", "Open command palette"),
-                        ("Cmd+/", "Quick search"),
-                        ("Cmd+,", "Show this shortcut help"),
-                        ("Company menu", "Open company info, backup, restore, and company-level actions"),
-                        ("Cmd+Shift+N", "New company"),
-                        ("Cmd+Shift+B", "Backup current company"),
-                        ("Cmd+Shift+R", "Restore backup"),
-                        ("Company → Inventory Settings", "Open inventory configuration"),
-                        ("Company → Payroll Settings", "Open payroll configuration"),
-                        ("Company → Lock FY", "Lock the active financial year"),
-                        ("Company → Close FY", "Close the active financial year"),
-                    ])
+                    section("Other", rows: otherRows)
                 }
                 .padding(16)
             }
         }
         .frame(minWidth: 520, minHeight: 540)
+    }
+
+    private var inventoryEnabled: Bool { env.companyContext?.isInventoryEnabled ?? false }
+
+    private var navigationRows: [(String, String)] {
+        var rows = [
+            ("Esc", "Back / cancel current action"),
+            ("Return / Enter", "Drill down (open selected item)"),
+            ("R", "Reload current view"),
+            ("Cmd+1", "Open Dashboard"),
+            ("Cmd+2", "Open Vouchers"),
+            ("Cmd+3", "Open Accounts"),
+            ("Cmd+4", "Open Reports")
+        ]
+        if inventoryEnabled { rows.append(("Cmd+5", "Open Inventory")) }
+        rows += [
+            ("Cmd+6", "Open GST"),
+            ("Cmd+7", "Open Payroll"),
+            ("Cmd+8", "Open Banking"),
+            ("Cmd+9", "Open Audit log"),
+            ("Cmd+0", "Open Settings")
+        ]
+        return rows
+    }
+
+    private var reportRows: [(String, String)] {
+        var rows = [
+            ("Cmd+Opt+1", "Trial Balance"),
+            ("Cmd+Opt+2", "Profit & Loss"),
+            ("Cmd+Opt+3", "Balance Sheet"),
+            ("Cmd+Opt+4", "GST Summary"),
+            ("Cmd+Opt+5", "Day Book"),
+            ("Cmd+Opt+6", "Ledger"),
+            ("Cmd+Opt+7", "Cash Book"),
+            ("Cmd+Opt+8", "Bank Book"),
+            ("Cmd+Opt+9", "Receivables"),
+            ("Cmd+Opt+0", "Payables"),
+            ("Cmd+Opt+Shift+1", "Cash Flow")
+        ]
+        if inventoryEnabled { rows.append(("Cmd+Opt+Shift+2", "Stock Ageing")) }
+        return rows
+    }
+
+    private var otherRows: [(String, String)] {
+        var rows = [
+            ("Cmd+K", "Open command palette"),
+            ("Cmd+/", "Quick search"),
+            ("Cmd+,", "Show this shortcut help"),
+            ("Company menu", "Open company info, backup, restore, and company-level actions"),
+            ("Cmd+Shift+N", "New company"),
+            ("Cmd+Shift+B", "Backup current company"),
+            ("Cmd+Shift+R", "Restore backup")
+        ]
+        if inventoryEnabled { rows.append(("Company → Inventory Settings", "Open inventory configuration")) }
+        rows += [
+            ("Company → Payroll Settings", "Open payroll configuration"),
+            ("Company → Lock FY", "Lock the active financial year"),
+            ("Company → Close FY", "Close the active financial year")
+        ]
+        return rows
     }
 
     @ViewBuilder

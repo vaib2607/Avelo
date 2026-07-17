@@ -1,15 +1,17 @@
 # Avelo Status Checklist
 
-Snapshot: 2026-07-15
+Snapshot: 2026-07-17
 
 This is the human-readable progress checklist for Avelo. It complements:
 
 - `Docs/Avelo_Release_Board.md` — canonical issue-level readiness board.
 - `Docs/Avelo_Execution_Checklist.md` — remaining `AVL-*` delivery queue.
 
+The consolidated product and execution roadmap is `Docs/Avelo_Master_Product_Execution_Plan.md`. This checklist records evidence only and must not convert roadmap intent into completion claims.
+
 Checkboxes show evidence, not aspiration: `[x]` means implemented with recorded automated evidence, not necessarily release-accepted; `[ ]` still needs implementation, re-verification, or human acceptance. A feature is not release-ready until current-worktree automated proof and every required accountant, operator, keyboard, accessibility, visual, and distribution gate are complete.
 
-## 0. Current worktree — evidence recorded on 2026-07-15
+## 0. Current worktree — evidence recorded on 2026-07-17
 
 The worktree is intentionally uncommitted. No commit, tag, or release artifact has been created by this pass.
 
@@ -20,8 +22,14 @@ The worktree is intentionally uncommitted. No commit, tag, or release artifact h
 - [x] Targeted audit/voucher regression command passed: 54 tests, 0 failures.
 - [x] All opt-in `PerformanceBenchmarkTests` passed: account-tree reload 0.094s; encrypted post-batch 10k 5.246s (limit 9.037s); encrypted post-batch 100k 98.944s (limit 106.381s); encrypted 50k reporting checks passed.
 - [x] `git diff --check` passed for the current tracked diff.
-- [ ] Re-run the normal full suite from this final worktree. A first run exposed the real-Keychain test dependency above; after the targeted fix passed, the restart was blocked by the execution environment's credit limit before it could begin.
-- [ ] Re-run the rule audit, release-candidate build/bundle self-test, launch smoke, GUI launch, and standard + million-scale benchmarks from this final worktree.
+- [x] Current full suite passed on 2026-07-17 after V023/V025 audit taxonomy, V024 party profiles, mutation contracts, inventory capability/link policy, historical restore, keyboard routing, and the exhaustive account-context/import/regrouping proof: 498 tests executed, 8 explicitly skipped, 0 failures.
+- [x] Current `make rule-audit` passed on 2026-07-17: network, R-16, R-15, and automated R-4 checks clean; the rule audit still names its required manual checks.
+- [x] `make rc-local` passed on 2026-07-17: rule audit, 498-test suite, release bundle assembly, bundle validation, and two balanced backup/restore self-test passes.
+- [x] `make launch-smoke` passed against `dist/Avelo.app` on 2026-07-17.
+- [x] Warning-free production compilation passed with `-Xswiftc -warnings-as-errors`; warnings found by a clean benchmark build were removed and focused regressions passed.
+- [x] Standard benchmark passed: 25k fixture 118.149s, 500 additional posts 2.272s, report bundle 6.048s, backup export 0.018s, and restore 0.038s.
+- [x] The explicit 500k large-data gate passed: batched posting 760.548s, financial report pass 21.969s, balanced books, approximately 140 MB reported resident memory, and no test failure.
+- [ ] Developer ID signing, hardened-runtime/entitlement review, notarization, stapling, downloadable-artifact verification, and clean-machine install/upgrade acceptance remain external distribution gates.
 
 ## 1. Foundation and safety — implemented; release acceptance pending
 
@@ -30,11 +38,14 @@ The worktree is intentionally uncommitted. No commit, tag, or release artifact h
 - [x] SQLite is the source of truth, with SQLCipher encryption for app-managed company databases.
 - [x] Per-company encryption keys are stored in Keychain; recovery keys support cross-machine restore.
 - [x] Multi-company registry, create/open/switch/delete flows, backup, restore, and safe staging paths exist.
-- [ ] `AVL-P0-036`: make cross-identity restore complete for every supported table. `avelo_voucher_item_lines` is currently missing from company-ID remapping; define explicit remap or discard behavior for scratch voucher drafts.
+- [ ] `AVL-P0-036`: implementation and automated proof are landed. Cross-identity restore remaps `avelo_voucher_item_lines` and `avelo_party_profiles`, intentionally discards scratch drafts, and the real-schema V14–V22 matrix upgrades and remaps FY openings, bills, cheques, BOMs, vouchers, ledger/stock/item/profile rows, dynamically checks every current `company_id` table for source-ID leakage, verifies foreign keys and exactly one restore event, and passes the 485-test full suite. Operator restore acceptance remains.
+- [ ] `AVL-P0-033`: implementation and automated proof are landed. Disabled companies now remove inventory from sidebar, menus, palette, shortcut help, reports, dashboard, voucher item loading, and keyboard routing; `AppRouter` rejects method and direct-property deep links, invalidates stale state on company/toggle changes, and inventory, BOM, order, item-invoice, and stock-report service boundaries fail closed. The 485-test full suite passes. Manual accountant capability-toggle acceptance remains.
 - [x] Core double-entry accounting uses `Int64` paise, typed errors, checked arithmetic, and deterministic date handling.
 - [x] Financial-year creation, lock/unlock, close, reopen, carry-forward, and overlap rejection are implemented.
 - [x] Audit records are HMAC-chain protected and company open fails closed on tampering.
-- [ ] `AVL-P0-034`: complete same-transaction audit coverage for every shipped mutation, especially FY unlock/reopen, bank statement import/clear/reconciliation, and promoted inventory/BOM/order workflows; chain integrity alone does not prove mutation coverage.
+- [ ] `AVL-P0-034`: implementation and automated proof are landed. V023/V025 provide dedicated actions for shipped mutations, including compound cheque bounce/re-presentation snapshots; export events publish only after successful file save and failed audit publication removes the artifact. Update paths preserve before/after data, required reasons are retained, and the unavailable repair workflow remains hidden under `AVL-P1-039`. Mutation-contract, chain-preservation, rollback, snapshot, app-flow, export, 50-cycle backup/restore, 494-test full-suite, and rule-audit proof pass. Representative accountant audit-diff acceptance remains.
+- [ ] `AVL-P0-037`: implementation and automated proof are landed. The ancestry-aware `AccountEligibilityPolicy` drives voucher batch/single validation, pickers, item invoices, orders, banking, payroll, cash/bank report selection, and the shipped bank-statement import. V024 profiles, full ancestry, the core voucher-field context matrix, retained invalid values, regrouping, and Alt+C account creation all use the same reloaded policy. The 498-test full suite, focused import/new-master proof, and rule audit pass. No account-master importer ships before Phase 8; accountant picker and retained-selection acceptance remains.
+- [ ] `AVL-P0-020`: implementation and automated proof are landed for Return/add-line, Command-Return post/save, Tab/Shift-Tab native traversal, Escape, validation focus, nested sheet capture, native text precedence, and duplicate-submit prevention. The 498-test full suite passes. Manual accountant first/middle/last/insert/delete/error traversal plus bundled keyboard and VoiceOver acceptance remains; the broader action-generated alias engine is `AVL-P1-044`.
 - [x] SQLite foreign keys, WAL, statement lifecycle cleanup, busy timeout, schema migration, and integrity checks are in place.
 - [x] Company ownership and fiscal-lock rules are enforced at service and database-trigger layers.
 
@@ -61,8 +72,8 @@ The worktree is intentionally uncommitted. No commit, tag, or release artifact h
 - [x] Hardened BOM recipe setup: exact quantities, explicit create-versus-update, duplicate-component guards, atomic cycle validation, audit records, and archive/load error handling are implemented and covered. Manufacturing execution remains a later workflow.
 - [x] Bank statement CSV import and baseline reconciliation flow.
 - [x] Payroll employees, salary entries, salary vouchers, and payroll register.
-- [ ] `AVL-P0-033`: enforce the accounting-only capability boundary: when inventory is disabled, remove Inventory from sidebar, menus, command palette, quick search, keyboard routing, and sheets, and reject direct/deep-link entry consistently.
-- [ ] `AVL-P0-035`: complete or hide ledger-voucher `autoPrompt` and `autoSilent`. Prompt mode must collect explicit item/quantity/direction/cost inputs; silent mode cannot ship without deterministic mapping, consent, reversal, valuation, and audit proof. Never infer an item from an account name.
+- [ ] `AVL-P0-033`: inventory-disabled Reports now hide stock selections and reject stale/deep-linked stock report selections. The full sidebar/menu/palette/search/shortcut/sheet/service matrix, current full-suite proof, and accountant acceptance remain.
+- [ ] `AVL-P0-035`: implementation and automated proof are landed. Production UI exposes only manual ledger-voucher inventory linkage; legacy automatic values remain decodable but are rejected by every `CompanyService` update path, emit no incomplete prompt or hidden stock consequences across post/edit/cancel/reverse, and default to manual in new/demo flows. Focused mode tests, the 485-test full suite, and rule audit pass; accountant acceptance remains.
 - [ ] `AVL-P0-020`: enforce one voucher keyboard contract—plain Return advances/adds a line, Command-Return posts/saves, Tab/Shift-Tab traverse predictably, and create/edit/help mappings agree.
 - [x] Resolved the active voucher-entry blockers: type-checkable UI composition, single-entry duplicate/recovery, account-creation eligibility plus domain invariants, robust `Alt+C`, and accessible narration recall.
 - [x] Completed the active voucher/BOM implementation worktree and its targeted regression coverage.
@@ -78,7 +89,7 @@ The worktree is intentionally uncommitted. No commit, tag, or release artifact h
 5. [ ] Run accessibility acceptance for VoiceOver names/values/grouping, visible focus, keyboard-only completion, contrast, non-color-only status, resizing, empty states, and error recovery on shipped paths.
 6. [ ] Run visual/document acceptance for B2B invoice PDF layout, GST breakdown, printing totals, light/dark appearance, resizing, and company switching.
 7. [ ] Select and document the public distribution path. The current bundle is ad-hoc signed and therefore only a local RC; public release requires Developer ID signing plus notarization (or a separately approved Mac App Store path), hardened-runtime/entitlement review, and a clean-Mac install/launch test.
-8. [ ] Align bundle metadata with v1.1. `Scripts/bundle.sh` currently emits `CFBundleShortVersionString=1.0` and `CFBundleVersion=2`; release version/build identity must come from one declared source and match the changelog/tag/artifact.
+8. [x] Bundle metadata is aligned to v1.1 build 3 through `ReleaseVersion.env`; assembly, validation, changelog, and release documents use the same declared source.
 9. [ ] Update `Docs/Avelo_Release_Board.md` and `Docs/Avelo_Execution_Checklist.md` with current evidence only.
 10. [ ] Cut the v1.1 changelog, build the final artifact, verify installation/launch, and tag only when every P0 item and the chosen distribution gate are accepted.
 

@@ -57,7 +57,7 @@ struct ReportsBody: View {
         VStack(alignment: .leading) {
             Text("Reports").font(.headline).padding(12)
             List(selection: $vm.selection) {
-                ForEach(ReportSelection.allCases) { r in
+                ForEach(ReportSelection.visibleCases(isInventoryEnabled: env.companyContext?.isInventoryEnabled ?? false)) { r in
                     Text(r.title).tag(r)
                 }
             }
@@ -116,7 +116,7 @@ struct ReportsBody: View {
             } else if vm.selection == .cashBook || vm.selection == .bankBook {
                 Picker("Account", selection: $vm.cashBankAccountId) {
                     Text("Select…").tag(Account.ID?.none)
-                    ForEach(vm.accounts.filter { $0.code.uppercased().contains("CASH") || $0.code.uppercased().contains("BANK") }) { a in
+                    ForEach(vm.cashBankAccounts) { a in
                         Text("\(a.code) — \(a.name.capitalized)").tag(Optional(a.id))
                     }
                 }

@@ -61,7 +61,7 @@ public enum DemoCompanySeeder {
         guard let fy = try fyService.mostRecent() else { return }
         try db.execute(
             "UPDATE avelo_companies SET is_inventory_enabled = 1, inventory_link_mode = ?, updated_at = ? WHERE id = ?",
-            [.text(InventoryLinkMode.autoPrompt.rawValue), .timestamp(Date()), .text(companyId.uuidString)]
+            [.text(InventoryLinkMode.manual.rawValue), .timestamp(Date()), .text(companyId.uuidString)]
         )
 
         let groups = try accounts.listGroups()

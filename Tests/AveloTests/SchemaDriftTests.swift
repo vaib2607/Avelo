@@ -54,6 +54,7 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_inventory_reorder_levels",
             "avelo_ledger_lines",
             "avelo_migrations",
+            "avelo_party_profiles",
             "avelo_payroll_employees",
             "avelo_payroll_entries",
             "avelo_stock_movements",
@@ -229,6 +230,16 @@ final class SchemaDriftTests: XCTestCase {
             "end_date",
             "created_at"
         ])
+        XCTAssertEqual(try columns("avelo_party_profiles", in: db), [
+            "account_id",
+            "company_id",
+            "usage",
+            "credit_limit_paise",
+            "default_credit_period_days",
+            "maintain_billwise",
+            "created_at",
+            "updated_at"
+        ])
         XCTAssertEqual(try columns("avelo_voucher_item_lines", in: db), [
             "id",
             "company_id",
@@ -280,13 +291,20 @@ final class SchemaDriftTests: XCTestCase {
             "financialYearCreated",
             "financialYearLocked",
             "financialYearClosed",
+            "financialYearUnlocked",
+            "financialYearReopened",
             "accountCreated",
             "accountUpdated",
             "accountDisabled",
+            "accountGroupCreated",
+            "accountGroupUpdated",
+            "accountGroupDeleted",
             "voucherPosted",
             "voucherEdited",
             "voucherReversed",
             "voucherCancelled",
+            "chequeBounced",
+            "chequeRepresented",
             "openingBalancePosted",
             "stockItemCreated",
             "stockItemUpdated",
@@ -300,7 +318,18 @@ final class SchemaDriftTests: XCTestCase {
             "backupExported",
             "backupImported",
             "companySwitched",
-            "financialYearSwitched"
+            "financialYearSwitched",
+            "bankStatementImported",
+            "bankStatementLineCleared",
+            "inventoryOrderCreated",
+            "inventoryOrderFulfilled",
+            "inventoryOrderStatusChanged",
+            "inventoryReorderLevelSet",
+            "billOfMaterialsCreated",
+            "billOfMaterialsUpdated",
+            "voucherTemplateSaved",
+            "gstReportExported",
+            "invoicePDFExported"
         ]
 
         for action in frozenActions {
@@ -319,8 +348,6 @@ final class SchemaDriftTests: XCTestCase {
             "employeeUpdated",
             "employeeDeactivated",
             "payrollEntryPosted",
-            "bankStatementImported",
-            "bankStatementLineCleared",
             "bankReconciled"
         ]
         for action in nonFrozenActions {
@@ -433,5 +460,31 @@ final class SchemaDriftTests: XCTestCase {
         try MigrationRunner().runMigrations(on: db)
 
         XCTAssertEqual(try columns("avelo_payroll_employees", in: db).last, "bank_account_id")
+    }
+
+    func testMigrationV025PreservesExistingAuditChainAndAddsChequeActions() throws {
+        let db = try SQLiteDatabase(path: ":memory:")
+        try MigrationRunner(migrations: MigrationRunner.defaultMigrations.filter { $0.version.rawValue <= 24 })
+            .runMigrations(on: db)
+        let fixture = try TestCompany.seed(into: db, companyId: UUID(), companyName: "V24 Audit")
+        try AuditService(db: db, companyId: fixture.companyId).record(
+            action: .voucherPosted,
+            entityType: "voucher",
+            entityId: UUID().uuidString,
+            reason: "before V25"
+        )
+        try AuditRepository(db: db).verifyIntegrity(companyId: fixture.companyId)
+
+        try MigrationRunner().runMigrations(on: db)
+
+        XCTAssertEqual(try db.userVersion(), 25)
+        try AuditRepository(db: db).verifyIntegrity(companyId: fixture.companyId)
+        try AuditService(db: db, companyId: fixture.companyId).record(
+            action: .chequeBounced,
+            entityType: "cheque",
+            entityId: UUID().uuidString,
+            reason: "after V25"
+        )
+        try AuditRepository(db: db).verifyIntegrity(companyId: fixture.companyId)
     }
 }

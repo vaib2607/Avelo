@@ -163,6 +163,31 @@ public struct BankReconciliationRepository: Sendable {
         }
     }
 
+    public func findStatementLine(id: UUID) throws -> StatementLine? {
+        try db.queryOne(
+            """
+            SELECT id, company_id, bank_account_id, statement_date, amount_paise,
+                   narration, matched_voucher_id, is_cleared
+            FROM avelo_bank_statement_lines
+            WHERE id = ?
+            """,
+            bind: [.text(id.uuidString)]
+        ) { row in
+            StatementLine(
+                id: try UUIDParsing.required(row.requiredText("id"), field: "avelo_bank_statement_lines.id"),
+                companyId: try UUIDParsing.required(row.requiredText("company_id"), field: "avelo_bank_statement_lines.company_id"),
+                accountId: try UUIDParsing.required(row.requiredText("bank_account_id"), field: "avelo_bank_statement_lines.bank_account_id"),
+                date: try row.requiredDate("statement_date"),
+                amountPaise: try row.requiredInt("amount_paise"),
+                narration: try row.requiredText("narration"),
+                matchedVoucherId: try row.checkedOptionalText("matched_voucher_id").map {
+                    try UUIDParsing.required($0, field: "avelo_bank_statement_lines.matched_voucher_id")
+                },
+                isCleared: try row.requiredBool("is_cleared")
+            )
+        }
+    }
+
     public func candidateVouchers(accountId: Account.ID, asOf: Date) throws -> [VoucherCandidate] {
         try db.query(
             """

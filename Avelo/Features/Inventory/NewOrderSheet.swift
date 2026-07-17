@@ -8,6 +8,9 @@ public struct NewOrderSheet: View {
     let onSaved: () -> Void
 
     @State private var accounts: [Account] = []
+    @State private var company: Company?
+    @State private var groups: [AccountGroup] = []
+    @State private var eligibilityPolicy = AccountEligibilityPolicy()
     @State private var items: [InventoryItem] = []
     @State private var partyAccountId: Account.ID?
     @State private var number: String = ""
@@ -42,7 +45,12 @@ public struct NewOrderSheet: View {
             Divider()
             Form {
                 TextField("Order number *", text: $number)
-                AccountPicker(selection: $partyAccountId, accounts: accounts, placeholder: "Party *")
+                AccountPicker(
+                    selection: $partyAccountId,
+                    accounts: accounts,
+                    placeholder: "Party *",
+                    eligibility: partyEligibility
+                )
                 DatePicker("Order date", selection: $orderDate, displayedComponents: .date)
                 Toggle("Expected date", isOn: $hasExpectedDate)
                 if hasExpectedDate {
@@ -122,6 +130,9 @@ public struct NewOrderSheet: View {
         guard let ctx = env.companyContext else { return }
         do {
             accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
+            company = try CompanyRepository(db: ctx.database).findById(ctx.companyId)
+            groups = try AccountGroupRepository(db: ctx.database).listForCompany(ctx.companyId)
+            eligibilityPolicy = try AccountEligibilityPolicy.loading(db: ctx.database, companyId: ctx.companyId)
             items = try InventoryRepository(db: ctx.database).listItems(
                 filter: .init(companyId: ctx.companyId, includeArchived: false, limit: 2000, offset: 0)
             )
@@ -152,5 +163,17 @@ public struct NewOrderSheet: View {
         } catch {
             env.showError(AppError.wrap(error))
         }
+    }
+
+    private func partyEligibility(_ account: Account) -> AccountEligibility {
+        guard let company else {
+            return AccountEligibility(isEligible: false, rejectionReason: "Company context is unavailable.")
+        }
+        return eligibilityPolicy.evaluate(
+            account: account,
+            for: .orderParty(orderType),
+            company: company,
+            groups: groups
+        )
     }
 }

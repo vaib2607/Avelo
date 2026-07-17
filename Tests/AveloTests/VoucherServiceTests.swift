@@ -2,6 +2,37 @@ import XCTest
 @testable import Avelo
 
 final class VoucherServiceTests: XCTestCase {
+    func testPurchaseVoucherAndBatchUseExplicitDualRolePartyProfile() throws {
+        let tc = try TestCompany.make()
+        try PartyProfileRepository(db: tc.db).upsert(PartyProfile(
+            accountId: tc.customerId,
+            companyId: tc.companyId,
+            usage: .both
+        ))
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        func purchaseDraft(_ narration: String) -> VoucherDraft {
+            VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .purchase,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.customerId,
+                narration: narration,
+                lines: [
+                    tc.line(tc.rentId, 10_000, .debit),
+                    tc.line(tc.customerId, 10_000, .credit)
+                ]
+            )
+        }
+
+        _ = try service.post(draft: purchaseDraft("Single profile policy"), in: tc.fy)
+        let batch = try service.postBatch(
+            [purchaseDraft("Batch profile policy")],
+            in: tc.fy
+        )
+
+        XCTAssertEqual(batch.count, 1)
+    }
+
 
     private func voucherSequenceValue(_ number: String, file: StaticString = #filePath, line: UInt = #line) throws -> Int {
         guard let suffix = number.split(separator: "/").last, let value = Int(suffix) else {
@@ -76,8 +107,12 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(totals?.0, totals?.1)
     }
 
-    func testSalesVoucherReturnsInventoryPromptWhenAutoPromptIsEnabled() throws {
+    func testLegacyAutoPromptModeDoesNotExposeIncompleteInventoryPrompt() throws {
         let tc = try TestCompany.make()
+        try tc.db.execute(
+            "UPDATE avelo_companies SET inventory_link_mode = 'autoPrompt' WHERE id = ?",
+            [.text(tc.companyId.uuidString)]
+        )
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
 
         let result = try svc.post(
@@ -88,9 +123,7 @@ final class VoucherServiceTests: XCTestCase {
             in: tc.fy
         )
 
-        let prompt = try XCTUnwrap(result.inventoryPrompt)
-        XCTAssertEqual(prompt.voucherId, result.voucher.id)
-        XCTAssertEqual(prompt.voucherNumber, result.voucher.number)
+        XCTAssertNil(result.inventoryPrompt)
     }
 
     func testPostBatchPersistsAllVouchersInOneBalancedBatch() throws {
@@ -264,10 +297,10 @@ final class VoucherServiceTests: XCTestCase {
                 mode: .create,
                 voucherTypeCode: .sales,
                 date: DateFormatters.parseDate("2024-06-01")!,
-                partyAccountId: tc.cashId,
+                partyAccountId: tc.customerId,
                 narration: "GST rounded invoice",
                 lines: [
-                    .init(accountId: tc.cashId, amountPaise: 11_799, side: .debit),
+                    .init(accountId: tc.customerId, amountPaise: 11_799, side: .debit),
                     .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208"),
                     .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
                     .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit)
@@ -293,10 +326,10 @@ final class VoucherServiceTests: XCTestCase {
                 mode: .create,
                 voucherTypeCode: .sales,
                 date: DateFormatters.parseDate("2024-06-01")!,
-                partyAccountId: tc.cashId,
+                partyAccountId: tc.customerId,
                 narration: "Rounded invoice",
                 lines: [
-                    .init(accountId: tc.cashId, amountPaise: 11_801, side: .debit),
+                    .init(accountId: tc.customerId, amountPaise: 11_801, side: .debit),
                     .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208"),
                     .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
                     .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit),
@@ -312,10 +345,10 @@ final class VoucherServiceTests: XCTestCase {
                 mode: .edit(originalVoucherId: posted.id),
                 voucherTypeCode: .sales,
                 date: DateFormatters.parseDate("2024-06-02")!,
-                partyAccountId: tc.cashId,
+                partyAccountId: tc.customerId,
                 narration: "Rounded invoice edited",
                 lines: [
-                    .init(accountId: tc.cashId, amountPaise: 11_798, side: .debit),
+                    .init(accountId: tc.customerId, amountPaise: 11_798, side: .debit),
                     .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208"),
                     .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
                     .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit),
@@ -343,10 +376,10 @@ final class VoucherServiceTests: XCTestCase {
                     mode: .create,
                     voucherTypeCode: .sales,
                     date: DateFormatters.parseDate("2024-06-01")!,
-                    partyAccountId: tc.cashId,
+                    partyAccountId: tc.customerId,
                     narration: "No GST lines",
                     lines: [
-                        .init(accountId: tc.cashId, amountPaise: 10_001, side: .debit),
+                        .init(accountId: tc.customerId, amountPaise: 10_001, side: .debit),
                         .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208")
                     ]
                 ),
@@ -551,7 +584,7 @@ final class VoucherServiceTests: XCTestCase {
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
 
         let debtorsGroup = try AccountService(db: tc.db, companyId: tc.companyId)
-            .createGroup(code: "SD", name: "Sundry Debtors", nature: .assets)
+            .createGroup(code: "SD", name: "Sundry Debtors", nature: .assets, parentGroupId: try XCTUnwrap(AccountRepository(db: tc.db).findById(tc.customerId)).groupId)
         let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
             .createAccount(.init(code: "DEBTOR_A", name: "Debtor A", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
 
@@ -595,12 +628,12 @@ final class VoucherServiceTests: XCTestCase {
                 mode: .create,
                 voucherTypeCode: .sales,
                 date: DateFormatters.parseDate("2024-06-01")!,
-                partyAccountId: tc.cashId,
+                partyAccountId: tc.customerId,
                 billReferenceType: .newRef,
                 billReferenceNumber: "INV-77",
                 narration: "Deferred workflow test",
                 lines: [
-                    .init(accountId: tc.cashId, amountPaise: 118000, side: .debit),
+                    .init(accountId: tc.customerId, amountPaise: 118000, side: .debit),
                     .init(accountId: tc.salesId, amountPaise: 100000, side: .credit),
                     .init(accountId: tc.rentId, amountPaise: 18000, side: .credit)
                 ]
@@ -712,7 +745,7 @@ final class VoucherServiceTests: XCTestCase {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
         let debtorsGroup = try AccountService(db: tc.db, companyId: tc.companyId)
-            .createGroup(code: "SD2", name: "Sundry Debtors 2", nature: .assets)
+            .createGroup(code: "SD2", name: "Sundry Debtors 2", nature: .assets, parentGroupId: try XCTUnwrap(AccountRepository(db: tc.db).findById(tc.customerId)).groupId)
         let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
             .createAccount(.init(code: "DEBTOR_B", name: "Debtor B", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
 
@@ -801,7 +834,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(errors.filter { $0.code == .voucherAccountInactive }.count, 2)
     }
 
-    func testHistoricalEditAllowsNewlyDeactivatedAccountsWhenLinesUnchanged() throws {
+    func testHistoricalEditExplainsNewlyDeactivatedRetainedAccounts() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
         let accountService = AccountService(db: tc.db, companyId: tc.companyId)
@@ -817,7 +850,13 @@ final class VoucherServiceTests: XCTestCase {
             tc.line(tc.cashId, 50000, .debit),
             tc.line(tc.salesId, 50000, .credit)
         ])
-        XCTAssertNoThrow(try svc.edit(posted.voucher.id, with: edited, in: tc.fy))
+        XCTAssertThrowsError(try svc.edit(posted.voucher.id, with: edited, in: tc.fy)) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected validation error, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .voucherAccountInactive)
+            XCTAssertTrue(validation.message.localizedCaseInsensitiveContains("inactive"))
+        }
     }
 
     func testPostInLockedFinancialYearThrows() throws {
@@ -864,7 +903,7 @@ final class VoucherServiceTests: XCTestCase {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
         let debtorsGroup = try AccountService(db: tc.db, companyId: tc.companyId)
-            .createGroup(code: "SD3", name: "Sundry Debtors 3", nature: .assets)
+            .createGroup(code: "SD3", name: "Sundry Debtors 3", nature: .assets, parentGroupId: try XCTUnwrap(AccountRepository(db: tc.db).findById(tc.customerId)).groupId)
         let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
             .createAccount(.init(code: "DEBTOR_C", name: "Debtor C", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
 
@@ -930,6 +969,53 @@ final class VoucherServiceTests: XCTestCase {
         let stored = try XCTUnwrap(cheque(tc.db, for: posted.voucher.id))
         XCTAssertEqual(stored.status, ChequeStatus.bounced.rawValue)
         XCTAssertEqual(stored.bouncedReversalVoucherId, reversal.id.uuidString)
+        let bounceEvents = try AuditRepository(db: tc.db).list(
+            filter: .init(companyId: tc.companyId, action: .chequeBounced)
+        )
+        XCTAssertEqual(bounceEvents.count, 1)
+        XCTAssertNotNil(bounceEvents.first?.snapshotBeforeJson)
+        XCTAssertNotNil(bounceEvents.first?.snapshotAfterJson)
+        XCTAssertEqual(bounceEvents.first?.reason, "Cheque bounced: NSF [actor=user]")
+    }
+
+    func testBounceChequeRollsBackReversalAndChequeWhenAuditFails() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try service.post(
+            draft: VoucherDraft(
+                mode: .create,
+                voucherTypeCode: .receipt,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                narration: "Rollback cheque",
+                lines: [
+                    .init(accountId: tc.cashId, amountPaise: 10_000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit)
+                ]
+            ),
+            in: tc.fy,
+            workflow: .init(chequeNumber: "CHQ-ROLLBACK", chequeStatus: .deposited)
+        )
+        try tc.db.execute(
+            """
+            CREATE TRIGGER trg_test_fail_cheque_bounce_audit
+            BEFORE INSERT ON avelo_audit_events
+            WHEN NEW.action = 'chequeBounced'
+            BEGIN SELECT RAISE(ABORT, 'forced cheque audit failure'); END;
+            """
+        )
+
+        XCTAssertThrowsError(try service.bounceCheque(posted.voucher.id, reason: "NSF"))
+
+        let stored = try XCTUnwrap(cheque(tc.db, for: posted.voucher.id))
+        XCTAssertEqual(stored.status, ChequeStatus.deposited.rawValue)
+        XCTAssertNil(stored.bouncedReversalVoucherId)
+        XCTAssertEqual(
+            try tc.db.queryOne(
+                "SELECT COUNT(*) FROM avelo_vouchers WHERE reversal_of_id = ?",
+                bind: [.text(posted.voucher.id.uuidString)]
+            ) { $0.int(0) },
+            0
+        )
     }
 
     func testRepresentChequeCreatesFreshVoucherAndLinksToBouncedCheque() throws {
@@ -972,6 +1058,12 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(representedCheque.status, ChequeStatus.issued.rawValue)
         XCTAssertEqual(representedCheque.representedFromChequeId, originalCheque.id)
         XCTAssertEqual(representedCheque.dueDate, "2024-06-05")
+        let representedEvents = try AuditRepository(db: tc.db).list(
+            filter: .init(companyId: tc.companyId, action: .chequeRepresented)
+        )
+        XCTAssertEqual(representedEvents.count, 1)
+        XCTAssertNotNil(representedEvents.first?.snapshotBeforeJson)
+        XCTAssertNotNil(representedEvents.first?.snapshotAfterJson)
     }
 
     func testReverseRejectsDisabledAccountsThroughValidation() throws {
@@ -1014,7 +1106,7 @@ final class VoucherServiceTests: XCTestCase {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
         let debtorsGroup = try AccountService(db: tc.db, companyId: tc.companyId)
-            .createGroup(code: "SD4", name: "Sundry Debtors 4", nature: .assets)
+            .createGroup(code: "SD4", name: "Sundry Debtors 4", nature: .assets, parentGroupId: try XCTUnwrap(AccountRepository(db: tc.db).findById(tc.customerId)).groupId)
         let debtor = try AccountService(db: tc.db, companyId: tc.companyId)
             .createAccount(.init(code: "DEBTOR_D", name: "Debtor D", groupId: debtorsGroup.id, openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil, existingAccountId: nil))
         let posted = try svc.post(

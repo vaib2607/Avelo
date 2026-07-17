@@ -88,6 +88,34 @@ public struct BackupService: Sendable {
                 AveloBackupLogger.error("backup manifest write failed: \(manifestURL.path, privacy: .public)")
                 throw AppError.fileSystem("Unable to write backup manifest at \(manifestURL.lastPathComponent): \(error.localizedDescription)")
             }
+            let existingHandle = await manager.openHandle(id: companyId)
+            let auditHandle: CompanyHandle
+            if let existingHandle {
+                auditHandle = existingHandle
+            } else {
+                auditHandle = try await manager.openCompany(id: companyId)
+            }
+            do {
+                try AuditService(db: auditHandle.db, companyId: companyId).record(
+                    action: .backupExported,
+                    entityType: "company",
+                    entityId: companyId.uuidString,
+                    snapshotAfter: manifest,
+                    reason: "Backup exported as \(destinationURL.lastPathComponent)"
+                )
+            } catch {
+                if existingHandle == nil {
+                    await manager.closeCompany(id: companyId)
+                }
+                // A backup without its required audit event is not complete.
+                // Remove both externally visible artifacts before failing.
+                try? fm.removeItem(at: destinationURL)
+                try? fm.removeItem(at: manifestURL)
+                throw error
+            }
+            if existingHandle == nil {
+                await manager.closeCompany(id: companyId)
+            }
             return manifest
         }
     }

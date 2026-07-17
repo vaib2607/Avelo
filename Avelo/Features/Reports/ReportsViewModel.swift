@@ -24,6 +24,7 @@ public final class ReportsViewModel {
     public var ledgerAccountId: Account.ID?
     public var cashBankAccountId: Account.ID?
     public var accounts: [Account] = []
+    public var cashBankAccounts: [Account] = []
     public var isLoading: Bool = false
     public var error: AppError?
 
@@ -52,6 +53,17 @@ public final class ReportsViewModel {
         do {
             let svc = ReportService(db: db, companyId: companyId)
             accounts = try AccountService(db: db, companyId: companyId).listActiveAccounts()
+            guard let company = try CompanyRepository(db: db).findById(companyId) else {
+                throw AppError.notFound("Company")
+            }
+            if selection.requiresInventory && !company.isInventoryEnabled {
+                throw AppError.featureUnavailable("Inventory is disabled for this company.")
+            }
+            let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
+            let policy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
+            cashBankAccounts = accounts.filter {
+                policy.evaluate(account: $0, for: .bankReconciliation, company: company, groups: groups).isEligible
+            }
             switch selection {
             case .trialBalance:
                 trialBalance = try svc.trialBalance(asOfDate: asOf, financialYearId: fyId).rows
@@ -80,7 +92,7 @@ public final class ReportsViewModel {
                 }
             case .cashBook, .bankBook:
                 if cashBankAccountId == nil {
-                    cashBankAccountId = accounts.first(where: { codeMatchesCashBank($0.code) })?.id
+                    cashBankAccountId = cashBankAccounts.first?.id
                 }
                 if let aid = cashBankAccountId {
                     ledger = try svc.ledger(accountId: aid, financialYearId: fyId, fromDate: fromDate, toDate: toDate)
@@ -138,10 +150,6 @@ public final class ReportsViewModel {
         Calendar(identifier: .gregorian).date(byAdding: .year, value: -1, to: date) ?? date
     }
 
-    private func codeMatchesCashBank(_ code: String) -> Bool {
-        let upper = code.uppercased()
-        return upper.contains("CASH") || upper.contains("BANK")
-    }
 }
 
 public struct StockRegisterRow: Identifiable, Hashable, Sendable {

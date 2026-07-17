@@ -6,12 +6,10 @@ public struct CompanyInfoSheet: View {
     @Environment(AppRouter.self) private var router
     @State private var company: Company
     @State private var inventoryEnabled: Bool
-    @State private var inventoryMode: InventoryLinkMode
 
     public init(company: Company) {
         _company = State(initialValue: company)
         _inventoryEnabled = State(initialValue: company.isInventoryEnabled)
-        _inventoryMode = State(initialValue: company.inventoryLinkMode)
     }
 
     public var body: some View {
@@ -43,12 +41,9 @@ public struct CompanyInfoSheet: View {
                     }
                     Section("Inventory") {
                         Toggle("Enable inventory", isOn: $inventoryEnabled)
-                        Picker("Link mode", selection: $inventoryMode) {
-                            ForEach(InventoryLinkMode.allCases) { mode in
-                                Text(mode.displayName).tag(mode)
-                            }
-                        }
-                        .disabled(!inventoryEnabled)
+                        Text("Ledger vouchers do not create stock movements automatically. Use an item invoice or record stock manually.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .formStyle(.grouped)
@@ -79,7 +74,7 @@ public struct CompanyInfoSheet: View {
         do {
             var updated = company
             updated.isInventoryEnabled = inventoryEnabled
-            updated.inventoryLinkMode = inventoryEnabled ? inventoryMode : .manual
+            updated.inventoryLinkMode = .manual
             try CompanyService(db: ctx.database, companyId: ctx.companyId, manager: env.manager).update(updated)
             env.notifyDataChanged()
             env.refreshCompanyFlags()

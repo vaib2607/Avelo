@@ -94,6 +94,7 @@ public final class ReportService: Sendable {
     }
 
     public func stockValuation(asOfDate: Date) throws -> ReportResult.StockValuationReport {
+        try requireInventoryEnabled()
         let f = makeFilter()
         return try repository.stockValuation(asOfDate: asOfDate, filter: f)
     }
@@ -104,12 +105,19 @@ public final class ReportService: Sendable {
     }
 
     public func stockAgeing(asOfDate: Date) throws -> ReportResult.StockAgeingReport {
+        try requireInventoryEnabled()
         let f = makeFilter()
         return try repository.stockAgeing(asOfDate: asOfDate, filter: f)
     }
 
     public static func invalidateCache(companyId: Company.ID) {
         cache.invalidate(companyId: companyId)
+    }
+
+    private func requireInventoryEnabled() throws {
+        guard try CompanyRepository(db: db).findById(companyId)?.isInventoryEnabled == true else {
+            throw AppError.featureUnavailable("Inventory is disabled for this company.")
+        }
     }
 }
 

@@ -66,8 +66,12 @@ public final class DashboardViewModel {
             let gst = try report.gstSummary(fromDate: ctx.financialYear.startDate, toDate: reportEndDate)
             gstPayablePaise = gst.netPayablePaise
 
-            let stock = try report.stockValuation(asOfDate: reportEndDate)
-            stockValuePaise = try CheckedMath.sum(stock.rows.map(\.valuePaise), context: "summing dashboard stock value")
+            if ctx.isInventoryEnabled {
+                let stock = try report.stockValuation(asOfDate: reportEndDate)
+                stockValuePaise = try CheckedMath.sum(stock.rows.map(\.valuePaise), context: "summing dashboard stock value")
+            } else {
+                stockValuePaise = 0
+            }
 
             let monthStart = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: today)) ?? today
             if let id = accountId(for: "SALES") {

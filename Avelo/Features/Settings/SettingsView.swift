@@ -72,15 +72,9 @@ public struct SettingsView: View {
                     get: { vm.company?.isInventoryEnabled ?? false },
                     set: { vm.setInventoryEnabled($0); env.refreshCompanyFlags() }
                 ))
-                Picker("Inventory link mode", selection: Binding(
-                    get: { vm.company?.inventoryLinkMode ?? .manual },
-                    set: { vm.setInventoryLinkMode($0); env.refreshCompanyFlags() }
-                )) {
-                    ForEach(InventoryLinkMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .disabled(!(vm.company?.isInventoryEnabled ?? false))
+                Text("Ledger vouchers do not create stock movements automatically. Use an item invoice or record stock manually.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("Financial years") {
                 Table(vm.financialYears) {

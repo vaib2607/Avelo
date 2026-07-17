@@ -86,7 +86,25 @@ public final class InvoicePDFService: Sendable {
             placeOfSupply: placeOfSupply,
             stockRows: stockRows
         )
-        return view.dataWithPDF(inside: view.bounds)
+        let pdfData = view.dataWithPDF(inside: view.bounds)
+        return pdfData
+    }
+
+    public func recordExportSaved(voucherId: Voucher.ID, url: URL) throws {
+        guard let voucher = try VoucherRepository(db: db).findById(voucherId) else {
+            throw AppError.notFound("Voucher")
+        }
+        do {
+            try AuditService(db: db, companyId: voucher.companyId).record(
+                action: .invoicePDFExported,
+                entityType: "voucher",
+                entityId: voucherId.uuidString,
+                reason: url.lastPathComponent
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
     }
 }
 

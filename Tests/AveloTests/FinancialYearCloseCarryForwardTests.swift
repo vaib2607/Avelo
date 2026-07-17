@@ -60,7 +60,7 @@ final class FinancialYearCloseCarryForwardTests: XCTestCase {
         ]), in: tc.fy)
         try service.close(tc.fy.id)
 
-        let report = try ReportService(db: tc.db, companyId: tc.companyId)
+        let report = ReportService(db: tc.db, companyId: tc.companyId)
         let ledger = try report.ledger(
             accountId: tc.cashId,
             financialYearId: nextFY.id,

@@ -3,12 +3,40 @@ import XCTest
 
 final class ItemInvoiceServiceTests: XCTestCase {
 
+    func testItemInvoiceRejectsDirectPostingWhenInventoryIsDisabled() throws {
+        let fx = try makeFixture()
+        try fx.tc.db.execute(
+            "UPDATE avelo_companies SET is_inventory_enabled = 0, inventory_link_mode = ? WHERE id = ?",
+            [.text(InventoryLinkMode.manual.rawValue), .text(fx.tc.companyId.uuidString)]
+        )
+
+        XCTAssertThrowsError(
+            try ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId).post(
+                voucherTypeCode: .sales,
+                date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: fx.customerId,
+                salesOrPurchaseLedgerId: fx.tc.salesId,
+                items: [.init(itemId: fx.itemId, quantity: 1, ratePaise: 10_000)],
+                in: fx.tc.fy
+            )
+        ) { error in
+            guard case AppError.featureUnavailable = AppError.wrap(error) else {
+                return XCTFail("Expected disabled inventory rejection, got \(error)")
+            }
+        }
+        XCTAssertEqual(
+            try VoucherRepository(db: fx.tc.db).count(filter: .init(companyId: fx.tc.companyId)),
+            0
+        )
+    }
+
     /// Extends `TestCompany` with the extra fixtures item-invoice posting
     /// needs: a company GSTIN, INPUT-side duty ledgers, a CESS ledger, a
     /// party with a known state, and a taxable stock item.
     private struct Fixture {
         let tc: TestCompany
         let customerId: Account.ID
+        let supplierId: Account.ID
         let purchaseId: Account.ID
         let itemId: InventoryItem.ID
     }
@@ -23,9 +51,12 @@ final class ItemInvoiceServiceTests: XCTestCase {
         try CompanyRepository(db: tc.db).update(company)
 
         let accountRepo = AccountRepository(db: tc.db)
-        try accountRepo.insert(Account(companyId: tc.companyId, groupId: tc.assetsGroupId, code: "CUST_1", name: "Test Customer",
-                                        openingBalancePaise: 0, openingBalanceSide: .debit, gstin: partyGSTIN))
-        let customer = try XCTUnwrap(accountRepo.findByCode("CUST_1", companyId: tc.companyId))
+        var customer = try XCTUnwrap(accountRepo.findById(tc.customerId))
+        customer.gstin = partyGSTIN
+        try accountRepo.update(customer)
+        var supplier = try XCTUnwrap(accountRepo.findById(tc.supplierId))
+        supplier.gstin = partyGSTIN
+        try accountRepo.update(supplier)
 
         try accountRepo.insert(Account(companyId: tc.companyId, groupId: tc.liabilityGroupId, code: "CGST_INPUT", name: "CGST Input",
                                         openingBalancePaise: 0, openingBalanceSide: .debit))
@@ -35,14 +66,16 @@ final class ItemInvoiceServiceTests: XCTestCase {
                                         openingBalancePaise: 0, openingBalanceSide: .debit))
         try accountRepo.insert(Account(companyId: tc.companyId, groupId: tc.liabilityGroupId, code: "CESS", name: "CESS",
                                         openingBalancePaise: 0, openingBalanceSide: .credit))
-        try accountRepo.insert(Account(companyId: tc.companyId, groupId: tc.expenseGroupId, code: "PURCHASE", name: "Purchase",
+        let purchaseGroup = AccountGroup(companyId: tc.companyId, code: "PURCHASE_ACCOUNTS", name: "Purchase Accounts", nature: .expense)
+        try AccountGroupRepository(db: tc.db).insert(purchaseGroup)
+        try accountRepo.insert(Account(companyId: tc.companyId, groupId: purchaseGroup.id, code: "PURCHASE", name: "Purchase",
                                         openingBalancePaise: 0, openingBalanceSide: .debit))
         let purchase = try XCTUnwrap(accountRepo.findByCode("PURCHASE", companyId: tc.companyId))
 
         let inventory = InventoryService(db: tc.db, companyId: tc.companyId)
         let item = try inventory.createItem(code: "ITEM-1", name: "Widget", unit: "Nos", gstRateBps: gstRateBps)
 
-        return Fixture(tc: tc, customerId: customer.id, purchaseId: purchase.id, itemId: item.id)
+        return Fixture(tc: tc, customerId: customer.id, supplierId: supplier.id, purchaseId: purchase.id, itemId: item.id)
     }
 
     // MARK: - Sales, inter-state (company MH, customer KA)
@@ -98,7 +131,7 @@ final class ItemInvoiceServiceTests: XCTestCase {
         let fx = try makeFixture(partyGSTIN: "27AAGCB7383J1Z4") // Maharashtra, same as company
 
         let accountRepo = AccountRepository(db: fx.tc.db)
-        var vendor = try XCTUnwrap(accountRepo.findById(fx.customerId))
+        var vendor = try XCTUnwrap(accountRepo.findById(fx.supplierId))
         vendor.gstin = "27AAGCB7383J1Z4"
         try accountRepo.update(vendor)
 
@@ -106,7 +139,7 @@ final class ItemInvoiceServiceTests: XCTestCase {
         let result = try svc.post(
             voucherTypeCode: .purchase,
             date: DateFormatters.parseDate("2024-06-01")!,
-            partyAccountId: fx.customerId,
+            partyAccountId: fx.supplierId,
             salesOrPurchaseLedgerId: fx.purchaseId,
             items: [.init(itemId: fx.itemId, quantity: 3, ratePaise: 100_000)], // Rs 1000 x 3 = Rs 3000
             in: fx.tc.fy
@@ -121,8 +154,8 @@ final class ItemInvoiceServiceTests: XCTestCase {
         let lines = try LedgerLineRepository(db: fx.tc.db).findForVoucher(result.voucher.id)
         let byAccount = Dictionary(uniqueKeysWithValues: lines.map { ($0.accountId, $0) })
         // Vendor is credited (we owe them); Purchase + CGST/SGST Input are debited.
-        XCTAssertEqual(byAccount[fx.customerId]?.side, .credit)
-        XCTAssertEqual(byAccount[fx.customerId]?.amountPaise, 354_000)
+        XCTAssertEqual(byAccount[fx.supplierId]?.side, .credit)
+        XCTAssertEqual(byAccount[fx.supplierId]?.amountPaise, 354_000)
         XCTAssertEqual(byAccount[fx.purchaseId]?.side, .debit)
         XCTAssertEqual(byAccount[fx.purchaseId]?.amountPaise, 300_000)
         let cgstInput = try XCTUnwrap(accountRepo.findByCode("CGST_INPUT", companyId: fx.tc.companyId))

@@ -16,6 +16,10 @@ Use repo-owned commands so local, CI, and release evidence mean the same thing. 
 | `Avelo_Release_Board.md` | canonical readiness verdict and backlog | low-level implementation design |
 | `DX.md` | supported commands and evidence format | release approval by itself |
 
+The product roadmap is `Avelo_Master_Product_Execution_Plan.md`. It coordinates the normative documents and release board; it does not replace them.
+
+Roadmap verification uses repository-owned commands: `make build`, `make test`, `make net-check`, `make rule-audit`, `make verify` or `make rc-local`, `make benchmark`, `make benchmark-million`, and `make launch-smoke` as applicable. Historical agent instructions are not an active source of commands or release status.
+
 When documents conflict, fix the owner instead of duplicating a second rule elsewhere.
 
 ## First run
@@ -122,7 +126,7 @@ Evidence is valid only for the identified worktree and artifact. A source, migra
 
 ## Public-production distribution runbook
 
-The current `Scripts/bundle.sh` produces an ad-hoc signed local RC with `CFBundleShortVersionString=1.0` and `CFBundleVersion=2`. The target is v1.1, so metadata and signing are release blockers until one declared source drives the bundle, changelog, tag, and artifact.
+`ReleaseVersion.env` is the single source for `CFBundleShortVersionString` and `CFBundleVersion`. The current candidate is v1.1 build 3. `Scripts/bundle.sh` still produces an ad-hoc signed local RC until a Developer ID identity is provisioned.
 
 Before public production, choose and document one path:
 
@@ -139,6 +143,14 @@ Before public production, choose and document one path:
 Document sandbox/container migration, App Store entitlements, review constraints, receipt behavior, and how existing local company files move safely. Treat this as a separate approved release plan, not a flag on the ad-hoc bundle script.
 
 For either path, record certificate ownership/expiry/rotation, notarization credentials, artifact checksum and retention, release notes/privacy/support contacts, rollback artifact and rollback limits, schema downgrade policy, crash/incident intake that preserves the offline rule, and who can declare or revoke release readiness.
+
+Capture the exact Phase 0 candidate before human testing:
+
+```bash
+./Scripts/phase0_evidence.sh dist/Avelo.app
+```
+
+Copy its output into `Docs/Avelo_Phase0_Manual_Acceptance.md`. A changed executable checksum invalidates prior acceptance and requires a new record.
 
 ## Documentation release check
 

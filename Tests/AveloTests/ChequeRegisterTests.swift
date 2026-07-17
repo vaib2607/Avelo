@@ -12,11 +12,11 @@ final class ChequeRegisterTests: XCTestCase {
                 mode: .create,
                 voucherTypeCode: .payment,
                 date: DateFormatters.parseDate("2024-06-01")!,
-                partyAccountId: tc.cashId,
+                partyAccountId: tc.supplierId,
                 narration: "Cheque payment",
                 lines: [
                     .init(accountId: tc.cashId, amountPaise: 25_000, side: .credit),
-                    .init(accountId: tc.rentId, amountPaise: 25_000, side: .debit)
+                    .init(accountId: tc.supplierId, amountPaise: 25_000, side: .debit)
                 ]
             ),
             in: tc.fy,
@@ -38,7 +38,7 @@ final class ChequeRegisterTests: XCTestCase {
         XCTAssertEqual(rows[0].cheque.chequeNumber, "CHQ-101")
         XCTAssertEqual(rows[0].voucherNumber, voucher.number)
         XCTAssertEqual(rows[0].amountPaise, 25_000)
-        XCTAssertEqual(rows[0].partyName, "Cash")
+        XCTAssertEqual(rows[0].partyName, "Test Supplier")
     }
 
     func testListChequesFiltersByStatus() throws {

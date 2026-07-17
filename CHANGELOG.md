@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Aligned the release-candidate bundle identity to Avelo 1.1 (build 3) through the repository-level `ReleaseVersion.env`; bundle assembly and validation now consume the same source.
+- Completed local Phase 0 implementation proof: 498 tests, automated rule audit, warning-free production build, RC self-test, launch smoke, standard benchmark, and the explicit 500k-voucher benchmark. Human and notarized-distribution acceptance remain open.
+
 - Added Tally item-invoice mode for Sales/Purchase (item-grid entry with per-line GST auto-calc via `GSTInvoiceCalculator`, structured item lines in `avelo_voucher_item_lines`) and single-entry mode for Contra/Payment/Receipt.
 - Fixed item-invoice posting atomicity: `ItemInvoiceService` now posts the ledger voucher, item lines, and stock movements inside one transaction, so a stock-movement failure (e.g. selling more than is on hand) rolls back the voucher instead of leaving it posted with no stock movement.
 - Added `MigrationV021`: voucher drafts now persist `account_ledger_id`, so crash recovery restores the cash/bank ledger for single-entry-mode (Contra/Payment/Receipt) drafts instead of forcing the user to re-pick it.

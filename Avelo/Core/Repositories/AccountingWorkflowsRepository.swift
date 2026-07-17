@@ -225,7 +225,7 @@ public struct AccountingWorkflowsRepository: Sendable {
             voucherId: try UUIDParsing.required(row.requiredText("voucher_id"), field: "avelo_cheques.voucher_id"),
             chequeNumber: try row.requiredText("cheque_number"),
             issueDate: try row.requiredDate("issue_date"),
-            dueDate: try row.optionalDate("due_date"),
+            dueDate: row.optionalDate("due_date"),
             status: try row.enumValue("status"),
             bouncedReversalVoucherId: try UUIDParsing.optional(try row.checkedOptionalText("bounced_reversal_voucher_id"), field: "avelo_cheques.bounced_reversal_voucher_id"),
             representedFromChequeId: try UUIDParsing.optional(try row.checkedOptionalText("represented_from_cheque_id"), field: "avelo_cheques.represented_from_cheque_id"),

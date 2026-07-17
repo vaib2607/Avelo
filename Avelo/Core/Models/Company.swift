@@ -59,6 +59,13 @@ public enum InventoryLinkMode: String, CaseIterable, Sendable, Codable, Identifi
 
     public var id: String { rawValue }
 
+    /// The persisted enum retains legacy values for compatibility, but v1.1
+    /// exposes only manual linkage until an automatic workflow can collect
+    /// explicit stock inputs and prove its correction/audit contract.
+    public var isAvailableForProduction: Bool {
+        self == .manual
+    }
+
     public var displayName: String {
         switch self {
         case .manual:     return "Manual"

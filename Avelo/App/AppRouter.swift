@@ -5,14 +5,33 @@ import Observation
 @Observable
 public final class AppRouter {
 
-    public var selection: SidebarDestination = .dashboard
-    public var presentedSheet: RouterSheet?
+    public var selection: SidebarDestination = .dashboard {
+        didSet {
+            if selection == .inventory && !isInventoryEnabled {
+                selection = oldValue == .inventory ? .dashboard : oldValue
+            }
+        }
+    }
+    public var presentedSheet: RouterSheet? {
+        didSet {
+            if presentedSheet?.requiresInventory == true && !isInventoryEnabled {
+                presentedSheet = oldValue?.requiresInventory == true ? nil : oldValue
+            }
+        }
+    }
     public var presentedAlert: RouterAlert?
 
     /// Set when another screen requests the Reports view open a specific
     /// account's ledger. Consumed (and cleared) by `ReportsView`.
     public var pendingLedgerAccountId: Account.ID?
-    public var pendingReportSelection: ReportSelection?
+    public var pendingReportSelection: ReportSelection? {
+        didSet {
+            if pendingReportSelection?.requiresInventory == true && !isInventoryEnabled {
+                pendingReportSelection = oldValue?.requiresInventory == true ? nil : oldValue
+            }
+        }
+    }
+    public private(set) var isInventoryEnabled: Bool = false
 
     public init() {}
 
@@ -25,6 +44,7 @@ public final class AppRouter {
     }
 
     public func go(_ destination: SidebarDestination) {
+        guard destination != .inventory || isInventoryEnabled else { return }
         selection = destination
     }
 
@@ -35,12 +55,23 @@ public final class AppRouter {
     }
 
     public func openReport(_ report: ReportSelection) {
+        guard !report.requiresInventory || isInventoryEnabled else { return }
         pendingReportSelection = report
         selection = .reports
     }
 
     public func present(_ sheet: RouterSheet) {
+        guard !sheet.requiresInventory || isInventoryEnabled else { return }
         presentedSheet = sheet
+    }
+
+    public func setInventoryEnabled(_ enabled: Bool) {
+        isInventoryEnabled = enabled
+        if !enabled {
+            if selection == .inventory { selection = .dashboard }
+            if pendingReportSelection?.requiresInventory == true { pendingReportSelection = nil }
+            if presentedSheet?.requiresInventory == true { presentedSheet = nil }
+        }
     }
 
     public func alert(_ alert: RouterAlert) {
@@ -110,6 +141,15 @@ public enum RouterSheet: Identifiable, Sendable {
         case .newCostCategory: return "newCostCategory"
         case .lockFinancialYear(let id): return "lockFy-\(id.uuidString)"
         case .closeFinancialYear(let id): return "closeFy-\(id.uuidString)"
+        }
+    }
+
+    public var requiresInventory: Bool {
+        switch self {
+        case .newItem:
+            return true
+        default:
+            return false
         }
     }
 }

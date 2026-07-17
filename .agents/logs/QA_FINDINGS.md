@@ -78,9 +78,10 @@
 - Blocker: none found.
 
 ## Release Gates
-- Status: clean
-- Zero known P0 bugs in shipped scope: confirmed by release board and passing shipped-path tests.
+- Status: automated review only; human and distribution gates remain open
+- No failing P0 regression was found by the listed automated tests. This is not evidence that zero P0 defects exist and does not replace the canonical manual acceptance record.
 - Zero silent data-loss or deletion paths: confirmed by restore and voucher delete regression coverage.
 - Zero FY lock bypasses: confirmed by locked-year voucher tests and FY lock coverage.
 - Zero network behavior: confirmed by `make net-check` returning zero matches.
 - Core reports reconcile on validation data: confirmed by report reconciliation tests.
+- Required accountant, operator, keyboard, VoiceOver, visual, physical-print, clean-machine, signing, and notarization acceptance is tracked in `Docs/Avelo_Phase0_Manual_Acceptance.md` and remains unperformed.

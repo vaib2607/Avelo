@@ -1,6 +1,6 @@
 import Foundation
 
-public struct VoucherTemplate: Identifiable, Hashable, Sendable {
+public struct VoucherTemplate: Identifiable, Hashable, Sendable, Codable {
     public typealias ID = UUID
 
     public let id: ID

@@ -2,6 +2,57 @@ import XCTest
 @testable import Avelo
 
 final class VoucherDraftTests: XCTestCase {
+    @MainActor
+    func testReloadAccountContextImmediatelyReflectsPartyProfileChanges() throws {
+        let tc = try TestCompany.make()
+        let viewModel = VoucherEditViewModel(
+            companyId: tc.companyId,
+            db: tc.db,
+            fyId: tc.fy.id,
+            initialType: .purchase
+        )
+        try viewModel.reloadAccountContext()
+        let customer = try XCTUnwrap(viewModel.accounts.first(where: { $0.id == tc.customerId }))
+        XCTAssertFalse(viewModel.eligibility(customer, for: .voucherParty(.purchase)).isEligible)
+
+        try PartyProfileRepository(db: tc.db).upsert(PartyProfile(
+            accountId: tc.customerId,
+            companyId: tc.companyId,
+            usage: .both
+        ))
+        try viewModel.reloadAccountContext()
+
+        let refreshed = try XCTUnwrap(viewModel.accounts.first(where: { $0.id == tc.customerId }))
+        XCTAssertTrue(viewModel.eligibility(refreshed, for: .voucherParty(.purchase)).isEligible)
+    }
+
+    @MainActor
+    func testReloadAccountContextImmediatelyReflectsAccountRegrouping() throws {
+        let tc = try TestCompany.make()
+        let viewModel = VoucherEditViewModel(
+            companyId: tc.companyId,
+            db: tc.db,
+            fyId: tc.fy.id,
+            initialType: .purchase
+        )
+        try viewModel.reloadAccountContext()
+        var customer = try XCTUnwrap(viewModel.accounts.first(where: { $0.id == tc.customerId }))
+        XCTAssertFalse(viewModel.eligibility(customer, for: .voucherParty(.purchase)).isEligible)
+
+        let creditorsGroupId = try XCTUnwrap(
+            AccountGroupRepository(db: tc.db)
+                .listForCompany(tc.companyId)
+                .first(where: { $0.code == "SUNDRY_CREDITORS" })?.id
+        )
+        customer.groupId = creditorsGroupId
+        try AccountRepository(db: tc.db).update(customer)
+        try viewModel.reloadAccountContext()
+
+        let regrouped = try XCTUnwrap(viewModel.accounts.first(where: { $0.id == tc.customerId }))
+        XCTAssertTrue(viewModel.eligibility(regrouped, for: .voucherParty(.purchase)).isEligible)
+        XCTAssertFalse(viewModel.eligibility(regrouped, for: .voucherParty(.sales)).isEligible)
+    }
+
 
     private func line(_ amount: Int64, _ side: EntrySide, account: Account.ID? = UUID()) -> VoucherDraft.Line {
         VoucherDraft.Line(accountId: account, amountPaise: amount, side: side)
@@ -110,9 +161,9 @@ final class VoucherDraftTests: XCTestCase {
         let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
             draft: VoucherDraft(
                 mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-06-01")!,
-                partyAccountId: tc.cashId, narration: "Original sale",
+                partyAccountId: tc.customerId, narration: "Original sale",
                 lines: [
-                    .init(accountId: tc.cashId, amountPaise: 100_000, side: .debit),
+                    .init(accountId: tc.customerId, amountPaise: 100_000, side: .debit),
                     .init(accountId: tc.salesId, amountPaise: 100_000, side: .credit)
                 ]
             ),
@@ -126,7 +177,7 @@ final class VoucherDraftTests: XCTestCase {
         vm.loadFromRecoveredDraft(duplicateEntry)
 
         XCTAssertEqual(vm.narration, "Original sale")
-        XCTAssertEqual(vm.partyAccountId, tc.cashId)
+        XCTAssertEqual(vm.partyAccountId, tc.customerId)
         XCTAssertEqual(vm.lines.count, 2)
         XCTAssertEqual(vm.lines[0].amount, "1000.00")
 
@@ -239,7 +290,7 @@ final class VoucherDraftTests: XCTestCase {
             companyId: tc.companyId,
             voucherTypeCode: .payment,
             date: DateFormatters.parseDate("2024-05-01")!,
-            partyAccountId: tc.cashId,
+            partyAccountId: tc.supplierId,
             narration: "Recovered narration",
             billReferenceType: .advance,
             billReferenceNumber: "REF-9",
@@ -254,7 +305,7 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertNotEqual(vm.draftId, originalDraftId, "continuing to edit a resumed draft must update its own row, not a fresh one")
         XCTAssertEqual(vm.draftId, entry.id)
         XCTAssertEqual(vm.narration, "Recovered narration")
-        XCTAssertEqual(vm.partyAccountId, tc.cashId)
+        XCTAssertEqual(vm.partyAccountId, tc.supplierId)
         XCTAssertEqual(vm.billReferenceType, .advance)
         XCTAssertEqual(vm.billReferenceNumber, "REF-9")
         XCTAssertEqual(vm.chequeNumber, "CHQ-9")
@@ -360,12 +411,12 @@ final class VoucherDraftTests: XCTestCase {
                 mode: .create,
                 voucherTypeCode: .sales,
                 date: DateFormatters.parseDate("2024-06-01")!,
-                partyAccountId: tc.cashId,
+                partyAccountId: tc.customerId,
                 billReferenceType: .newRef,
                 billReferenceNumber: "INV-501",
                 narration: "Sale on credit",
                 lines: [
-                    .init(accountId: tc.cashId, amountPaise: 100_000, side: .debit),
+                    .init(accountId: tc.customerId, amountPaise: 100_000, side: .debit),
                     .init(accountId: tc.salesId, amountPaise: 100_000, side: .credit)
                 ]
             ),

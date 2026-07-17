@@ -34,21 +34,9 @@ public final class SettingsViewModel {
         guard var company else { return }
         do {
             company.isInventoryEnabled = enabled
-            if !enabled {
+            if !enabled || !company.inventoryLinkMode.isAvailableForProduction {
                 company.inventoryLinkMode = .manual
             }
-            try CompanyRepository(db: db).update(company)
-            reload()
-        } catch {
-            self.error = AppError.wrap(error)
-        }
-    }
-
-    public func setInventoryLinkMode(_ mode: InventoryLinkMode) {
-        guard var company else { return }
-        do {
-            company.isInventoryEnabled = true
-            company.inventoryLinkMode = mode
             try CompanyRepository(db: db).update(company)
             reload()
         } catch {

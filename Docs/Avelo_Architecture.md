@@ -2,6 +2,8 @@
 
 This document defines Avelo's dependency, lifecycle, persistence, and execution boundaries. It explains how product behavior from `Avelo_Master_PRD.md` is allowed to be implemented. `Avelo_Rules.md` wins on invariants; executable migrations win on schema mechanics; `Avelo_Release_Board.md` wins on readiness.
 
+The complete product and phased execution roadmap is `Avelo_Master_Product_Execution_Plan.md`.
+
 ## 1. Layered model
 
 ```text
@@ -131,11 +133,13 @@ Inventory-disabled routing currently has an open production blocker (`AVL-P0-033
 
 ## 9. Accounting write pipelines
 
+Account meaning is resolved before a workflow reads or writes financial state. `AccountEligibilityPolicy` evaluates the complete frozen-code group ancestry plus explicit account semantics; picker visibility and service validation call the same policy. Display names never determine cash, bank, party, sales, purchase, tax, stock, payroll, cost, or order eligibility. A retained selection that becomes invalid remains visible with an actionable reason until replaced.
+
 ### 9.1 Ledger voucher
 
 `VoucherService` validates the draft and workflow inputs, resolves the exact FY, checks the lock and company, allocates the next number, writes the voucher and lines, writes bill/cheque workflow rows, appends audit evidence, and marks referenced accounts used in one transaction.
 
-The service returns the durable voucher and an optional inventory-prompt context. A prompt context is not permission to infer stock data. The incomplete prompt consumption/mapping contract is tracked by `AVL-P0-035`.
+The service returns the durable voucher. Legacy automatic inventory-link enum values remain decodable, but production suppresses the incomplete prompt and exposes only manual linkage plus explicit item-invoice entry until `AVL-P0-035` is fully proven.
 
 ### 9.2 Item invoice
 

@@ -9,14 +9,23 @@ public struct VoucherDraftValidator: Sendable {
     /// the batch.
     struct BatchContext: Sendable {
         private let financialYears: [FinancialYear]
-        private let accountActivityById: [Account.ID: Bool]
+        private let accountsById: [Account.ID: Account]
+        private let company: Company
+        private let groups: [AccountGroup]
+        private let eligibilityPolicy: AccountEligibilityPolicy
         let cashOrBankAccountIDs: Set<Account.ID>
 
         init(financialYears: [FinancialYear],
-             accountActivityById: [Account.ID: Bool],
+             accountsById: [Account.ID: Account],
+             company: Company,
+             groups: [AccountGroup],
+             eligibilityPolicy: AccountEligibilityPolicy,
              cashOrBankAccountIDs: Set<Account.ID>) {
             self.financialYears = financialYears
-            self.accountActivityById = accountActivityById
+            self.accountsById = accountsById
+            self.company = company
+            self.groups = groups
+            self.eligibilityPolicy = eligibilityPolicy
             self.cashOrBankAccountIDs = cashOrBankAccountIDs
         }
 
@@ -33,8 +42,11 @@ public struct VoucherDraftValidator: Sendable {
             financialYears.first(where: { $0.id == financialYearId })?.isLocked ?? false
         }
 
-        func isAccountActive(_ id: Account.ID) -> Bool {
-            accountActivityById[id] ?? false
+        func eligibility(_ id: Account.ID, for context: AccountSelectionContext) -> AccountEligibility {
+            guard let account = accountsById[id] else {
+                return AccountEligibility(isEligible: false, rejectionReason: "Account is missing.")
+            }
+            return eligibilityPolicy.evaluate(account: account, for: context, company: company, groups: groups)
         }
     }
 
@@ -50,14 +62,20 @@ public struct VoucherDraftValidator: Sendable {
         let financialYears = try FinancialYearRepository(db: db).listForCompany(companyId)
         let accounts = try AccountRepository(db: db).listForCompany(companyId)
         let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
-        let groupCodesByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0.code) })
-        let accountActivityById = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0.isActive) })
+        guard let company = try CompanyRepository(db: db).findById(companyId) else {
+            throw AppError.notFound("Company")
+        }
+        let accountsById = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        let policy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
         let cashOrBankAccountIDs = Set(accounts.lazy.filter {
-            isCashOrBank($0, groupCodesByID: groupCodesByID)
+            policy.evaluate(account: $0, for: .bankReconciliation, company: company, groups: groups).isEligible
         }.map(\.id))
         return BatchContext(
             financialYears: financialYears,
-            accountActivityById: accountActivityById,
+            accountsById: accountsById,
+            company: company,
+            groups: groups,
+            eligibilityPolicy: policy,
             cashOrBankAccountIDs: cashOrBankAccountIDs
         )
     }
@@ -267,31 +285,53 @@ public struct VoucherDraftValidator: Sendable {
             ))
         }
 
-        if existingVoucherId == nil {
-            for line in filled {
-                if let acc = line.accountId {
-                    do {
-                        let isActive: Bool
-                        if let batchContext {
-                            isActive = batchContext.isAccountActive(acc)
-                        } else {
-                            isActive = try isAccountActive(acc, companyId: companyId)
-                        }
-                        if !isActive {
-                            errors.append(ValidationError(
-                                code: .voucherAccountInactive,
-                                field: "lines",
-                                message: "Account is inactive."
-                            ))
-                        }
-                    } catch {
+        for line in filled {
+            if let accountId = line.accountId {
+                do {
+                    let eligibility = try accountEligibility(
+                        accountId,
+                        for: .unrestrictedPosting,
+                        companyId: companyId,
+                        batchContext: batchContext
+                    )
+                    if !eligibility.isEligible {
                         errors.append(ValidationError(
-                            code: .internal,
+                            code: .voucherAccountInactive,
                             field: "lines",
-                            message: "Unable to validate account activity."
+                            message: eligibility.rejectionReason ?? "Account is not eligible for posting."
                         ))
                     }
+                } catch {
+                    errors.append(ValidationError(
+                        code: .internal,
+                        field: "lines",
+                        message: "Unable to validate account eligibility."
+                    ))
                 }
+            }
+        }
+
+        if let partyAccountId = draft.partyAccountId {
+            do {
+                let eligibility = try accountEligibility(
+                    partyAccountId,
+                    for: .voucherParty(draft.voucherTypeCode),
+                    companyId: companyId,
+                    batchContext: batchContext
+                )
+                if !eligibility.isEligible {
+                    errors.append(ValidationError(
+                        code: .voucherAccountInactive,
+                        field: "party",
+                        message: eligibility.rejectionReason ?? "Party account is not eligible for this voucher."
+                    ))
+                }
+            } catch {
+                errors.append(ValidationError(
+                    code: .internal,
+                    field: "party",
+                    message: "Unable to validate party account eligibility."
+                ))
             }
         }
 
@@ -302,12 +342,22 @@ public struct VoucherDraftValidator: Sendable {
         try fiscalLockChecker.financialYear(containing: date, companyId: companyId)
     }
 
-    private func isAccountActive(_ id: Account.ID, companyId: Company.ID) throws -> Bool {
-        let v: Int64? = try db.queryOne(
-            "SELECT is_active FROM avelo_accounts WHERE id = ? AND company_id = ?",
-            bind: [.text(id.uuidString), .text(companyId.uuidString)]
-        ) { r in r.int("is_active") }
-        return (v ?? 0) != 0
+    private func accountEligibility(
+        _ id: Account.ID,
+        for context: AccountSelectionContext,
+        companyId: Company.ID,
+        batchContext: BatchContext?
+    ) throws -> AccountEligibility {
+        if let batchContext {
+            return batchContext.eligibility(id, for: context)
+        }
+        guard let company = try CompanyRepository(db: db).findById(companyId),
+              let account = try AccountRepository(db: db).findById(id) else {
+            return AccountEligibility(isEligible: false, rejectionReason: "Account is missing.")
+        }
+        let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
+        return try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
+            .evaluate(account: account, for: context, company: company, groups: groups)
     }
 
     private func singleEntryVoucherErrors(for draft: VoucherDraft,
@@ -322,10 +372,13 @@ public struct VoucherDraftValidator: Sendable {
             cashOrBankAccountIDs = cachedCashOrBankAccountIDs
         } else {
             let accounts = try AccountRepository(db: db).listForCompany(companyId)
+            guard let company = try CompanyRepository(db: db).findById(companyId) else {
+                throw AppError.notFound("Company")
+            }
             let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
-            let groupCodesByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0.code) })
+            let policy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
             cashOrBankAccountIDs = Set(accounts.lazy.filter {
-                isCashOrBank($0, groupCodesByID: groupCodesByID)
+                policy.evaluate(account: $0, for: .bankReconciliation, company: company, groups: groups).isEligible
             }.map(\.id))
         }
         let lines = draft.filledLines
@@ -361,19 +414,6 @@ public struct VoucherDraftValidator: Sendable {
         }
 
         return []
-    }
-
-    private func isCashOrBank(_ account: Account,
-                              groupCodesByID: [AccountGroup.ID: String]) -> Bool {
-        if account.isBankAccount || account.code == "CASH_IN_HAND" {
-            return true
-        }
-        if account.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            .compare("Cash", options: .caseInsensitive) == .orderedSame {
-            return true
-        }
-        guard let groupCode = groupCodesByID[account.groupId] else { return false }
-        return ["BANK_ACCOUNTS", "CASH_IN_HAND", "BANK_OD"].contains(groupCode)
     }
 
     private func singleEntryValidationError(_ message: String) -> ValidationError {

@@ -19,11 +19,11 @@ final class NewVoucherAccountCreationTests: XCTestCase {
             code: "ALT_C", name: "Alt C Account", groupId: tc.assetsGroupId,
             openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil,
             existingAccountId: nil))
-        vm.accounts = try service.listActiveAccounts()
+        try vm.reloadAccountContext()
         let selection = accountCreationSelection(
             before: beforeIDs,
             accounts: vm.accounts,
-            eligibility: { _ in true }
+            eligibility: { vm.eligibility($0, for: .unrestrictedPosting).isEligible }
         )
         guard case .selected(let createdID) = selection else {
             return XCTFail("Expected the eligible new account to be selected")
@@ -39,6 +39,9 @@ final class NewVoucherAccountCreationTests: XCTestCase {
     func testCreateAccountRejectsNewAccountOutsidePickerEligibility() throws {
         let tc = try TestCompany.make()
         let service = AccountService(db: tc.db, companyId: tc.companyId)
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db,
+                                      fyId: tc.fy.id, initialType: .payment)
+        try vm.reloadAccountContext()
         let beforeIDs = Set(try service.listActiveAccounts().map(\.id))
 
         let created = try service.createAccount(.init(
@@ -46,10 +49,11 @@ final class NewVoucherAccountCreationTests: XCTestCase {
             openingBalancePaise: 0, openingBalanceSide: .debit, gstin: nil,
             existingAccountId: nil
         ))
+        try vm.reloadAccountContext()
         let selection = accountCreationSelection(
             before: beforeIDs,
-            accounts: try service.listActiveAccounts(),
-            eligibility: { $0.isBankAccount || $0.code == "CASH_IN_HAND" }
+            accounts: vm.accounts,
+            eligibility: { vm.eligibility($0, for: .voucherPrimaryCashBank(.payment)).isEligible }
         )
 
         XCTAssertEqual(selection, .rejected(created.id))

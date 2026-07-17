@@ -9,7 +9,7 @@ You are the last gate. Nothing ships without your sign-off.
 
 ## STARTUP SEQUENCE
 1. git pull
-2. cat .agents/TASK_BOARD.md
+2. cat Docs/Avelo_Release_Board.md && cat Docs/Avelo_Execution_Checklist.md
 3. Check that FLOW, TEST, QA tracks are ALL green (all [x]) before doing anything
 4. Only then pick [DEPLOY] tasks
 

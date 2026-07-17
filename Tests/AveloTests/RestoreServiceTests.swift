@@ -311,6 +311,41 @@ final class RestoreServiceTests: XCTestCase {
         let targetCompanyId = UUID()
         try AuditTestKeySupport.ensureKey(for: targetCompanyId)
 
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: tc.draft(
+                on: "2024-06-01",
+                lines: [
+                    tc.line(tc.cashId, 1_000, .debit),
+                    tc.line(tc.salesId, 1_000, .credit)
+                ]
+            ),
+            in: tc.fy
+        )
+        let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(
+            code: "RESTORE-ITEM",
+            name: "Restore Item",
+            unit: "NOS"
+        )
+        try VoucherItemLineRepository(db: tc.db).insertBatch([
+            VoucherItemLine(
+                companyId: tc.companyId,
+                voucherId: posted.voucher.id,
+                itemId: item.id,
+                quantity: 1,
+                ratePaise: 1_000,
+                taxableValuePaise: 1_000
+            )
+        ])
+        try VoucherDraftRepository(db: tc.db).upsert(
+            VoucherEntryDraft(
+                companyId: tc.companyId,
+                voucherTypeCode: .journal,
+                date: DateFormatters.parseDate("2024-06-02")!,
+                narration: "Discard during restore",
+                linesJSON: "[]"
+            )
+        )
+
         try RestoreService.prepareRestoredCompanyDatabase(
             db: tc.db,
             restoredCompanyId: targetCompanyId,
@@ -331,12 +366,28 @@ final class RestoreServiceTests: XCTestCase {
             "SELECT COUNT(*) FROM avelo_accounts WHERE company_id = ?",
             bind: [.text(targetCompanyId.uuidString)]
         ) { $0.int(0) }
-        XCTAssertEqual(accountCount, 8)
+        XCTAssertEqual(accountCount, 10)
 
-        let auditEvents = try AuditRepository(db: tc.db).list(filter: .init(companyId: targetCompanyId))
-        XCTAssertEqual(auditEvents.count, 1)
-        XCTAssertEqual(auditEvents.first?.action, .backupImported)
-        XCTAssertEqual(auditEvents.first?.entityId, targetCompanyId.uuidString)
+        let restoredItemLines = try VoucherItemLineRepository(db: tc.db).findForVoucher(posted.voucher.id)
+        XCTAssertEqual(restoredItemLines.count, 1)
+        XCTAssertEqual(restoredItemLines.first?.companyId, targetCompanyId)
+        XCTAssertNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: targetCompanyId))
+
+        let sourceRows = try tc.db.queryOne(
+            "SELECT COUNT(*) FROM avelo_voucher_item_lines WHERE company_id = ?",
+            bind: [.text(tc.companyId.uuidString)]
+        ) { $0.int(0) }
+        XCTAssertEqual(sourceRows, 0)
+        let remainingDrafts = try tc.db.queryOne(
+            "SELECT COUNT(*) FROM avelo_voucher_drafts"
+        ) { $0.int(0) }
+        XCTAssertEqual(remainingDrafts, 0)
+
+        let restoreAudit = try AuditRepository(db: tc.db).list(
+            filter: .init(companyId: targetCompanyId, action: .backupImported)
+        )
+        XCTAssertEqual(restoreAudit.count, 1)
+        XCTAssertEqual(restoreAudit.first?.entityId, targetCompanyId.uuidString)
     }
 
     func testPrepareRestoredCompanyDatabasePreservesOriginalErrorWhenTriggerCleanupFails() throws {
@@ -371,6 +422,168 @@ final class RestoreServiceTests: XCTestCase {
                 return XCTFail("Expected original SQLite error, got \(error)")
             }
             XCTAssertTrue(message.localizedCaseInsensitiveContains("avelo_vouchers"))
+        }
+    }
+
+    func testHistoricalV14ThroughV22SchemasUpgradeAndRemapEveryCompanyScopedTable() throws {
+        for version in 14...22 {
+            let db = try SQLiteDatabase(path: ":memory:")
+            let historicalMigrations = MigrationRunner.defaultMigrations.filter { $0.version.rawValue <= version }
+            try MigrationRunner(migrations: historicalMigrations).runMigrations(on: db)
+
+            let fixture = try seedHistoricalRestoreFixture(db: db, version: version)
+            try MigrationRunner().runMigrations(on: db)
+            XCTAssertEqual(try db.userVersion(), SchemaVersion.current.rawValue, "V\(version) did not upgrade")
+            try PartyProfileRepository(db: db).upsert(PartyProfile(
+                accountId: fixture.accountId,
+                companyId: fixture.companyId,
+                usage: .both,
+                maintainBillwise: true
+            ))
+
+            let restoredCompanyId = UUID()
+            try AuditTestKeySupport.ensureKey(for: restoredCompanyId)
+            try RestoreService.prepareRestoredCompanyDatabase(
+                db: db,
+                restoredCompanyId: restoredCompanyId,
+                restoredCompanyName: "Restored V\(version)"
+            )
+
+            let scopedTables = try companyScopedTables(in: db)
+            XCTAssertFalse(scopedTables.isEmpty, "V\(version) produced no company-scoped tables")
+            for table in scopedTables {
+                let leaked = try db.queryOne(
+                    "SELECT COUNT(*) FROM \(table) WHERE company_id = ?",
+                    bind: [.text(fixture.companyId.uuidString)]
+                ) { $0.int(0) } ?? 0
+                XCTAssertEqual(leaked, 0, "V\(version) leaked source identity in \(table)")
+            }
+            XCTAssertNotNil(try CompanyRepository(db: db).findById(restoredCompanyId))
+            XCTAssertEqual(try db.query("PRAGMA foreign_key_check") { _ in true }.count, 0, "V\(version)")
+            XCTAssertNil(try VoucherDraftRepository(db: db).mostRecent(companyId: restoredCompanyId), "V\(version) scratch draft survived")
+            XCTAssertEqual(
+                try PartyProfileRepository(db: db).find(accountId: fixture.accountId, companyId: restoredCompanyId)?.usage,
+                .both,
+                "V\(version) party profile was not remapped"
+            )
+
+            if version >= 20 {
+                let itemLineCompany = try db.queryOne(
+                    "SELECT company_id FROM avelo_voucher_item_lines WHERE id = ?",
+                    bind: [.text(fixture.itemLineId.uuidString)]
+                ) { try UUIDParsing.required($0.requiredText("company_id"), field: "fixture.item_line.company_id") }
+                XCTAssertEqual(itemLineCompany, restoredCompanyId, "V\(version) item line was not remapped")
+            }
+            let restoreEvents = try AuditRepository(db: db).list(
+                filter: .init(companyId: restoredCompanyId, action: .backupImported)
+            )
+            XCTAssertEqual(restoreEvents.count, 1, "V\(version) restore audit count")
+            db.close()
+        }
+    }
+
+    private struct HistoricalRestoreFixture {
+        let companyId: Company.ID
+        let accountId: Account.ID
+        let itemLineId: UUID
+    }
+
+    private func seedHistoricalRestoreFixture(db: SQLiteDatabase, version: Int) throws -> HistoricalRestoreFixture {
+        let companyId = UUID()
+        let financialYearId = UUID()
+        let groupId = UUID()
+        let accountId = UUID()
+        let voucherId = UUID()
+        let itemId = UUID()
+        let componentItemId = UUID()
+        let itemLineId = UUID()
+        let now = DateFormatters.formatIsoTimestamp(Date())
+
+        try db.execute(
+            "INSERT INTO avelo_companies (id, name, is_inventory_enabled, inventory_link_mode, created_at, updated_at) VALUES (?, ?, 1, 'manual', ?, ?)",
+            [.text(companyId.uuidString), .text("Historical V\(version)"), .text(now), .text(now)]
+        )
+        try db.execute(
+            "INSERT INTO avelo_financial_years (id, company_id, label, start_date, end_date, books_begin_date, created_at) VALUES (?, ?, '2024-25', '2024-04-01', '2025-03-31', '2024-04-01', ?)",
+            [.text(financialYearId.uuidString), .text(companyId.uuidString), .text(now)]
+        )
+        try db.execute(
+            "INSERT INTO avelo_account_groups (id, company_id, code, name, nature, created_at) VALUES (?, ?, 'RESTORE', 'Restore Group', 'assets', ?)",
+            [.text(groupId.uuidString), .text(companyId.uuidString), .text(now)]
+        )
+        try db.execute(
+            "INSERT INTO avelo_accounts (id, company_id, group_id, code, name, opening_balance_paise, opening_balance_side, created_at, updated_at) VALUES (?, ?, ?, 'RESTORE-A', 'Restore Account', 0, 'debit', ?, ?)",
+            [.text(accountId.uuidString), .text(companyId.uuidString), .text(groupId.uuidString), .text(now), .text(now)]
+        )
+        try db.execute(
+            "INSERT INTO avelo_vouchers (id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id, narration, total_paise, created_at, updated_at) VALUES (?, ?, ?, 'journal', 'RESTORE-1', '2024-06-01', ?, 'Historical restore', 100, ?, ?)",
+            [.text(voucherId.uuidString), .text(companyId.uuidString), .text(financialYearId.uuidString), .text(accountId.uuidString), .text(now), .text(now)]
+        )
+        try db.execute(
+            "INSERT INTO avelo_ledger_lines (id, company_id, voucher_id, account_id, amount_paise, side, line_order) VALUES (?, ?, ?, ?, 100, 'debit', 0), (?, ?, ?, ?, 100, 'credit', 1)",
+            [.text(UUID().uuidString), .text(companyId.uuidString), .text(voucherId.uuidString), .text(accountId.uuidString), .text(UUID().uuidString), .text(companyId.uuidString), .text(voucherId.uuidString), .text(accountId.uuidString)]
+        )
+        for (id, code) in [(itemId, "RESTORE-I"), (componentItemId, "RESTORE-C")] {
+            try db.execute(
+                "INSERT INTO avelo_inventory_items (id, company_id, code, name, unit, created_at) VALUES (?, ?, ?, ?, 'NOS', ?)",
+                [.text(id.uuidString), .text(companyId.uuidString), .text(code), .text(code), .text(now)]
+            )
+        }
+        try db.execute(
+            "INSERT INTO avelo_stock_movements (id, company_id, item_id, voucher_id, date, movement_type, quantity, unit_cost_paise, total_value_paise, created_at) VALUES (?, ?, ?, ?, '2024-06-01', 'in', 1, 100, 100, ?)",
+            [.text(UUID().uuidString), .text(companyId.uuidString), .text(itemId.uuidString), .text(voucherId.uuidString), .text(now)]
+        )
+
+        if version >= 14 {
+            try db.execute(
+                "INSERT INTO avelo_financial_year_opening_balances (financial_year_id, source_financial_year_id, account_id, opening_balance_paise, opening_balance_side, created_at) VALUES (?, ?, ?, 100, 'debit', ?)",
+                [.text(financialYearId.uuidString), .text(financialYearId.uuidString), .text(accountId.uuidString), .text(now)]
+            )
+        }
+        if version >= 15 {
+            try db.execute(
+                "INSERT INTO avelo_bill_allocations (id, company_id, voucher_id, party_account_id, kind, reference_number, allocated_paise, created_at) VALUES (?, ?, ?, ?, 'New Ref', 'RESTORE-BILL', 100, ?)",
+                [.text(UUID().uuidString), .text(companyId.uuidString), .text(voucherId.uuidString), .text(accountId.uuidString), .text(now)]
+            )
+        }
+        if version >= 16 {
+            try db.execute(
+                "INSERT INTO avelo_cheques (id, company_id, voucher_id, cheque_number, issue_date, status, created_at) VALUES (?, ?, ?, 'RESTORE-CHQ', '2024-06-01', 'issued', ?)",
+                [.text(UUID().uuidString), .text(companyId.uuidString), .text(voucherId.uuidString), .text(now)]
+            )
+        }
+        if version >= 17 {
+            let bomId = UUID()
+            try db.execute(
+                "INSERT INTO avelo_boms (id, company_id, assembly_item_id, output_quantity, created_at, updated_at) VALUES (?, ?, ?, 1.0, ?, ?)",
+                [.text(bomId.uuidString), .text(companyId.uuidString), .text(itemId.uuidString), .text(now), .text(now)]
+            )
+            try db.execute(
+                "INSERT INTO avelo_bom_components (id, company_id, bom_id, component_item_id, quantity, line_order) VALUES (?, ?, ?, ?, 1.0, 0)",
+                [.text(UUID().uuidString), .text(companyId.uuidString), .text(bomId.uuidString), .text(componentItemId.uuidString)]
+            )
+        }
+        if version >= 18 {
+            try db.execute(
+                "INSERT INTO avelo_voucher_drafts (id, company_id, voucher_type_code, date, narration, lines_json, updated_at) VALUES (?, ?, 'journal', '2024-06-01', 'discard me', '[]', ?)",
+                [.text(UUID().uuidString), .text(companyId.uuidString), .text(now)]
+            )
+        }
+        if version >= 20 {
+            try db.execute(
+                "INSERT INTO avelo_voucher_item_lines (id, company_id, voucher_id, item_id, quantity, rate_paise, taxable_value_paise, created_at) VALUES (?, ?, ?, ?, 1, 100, 100, ?)",
+                [.text(itemLineId.uuidString), .text(companyId.uuidString), .text(voucherId.uuidString), .text(itemId.uuidString), .text(now)]
+            )
+        }
+        return HistoricalRestoreFixture(companyId: companyId, accountId: accountId, itemLineId: itemLineId)
+    }
+
+    private func companyScopedTables(in db: SQLiteDatabase) throws -> [String] {
+        let tables = try db.query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'avelo_%' ORDER BY name"
+        ) { try $0.requiredText("name") }
+        return try tables.filter { table in
+            try db.query("PRAGMA table_info(\(table))") { $0.text("name") }.contains("company_id")
         }
     }
 
@@ -626,7 +839,7 @@ final class RestoreServiceTests: XCTestCase {
         XCTAssertEqual(finalSize, originalSize)
     }
 
-    func testRepeatedBackupRestoreCyclesKeepBackupStableAndRestoresReadable() async throws {
+    func testRepeatedBackupRestoreCyclesRemainBoundedAuditedAndReadable() async throws {
         let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
@@ -637,7 +850,8 @@ final class RestoreServiceTests: XCTestCase {
         }
 
         let backedUp = try await makeBackedUpCompany(root: sourceRoot, name: "Backup Restore Soak Co")
-        var previousSize = try XCTUnwrap((try FileManager.default.attributesOfItem(atPath: backedUp.backupURL.path)[.size] as? NSNumber)?.int64Value)
+        let initialSize = try XCTUnwrap((try FileManager.default.attributesOfItem(atPath: backedUp.backupURL.path)[.size] as? NSNumber)?.int64Value)
+        var largestSize = initialSize
         for index in 0..<50 {
             _ = try await BackupService(manager: backedUp.manager).export(
                 companyId: backedUp.company.id,
@@ -645,8 +859,12 @@ final class RestoreServiceTests: XCTestCase {
                 to: backedUp.backupURL
             )
             let size = try XCTUnwrap((try FileManager.default.attributesOfItem(atPath: backedUp.backupURL.path)[.size] as? NSNumber)?.int64Value)
-            XCTAssertEqual(size, previousSize, "Backup size drifted at cycle \(index)")
-            previousSize = size
+            largestSize = max(largestSize, size)
+            XCTAssertLessThanOrEqual(
+                size,
+                initialSize + 512 * 1_024,
+                "Audit-backed backup growth exceeded the bounded soak allowance at cycle \(index)"
+            )
 
             let restoreManager = try DatabaseManager(
                 appSupportDirectory: targetRoot.appendingPathComponent("restore-\(index)", isDirectory: true),
@@ -657,6 +875,13 @@ final class RestoreServiceTests: XCTestCase {
             XCTAssertNotNil(try CompanyRepository(db: handle.db).findById(restored.id), "Cycle \(index)")
             await restoreManager.closeCompany(id: restored.id)
         }
+        XCTAssertGreaterThanOrEqual(largestSize, initialSize)
+        let sourceHandle = try await backedUp.manager.openCompany(id: backedUp.company.id)
+        let exportEvents = try AuditRepository(db: sourceHandle.db).list(
+            filter: .init(companyId: backedUp.company.id, action: .backupExported)
+        )
+        XCTAssertEqual(exportEvents.count, 51, "Initial backup plus 50 soak exports must each emit one event")
+        await backedUp.manager.closeCompany(id: backedUp.company.id)
     }
 
     func testBackupStagingFailureCleansTemporaryArtifactsAndKeepsNoPartialManifest() async throws {
@@ -682,6 +907,39 @@ final class RestoreServiceTests: XCTestCase {
             XCTAssertTrue(try tempArtifacts(in: root).isEmpty)
             XCTAssertFalse(FileManager.default.fileExists(atPath: blockedURL.appendingPathExtension("manifest.json").path))
         }
+    }
+
+    func testBackupAuditFailureRemovesPublishedBackupAndManifest() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let backedUp = try await makeBackedUpCompany(root: root, name: "Backup Audit Rollback Co")
+        let handle = try await backedUp.manager.openCompany(id: backedUp.company.id)
+        try handle.db.execute(
+            "CREATE TRIGGER test_reject_backup_export_audit BEFORE INSERT ON avelo_audit_events WHEN NEW.action = 'backupExported' BEGIN SELECT RAISE(ABORT, 'test audit failure'); END;"
+        )
+        let rejectedURL = root.appendingPathComponent("rejected.avelobackup")
+
+        do {
+            _ = try await BackupService(manager: backedUp.manager).export(
+                companyId: backedUp.company.id,
+                companyName: backedUp.company.name,
+                to: rejectedURL
+            )
+            XCTFail("Expected the audit failure to reject the backup")
+        } catch {
+            // Expected: publishing and audit are one externally visible operation.
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rejectedURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rejectedURL.appendingPathExtension("manifest.json").path))
+        XCTAssertEqual(
+            try AuditRepository(db: handle.db).list(filter: .init(companyId: backedUp.company.id, action: .backupExported)).count,
+            1,
+            "Only the successful setup export should remain audited"
+        )
+        await backedUp.manager.closeCompany(id: backedUp.company.id)
     }
 
     func testRestoreRejectsDuplicateCompanyNameClearly() async throws {

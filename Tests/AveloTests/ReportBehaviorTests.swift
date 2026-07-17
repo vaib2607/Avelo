@@ -382,7 +382,7 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(cashFlow.netCashFlowPaise, -10000)
     }
 
-    func testStockAgeingReturnsNoOpRowsWhenInventoryIsDisabled() throws {
+    func testStockAgeingRejectsDirectInvocationWhenInventoryIsDisabled() throws {
         let tc = try TestCompany.make()
         let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(
             code: "RAW-1",
@@ -402,16 +402,21 @@ final class ReportBehaviorTests: XCTestCase {
             [.text(InventoryLinkMode.manual.rawValue), .text(tc.companyId.uuidString)]
         )
 
-        let report = try ReportService(db: tc.db, companyId: tc.companyId).stockAgeing(
-            asOfDate: DateFormatters.parseDate("2024-05-01")!
-        )
-        XCTAssertTrue(report.rows.isEmpty)
+        XCTAssertThrowsError(
+            try ReportService(db: tc.db, companyId: tc.companyId).stockAgeing(
+                asOfDate: DateFormatters.parseDate("2024-05-01")!
+            )
+        ) { error in
+            guard case AppError.featureUnavailable = AppError.wrap(error) else {
+                return XCTFail("Expected disabled inventory rejection, got \(error)")
+            }
+        }
     }
 
     // AVL-P0-033: stockValuation had no isInventoryEnabled gate at all
     // (unlike its sibling stockAgeing above), so real stock value leaked
     // into Reports and the Dashboard KPI even when disabled.
-    func testStockValuationReturnsNoOpRowsWhenInventoryIsDisabled() throws {
+    func testStockValuationRejectsDirectInvocationWhenInventoryIsDisabled() throws {
         let tc = try TestCompany.make()
         let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(
             code: "RAW-2",
@@ -431,11 +436,15 @@ final class ReportBehaviorTests: XCTestCase {
             [.text(InventoryLinkMode.manual.rawValue), .text(tc.companyId.uuidString)]
         )
 
-        let report = try ReportService(db: tc.db, companyId: tc.companyId).stockValuation(
-            asOfDate: DateFormatters.parseDate("2024-05-01")!
-        )
-        XCTAssertTrue(report.rows.isEmpty)
-        XCTAssertEqual(report.totalPaise, 0)
+        XCTAssertThrowsError(
+            try ReportService(db: tc.db, companyId: tc.companyId).stockValuation(
+                asOfDate: DateFormatters.parseDate("2024-05-01")!
+            )
+        ) { error in
+            guard case AppError.featureUnavailable = AppError.wrap(error) else {
+                return XCTFail("Expected disabled inventory rejection, got \(error)")
+            }
+        }
     }
 
     func testStockValuationUsesAuthoritativeFifoCostingNotCallerStockOutRate() throws {

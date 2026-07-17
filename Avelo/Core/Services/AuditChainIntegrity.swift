@@ -18,8 +18,14 @@ enum AuditChainKeyProvider {
         // Re-registering the same store instance (e.g. a test helper calling
         // this once per test method) would otherwise grow this list without
         // bound over a long test run.
-        if let newObj = newStore as? AnyObject, stores.contains(where: { ($0 as? AnyObject) === newObj }) {
-            return
+        if Mirror(reflecting: newStore).displayStyle == .class {
+            let newObject = newStore as AnyObject
+            if stores.contains(where: { existing in
+                Mirror(reflecting: existing).displayStyle == .class
+                    && (existing as AnyObject) === newObject
+            }) {
+                return
+            }
         }
         stores.insert(newStore, at: 0)
     }

@@ -71,11 +71,18 @@ public final class FinancialYearService: Sendable {
 
     public func lock(_ id: FinancialYear.ID, reason: String? = nil) throws {
         try db.write { tx in
-            try FinancialYearRepository(db: tx).lock(id)
+            let repository = FinancialYearRepository(db: tx)
+            guard let before = try repository.findById(id), before.companyId == audit.companyId else {
+                throw AppError.notFound("Financial year")
+            }
+            try repository.lock(id)
+            guard let after = try repository.findById(id) else { throw AppError.notFound("Financial year") }
             try AuditService(db: tx, companyId: audit.companyId).record(
                 action: .financialYearLocked,
                 entityType: "financial_year",
                 entityId: id.uuidString,
+                snapshotBefore: before,
+                snapshotAfter: after,
                 reason: reason
             )
         }
@@ -83,7 +90,20 @@ public final class FinancialYearService: Sendable {
 
     public func unlock(_ id: FinancialYear.ID, reason: String? = nil) throws {
         try db.write { tx in
-            try FinancialYearRepository(db: tx).unlock(id)
+            let repository = FinancialYearRepository(db: tx)
+            guard let before = try repository.findById(id), before.companyId == audit.companyId else {
+                throw AppError.notFound("Financial year")
+            }
+            try repository.unlock(id)
+            guard let after = try repository.findById(id) else { throw AppError.notFound("Financial year") }
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .financialYearUnlocked,
+                entityType: "financial_year",
+                entityId: id.uuidString,
+                snapshotBefore: before,
+                snapshotAfter: after,
+                reason: reason
+            )
         }
     }
 
@@ -112,6 +132,9 @@ public final class FinancialYearService: Sendable {
                 rows: carryForwardRows
             )
             try repo.markClosed(id)
+            guard let closedFinancialYear = try repo.findById(id) else {
+                throw AppError.notFound("Financial year")
+            }
             let audit = AuditService(db: tx, companyId: audit.companyId)
             try audit.record(
                 action: .openingBalancePosted,
@@ -122,7 +145,9 @@ public final class FinancialYearService: Sendable {
             try audit.record(
                 action: .financialYearClosed,
                 entityType: "financial_year",
-                entityId: id.uuidString
+                entityId: id.uuidString,
+                snapshotBefore: financialYear,
+                snapshotAfter: closedFinancialYear
             )
         }
     }
@@ -138,11 +163,14 @@ public final class FinancialYearService: Sendable {
             }
             try FinancialYearOpeningBalanceRepository(db: tx).deleteForFinancialYear(targetFinancialYear.id)
             try repo.reopen(id)
+            guard let reopened = try repo.findById(id) else { throw AppError.notFound("Financial year") }
             try AuditService(db: tx, companyId: audit.companyId).record(
-                action: .financialYearClosed,
+                action: .financialYearReopened,
                 entityType: "financial_year",
                 entityId: id.uuidString,
-                reason: reason.map { "Reopened: \($0)" } ?? "Reopened"
+                snapshotBefore: financialYear,
+                snapshotAfter: reopened,
+                reason: reason
             )
         }
     }

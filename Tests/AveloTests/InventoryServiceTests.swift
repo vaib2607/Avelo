@@ -435,7 +435,7 @@ final class InventoryServiceTests: XCTestCase {
         let purchase = try service.createOrder(
             type: .purchaseOrder,
             number: "PO-001",
-            partyAccountId: tc.capitalId,
+            partyAccountId: tc.supplierId,
             orderDate: DateFormatters.parseDate("2024-07-01")!,
             expectedDate: DateFormatters.parseDate("2024-07-10")!,
             lines: [.init(itemId: item.id, quantity: 10, fulfilledQuantity: 4, unitRatePaise: 1200)]
@@ -443,7 +443,7 @@ final class InventoryServiceTests: XCTestCase {
         _ = try service.createOrder(
             type: .salesOrder,
             number: "SO-001",
-            partyAccountId: tc.salesId,
+            partyAccountId: tc.customerId,
             orderDate: DateFormatters.parseDate("2024-07-02")!,
             expectedDate: DateFormatters.parseDate("2024-07-11")!,
             lines: [.init(itemId: item.id, quantity: 6, fulfilledQuantity: 1, unitRatePaise: 1500)]
@@ -495,7 +495,7 @@ final class InventoryServiceTests: XCTestCase {
             try InventoryOrderService(db: tc.db, companyId: tc.companyId).createOrder(
                 type: .purchaseOrder,
                 number: "PO-FOREIGN",
-                partyAccountId: tc.capitalId,
+                partyAccountId: tc.supplierId,
                 orderDate: DateFormatters.parseDate("2024-07-01")!,
                 expectedDate: nil,
                 lines: [.init(itemId: foreignItem.id, quantity: 1)]
@@ -515,13 +515,13 @@ final class InventoryServiceTests: XCTestCase {
 
         let voucherA = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: VoucherDraft(
             mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-06-15")!,
-            partyAccountId: tc.capitalId,
-            lines: [.init(accountId: tc.capitalId, amountPaise: 1000, side: .debit), .init(accountId: tc.salesId, amountPaise: 1000, side: .credit)]
+            partyAccountId: tc.customerId,
+            lines: [.init(accountId: tc.customerId, amountPaise: 1000, side: .debit), .init(accountId: tc.salesId, amountPaise: 1000, side: .credit)]
         ), in: tc.fy).voucher
         let voucherB = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: VoucherDraft(
             mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-06-16")!,
-            partyAccountId: tc.capitalId,
-            lines: [.init(accountId: tc.capitalId, amountPaise: 1000, side: .debit), .init(accountId: tc.salesId, amountPaise: 1000, side: .credit)]
+            partyAccountId: tc.customerId,
+            lines: [.init(accountId: tc.customerId, amountPaise: 1000, side: .debit), .init(accountId: tc.salesId, amountPaise: 1000, side: .credit)]
         ), in: tc.fy).voucher
 
         _ = try service.recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-15")!, type: .stockIn, quantity: 5, ratePaise: 1000, voucherId: voucherA.id)

@@ -58,7 +58,9 @@ public final class KeyboardBridge {
         case .openAccounts:      router?.go(.accounts)
         case .openVouchers:      router?.go(.vouchers)
         case .openReports:       router?.go(.reports)
-        case .openInventory:     if isInventoryEnabled { router?.go(.inventory) }
+        case .openInventory:
+            router?.setInventoryEnabled(isInventoryEnabled)
+            if isInventoryEnabled { router?.go(.inventory) }
         case .openGST:           router?.go(.gst)
         case .openPayroll:       router?.go(.payroll)
         case .openBanking:       router?.go(.banking)
@@ -69,7 +71,9 @@ public final class KeyboardBridge {
             router?.present(sheet(for: type))
 
         case .newAccount:        router?.present(.newAccount)
-        case .newItem:           if isInventoryEnabled { router?.present(.newItem) }
+        case .newItem:
+            router?.setInventoryEnabled(isInventoryEnabled)
+            if isInventoryEnabled { router?.present(.newItem) }
         case .newEmployee:       router?.present(.newEmployee)
 
         case .commandPalette:    commandPaletteActive = true

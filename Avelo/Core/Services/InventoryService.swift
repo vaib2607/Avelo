@@ -116,11 +116,15 @@ public final class InventoryService: Sendable {
         try ensureInventoryEnabled()
         try db.write { tx in
             let repo = InventoryRepository(db: tx)
+            guard let before = try repo.findItemById(item.id), before.companyId == companyId else {
+                throw AppError.notFound("Inventory item")
+            }
             try repo.updateItem(item)
             try AuditService(db: tx, companyId: companyId).record(
                 action: .stockItemUpdated,
                 entityType: "inventory_item",
                 entityId: item.id.uuidString,
+                snapshotBefore: before,
                 snapshotAfter: item
             )
         }
@@ -130,15 +134,22 @@ public final class InventoryService: Sendable {
         try ensureInventoryEnabled()
         try db.write { tx in
             let repo = InventoryRepository(db: tx)
+            guard let before = try repo.findItemById(id), before.companyId == companyId else {
+                throw AppError.notFound("Inventory item")
+            }
             try repo.archiveItem(id)
+            guard let after = try repo.findItemById(id) else { throw AppError.notFound("Inventory item") }
             try AuditService(db: tx, companyId: companyId).record(
                 action: .stockItemDisabled,
                 entityType: "inventory_item",
-                entityId: id.uuidString
+                entityId: id.uuidString,
+                snapshotBefore: before,
+                snapshotAfter: after
             )
         }
     }
 
+    @discardableResult
     public func recordMovement(itemId: InventoryItem.ID,
                                date: Date,
                                type: InventoryItem.MovementType,
@@ -158,6 +169,7 @@ public final class InventoryService: Sendable {
         )
     }
 
+    @discardableResult
     public func recordMovement(itemId: InventoryItem.ID,
                                date: Date,
                                type: InventoryItem.MovementType,

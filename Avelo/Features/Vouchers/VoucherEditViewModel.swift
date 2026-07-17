@@ -38,6 +38,8 @@ public final class VoucherEditViewModel {
     public var singleEntryMode: Bool = false
     public var accountLedgerId: Account.ID?
     public var groups: [AccountGroup] = []
+    public private(set) var company: Company?
+    private var eligibilityPolicy = AccountEligibilityPolicy()
 
     // MARK: - Tally item-invoice mode (Sales/Purchase item-grid entry)
     //
@@ -100,20 +102,15 @@ public final class VoucherEditViewModel {
         accountSide == .debit ? .credit : .debit
     }
 
-    /// Tally classifies contra-eligible ledgers by group (Cash-in-Hand, Bank
-    /// Accounts, Bank OD). Avelo's legacy seed keeps cash as a ledger under
-    /// Current Assets, so the account-level flags are checked too.
+    public func eligibility(_ account: Account, for context: AccountSelectionContext) -> AccountEligibility {
+        guard let company else {
+            return AccountEligibility(isEligible: false, rejectionReason: "Company context is unavailable.")
+        }
+        return eligibilityPolicy.evaluate(account: account, for: context, company: company, groups: groups)
+    }
+
     public func isCashOrBank(_ account: Account) -> Bool {
-        if account.isBankAccount { return true }
-        if account.code == "CASH_IN_HAND" { return true }
-        if account.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            .compare("Cash", options: .caseInsensitive) == .orderedSame {
-            return true
-        }
-        if let group = groups.first(where: { $0.id == account.groupId }) {
-            return ["BANK_ACCOUNTS", "CASH_IN_HAND", "BANK_OD"].contains(group.code)
-        }
-        return false
+        eligibility(account, for: .bankReconciliation).isEligible
     }
 
     public var particularsTotalPaise: Int64 {
@@ -140,6 +137,7 @@ public final class VoucherEditViewModel {
         self.companyId = companyId
         self.db = db
         self.fyId = fyId
+        self.company = try? CompanyRepository(db: db).findById(companyId)
         if let eid = existingId {
             self.mode = .edit(originalVoucherId: eid)
                 self.draft = VoucherDraft(
@@ -187,6 +185,16 @@ public final class VoucherEditViewModel {
     public func load(accounts: [Account], groups: [AccountGroup] = [], initialDate: Date) {
         self.accounts = accounts
         self.groups = groups
+        self.company = try? CompanyRepository(db: db).findById(companyId)
+        do {
+            self.eligibilityPolicy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
+        } catch {
+            self.validation = .invalid([ValidationError(
+                code: .internal,
+                field: "accounts",
+                message: "Failed to load account eligibility: \(AppError.wrap(error).localizedMessage)"
+            )])
+        }
         if case .edit(let vid) = mode {
             do {
                 let svc = VoucherService(db: db, companyId: companyId)
@@ -217,6 +225,17 @@ public final class VoucherEditViewModel {
         } else {
             self.date = initialDate
         }
+    }
+
+    /// Reloads the complete semantic account context after inline creation,
+    /// regrouping, activation changes, or party-profile edits. Account rows,
+    /// ancestor groups, company features, and explicit profiles must change as
+    /// one snapshot or the picker and posting service can temporarily disagree.
+    public func reloadAccountContext() throws {
+        accounts = try AccountService(db: db, companyId: companyId).listActiveAccounts()
+        groups = try AccountGroupRepository(db: db).listForCompany(companyId)
+        company = try CompanyRepository(db: db).findById(companyId)
+        eligibilityPolicy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
     }
 
     public func addLine() {

@@ -138,4 +138,8 @@ public final class VouchersViewModel {
     public func invoicePDFData(voucherId: Voucher.ID) throws -> Data {
         try InvoicePDFService(db: db).exportTaxInvoicePDF(voucherId: voucherId)
     }
+
+    public func recordInvoicePDFSaved(voucherId: Voucher.ID, url: URL) throws {
+        try InvoicePDFService(db: db).recordExportSaved(voucherId: voucherId, url: url)
+    }
 }

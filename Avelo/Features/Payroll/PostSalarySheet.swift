@@ -11,6 +11,9 @@ public struct PostSalarySheet: View {
     @State private var deductions: String = "0.00"
     @State private var canSave: Bool = false
     @State private var accounts: [Account] = []
+    @State private var company: Company?
+    @State private var groups: [AccountGroup] = []
+    @State private var eligibilityPolicy = AccountEligibilityPolicy()
     @State private var salaryExpenseAccountId: Account.ID?
     @State private var paymentAccountId: Account.ID?
 
@@ -32,13 +35,23 @@ public struct PostSalarySheet: View {
                 HStack {
                     Text("Salary Expense")
                     Spacer()
-                    AccountPicker(selection: $salaryExpenseAccountId, accounts: accounts, placeholder: "Choose expense account…")
+                    AccountPicker(
+                        selection: $salaryExpenseAccountId,
+                        accounts: accounts,
+                        placeholder: "Choose expense account…",
+                        eligibility: { eligibility($0, for: .payrollExpense) }
+                    )
                         .frame(width: 260)
                 }
                 HStack {
                     Text("Credit Account")
                     Spacer()
-                    AccountPicker(selection: $paymentAccountId, accounts: accounts, placeholder: "Choose cash, bank, or payable…")
+                    AccountPicker(
+                        selection: $paymentAccountId,
+                        accounts: accounts,
+                        placeholder: "Choose cash, bank, or payable…",
+                        eligibility: { eligibility($0, for: .payrollSettlement) }
+                    )
                         .frame(width: 260)
                 }
                 HStack {
@@ -115,16 +128,25 @@ public struct PostSalarySheet: View {
         guard let ctx = env.companyContext else { return }
         do {
             let loaded = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
+            company = try CompanyRepository(db: ctx.database).findById(ctx.companyId)
+            groups = try AccountGroupRepository(db: ctx.database).listForCompany(ctx.companyId)
+            eligibilityPolicy = try AccountEligibilityPolicy.loading(db: ctx.database, companyId: ctx.companyId)
             accounts = loaded
             salaryExpenseAccountId = salaryExpenseAccountId
                 ?? loaded.first(where: { $0.code == "SALARY_EXPENSE" })?.id
-                ?? loaded.first(where: { $0.name.localizedCaseInsensitiveContains("salary") })?.id
+                ?? loaded.first(where: { eligibility($0, for: .payrollExpense).isEligible })?.id
             paymentAccountId = paymentAccountId
-                ?? loaded.first(where: { $0.isBankAccount })?.id
-                ?? loaded.first(where: { $0.code == "CASH_IN_HAND" })?.id
+                ?? loaded.first(where: { eligibility($0, for: .payrollSettlement).isEligible })?.id
             refresh()
         } catch {
             env.showError(AppError.wrap(error))
         }
+    }
+
+    private func eligibility(_ account: Account, for context: AccountSelectionContext) -> AccountEligibility {
+        guard let company else {
+            return AccountEligibility(isEligible: false, rejectionReason: "Company context is unavailable.")
+        }
+        return eligibilityPolicy.evaluate(account: account, for: context, company: company, groups: groups)
     }
 }

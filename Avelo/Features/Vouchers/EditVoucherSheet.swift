@@ -156,6 +156,8 @@ private struct EditInner: View {
 /// the single-entry Account field (edit mode is always double-entry lines).
 private enum EditVoucherField: Hashable {
     case date
+    case party
+    case narration
     case line(UUID)
     case amount(UUID)
 }
@@ -229,7 +231,12 @@ private struct EditVoucherBody: View {
             if !isContra {
                 AccountPicker(selection: $vm.partyAccountId,
                               accounts: vm.accounts,
-                              placeholder: "Party (optional)")
+                              placeholder: "Party (optional)",
+                              eligibility: { vm.eligibility($0, for: .voucherParty(vm.draft.voucherTypeCode)) },
+                              isFocusedExternally: Binding(
+                                  get: { focusedField == .party },
+                                  set: { if $0 { focusedField = .party } }
+                              ))
                 Picker("Bill reference type", selection: $vm.billReferenceType) {
                     Text("None").tag(VoucherDraft.BillReferenceType?.none)
                     ForEach(VoucherDraft.BillReferenceType.allCases) { type in
@@ -241,6 +248,7 @@ private struct EditVoucherBody: View {
             HStack(alignment: .top) {
                 TextField("Narration", text: $vm.narration, axis: .vertical)
                     .lineLimit(2...4)
+                    .focused($focusedField, equals: .narration)
                 Menu {
                     if vm.narrationSuggestions.isEmpty {
                         Text("No recent narrations").foregroundStyle(.secondary)
@@ -336,8 +344,23 @@ private struct EditVoucherBody: View {
     /// missing instead of the button silently doing nothing.
     private func attemptSave() {
         vm.revalidate()
-        guard vm.canPost else { return }
+        guard vm.canPost else {
+            if let first = vm.validationErrors.first { focus(first) }
+            return
+        }
         onSave(vm)
+    }
+
+    private func focus(_ error: ValidationError) {
+        switch error.field {
+        case "date": focusedField = .date
+        case "party", "partyAccountId": focusedField = .party
+        case "narration": focusedField = .narration
+        default:
+            if let row = vm.lines.first(where: { $0.accountId == nil }) ?? vm.lines.first {
+                focusedField = row.accountId == nil ? .line(row.id) : .amount(row.id)
+            }
+        }
     }
 
     private var totalsSection: some View {

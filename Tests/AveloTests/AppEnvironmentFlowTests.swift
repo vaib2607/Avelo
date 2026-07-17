@@ -69,6 +69,58 @@ final class AppEnvironmentFlowTests: XCTestCase {
         XCTAssertEqual(env.router.selection, .dashboard)
         XCTAssertNil(env.router.presentedSheet)
         XCTAssertEqual(env.banner?.message, "Company opened.")
+        let openEvents = try AuditRepository(db: ctx.database).list(
+            filter: .init(companyId: company.id, action: .companySwitched)
+        )
+        XCTAssertEqual(openEvents.count, 1)
+        XCTAssertEqual(openEvents.first?.entityId, company.id.uuidString)
+        XCTAssertNotNil(openEvents.first?.reason)
+    }
+
+    func testFinancialYearSwitchIsAuditedBeforeVisibleContextChanges() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manager = try DatabaseManager(appSupportDirectory: root, keyStore: InMemoryCompanyKeyStore())
+        let registryDb = try await SQLiteDatabase(path: manager.registryPath)
+        defer { registryDb.close() }
+        let env = AppEnvironment(
+            manager: manager,
+            router: AppRouter(),
+            keyboard: KeyboardRouter(),
+            registry: RegistryRepository(db: registryDb),
+            backupService: BackupService(manager: manager)
+        )
+        let company = try await CompanyService.create(
+            companyInput: .init(name: "FY Switch Co", gstin: nil, pan: nil),
+            fyInput: .init(
+                label: "2024-25",
+                startDate: DateFormatters.parseDate("2024-04-01")!,
+                endDate: DateFormatters.parseDate("2025-03-31")!,
+                booksBeginDate: DateFormatters.parseDate("2024-04-01")!
+            ),
+            seedDefaults: true,
+            manager: manager
+        )
+        await env.openCompany(company.id)
+        let initial = try XCTUnwrap(env.companyContext)
+        let next = try FinancialYearService(db: initial.database, companyId: company.id).create(
+            label: "2025-26",
+            startDate: DateFormatters.parseDate("2025-04-01")!,
+            endDate: DateFormatters.parseDate("2026-03-31")!,
+            booksBeginDate: DateFormatters.parseDate("2025-04-01")!
+        )
+
+        env.switchFinancialYear(next.id)
+
+        XCTAssertEqual(env.companyContext?.financialYear.id, next.id)
+        let events = try AuditRepository(db: initial.database).list(
+            filter: .init(companyId: company.id, action: .financialYearSwitched)
+        )
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.entityId, next.id.uuidString)
+        XCTAssertNotNil(events.first?.reason)
     }
 
     func testOpeningSecondCompanyResetsRouterAndSwapsVisibleContext() async throws {

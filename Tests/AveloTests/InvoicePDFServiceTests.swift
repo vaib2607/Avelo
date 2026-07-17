@@ -11,6 +11,7 @@ final class InvoicePDFServiceTests: XCTestCase {
     @discardableResult
     private func insertParty(_ tc: TestCompany, code: String, name: String, gstin: String?) throws -> Account.ID {
         let id = UUID()
+        let debtorGroupId = try XCTUnwrap(AccountRepository(db: tc.db).findById(tc.customerId)).groupId
         try tc.db.execute(
             """
             INSERT INTO avelo_accounts
@@ -21,7 +22,7 @@ final class InvoicePDFServiceTests: XCTestCase {
             [
                 .text(id.uuidString),
                 .text(tc.companyId.uuidString),
-                .text(tc.assetsGroupId.uuidString),
+                .text(debtorGroupId.uuidString),
                 .text(code),
                 .text(name),
                 .integer(0),
@@ -58,6 +59,7 @@ final class InvoicePDFServiceTests: XCTestCase {
 
         let accounts = AccountRepository(db: tc.db)
         let customerId = UUID()
+        let debtorGroupId = try XCTUnwrap(accounts.findById(tc.customerId)).groupId
         try tc.db.execute(
             """
             INSERT INTO avelo_accounts
@@ -68,7 +70,7 @@ final class InvoicePDFServiceTests: XCTestCase {
             [
                 .text(customerId.uuidString),
                 .text(tc.companyId.uuidString),
-                .text(tc.assetsGroupId.uuidString),
+                .text(debtorGroupId.uuidString),
                 .text("CUST-001"),
                 .text("Acme Traders"),
                 .integer(0),
@@ -98,6 +100,13 @@ final class InvoicePDFServiceTests: XCTestCase {
 
         let pdfData = try InvoicePDFService(db: tc.db).exportTaxInvoicePDF(voucherId: voucher.id)
         XCTAssertTrue(pdfData.starts(with: Data("%PDF".utf8)))
+        XCTAssertEqual(try AuditRepository(db: tc.db).list(filter: .init(companyId: tc.companyId, action: .invoicePDFExported)).count, 0)
+
+        let savedURL = FileManager.default.temporaryDirectory.appendingPathComponent("invoice-\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: savedURL) }
+        try pdfData.write(to: savedURL, options: .atomic)
+        try InvoicePDFService(db: tc.db).recordExportSaved(voucherId: voucher.id, url: savedURL)
+        XCTAssertEqual(try AuditRepository(db: tc.db).list(filter: .init(companyId: tc.companyId, action: .invoicePDFExported)).count, 1)
 
         let document = PDFDocument(data: pdfData)
         XCTAssertNotNil(document)

@@ -12,7 +12,7 @@ App: AVELO — 100% offline macOS accounting app. Swift + SwiftUI + SQLite. Zero
 1. git pull
 2. swift build — verify still green (report any regression immediately)
 3. swift test — verify still green
-4. cat .agents/TASK_BOARD.md
+4. cat Docs/Avelo_Release_Board.md && cat Docs/Avelo_Execution_Checklist.md
 5. Pick [TEST] tasks
 
 ## RB-036 REGRESSION GAP

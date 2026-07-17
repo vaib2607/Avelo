@@ -41,8 +41,22 @@ public final class InventoryOrderService: Sendable {
         guard !lines.isEmpty else {
             throw AppError.validation(ValidationError(code: .internal, field: "lines", message: "At least one order line is required."))
         }
-        guard let party = try AccountRepository(db: db).findById(partyAccountId), party.companyId == companyId, party.isActive else {
-            throw AppError.validation(ValidationError(code: .voucherAccountInactive, field: "partyAccountId", message: "Party account must belong to this company and be active."))
+        guard let company = try CompanyRepository(db: db).findById(companyId),
+              let party = try AccountRepository(db: db).findById(partyAccountId) else {
+            throw AppError.validation(ValidationError(code: .voucherAccountInactive, field: "partyAccountId", message: "Party account is missing."))
+        }
+        let partyEligibility = try AccountEligibilityPolicy.loading(db: db, companyId: companyId).evaluate(
+            account: party,
+            for: .orderParty(type),
+            company: company,
+            groups: try AccountGroupRepository(db: db).listForCompany(companyId)
+        )
+        guard partyEligibility.isEligible else {
+            throw AppError.validation(ValidationError(
+                code: .voucherAccountInactive,
+                field: "partyAccountId",
+                message: partyEligibility.rejectionReason ?? "Party account is not eligible for this order."
+            ))
         }
         let inventory = InventoryRepository(db: db)
         let order = InventoryOrder(
@@ -75,7 +89,15 @@ public final class InventoryOrderService: Sendable {
                 unitRatePaise: draft.unitRatePaise
             )
         }
-        try repository.insertOrder(order, lines: orderLines)
+        try db.write { tx in
+            try InventoryOrderRepository(db: tx).insertOrder(order, lines: orderLines)
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .inventoryOrderCreated,
+                entityType: "inventory_order",
+                entityId: order.id.uuidString,
+                snapshotAfter: order
+            )
+        }
         return order
     }
 
@@ -114,7 +136,21 @@ public final class InventoryOrderService: Sendable {
         guard fulfilledQuantity >= 0, fulfilledQuantity <= line.quantity else {
             throw AppError.validation(ValidationError(code: .stockMovementCostMismatch, field: "fulfilledQuantity", message: "Fulfilled quantity must be within the ordered quantity."))
         }
-        try repository.updateLineFulfillment(orderLineId, companyId: companyId, fulfilledQuantity: fulfilledQuantity)
+        try db.write { tx in
+            let repository = InventoryOrderRepository(db: tx)
+            try repository.updateLineFulfillment(orderLineId, companyId: companyId, fulfilledQuantity: fulfilledQuantity)
+            guard let updatedLine = try repository.findOrderLine(id: orderLineId, companyId: companyId) else {
+                throw AppError.notFound("Order line")
+            }
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .inventoryOrderFulfilled,
+                entityType: "inventory_order_line",
+                entityId: orderLineId.uuidString,
+                snapshotBefore: line,
+                snapshotAfter: updatedLine,
+                reason: "Fulfilled quantity set to \(fulfilledQuantity)"
+            )
+        }
     }
 
     public func closeOrder(_ orderId: InventoryOrder.ID) throws {
@@ -133,7 +169,21 @@ public final class InventoryOrderService: Sendable {
         guard order.status == .open else {
             throw AppError.businessRule("Only open orders can change status.")
         }
-        try repository.updateOrderStatus(orderId, companyId: companyId, status: status)
+        try db.write { tx in
+            let repository = InventoryOrderRepository(db: tx)
+            try repository.updateOrderStatus(orderId, companyId: companyId, status: status)
+            guard let updatedOrder = try repository.findOrder(id: orderId, companyId: companyId) else {
+                throw AppError.notFound("Order")
+            }
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .inventoryOrderStatusChanged,
+                entityType: "inventory_order",
+                entityId: orderId.uuidString,
+                snapshotBefore: order,
+                snapshotAfter: updatedOrder,
+                reason: "Status set to \(status)"
+            )
+        }
     }
 
     public func setReorderLevel(itemId: InventoryItem.ID,
@@ -155,7 +205,15 @@ public final class InventoryOrderService: Sendable {
             createdAt: Date(),
             updatedAt: Date()
         )
-        try repository.upsertReorderLevel(level)
+        try db.write { tx in
+            try InventoryOrderRepository(db: tx).upsertReorderLevel(level)
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .inventoryReorderLevelSet,
+                entityType: "inventory_reorder_level",
+                entityId: itemId.uuidString,
+                snapshotAfter: level
+            )
+        }
     }
 
     public func reorderAlerts(asOfDate: Date) throws -> [ReorderAlert] {

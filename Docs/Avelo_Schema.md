@@ -418,6 +418,8 @@ Indexes:
 
 Append-only. Triggers reject UPDATE and DELETE.
 
+The frozen persisted `AuditAction` values are listed in `Avelo_Naming_Freeze.md`. V23 widens the action CHECK for dedicated FY unlock/reopen, bank import/clear, account-group, inventory-order/reorder, BOM, voucher-template, GST-export, and invoice-PDF-export events. V25 adds dedicated cheque-bounce and cheque-representation actions. Both migrations preserve existing sequence and HMAC values.
+
 | Column | Type | Constraint |
 |---|---|---|
 | id | TEXT | PK |
@@ -722,12 +724,28 @@ idx_avelo_audit_sequence
 idx_avelo_registry_name
 ```
 
-## 30. Migration policy
+## 30. Party profiles (`avelo_party_profiles`, v24)
 
-- `SchemaVersion.current = 22` and `MigrationRunner.defaultMigrations` contains `MigrationV001` through `MigrationV022` in order.
+Focused party meaning and credit policy live outside the base ledger row:
+
+| Column | Contract |
+|---|---|
+| `account_id` | Primary key and same-company account foreign key. |
+| `company_id` | Required company ownership boundary. |
+| `usage` | `customer`, `supplier`, or `both`; authoritative when present. |
+| `credit_limit_paise` | Optional non-negative checked `Int64` paise. |
+| `default_credit_period_days` | Optional non-negative integer days. |
+| `maintain_billwise` | Strict `0`/`1` flag. |
+| `created_at`, `updated_at` | Required ISO timestamps. |
+
+`idx_avelo_party_profiles_company_usage` supports company-scoped policy loading. Insert/update ownership triggers reject profiles whose account and company do not match. Restore remaps this table after accounts.
+
+## 31. Migration policy
+
+- `SchemaVersion.current = 25` and `MigrationRunner.defaultMigrations` contains `MigrationV001` through `MigrationV025` in order.
 - `MigrationRunner` reads `PRAGMA user_version` and `avelo_migrations`, then applies each pending migration in its own `SQLiteDatabase.write` transaction.
 - Each migration is a `struct: Migration` with a numeric version, description, and `up(_ db: SQLiteDatabase) throws` body.
 - Migrations are append-only. Never edit a past migration.
-- Fresh databases begin at v1 and converge through the same ordered migrations as upgraded databases. Fresh-create and representative historical fixtures must have identical v22 tables, columns, indexes, triggers, strict-decoding behavior, and restore coverage.
+- Fresh databases begin at v1 and converge through the same ordered migrations as upgraded databases. Fresh-create and representative historical fixtures must have identical v25 tables, columns, indexes, triggers, strict-decoding behavior, and restore coverage.
 - Every persistent change updates this document, schema-drift tests, restore/remap tables, backup/manifest compatibility, ownership and fiscal-lock triggers, and audit coverage as applicable.
 - Unknown future versions, unreadable schema versions, wrong keys, and migration/backfill failures stop before publishing a replacement database.

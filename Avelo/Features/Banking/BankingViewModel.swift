@@ -24,9 +24,14 @@ public final class BankingViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
+            guard let company = try CompanyRepository(db: db).findById(companyId) else {
+                throw AppError.notFound("Company")
+            }
+            let groups = try AccountGroupRepository(db: db).listForCompany(companyId)
+            let policy = try AccountEligibilityPolicy.loading(db: db, companyId: companyId)
             accounts = try AccountService(db: db, companyId: companyId)
                 .listActiveAccounts()
-                .filter { ($0.code.uppercased().contains("BANK")) || ($0.name.uppercased().contains("BANK")) }
+                .filter { policy.evaluate(account: $0, for: .bankReconciliation, company: company, groups: groups).isEligible }
             if selectedAccountId == nil { selectedAccountId = accounts.first?.id }
             reconcile()
         } catch {

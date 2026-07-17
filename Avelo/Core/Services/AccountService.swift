@@ -137,7 +137,7 @@ public final class AccountService: Sendable {
         }
     }
 
-    public func markUsed(_ id: Account.ID) throws {
+    func markUsed(_ id: Account.ID) throws {
         try repository.markUsed(id)
     }
 
@@ -156,6 +156,12 @@ public final class AccountService: Sendable {
             let repository = AccountGroupRepository(db: tx)
             try validateGroupHierarchy(group, using: repository)
             try repository.insert(group)
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .accountGroupCreated,
+                entityType: "account_group",
+                entityId: group.id.uuidString,
+                snapshotAfter: group
+            )
         }
         return group
     }
@@ -171,6 +177,13 @@ public final class AccountService: Sendable {
             }
             try validateGroupHierarchy(group, using: repository)
             try repository.update(group)
+            try AuditService(db: tx, companyId: audit.companyId).record(
+                action: .accountGroupUpdated,
+                entityType: "account_group",
+                entityId: group.id.uuidString,
+                snapshotBefore: existing,
+                snapshotAfter: group
+            )
         }
     }
 
@@ -231,7 +244,7 @@ public final class AccountService: Sendable {
         try db.write { tx in
             try AccountGroupRepository(db: tx).delete(group.id)
             try AuditService(db: tx, companyId: audit.companyId).record(
-                action: .accountUpdated,
+                action: .accountGroupDeleted,
                 entityType: "account_group",
                 entityId: group.id.uuidString,
                 snapshotBefore: group

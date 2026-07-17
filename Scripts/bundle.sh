@@ -15,6 +15,23 @@ EXECUTABLE_NAME="Avelo"
 EXECUTABLE_PATH="$BUILD_DIR/$EXECUTABLE_NAME"
 SEED_RESOURCE="$ROOT_DIR/Avelo/Resources/Seed/DefaultChartOfAccounts.json"
 ENTITLEMENTS_FILE="$ROOT_DIR/Avelo/Avelo.entitlements"
+VERSION_FILE="$ROOT_DIR/ReleaseVersion.env"
+
+if [[ ! -f "$VERSION_FILE" ]]; then
+  echo "error: release version file missing: $VERSION_FILE" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$VERSION_FILE"
+if [[ ! "${AVELO_VERSION:-}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+  echo "error: AVELO_VERSION must be a numeric dotted version" >&2
+  exit 1
+fi
+if [[ ! "${AVELO_BUILD:-}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "error: AVELO_BUILD must be a positive integer" >&2
+  exit 1
+fi
 
 if [[ ! -x "$EXECUTABLE_PATH" ]]; then
   echo "error: expected built executable at $EXECUTABLE_PATH" >&2
@@ -29,7 +46,7 @@ cp "$EXECUTABLE_PATH" "$MACOS_DIR/$EXECUTABLE_NAME"
 cp "$SEED_RESOURCE" "$RESOURCES_DIR/DefaultChartOfAccounts.json"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 
-cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
+cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -49,9 +66,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0</string>
+  <string>$AVELO_VERSION</string>
   <key>CFBundleVersion</key>
-  <string>2</string>
+  <string>$AVELO_BUILD</string>
   <key>NSHumanReadableCopyright</key>
   <string>Copyright © 2026 Karbonteck. All rights reserved.</string>
   <key>LSMinimumSystemVersion</key>

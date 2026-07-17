@@ -251,7 +251,7 @@ Company files are encrypted. Keys are stored in the macOS Keychain for the local
 
 ## Docs
 
-See `Docs/Avelo_Master_PRD.md` for the product spec, `Docs/Avelo_Architecture.md` for the layer map, and `Docs/Avelo_Release_Board.md` for the current hardening board and benchmark numbers.
+Start with `Docs/Avelo_Master_Product_Execution_Plan.md` for the consolidated roadmap, `Docs/Avelo_Master_PRD.md` for normative behavior, `Docs/Avelo_Architecture.md` for the layer map, and `Docs/Avelo_Release_Board.md` for current readiness and benchmark evidence. Phase 0 human sign-off is recorded only in `Docs/Avelo_Phase0_Manual_Acceptance.md`.
 
 For the developer loop, proof-set commands, and benchmark interpretation, see `Docs/DX.md`.
 

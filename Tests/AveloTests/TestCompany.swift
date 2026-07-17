@@ -17,6 +17,8 @@ struct TestCompany {
 
     // Ledgers
     let cashId: Account.ID
+    let customerId: Account.ID
+    let supplierId: Account.ID
     let salesId: Account.ID
     let rentId: Account.ID
     let capitalId: Account.ID
@@ -49,7 +51,7 @@ struct TestCompany {
         let now = DateFormatters.formatIsoTimestamp(Date())
         try db.execute(
             "INSERT INTO avelo_companies (id, name, is_inventory_enabled, inventory_link_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            [.text(companyId.uuidString), .text(companyName), .bool(true), .text(InventoryLinkMode.autoPrompt.rawValue), .text(now), .text(now)]
+            [.text(companyId.uuidString), .text(companyName), .bool(true), .text(InventoryLinkMode.manual.rawValue), .text(now), .text(now)]
         )
 
         let fyId = UUID()
@@ -106,11 +108,15 @@ struct TestCompany {
 
         let assets = try insertGroup("1000", "Current Assets", "assets", sort: 0)
         let capital = try insertGroup("3000", "Capital Account", "liabilities", sort: 1)
-        let liability = try insertGroup("3500", "Duties & Taxes", "liabilities", sort: 2)
-        let income = try insertGroup("4000", "Sales Accounts", "income", sort: 3)
+        let liability = try insertGroup("DUTIES_TAXES", "Duties & Taxes", "liabilities", sort: 2)
+        let income = try insertGroup("SALES_ACCOUNTS", "Sales Accounts", "income", sort: 3)
         let expense = try insertGroup("5000", "Indirect Expenses", "expense", sort: 4)
+        let debtors = try insertGroup("SUNDRY_DEBTORS", "Sundry Debtors", "assets", sort: 5)
+        let creditors = try insertGroup("SUNDRY_CREDITORS", "Sundry Creditors", "liabilities", sort: 6)
 
-        let cash = try insertAccount("1001", "Cash", group: assets, openingPaise: 10000, side: "debit")
+        let cash = try insertAccount("CASH_IN_HAND", "Cash", group: assets, openingPaise: 10000, side: "debit")
+        let customer = try insertAccount("CUSTOMER_1", "Test Customer", group: debtors, openingPaise: 0, side: "debit")
+        let supplier = try insertAccount("SUPPLIER_1", "Test Supplier", group: creditors, openingPaise: 0, side: "credit")
         let capitalAcc = try insertAccount("3001", "Capital", group: capital, openingPaise: 10000, side: "credit")
         let sales = try insertAccount("4001", "Sales", group: income, openingPaise: 0, side: "credit")
         let rent = try insertAccount("5001", "Rent", group: expense, openingPaise: 0, side: "debit")
@@ -122,7 +128,8 @@ struct TestCompany {
         return TestCompany(
             db: db, companyId: companyId, fy: fy,
             assetsGroupId: assets, incomeGroupId: income, expenseGroupId: expense, capitalGroupId: capital, liabilityGroupId: liability,
-            cashId: cash, salesId: sales, rentId: rent, capitalId: capitalAcc, roundOffId: roundOff, cgstOutputId: cgstOutput, sgstOutputId: sgstOutput,
+            cashId: cash, customerId: customer, supplierId: supplier,
+            salesId: sales, rentId: rent, capitalId: capitalAcc, roundOffId: roundOff, cgstOutputId: cgstOutput, sgstOutputId: sgstOutput,
             igstOutputId: igstOutput
         )
     }

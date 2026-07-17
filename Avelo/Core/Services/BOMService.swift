@@ -33,17 +33,6 @@ public final class BOMService: Sendable {
         )
     }
 
-    @available(*, deprecated, message: "Use createBOM or updateBOM explicitly.")
-    public func saveBOM(assemblyItemId: InventoryItem.ID,
-                        outputQuantity: ExactQuantity,
-                        components: [BOMComponent]) throws {
-        try createBOM(
-            assemblyItemId: assemblyItemId,
-            outputQuantity: outputQuantity,
-            components: components
-        )
-    }
-
     public func loadBOM(for assemblyItemId: InventoryItem.ID) throws -> (BillOfMaterials, [BOMComponent])? {
         try ensureInventoryEnabled(using: db)
         return try repository.loadBOM(companyId: companyId, assemblyItemId: assemblyItemId)
@@ -143,7 +132,7 @@ public final class BOMService: Sendable {
             try repo.replaceComponents(for: bom.id, companyId: companyId, components: normalizedComponents)
 
             try AuditService(db: tx, companyId: companyId).record(
-                action: .stockItemUpdated,
+                action: mode == .create ? .billOfMaterialsCreated : .billOfMaterialsUpdated,
                 entityType: "bill_of_materials",
                 entityId: bom.id.uuidString,
                 snapshotBefore: beforeSnapshot,

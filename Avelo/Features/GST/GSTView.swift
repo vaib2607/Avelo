@@ -136,6 +136,7 @@ private struct GSTBody: View {
                 let data = try vm.summaryCSVData()
                 let name = "GST-Summary-\(DateFormatters.isoDate.string(from: vm.fromDate))-to-\(DateFormatters.isoDate.string(from: vm.toDate)).csv"
                 if let url = try await NSPanelBridge.saveData(data, suggestedName: name) {
+                    try vm.recordExportSaved(kind: "gst_summary_export", url: url)
                     env.showSuccess("GST summary exported to \(url.lastPathComponent).")
                 }
             } catch {
@@ -150,6 +151,7 @@ private struct GSTBody: View {
                 let data = try vm.gstr1InvoiceCSVData()
                 let name = "GSTR1-Invoices-\(DateFormatters.isoDate.string(from: vm.fromDate))-to-\(DateFormatters.isoDate.string(from: vm.toDate)).csv"
                 if let url = try await NSPanelBridge.saveData(data, suggestedName: name) {
+                    try vm.recordExportSaved(kind: "gstr1_invoice_export", url: url)
                     env.showSuccess("GSTR-1 invoice export saved to \(url.lastPathComponent).")
                 }
             } catch {
@@ -207,5 +209,14 @@ public final class GSTViewModel {
     public func gstr1InvoiceCSVData() throws -> Data {
         let svc = GSTService(db: db, companyId: companyId)
         return try svc.exportGSTR1InvoiceCSV(fromDate: fromDate, toDate: toDate)
+    }
+
+    public func recordExportSaved(kind: String, url: URL) throws {
+        try GSTService(db: db, companyId: companyId).recordExportSaved(
+            kind: kind,
+            fromDate: fromDate,
+            toDate: toDate,
+            url: url
+        )
     }
 }

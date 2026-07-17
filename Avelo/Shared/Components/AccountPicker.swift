@@ -8,6 +8,7 @@ public struct AccountPicker: View {
     public var accounts: [Account]
     public var placeholder: String = "Choose account…"
     public var filter: ((Account) -> Bool)? = nil
+    public var eligibility: ((Account) -> AccountEligibility)? = nil
     public var isEditable: Bool = true
     public var onCreate: (() -> Void)? = nil
     /// Fired after a selection is committed (Return or click), once the
@@ -30,6 +31,7 @@ public struct AccountPicker: View {
                 accounts: [Account],
                 placeholder: String = "Choose account…",
                 filter: ((Account) -> Bool)? = nil,
+                eligibility: ((Account) -> AccountEligibility)? = nil,
                 isEditable: Bool = true,
                 onCreate: (() -> Void)? = nil,
                 onCommitSelection: (() -> Void)? = nil,
@@ -38,6 +40,7 @@ public struct AccountPicker: View {
         self.accounts = accounts
         self.placeholder = placeholder
         self.filter = filter
+        self.eligibility = eligibility
         self.isEditable = isEditable
         self.onCreate = onCreate
         self.onCommitSelection = onCommitSelection
@@ -55,6 +58,11 @@ public struct AccountPicker: View {
                     .foregroundStyle(selection == nil ? .secondary : .primary)
                     .lineLimit(1)
                 Spacer()
+                if selectedEligibility?.isEligible == false {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .help(selectedEligibility?.rejectionReason ?? "This account is no longer eligible.")
+                }
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -89,6 +97,12 @@ public struct AccountPicker: View {
             return "\(acc.code)  —  \(acc.name)"
         }
         return placeholder
+    }
+
+    private var selectedEligibility: AccountEligibility? {
+        guard let id = selection,
+              let account = accounts.first(where: { $0.id == id }) else { return nil }
+        return eligibility?(account)
     }
 
     @ViewBuilder
@@ -216,8 +230,14 @@ public struct AccountPicker: View {
 
     /// All eligible accounts, recently-used first then by code.
     private var sortedAccounts: [Account] {
-        let base = filter.map { f in accounts.filter(f) } ?? accounts
+        let filteredByLegacyClosure = filter.map { f in accounts.filter(f) } ?? accounts
+        let base = eligibility.map { evaluate in
+            filteredByLegacyClosure.filter { evaluate($0).isEligible }
+        } ?? filteredByLegacyClosure
         return base.sorted { lhs, rhs in
+            let lhsRank = eligibility?(lhs).ranking ?? 0
+            let rhsRank = eligibility?(rhs).ranking ?? 0
+            if lhsRank != rhsRank { return lhsRank > rhsRank }
             switch (lhs.lastUsedAt, rhs.lastUsedAt) {
             case let (l?, r?) where l != r:
                 return l > r
@@ -237,6 +257,24 @@ public struct AccountPicker: View {
         guard !q.isEmpty else { return sortedAccounts }
         return sortedAccounts.filter {
             $0.code.lowercased().contains(q) || $0.name.lowercased().contains(q)
+        }.sorted { lhs, rhs in
+            let lhsCodeExact = lhs.code.lowercased() == q
+            let rhsCodeExact = rhs.code.lowercased() == q
+            if lhsCodeExact != rhsCodeExact { return lhsCodeExact }
+            let lhsNameExact = lhs.name.lowercased() == q
+            let rhsNameExact = rhs.name.lowercased() == q
+            if lhsNameExact != rhsNameExact { return lhsNameExact }
+            let lhsRank = eligibility?(lhs).ranking ?? 0
+            let rhsRank = eligibility?(rhs).ranking ?? 0
+            if lhsRank != rhsRank { return lhsRank > rhsRank }
+            switch (lhs.lastUsedAt, rhs.lastUsedAt) {
+            case let (l?, r?) where l != r: return l > r
+            case (.some, .none): return true
+            case (.none, .some): return false
+            default:
+                if lhs.code == rhs.code { return lhs.name < rhs.name }
+                return lhs.code < rhs.code
+            }
         }
     }
 }

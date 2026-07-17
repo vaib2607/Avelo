@@ -70,6 +70,13 @@ public final class BankReconciliationService: Sendable {
                     importBatchId: importBatchId
                 )
             }
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .bankStatementImported,
+                entityType: "bank_statement_import",
+                entityId: importBatchId.uuidString,
+                snapshotAfter: entries,
+                reason: "\(entries.count) line(s) imported for account \(accountId.uuidString)"
+            )
         }
     }
 
@@ -131,30 +138,43 @@ public final class BankReconciliationService: Sendable {
     }
 
     public func clearStatementLine(id: UUID) throws {
-        let line: (companyId: Company.ID, statementDate: Date)? = try db.queryOne(
-            "SELECT company_id, statement_date FROM avelo_bank_statement_lines WHERE id = ?",
-            bind: [.text(id.uuidString)]
-        ) {
-            (
-                companyId: try UUIDParsing.required($0.text("company_id"), field: "avelo_bank_statement_lines.company_id"),
-                statementDate: $0.date("statement_date")
-            )
-        }
-        guard let line, line.companyId == companyId else {
+        guard let line = try repository.findStatementLine(id: id), line.companyId == companyId else {
             throw AppError.notFound("Bank statement line")
         }
-        _ = try FiscalLockChecker(db: db).assertDateOpen(line.statementDate, companyId: companyId, mutationLabel: "Bank statement date")
+        _ = try FiscalLockChecker(db: db).assertDateOpen(line.date, companyId: companyId, mutationLabel: "Bank statement date")
         try db.write { tx in
             let repo = BankReconciliationRepository(db: tx)
             try repo.clearStatementLine(id: id)
+            guard let cleared = try repo.findStatementLine(id: id) else {
+                throw AppError.notFound("Bank statement line")
+            }
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .bankStatementLineCleared,
+                entityType: "bank_statement_line",
+                entityId: id.uuidString,
+                snapshotBefore: line,
+                snapshotAfter: cleared
+            )
         }
     }
 
     private func requireReconcilableAccount(_ accountId: Account.ID) throws -> Account {
-        guard let account = try AccountRepository(db: db).findById(accountId),
-              account.companyId == companyId,
-              account.isActive else {
+        guard let company = try CompanyRepository(db: db).findById(companyId),
+              let account = try AccountRepository(db: db).findById(accountId) else {
             throw AppError.notFound("Account")
+        }
+        let eligibility = try AccountEligibilityPolicy.loading(db: db, companyId: companyId).evaluate(
+            account: account,
+            for: .bankReconciliation,
+            company: company,
+            groups: try AccountGroupRepository(db: db).listForCompany(companyId)
+        )
+        guard eligibility.isEligible else {
+            throw AppError.validation(.init(
+                code: .voucherAccountInactive,
+                field: "accountId",
+                message: eligibility.rejectionReason ?? "Account is not eligible for bank reconciliation."
+            ))
         }
         return account
     }

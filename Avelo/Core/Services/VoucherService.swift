@@ -45,6 +45,12 @@ public final class VoucherService: Sendable {
         let lines: [LedgerLine]
     }
 
+    struct ChequeAuditSnapshot: Sendable, Codable {
+        let cheque: Cheque
+        let voucher: Voucher
+        let lines: [LedgerLine]
+    }
+
     public struct WorkflowInputs: Sendable {
         public var billAllocationKind: BillAllocationKind?
         public var billAllocationNumber: String?
@@ -305,16 +311,13 @@ public final class VoucherService: Sendable {
         return PostResult(voucher: voucher, inventoryPrompt: prompt)
     }
 
-    private func inventoryPromptContext(for voucher: Voucher) throws -> InventoryPromptContext? {
-        guard voucher.voucherTypeCode == .sales || voucher.voucherTypeCode == .purchase else {
-            return nil
-        }
-        guard let company = try CompanyRepository(db: db).findById(companyId),
-              company.isInventoryEnabled,
-              company.inventoryLinkMode == .autoPrompt else {
-            return nil
-        }
-        return InventoryPromptContext(voucherId: voucher.id, voucherNumber: voucher.number, lines: [])
+    private func inventoryPromptContext(for _: Voucher) throws -> InventoryPromptContext? {
+        // `autoPrompt` remains decodable for existing companies, but its
+        // previous empty prompt could not collect the explicit item, exact
+        // quantity, direction, and cost inputs required by R-2/R-8. Do not
+        // expose a partial workflow; item-invoice mode is the explicit stock
+        // path until a complete prompt contract is implemented.
+        nil
     }
 
     public func edit(_ voucherId: Voucher.ID, with newDraft: VoucherDraft, in fy: FinancialYear) throws -> Voucher {
@@ -566,6 +569,7 @@ public final class VoucherService: Sendable {
             guard storedCheque.status != .cancelled else {
                 throw AppError.businessRule("Cancelled cheques cannot be bounced.")
             }
+            let chequeBefore = storedCheque
 
             try vRepo.insert(reversal)
             try lRepo.insertBatch(flippedLines)
@@ -579,11 +583,11 @@ public final class VoucherService: Sendable {
             storedCheque.bouncedReversalVoucherId = reversal.id
             try workflowRepo.update(storedCheque)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .voucherReversed,
-                entityType: "voucher",
-                entityId: reversal.id.uuidString,
-                snapshotBefore: VoucherAuditSnapshot(voucher: original, lines: originalLines),
-                snapshotAfter: VoucherAuditSnapshot(voucher: reversal, lines: flippedLines),
+                action: .chequeBounced,
+                entityType: "cheque",
+                entityId: storedCheque.id.uuidString,
+                snapshotBefore: ChequeAuditSnapshot(cheque: chequeBefore, voucher: original, lines: originalLines),
+                snapshotAfter: ChequeAuditSnapshot(cheque: storedCheque, voucher: reversal, lines: flippedLines),
                 reason: "Cheque bounced: \(trimmedReason) [actor=\(actor)]"
             )
             try markAccountsUsed(accountRepo, lines: flippedLines)
@@ -706,10 +710,11 @@ public final class VoucherService: Sendable {
             )
             try workflowRepo.insert(representedCheque)
             try AuditService(db: tx, companyId: companyId).record(
-                action: .voucherPosted,
-                entityType: "voucher",
-                entityId: representedVoucher.id.uuidString,
-                snapshotAfter: VoucherAuditSnapshot(voucher: representedVoucher, lines: representedLines),
+                action: .chequeRepresented,
+                entityType: "cheque",
+                entityId: representedCheque.id.uuidString,
+                snapshotBefore: ChequeAuditSnapshot(cheque: originalCheque, voucher: original, lines: originalLines),
+                snapshotAfter: ChequeAuditSnapshot(cheque: representedCheque, voucher: representedVoucher, lines: representedLines),
                 reason: "Cheque re-presented" + (reason.map { ": \($0)" } ?? "")
             )
             try markAccountsUsed(accountRepo, lines: representedLines)

@@ -2,6 +2,8 @@
 
 These are Avelo's non-negotiable product and engineering invariants. A change is not releasable when it violates a rule, even if its local tests pass. `Avelo_Master_PRD.md` defines user-visible behavior, `Avelo_Schema.md` describes persistence, and `Avelo_Release_Board.md` owns the readiness verdict.
 
+The consolidated product roadmap is `Avelo_Master_Product_Execution_Plan.md`.
+
 ## R-1. Avelo is fully offline
 
 - Shipped code must not use `URLSession`, `Network`, `NWConnection`, web views, telemetry, analytics, crash reporting, online licensing, update checks, or any other network transport.
@@ -16,6 +18,10 @@ These are Avelo's non-negotiable product and engineering invariants. A change is
 - Avelo may deterministically derive GST, CESS, taxable value, valuation, COGS, round-off, totals, and balancing presentation from explicit inputs plus stored master data.
 - Derived values must be visible before or immediately after posting, reproducible from stored inputs, and covered by golden tests.
 - Avelo never infers an item, party, price, tax treatment, or vendor from an account name or usage history.
+
+Account eligibility is a shared policy, not view-local filtering. Account meaning is resolved through the full group hierarchy and explicit role/profile data. Picker visibility, posting validation, import validation, edit validation, and restore validation use the same policy.
+
+Future extensions are restricted to approved typed service commands and datasets. They may not access arbitrary SQL, network transports, processes, DLLs, COM, unrestricted files, or bypass ownership, balancing, fiscal locks, checked arithmetic, or audit requirements.
 - Templates and recalled values create reviewable drafts. No system event posts a voucher automatically.
 
 ## R-3. SQLite is the system of record

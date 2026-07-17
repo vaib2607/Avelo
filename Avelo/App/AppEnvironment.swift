@@ -181,7 +181,7 @@ public final class AppEnvironment {
             throw AppError.notFound("Financial year")
         }
         try CompanyService(db: db, companyId: company.id, manager: manager)
-            .setInventoryMode(enabled: true, linkMode: .autoPrompt)
+            .setInventoryMode(enabled: true, linkMode: .manual)
 
         let groups = try accounts.listGroups()
         func group(_ code: String) throws -> AccountGroup {
@@ -260,6 +260,13 @@ public final class AppEnvironment {
                 throw AppError.notFound("Financial year for company \(id.uuidString)")
             }
             let inventoryEnabled = try CompanyRepository(db: handle.db).findById(handle.companyId)?.isInventoryEnabled ?? false
+            try AuditService(db: handle.db, companyId: handle.companyId).record(
+                action: .companySwitched,
+                entityType: "company",
+                entityId: handle.companyId.uuidString,
+                reason: "Company opened in this window"
+            )
+            router.setInventoryEnabled(inventoryEnabled)
             self.companyContext = CompanyContext(
                 companyId: handle.companyId,
                 companyName: handle.companyName,
@@ -286,6 +293,15 @@ public final class AppEnvironment {
             guard let fy = try FinancialYearRepository(db: ctx.database).findById(id) else {
                 throw AppError.notFound("Financial year")
             }
+            guard fy.companyId == ctx.companyId else {
+                throw AppError.notFound("Financial year")
+            }
+            try AuditService(db: ctx.database, companyId: ctx.companyId).record(
+                action: .financialYearSwitched,
+                entityType: "financial_year",
+                entityId: fy.id.uuidString,
+                reason: "Switched from \(ctx.financialYear.label) to \(fy.label)"
+            )
             companyContext = CompanyContext(
                 companyId: ctx.companyId,
                 companyName: ctx.companyName,
@@ -319,6 +335,7 @@ public final class AppEnvironment {
     public func refreshCompanyFlags() {
         guard let ctx = companyContext else { return }
         let inventoryEnabled = ((try? CompanyRepository(db: ctx.database).findById(ctx.companyId)) ?? nil)?.isInventoryEnabled ?? false
+        router.setInventoryEnabled(inventoryEnabled)
         companyContext = CompanyContext(
             companyId: ctx.companyId,
             companyName: ctx.companyName,
@@ -335,6 +352,7 @@ public final class AppEnvironment {
             Task { await manager.closeCompany(id: ctx.companyId) }
         }
         companyContext = nil
+        router.setInventoryEnabled(false)
         accountTree = nil
         pendingDraftRecovery = nil
         router.reset()

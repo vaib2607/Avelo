@@ -19,6 +19,9 @@ public final class CompanyService: Sendable {
     }
 
     public func update(_ company: Company) throws {
+        guard !company.isInventoryEnabled || company.inventoryLinkMode.isAvailableForProduction else {
+            throw AppError.businessRule("Automatic inventory linking is not available. Use manual stock movements or an explicit item invoice.")
+        }
         var c = company
         c.updatedAt = Date()
         try db.write { tx in
@@ -34,6 +37,9 @@ public final class CompanyService: Sendable {
     }
 
     public func setInventoryMode(enabled: Bool, linkMode: InventoryLinkMode) throws {
+        guard !enabled || linkMode.isAvailableForProduction else {
+            throw AppError.businessRule("Automatic inventory linking is not available. Use manual stock movements or an explicit item invoice.")
+        }
         guard var company = try current() else {
             throw AppError.notFound("Company")
         }

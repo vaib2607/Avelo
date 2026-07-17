@@ -64,7 +64,7 @@ enum LocalRCFlowRunner {
         let reportService = ReportService(db: ctx.database, companyId: ctx.companyId)
         let companyService = CompanyService(db: ctx.database, companyId: ctx.companyId, manager: manager)
 
-        try companyService.setInventoryMode(enabled: true, linkMode: .autoPrompt)
+        try companyService.setInventoryMode(enabled: true, linkMode: .manual)
 
         let groups = try accountService.listGroups()
         // Post to the leaf sub-group, not the non-leaf "Current Assets"

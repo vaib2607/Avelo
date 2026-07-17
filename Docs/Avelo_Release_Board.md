@@ -6,6 +6,8 @@ Snapshot: 2026-07-15
 
 This is the repo-tracked `P0/P1/P2` source of truth for readiness. Each unresolved issue appears once, carries one severity, and maps to `Docs/Avelo_Execution_Checklist.md`. Feature presence, an old green test log, or a locally launchable ad-hoc bundle does not override this verdict.
 
+The complete product roadmap and requirement crosswalk is `Docs/Avelo_Master_Product_Execution_Plan.md`. This board remains the authority for current status and proof.
+
 Current release target:
 - `v1.1` is the performance, accuracy, and reliability hardening release.
 - The current benchmark focus is on repeatable local measurement for cold launch, core voucher/report paths, backup/restore, soak, stress, and million-voucher runs on the same machine and dataset.
@@ -26,7 +28,9 @@ State rules:
 
 Evidence is valid only for the recorded commit/worktree and artifact. Record date/time, macOS/Xcode/Swift, machine, schema/fixture, command, result, skipped tests, artifact version/build/SHA-256/signing identity, owner, and `AVL-*` row. The active dirty worktree invalidates historical closure claims until the supported proof set is rerun.
 
-Distribution status: `Scripts/bundle.sh` currently emits an ad-hoc signed local RC with version `1.0` and build `2`. Public production requires the approved Developer ID/notarization or Mac App Store runbook in `Docs/DX.md`, aligned v1.1 metadata, and clean-Mac install/launch/upgrade proof.
+Distribution status: `ReleaseVersion.env` is the single source for v1.1 build 3 and bundle validation rejects drift. `Scripts/bundle.sh` emits an ad-hoc signed local RC. Public production still requires the Developer ID/notarization runbook in `Docs/DX.md` and clean-Mac install/launch/upgrade proof.
+
+The canonical artifact-bound human protocol is `Docs/Avelo_Phase0_Manual_Acceptance.md`. As of 2026-07-17 its accountant, operator, accessibility, visual, and physical-print rows are `NOT RUN`; distribution is `BLOCKED` because the machine has no valid Developer ID identity. `Scripts/phase0_evidence.sh` confirms the current bundle is ad-hoc signed, Gatekeeper-rejected, and unstapled.
 
 Module ship status:
 - `Exposed, not Ready`: company setup, company switching, FYs, accounts, vouchers, reports, inventory, payroll, banking, audit, backup/restore, and the offline shell remain available for development and accountant QA, but the open P0 catalogue below blocks a Ready designation.
@@ -82,16 +86,16 @@ Hidden entry-point rule:
 
 ## Top 10 Blockers In Execution Order
 
-1. `AVL-P0-036` — remap and validate every v14-v22 company-scoped table during restore, including item-invoice rows.
-2. `AVL-P0-034` — complete same-transaction audit action and service coverage for every shipped mutation.
-3. `AVL-P0-033` — enforce the inventory-disabled capability boundary across UI, routing, search, shortcuts, and services.
-4. `AVL-P0-035` — complete or hide ledger-voucher `autoPrompt`/`autoSilent`; never infer stock from account names.
-5. `AVL-P0-020` — make create/edit/help agree on Return, Command-Return, Tab, Shift-Tab, and Escape.
-6. Active voucher/BOM worktree — settle implementation, then rerun focused and full regression proof.
-7. Current automated gate — `make rule-audit`, warnings-as-errors release build, `make test`, `make rc-local`, benchmark, and bundled self-test/GUI launch.
-8. Human gate — accountant, operator, keyboard, accessibility, visual/PDF, and recovery acceptance on the same artifact.
-9. Distribution gate — align v1.1 version/build, choose signing path, notarize or complete App Store acceptance, and test a clean Mac.
-10. Evidence gate — update every P0 row with current commit/worktree/artifact identity; historical logs remain context only.
+1. Accountant acceptance for the remaining P0 accounting, report, inventory, GST, audit, and picker workflows.
+2. Operator acceptance for migration, backup/restore, recovery, corruption, storage, sleep/App Nap, and resource cleanup.
+3. Keyboard, VoiceOver, focus, appearance, resize, PDF, and physical-printer acceptance.
+4. Manual review of rule categories that the automated rule audit explicitly cannot prove.
+5. Settle the intentionally uncommitted worktree and identify the exact release artifact.
+6. Align v1.1 version/build, release notes, upgrade guidance, and rollback guidance.
+7. Provision Developer ID signing and approve hardened-runtime entitlements.
+8. Notarize and staple the final downloadable artifact.
+9. Complete clean-machine install, prior-version upgrade, launch, backup, and restore acceptance.
+10. Attach human and distribution evidence to every P0 row; current implementation, 498-test, rule-audit, RC, launch-smoke, standard benchmark, and 500k benchmark gates pass.
 
 Execution queue alignment:
 
@@ -147,7 +151,7 @@ Execution queue alignment:
 
 This is the single normalized readiness catalogue. Existing completed `RB-*` entries below are historical implementation evidence, not proof that Avelo is Ready. An item remains `Open` until its automated proof and manual accountant acceptance both pass. Exact Tally chords are compatibility aliases; current macOS bindings remain supported.
 
-### P0 — Must Fix Before “Ready” (36 unresolved)
+### P0 — Must Fix Before “Ready” (37 unresolved)
 
 | ID | Status | Depends | Requirement | Proof of done |
 | --- | --- | --- | --- | --- |
@@ -170,7 +174,7 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P0-017 | Open | None | Guarantee `sqlite3_finalize`/reset/clear on every prepare, bind, step, cancellation, eviction, and close path. | Fault-injection tests leave no busy statements or leaked handles. |
 | AVL-P0-018 | Open | None | Autosave and crash recovery for in-progress vouchers without double-posting. | Kill/relaunch fixtures restore drafts and never convert a draft into a posted voucher automatically. |
 | AVL-P0-019 | Open | AVL-P0-010 | Cascade inventory-cost recalculation after backdated insert, edit, reversal, or cancellation. | Downstream valuation/COGS fixtures update deterministically and expose progress/failure state. |
-| AVL-P0-020 | Open | None | Reliable `@FocusState` Tab/Shift-Tab/Enter navigation in voucher grids. | Full keyboard matrix passes for first, middle, last, inserted, deleted, and validation-error rows. |
+| AVL-P0-020 | Manual acceptance remaining | None | New/Edit editors implement reliable `@FocusState` Return advance/add, Command-Return post/save, native Tab/Shift-Tab, Escape cancellation, validation-error focus, native text precedence, depth-safe sheet capture, and one-shot submission. | Automated focus/add-line/validation, shortcut-map, nested-capture, and repeated-activation proof plus the 498-test full suite pass; accountant executes the first/middle/last/insert/delete/error matrix and bundled keyboard/VoiceOver acceptance. The broader generated multi-binding registry remains `AVL-P1-044`. |
 | AVL-P0-021 | Open | None | Locale-aware decimal parsing with unambiguous stored paise. | Indian and comma-decimal locale fixtures round-trip pasted and typed values. |
 | AVL-P0-022 | Open | None | GST-compliant invoice/PDF for registered-party (B2B) Sales/Purchase vouchers: mandatory fields, CGST/SGST/IGST/CESS breakdown, HSN/SAC, place of supply, inventory-linked stock detail. B2C (unregistered party), export invoices, credit/debit notes, and RCM are deferred. Direct IRN/government-signed QR issuance is policy-excluded by R-1 under `AVL-P1-008`. | Field-matrix tests (intra-state CGST/SGST, inter-state IGST, CESS, unregistered-party fallback, inventory-linked/non-linked stock detail) and a working UI export button in `VouchersView`; remains open until current automated proof and accountant B2B tax-invoice acceptance are recorded. |
 | AVL-P0-023 | Open | None | Force Indian accounting calendar semantics in IST regardless of device timezone. | Boundary tests cover midnight, DST device zones, leap days, GST periods, and FY transitions. |
@@ -183,10 +187,11 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P0-030 | Open | None | Enforce same-company ownership through database constraints/triggers plus service/repository validation. | Adversarial cross-company FY/account/item/employee/voucher/bank/order references are rejected at every boundary. |
 | AVL-P0-031 | Open | None | Make schema-version reads throwing; never interpret an unreadable database as version zero. | Corrupt, locked, wrong-key, and I/O-failure tests stop before any migration mutation. |
 | AVL-P0-032 | Open | AVL-P0-002, AVL-P0-012 | Audit-safe voucher cancellation that preserves the voucher, number, persisted reason/actor/timestamp, linkage, and history. | Cancelled vouchers remain visible, numbers are not reused, reversal linkage and audit evidence persist, reports apply defined treatment, and deletion is unnecessary. |
-| AVL-P0-033 | Implementation remaining | None | Enforce the accounting-only capability boundary when inventory is disabled across sidebar, menus, command palette, quick search, keyboard routing, sheets/deep links, dashboard content, and mutation services. | Entry-point matrix and direct-service tests prove Inventory is unreachable and rejects mutation when disabled; accountant toggles the capability without stale routes or data loss. |
-| AVL-P0-034 | Implementation remaining | AVL-P0-012 | Give every shipped financially or operationally meaningful mutation a persisted `AuditAction` and exactly one same-transaction event; cover FY unlock/reopen, bank import/match/clear, inventory orders/BOMs/masters, repair, export, and other promoted workflows. | A mutation-inventory test maps every public mutation to action, before/after/reason policy, rollback semantics, and one immutable event; accountant verifies representative audit diffs. |
-| AVL-P0-035 | Implementation remaining | AVL-P0-033, AVL-P0-034 | Complete or hide ledger-voucher inventory link modes. `autoPrompt` must collect explicit item/quantity/direction/cost inputs; `autoSilent` requires deterministic mapping/consent/reversal/audit. Account-name or history inference is forbidden. | UI/service tests prove manual, item-invoice, prompt yes/no/policy change, edit/reverse/cancel, fiscal lock, restore, valuation, and audit behavior; unsupported modes are absent from production UI. |
-| AVL-P0-036 | Implementation remaining | AVL-P0-030, AVL-P0-031 | Restore every supported schema table under a new company identity. Include `avelo_voucher_item_lines` in company-ID remap and define whether scratch `avelo_voucher_drafts` are remapped or intentionally discarded. | Restore fixtures containing item invoices, bill/cheque rows, BOM exact quantities, FY openings, and drafts pass checksum, migration, company ownership, audit/trigger recreation, `foreign_key_check`, and post-restore reports without retaining the source company ID. |
+| AVL-P0-033 | Manual acceptance remaining | None | The accounting-only boundary is implemented across sidebar, menus, command palette, shortcut help, keyboard routing, sheets/deep links, report selection, dashboard and voucher content, stale route invalidation, and inventory/BOM/order/item-invoice/report service authorization. | Automated enabled/disabled router, keyboard, report, item-invoice, service, and company-switch checks plus the 485-test full suite pass; accountant must still toggle the capability across companies and confirm no stale route or data loss. |
+| AVL-P0-034 | Manual acceptance remaining | AVL-P0-012 | V023/V025 and shipped services provide dedicated persisted coverage for every currently shipped mutation. Cheque bounce/re-presentation have compound before/after snapshots; saved-file exports audit only after publication and remove artifacts when audit persistence fails; repair remains unavailable and hidden under AVL-P1-039. | Chain-preservation, exactly-one-event, rollback, snapshot, app-flow, export, 50-cycle backup/restore, 494-test full-suite, and rule-audit proof pass; representative accountant audit-diff acceptance remains. |
+| AVL-P0-035 | Manual acceptance remaining | AVL-P0-033, AVL-P0-034 | Production UI exposes only manual linkage; legacy automatic modes are rejected by direct and general company updates and cannot emit a prompt or hidden stock consequences across post/edit/reverse/cancel. Item-invoice remains the explicit stock path. | Focused mode tests, the 485-test full suite, and rule audit pass; accountant confirms unsupported controls are absent and explicit manual/item-invoice behavior remains usable. |
+| AVL-P0-036 | Manual acceptance remaining | AVL-P0-030, AVL-P0-031 | Restore remaps item-invoice and party-profile rows and discards drafts. The automated real-schema V14–V22 matrix upgrades FY openings, bills, cheques, BOMs, vouchers, ledger/stock/item/profile rows, dynamically scans every current `company_id` table for source-ID leakage, checks foreign keys, and proves exactly one restore event. | Focused restore tests and the 485-test full suite pass; operator must still perform cross-machine recovery-key restore, confirm the draft-discard notice, and reconcile restored reports. |
+| AVL-P0-037 | Manual acceptance remaining | AVL-P0-020, AVL-P0-033, AVL-P0-034 | The central ancestry-aware policy drives voucher batch/single validation and pickers, item invoices, orders, banking, payroll, report selection, and the shipped bank-statement import. V024 adds company-owned customer/supplier/both profiles used by service and UI policy loading and remapped on restore. Regrouped and newly created accounts reload the same policy immediately; retained invalid selections remain visible with a reason. | The exhaustive core voucher-field context matrix, ancestry, profile, inactive/foreign, service/batch, import rejection, regrouping, Alt+C new-account, retained-selection, migration/restore, 498-test full-suite, and rule-audit proof pass. No account-master importer ships before the Phase 8 Tally importer, so there is no additional current import bypass; accountant picker and retained-selection acceptance remains. |
 
 ### P1 — Fix Before Broad Rollout (44 open)
 

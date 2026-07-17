@@ -175,7 +175,7 @@ final class BOMServiceTests: XCTestCase {
             filter: .init(companyId: tc.companyId, entityType: "bill_of_materials")
         )
         XCTAssertEqual(events.count, 2)
-        XCTAssertTrue(events.allSatisfy { $0.action == .stockItemUpdated })
+        XCTAssertEqual(Set(events.map(\.action)), [.billOfMaterialsCreated, .billOfMaterialsUpdated])
 
         let created = try XCTUnwrap(events.first(where: { $0.snapshotBeforeJson == nil }))
         let updated = try XCTUnwrap(events.first(where: { $0.snapshotBeforeJson != nil }))

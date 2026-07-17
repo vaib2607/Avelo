@@ -112,10 +112,9 @@ public struct NewCompanySheet: View {
         card(title: "Inventory") {
             Toggle("Enable inventory", isOn: $vm.enableInventory)
             if vm.enableInventory {
-                Picker("Link mode", selection: $vm.inventoryMode) {
-                    Text("Manual").tag(InventoryLinkMode.manual)
-                    Text("Auto-prompt").tag(InventoryLinkMode.autoPrompt)
-                }
+                Text("Ledger vouchers do not change stock automatically. Use explicit item invoices or manual stock movements.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -222,7 +221,7 @@ public struct NewCompanySheet: View {
                 if vm.enableInventory {
                     if let ctx = env.companyContext {
                         let svc = CompanyService(db: ctx.database, companyId: ctx.companyId, manager: env.manager)
-                        try svc.setInventoryMode(enabled: true, linkMode: vm.inventoryMode)
+                        try svc.setInventoryMode(enabled: true, linkMode: .manual)
                     }
                 }
                 env.notifyDataChanged()

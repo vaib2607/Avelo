@@ -205,6 +205,20 @@ public final class GSTService: Sendable {
         return Data(csv.utf8)
     }
 
+    public func recordExportSaved(kind: String, fromDate: Date, toDate: Date, url: URL) throws {
+        do {
+            try audit.record(
+                action: .gstReportExported,
+                entityType: kind,
+                entityId: url.lastPathComponent,
+                reason: "\(DateFormatters.formatIsoDate(fromDate)) - \(DateFormatters.formatIsoDate(toDate))"
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
+    }
+
     @available(*, deprecated, message: "This export is summary-only; use exportGSTSummaryCSV(fromDate:toDate:) for the honest label.")
     public func exportGSTR1(fromDate: Date, toDate: Date) throws -> Data {
         try exportGSTSummaryCSV(fromDate: fromDate, toDate: toDate)

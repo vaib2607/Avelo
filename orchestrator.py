@@ -8,7 +8,10 @@ import os
 # Change 'llama3' to whichever coding model you have pulled (e.g., 'codellama' or 'phi3').
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "llama3"
-BOARD_PATH = ".agents/TASK_BOARD.md"
+BOARD_PATHS = [
+    "Docs/Avelo_Release_Board.md",
+    "Docs/Avelo_Execution_Checklist.md",
+]
 
 def ask_local_llm(system_prompt, user_message):
     """Sends the task to your local LLM and returns the response."""
@@ -42,11 +45,14 @@ def read_file(filepath):
 def main():
     print("🚀 Starting Avelo Autonomous Pipeline...")
     
-    # 1. Read the Task Board
-    if not os.path.exists(BOARD_PATH):
-        print(f"Error: {BOARD_PATH} not found.")
+    # 1. Read the canonical readiness board and executable queue.
+    missing = [path for path in BOARD_PATHS if not os.path.exists(path)]
+    if missing:
+        print(f"Error: required canonical document(s) missing: {', '.join(missing)}")
         return
-    board_content = read_file(BOARD_PATH)
+    board_content = "\n\n".join(
+        f"# Source: {path}\n{read_file(path)}" for path in BOARD_PATHS
+    )
     
     # 2. Define the FLOW Agent's Brain
     flow_system_prompt = read_file(".agents/prompts/FLOW.md")

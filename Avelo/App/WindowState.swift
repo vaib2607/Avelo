@@ -40,6 +40,29 @@ public enum ReportSelection: String, CaseIterable, Identifiable, Sendable {
 
     public var id: String { rawValue }
 
+    /// Inventory reports are unavailable when the active company has disabled
+    /// the Inventory capability. Keeping this classification on the selection
+    /// type lets every navigation surface apply the same capability boundary.
+    public var requiresInventory: Bool {
+        switch self {
+        case .stockMovement, .stockRegister, .stockValuation, .stockAgeing:
+            return true
+        default:
+            return false
+        }
+    }
+
+    public static func visibleCases(isInventoryEnabled: Bool) -> [ReportSelection] {
+        isInventoryEnabled ? allCases : allCases.filter { !$0.requiresInventory }
+    }
+
+    public static func permitted(
+        _ selection: ReportSelection,
+        isInventoryEnabled: Bool
+    ) -> ReportSelection {
+        selection.requiresInventory && !isInventoryEnabled ? .trialBalance : selection
+    }
+
     public var title: String {
         switch self {
         case .trialBalance:  return "Trial Balance"

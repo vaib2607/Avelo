@@ -12,8 +12,10 @@ public struct RestoreService: Sendable {
         "avelo_financial_years",
         "avelo_account_groups",
         "avelo_accounts",
+        "avelo_party_profiles",
         "avelo_voucher_types",
         "avelo_vouchers",
+        "avelo_voucher_item_lines",
         "avelo_bill_allocations",
         "avelo_cheques",
         "avelo_ledger_lines",
@@ -575,6 +577,14 @@ public struct RestoreService: Sendable {
             try dropAuditImmutabilityTriggers(db: db)
             try dropLockedFinancialYearTriggers(db: db)
             try db.write { tx in
+                // Drafts are scratch keystrokes, not durable accounting
+                // history. They can refer to local UI state and are therefore
+                // intentionally discarded rather than remapped into a newly
+                // restored company identity.
+                try tx.execute(
+                    "DELETE FROM avelo_voucher_drafts WHERE company_id = ?",
+                    [.text(sourceCompany.id.uuidString)]
+                )
                 try tx.execute(
                     "UPDATE avelo_companies SET id = ?, name = ?, updated_at = ? WHERE id = ?",
                     [

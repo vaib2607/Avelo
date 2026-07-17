@@ -12,9 +12,13 @@ Authority order:
 
 Current verdict: **NOT READY FOR PUBLIC PRODUCTION**.
 
+The complete product roadmap, Tally-parity scope, phased delivery order, and cross-document ownership are defined in `Avelo_Master_Product_Execution_Plan.md`.
+
 ## 1. Product definition
 
 Avelo is a fully offline native macOS accounting application for Indian small businesses. It uses SwiftUI, Swift Package Manager, and one local SQLite/SQLCipher database per company. It is keyboard-first, single-user, and designed around double-entry bookkeeping, auditability, recovery, Indian financial years, GST-aware invoicing, and local ownership of data.
+
+The product uses a modern native shell with Tally-inspired contextual actions, continuous voucher entry, inline master creation, hierarchical report drill-down, configurable workspaces, no-code reports/charts/documents, and native macOS accessibility. Company capabilities and per-screen behavior are separate. Direct government API calls, direct email dispatch, and arbitrary extension execution are outside the offline product contract.
 
 The user explicitly supplies or selects every business input and posting intent. Avelo may deterministically derive reviewable GST, CESS, valuation, COGS, round-off, totals, and reports from those inputs and stored masters. It never infers a party/item/price from history and never posts a voucher because of a background event.
 
@@ -140,6 +144,7 @@ One reviewable sheet collects legal/contact/GST fields, the initial FY, the defa
 - Ledger create/update validates company, group, code/name, opening amount/side, bank flag, GST/mailing fields, bill-wise policy, and fiscal lock.
 - Referenced ledgers are disabled, not hard-deleted.
 - Creating an account from voucher entry returns to the originating field, preserves the draft, and revalidates eligibility.
+- Account eligibility resolves the complete group ancestry using stable semantic codes and explicit profiles; account/group display names never determine accounting meaning. The same decision governs pickers, voucher validation, item invoices, orders, banking, payroll, reports, imports, edits, duplication, and restore checks. Invalid retained selections remain visible with a reason until replaced.
 
 ## 9. Voucher workspace
 

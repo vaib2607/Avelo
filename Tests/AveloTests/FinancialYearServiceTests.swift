@@ -41,6 +41,42 @@ final class FinancialYearServiceTests: XCTestCase {
         XCTAssertEqual(events.count, 1)
         XCTAssertEqual(events.first?.entityId, tc.fy.id.uuidString)
         XCTAssertEqual(events.first?.reason, "period close")
+        XCTAssertNotNil(events.first?.snapshotBeforeJson)
+        XCTAssertNotNil(events.first?.snapshotAfterJson)
+    }
+
+    func testUnlockWritesExactlyOneDedicatedAuditEvent() throws {
+        let tc = try TestCompany.make()
+        let service = FinancialYearService(db: tc.db, companyId: tc.companyId)
+        try service.lock(tc.fy.id, reason: "period close")
+
+        try service.unlock(tc.fy.id, reason: "approved correction")
+
+        let events = try AuditRepository(db: tc.db).list(
+            filter: .init(companyId: tc.companyId, action: .financialYearUnlocked)
+        )
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.entityId, tc.fy.id.uuidString)
+        XCTAssertEqual(events.first?.reason, "approved correction")
+        XCTAssertNotNil(events.first?.snapshotBeforeJson)
+        XCTAssertNotNil(events.first?.snapshotAfterJson)
+    }
+
+    func testUnlockRollsBackWhenAuditInsertFails() throws {
+        let tc = try TestCompany.make()
+        let service = FinancialYearService(db: tc.db, companyId: tc.companyId)
+        try service.lock(tc.fy.id, reason: "period close")
+        try tc.db.execute(
+            "CREATE TRIGGER test_reject_unlock_audit BEFORE INSERT ON avelo_audit_events WHEN NEW.action = 'financialYearUnlocked' BEGIN SELECT RAISE(ABORT, 'test audit failure'); END;"
+        )
+
+        XCTAssertThrowsError(try service.unlock(tc.fy.id, reason: "must roll back"))
+
+        XCTAssertEqual(try FinancialYearRepository(db: tc.db).findById(tc.fy.id)?.isLocked, true)
+        XCTAssertEqual(
+            try AuditRepository(db: tc.db).list(filter: .init(companyId: tc.companyId, action: .financialYearUnlocked)).count,
+            0
+        )
     }
 
     func testFindOpenForCompanyExcludesClosedYears() throws {

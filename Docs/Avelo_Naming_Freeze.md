@@ -134,18 +134,26 @@ The `autoSilent` name is frozen for database compatibility even while the mode i
 ```text
 companyCreated, companyUpdated,
 financialYearCreated, financialYearLocked, financialYearClosed,
+financialYearUnlocked, financialYearReopened,
 accountCreated, accountUpdated, accountDisabled,
+accountGroupCreated, accountGroupUpdated, accountGroupDeleted,
 voucherPosted, voucherEdited, voucherReversed, voucherCancelled,
+chequeBounced, chequeRepresented,
 openingBalancePosted,
 stockItemCreated, stockItemUpdated, stockItemDisabled,
 stockMovementPosted, stockMovementReversed,
 payrollEmployeeCreated, payrollEmployeeUpdated, payrollEmployeeTerminated,
 salaryPosted,
 backupExported, backupImported,
-companySwitched, financialYearSwitched
+companySwitched, financialYearSwitched,
+bankStatementImported, bankStatementLineCleared,
+inventoryOrderCreated, inventoryOrderFulfilled, inventoryOrderStatusChanged,
+inventoryReorderLevelSet,
+billOfMaterialsCreated, billOfMaterialsUpdated, voucherTemplateSaved,
+gstReportExported, invoicePDFExported
 ```
 
-This list reflects current persisted raw values, not adequate production coverage. Missing action families and service coverage remain `AVL-P0-034`.
+This list reflects current persisted raw values, not adequate production coverage. Any future action name must be added through a forward migration and frozen here before use. Missing action families and service coverage remain `AVL-P0-034`.
 
 ### ValidationErrorCode
 
@@ -185,7 +193,7 @@ RestoreService
 
 `SQLiteError` lives in `Core/Validation/AppError.swift`; it is not declared by `SQLiteDatabase.swift`.
 
-Migration types are frozen as `MigrationV001` through `MigrationV022`. The next persistent change uses `MigrationV023`; an existing migration is never renumbered, edited to mean something else, or removed from `MigrationRunner.defaultMigrations`.
+Migration types are frozen as `MigrationV001` through `MigrationV025`. The next persistent change uses `MigrationV026`; an existing migration is never renumbered, edited to mean something else, or removed from `MigrationRunner.defaultMigrations`.
 
 ## 5. Repository names
 
@@ -206,11 +214,31 @@ AccountingWorkflowsRepository
 InventoryRepository
 InventoryOrderRepository
 BOMRepository
+PartyProfileRepository
 PayrollRepository
 BankReconciliationRepository
 AuditRepository
 ReportRepository
 MasterDataRepository
+```
+
+The following v24 identifiers are frozen:
+
+```text
+PartyUsage
+PartyProfile
+avelo_party_profiles
+account_id
+company_id
+usage
+credit_limit_paise
+default_credit_period_days
+maintain_billwise
+created_at
+updated_at
+idx_avelo_party_profiles_company_usage
+trg_avelo_party_profiles_company_insert
+trg_avelo_party_profiles_company_update
 ```
 
 Repository method names are not globally frozen by this file. Public renames still require call-site and test updates, but persistence compatibility is governed by SQL identifiers below.
