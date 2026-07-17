@@ -1,0 +1,3689 @@
+{
+  "version": "1.0.0",
+  "gitCommitHash": "e1a1a24094fde2dabfb284733a3399552b97cde9",
+  "generatedAt": "2026-07-17T13:12:30.825Z",
+  "files": {
+    "Avelo/Core/Database/SQLiteDatabase.swift": {
+      "filePath": "Avelo/Core/Database/SQLiteDatabase.swift",
+      "contentHash": "6f06823b42f816186c3028d921b6d113a92d4cfc60b093b98be8c43cc8a74193",
+      "functions": [
+        {
+          "name": "date",
+          "params": [
+            "d"
+          ],
+          "returnType": "SQLValue",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "timestamp",
+          "params": [
+            "d"
+          ],
+          "returnType": "SQLValue",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "optionalText",
+          "params": [
+            "s"
+          ],
+          "returnType": "SQLValue",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "optionalInteger",
+          "params": [
+            "i"
+          ],
+          "returnType": "SQLValue",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "optionalReal",
+          "params": [
+            "d"
+          ],
+          "returnType": "SQLValue",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "optionalDate",
+          "params": [
+            "d"
+          ],
+          "returnType": "SQLValue",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "optionalTimestamp",
+          "params": [
+            "d"
+          ],
+          "returnType": "SQLValue",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "bool",
+          "params": [
+            "b"
+          ],
+          "returnType": "SQLValue",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "PreparedStatementBox.init",
+          "params": [
+            "stmt"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "Row.init",
+          "params": [
+            "box"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "index",
+          "params": [
+            "name"
+          ],
+          "returnType": "Int32",
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "index",
+          "params": [
+            "i"
+          ],
+          "returnType": "Int32",
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "int",
+          "params": [
+            "name"
+          ],
+          "returnType": "Int64",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "int",
+          "params": [
+            "i"
+          ],
+          "returnType": "Int64",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "text",
+          "params": [
+            "name"
+          ],
+          "returnType": "String",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "text",
+          "params": [
+            "i"
+          ],
+          "returnType": "String",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "optionalText",
+          "params": [
+            "name"
+          ],
+          "returnType": "String?",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "date",
+          "params": [
+            "name"
+          ],
+          "returnType": "Date",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "date",
+          "params": [
+            "i"
+          ],
+          "returnType": "Date",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "timestamp",
+          "params": [
+            "name"
+          ],
+          "returnType": "Date",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "timestamp",
+          "params": [
+            "i"
+          ],
+          "returnType": "Date",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "optionalDate",
+          "params": [
+            "name"
+          ],
+          "returnType": "Date?",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "optionalDate",
+          "params": [
+            "i"
+          ],
+          "returnType": "Date?",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "bool",
+          "params": [
+            "name"
+          ],
+          "returnType": "Bool",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "bool",
+          "params": [
+            "i"
+          ],
+          "returnType": "Bool",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "real",
+          "params": [
+            "name"
+          ],
+          "returnType": "Double",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "real",
+          "params": [
+            "i"
+          ],
+          "returnType": "Double",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "optionalReal",
+          "params": [
+            "name"
+          ],
+          "returnType": "Double?",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "data",
+          "params": [
+            "name"
+          ],
+          "returnType": "Data",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "SQLiteDatabase.init",
+          "params": [
+            "path",
+            "readonly"
+          ],
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "SQLiteDatabase.deinit",
+          "params": [],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "finalizeStatementCacheNoLock",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "sync",
+          "params": [
+            "block"
+          ],
+          "returnType": "T",
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "applyPragmas",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "execute",
+          "params": [
+            "sql"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "execute",
+          "params": [
+            "sql",
+            "bindings"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "execNoLock",
+          "params": [
+            "sql"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "execWithBindingsNoLock",
+          "params": [
+            "sql",
+            "bindings"
+          ],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "query",
+          "params": [
+            "sql",
+            "bind",
+            "row"
+          ],
+          "returnType": "[T]",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "queryOne",
+          "params": [
+            "sql",
+            "bind",
+            "row"
+          ],
+          "returnType": "T?",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "queryNoLock",
+          "params": [
+            "sql",
+            "bind",
+            "row"
+          ],
+          "returnType": "[T]",
+          "exported": false,
+          "lineCount": 22
+        },
+        {
+          "name": "queryOneNoLock",
+          "params": [
+            "sql",
+            "bind",
+            "row"
+          ],
+          "returnType": "T?",
+          "exported": false,
+          "lineCount": 18
+        },
+        {
+          "name": "preparedStatement",
+          "params": [
+            "sql"
+          ],
+          "returnType": "OpaquePointer",
+          "exported": false,
+          "lineCount": 20
+        },
+        {
+          "name": "bindAll",
+          "params": [
+            "stmt",
+            "values"
+          ],
+          "exported": false,
+          "lineCount": 29
+        },
+        {
+          "name": "write",
+          "params": [
+            "block"
+          ],
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "lastInsertRowID",
+          "params": [],
+          "returnType": "Int64",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "changes",
+          "params": [],
+          "returnType": "Int32",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "userVersion",
+          "params": [],
+          "returnType": "Int",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "setUserVersion",
+          "params": [
+            "version"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "checkpoint",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "vacuum",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "close",
+          "params": [],
+          "exported": true,
+          "lineCount": 16
+        }
+      ],
+      "classes": [
+        {
+          "name": "SQLValue",
+          "methods": [
+            "date",
+            "timestamp",
+            "optionalText",
+            "optionalInteger",
+            "optionalReal",
+            "optionalDate",
+            "optionalTimestamp",
+            "bool"
+          ],
+          "properties": [
+            "integer",
+            "real",
+            "text",
+            "blob",
+            "null"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "PreparedStatementBox",
+          "methods": [
+            "init"
+          ],
+          "properties": [
+            "stmt",
+            "columnIndexCache"
+          ],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "Row",
+          "methods": [
+            "init",
+            "index",
+            "index",
+            "int",
+            "int",
+            "text",
+            "text",
+            "optionalText",
+            "date",
+            "date",
+            "timestamp",
+            "timestamp",
+            "optionalDate",
+            "optionalDate",
+            "bool",
+            "bool",
+            "real",
+            "real",
+            "optionalReal",
+            "data"
+          ],
+          "properties": [
+            "box"
+          ],
+          "exported": true,
+          "lineCount": 131
+        },
+        {
+          "name": "SQLiteDatabase",
+          "methods": [
+            "init",
+            "deinit",
+            "finalizeStatementCacheNoLock",
+            "sync",
+            "applyPragmas",
+            "execute",
+            "execute",
+            "execNoLock",
+            "execWithBindingsNoLock",
+            "query",
+            "queryOne",
+            "queryNoLock",
+            "queryOneNoLock",
+            "preparedStatement",
+            "bindAll",
+            "write",
+            "lastInsertRowID",
+            "changes",
+            "userVersion",
+            "setUserVersion",
+            "checkpoint",
+            "vacuum",
+            "close"
+          ],
+          "properties": [
+            "path",
+            "handle",
+            "lock",
+            "inTransactionDepth",
+            "statementCache"
+          ],
+          "exported": true,
+          "lineCount": 283
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        },
+        {
+          "source": "SQLite3",
+          "specifiers": [
+            "SQLite3"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        }
+      ],
+      "exports": [
+        "date",
+        "timestamp",
+        "optionalText",
+        "optionalInteger",
+        "optionalReal",
+        "optionalDate",
+        "optionalTimestamp",
+        "bool",
+        "SQLValue",
+        "stmt",
+        "columnIndexCache",
+        "PreparedStatementBox.init",
+        "PreparedStatementBox",
+        "int",
+        "int",
+        "text",
+        "text",
+        "optionalText",
+        "date",
+        "date",
+        "timestamp",
+        "timestamp",
+        "optionalDate",
+        "optionalDate",
+        "bool",
+        "bool",
+        "real",
+        "real",
+        "optionalReal",
+        "data",
+        "Row",
+        "path",
+        "SQLiteDatabase.init",
+        "execute",
+        "execute",
+        "query",
+        "queryOne",
+        "write",
+        "lastInsertRowID",
+        "changes",
+        "userVersion",
+        "setUserVersion",
+        "checkpoint",
+        "vacuum",
+        "close",
+        "SQLiteDatabase"
+      ],
+      "totalLines": 449,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/DatabaseManager.swift": {
+      "filePath": "Avelo/Core/Database/DatabaseManager.swift",
+      "contentHash": "ef72d96b7725e6d4ea8ccde824d24a85f8cb76788228097cee08650297870a58",
+      "functions": [
+        {
+          "name": "CompanyHandle.init",
+          "params": [
+            "companyId",
+            "companyName",
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "DatabaseManager.init",
+          "params": [
+            "appSupportDirectory"
+          ],
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "listCompanies",
+          "params": [],
+          "returnType": "[CompanyRegistryEntry]",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "findCompany",
+          "params": [
+            "id"
+          ],
+          "returnType": "CompanyRegistryEntry?",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "registerCompany",
+          "params": [
+            "entry"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "unregisterCompany",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "touchLastOpened",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "createCompanyFile",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "URL",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "openCompany",
+          "params": [
+            "id"
+          ],
+          "returnType": "CompanyHandle",
+          "exported": true,
+          "lineCount": 28
+        },
+        {
+          "name": "closeCompany",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "closeAll",
+          "params": [],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "openHandle",
+          "params": [
+            "id"
+          ],
+          "returnType": "CompanyHandle?",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "companyFileURL",
+          "params": [
+            "id"
+          ],
+          "returnType": "URL",
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "deleteCompanyFiles",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 22
+        }
+      ],
+      "classes": [
+        {
+          "name": "CompanyHandle",
+          "methods": [
+            "init"
+          ],
+          "properties": [
+            "companyId",
+            "companyName",
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "DatabaseManager",
+          "methods": [
+            "init",
+            "listCompanies",
+            "findCompany",
+            "registerCompany",
+            "unregisterCompany",
+            "touchLastOpened",
+            "createCompanyFile",
+            "openCompany",
+            "closeCompany",
+            "closeAll",
+            "openHandle",
+            "companyFileURL",
+            "deleteCompanyFiles"
+          ],
+          "properties": [
+            "appSupportDirectory",
+            "companiesDirectory",
+            "registryPath",
+            "openHandles",
+            "registryDb",
+            "registrySchemaSQL"
+          ],
+          "exported": true,
+          "lineCount": 195
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        }
+      ],
+      "exports": [
+        "companyId",
+        "companyName",
+        "db",
+        "CompanyHandle.init",
+        "CompanyHandle",
+        "appSupportDirectory",
+        "companiesDirectory",
+        "registryPath",
+        "DatabaseManager.init",
+        "registrySchemaSQL",
+        "listCompanies",
+        "findCompany",
+        "registerCompany",
+        "unregisterCompany",
+        "touchLastOpened",
+        "createCompanyFile",
+        "openCompany",
+        "closeCompany",
+        "closeAll",
+        "openHandle",
+        "companyFileURL",
+        "deleteCompanyFiles",
+        "DatabaseManager"
+      ],
+      "totalLines": 213,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/SchemaVersion.swift": {
+      "filePath": "Avelo/Core/Database/SchemaVersion.swift",
+      "contentHash": "42ed80411f42ec7d99f857be63e20b1a2d8eeaf811aca4ec605643fb49231b01",
+      "functions": [
+        {
+          "name": "<",
+          "params": [
+            "lhs",
+            "rhs"
+          ],
+          "returnType": "Bool",
+          "exported": true,
+          "lineCount": 3
+        }
+      ],
+      "classes": [
+        {
+          "name": "SchemaVersion",
+          "methods": [
+            "<"
+          ],
+          "properties": [
+            "v1",
+            "v2",
+            "current"
+          ],
+          "exported": true,
+          "lineCount": 10
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "current",
+        "<",
+        "SchemaVersion"
+      ],
+      "totalLines": 13,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/MigrationRunner.swift": {
+      "filePath": "Avelo/Core/Database/MigrationRunner.swift",
+      "contentHash": "e4732b5fd16f7a05431726a0fd8f37278c9765332dbe1895873f225e4dbafd44",
+      "functions": [
+        {
+          "name": "up",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "MigrationRunner.init",
+          "params": [
+            "migrations"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "runMigrations",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "fetchAppliedVersions",
+          "params": [
+            "db"
+          ],
+          "returnType": "Set<SchemaVersion>",
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "insertMigrationRecord",
+          "params": [
+            "db",
+            "version",
+            "description"
+          ],
+          "exported": false,
+          "lineCount": 10
+        }
+      ],
+      "classes": [
+        {
+          "name": "Migration",
+          "methods": [
+            "up"
+          ],
+          "properties": [
+            "version",
+            "description"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "MigrationRunner",
+          "methods": [
+            "init",
+            "runMigrations",
+            "fetchAppliedVersions",
+            "insertMigrationRecord"
+          ],
+          "properties": [
+            "migrations",
+            "defaultMigrations"
+          ],
+          "exported": true,
+          "lineCount": 51
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "version",
+        "description",
+        "up",
+        "Migration",
+        "migrations",
+        "MigrationRunner.init",
+        "defaultMigrations",
+        "runMigrations",
+        "MigrationRunner"
+      ],
+      "totalLines": 60,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/SeedLoader.swift": {
+      "filePath": "Avelo/Core/Database/SeedLoader.swift",
+      "contentHash": "de2bb4044d0161e1579008a0bde24562bf49d124053b864425241d90db1307a0",
+      "functions": [
+        {
+          "name": "SeedLoader.init",
+          "params": [],
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "loadDefaults",
+          "params": [
+            "db",
+            "companyId",
+            "financialYearId",
+            "bundle",
+            "resourceName",
+            "resourceExtension"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "load",
+          "params": [
+            "payload",
+            "db",
+            "companyId",
+            "financialYearId"
+          ],
+          "exported": true,
+          "lineCount": 94
+        },
+        {
+          "name": "validateAccountGroupHierarchy",
+          "params": [
+            "groups"
+          ],
+          "exported": false,
+          "lineCount": 33
+        }
+      ],
+      "classes": [
+        {
+          "name": "SeedLoader",
+          "methods": [
+            "init",
+            "loadDefaults",
+            "load",
+            "validateAccountGroupHierarchy"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 153
+        },
+        {
+          "name": "DefaultChartOfAccountsPayload",
+          "methods": [],
+          "properties": [
+            "groups",
+            "ledgers",
+            "voucherTypes"
+          ],
+          "exported": true,
+          "lineCount": 50
+        },
+        {
+          "name": "Group",
+          "methods": [],
+          "properties": [
+            "code",
+            "name",
+            "nature",
+            "sortOrder",
+            "under"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "CodingKeys",
+          "methods": [],
+          "properties": [
+            "code",
+            "name",
+            "nature",
+            "under",
+            "sortOrder"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "Ledger",
+          "methods": [],
+          "properties": [
+            "code",
+            "name",
+            "under",
+            "openingBalancePaise",
+            "openingBalanceSide",
+            "isBankAccount"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "CodingKeys",
+          "methods": [],
+          "properties": [
+            "code",
+            "name",
+            "under",
+            "openingBalancePaise",
+            "openingBalanceSide",
+            "isBankAccount"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "VoucherTypeSeed",
+          "methods": [],
+          "properties": [
+            "code",
+            "name",
+            "abbreviation",
+            "isSystem",
+            "affectsInventory",
+            "sortOrder"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "CodingKeys",
+          "methods": [],
+          "properties": [
+            "code",
+            "name",
+            "abbreviation",
+            "isSystem",
+            "affectsInventory",
+            "sortOrder"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "DefaultChartOfDefaults",
+          "methods": [],
+          "properties": [
+            "builtIn"
+          ],
+          "exported": true,
+          "lineCount": 92
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        }
+      ],
+      "exports": [
+        "SeedLoader.init",
+        "loadDefaults",
+        "load",
+        "SeedLoader",
+        "groups",
+        "ledgers",
+        "voucherTypes",
+        "DefaultChartOfAccountsPayload",
+        "code",
+        "name",
+        "nature",
+        "sortOrder",
+        "under",
+        "Group",
+        "CodingKeys",
+        "code",
+        "name",
+        "under",
+        "openingBalancePaise",
+        "openingBalanceSide",
+        "isBankAccount",
+        "Ledger",
+        "CodingKeys",
+        "code",
+        "name",
+        "abbreviation",
+        "isSystem",
+        "affectsInventory",
+        "sortOrder",
+        "VoucherTypeSeed",
+        "CodingKeys",
+        "builtIn",
+        "DefaultChartOfDefaults"
+      ],
+      "totalLines": 303,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/BackupService.swift": {
+      "filePath": "Avelo/Core/Database/BackupService.swift",
+      "contentHash": "19ec06a1d6fd614ef2544fbd4b1ff9fc69111592157d261d3f92209ed8b12a35",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        },
+        {
+          "source": "CryptoKit",
+          "specifiers": [
+            "CryptoKit"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 201,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/RestoreService.swift": {
+      "filePath": "Avelo/Core/Database/RestoreService.swift",
+      "contentHash": "d30726a1c2a1316745f10548fef18192a13ee0b08f9121ed943c3127c7a255a3",
+      "functions": [
+        {
+          "name": "restore",
+          "params": [
+            "sourceURL",
+            "recoveryKey"
+          ],
+          "returnType": "CompanyRegistryEntry",
+          "exported": true,
+          "lineCount": 124
+        },
+        {
+          "name": "decodedRecoveryKey",
+          "params": [
+            "recoveryKey"
+          ],
+          "returnType": "Data?",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "openStagedDatabase",
+          "params": [
+            "stagingURL",
+            "key"
+          ],
+          "returnType": "(db: SQLiteDatabase, source: StagedSource)",
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "applyBackupExclusionIfPresent",
+          "params": [
+            "url"
+          ],
+          "exported": false,
+          "lineCount": 5
+        }
+      ],
+      "classes": [
+        {
+          "name": "StagedSource",
+          "methods": [],
+          "properties": [
+            "keyed",
+            "plaintext",
+            "legacyPassphrase"
+          ],
+          "exported": false,
+          "lineCount": 5
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        },
+        {
+          "source": "CryptoKit",
+          "specifiers": [
+            "CryptoKit"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        }
+      ],
+      "exports": [
+        "restore"
+      ],
+      "totalLines": 916,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/RecoveryKeyCodec.swift": {
+      "filePath": "Avelo/Core/Database/RecoveryKeyCodec.swift",
+      "contentHash": "630fc2dafe57efaff3fc783c2deebc6f44e2b88b47ce5465943e1356b9c8a883",
+      "functions": [
+        {
+          "name": "encode",
+          "params": [
+            "key"
+          ],
+          "returnType": "String",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "canonicalize",
+          "params": [
+            "recoveryKey"
+          ],
+          "returnType": "String",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "decode",
+          "params": [
+            "recoveryKey"
+          ],
+          "returnType": "Data",
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "decodeAV1",
+          "params": [
+            "normalized"
+          ],
+          "returnType": "Data",
+          "exported": false,
+          "lineCount": 21
+        },
+        {
+          "name": "normalize",
+          "params": [
+            "recoveryKey"
+          ],
+          "returnType": "String",
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "versionPrefix",
+          "params": [
+            "normalized"
+          ],
+          "returnType": "String?",
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "encodeBase32",
+          "params": [
+            "key"
+          ],
+          "returnType": "String",
+          "exported": false,
+          "lineCount": 20
+        },
+        {
+          "name": "decodeBase32Payload",
+          "params": [
+            "payload"
+          ],
+          "returnType": "Data",
+          "exported": false,
+          "lineCount": 38
+        },
+        {
+          "name": "formatPayload",
+          "params": [
+            "payload"
+          ],
+          "returnType": "String",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "checksum",
+          "params": [
+            "key"
+          ],
+          "returnType": "String",
+          "exported": false,
+          "lineCount": 5
+        }
+      ],
+      "classes": [
+        {
+          "name": "RecoveryKeyError",
+          "methods": [],
+          "properties": [
+            "empty",
+            "malformed",
+            "unsupportedVersion",
+            "checksumMismatch",
+            "message",
+            "identifier"
+          ],
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "RecoveryKeyCodec",
+          "methods": [
+            "encode",
+            "canonicalize",
+            "decode",
+            "decodeAV1",
+            "normalize",
+            "versionPrefix",
+            "encodeBase32",
+            "decodeBase32Payload",
+            "formatPayload",
+            "checksum"
+          ],
+          "properties": [
+            "alphabet",
+            "checksumAlphabet",
+            "canonicalVersion",
+            "payloadLength",
+            "checksumLength",
+            "keyByteCount",
+            "checksumDomain"
+          ],
+          "exported": true,
+          "lineCount": 157
+        }
+      ],
+      "imports": [
+        {
+          "source": "CryptoKit",
+          "specifiers": [
+            "CryptoKit"
+          ]
+        },
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "message",
+        "identifier",
+        "RecoveryKeyError",
+        "encode",
+        "canonicalize",
+        "decode",
+        "RecoveryKeyCodec"
+      ],
+      "totalLines": 194,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/CompanyKeyStore.swift": {
+      "filePath": "Avelo/Core/Database/CompanyKeyStore.swift",
+      "contentHash": "112c32c985e0e3ed84dbb0dee53a16b216b67d0f8b4e97130595f2b1d4ea81d7",
+      "functions": [
+        {
+          "name": "generateKey",
+          "params": [],
+          "returnType": "Data",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "store",
+          "params": [
+            "key",
+            "companyId"
+          ],
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "retrieve",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "Data?",
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "delete",
+          "params": [
+            "companyId"
+          ],
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "CompanyKeyStore.init",
+          "params": [
+            "service"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "generateKey",
+          "params": [],
+          "returnType": "Data",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "store",
+          "params": [
+            "key",
+            "companyId"
+          ],
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "retrieve",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "Data?",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "delete",
+          "params": [
+            "companyId"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "baseQuery",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[String: Any]",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "InMemoryCompanyKeyStore.init",
+          "params": [],
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "generateKey",
+          "params": [],
+          "returnType": "Data",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "store",
+          "params": [
+            "key",
+            "companyId"
+          ],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "retrieve",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "Data?",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "delete",
+          "params": [
+            "companyId"
+          ],
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "classes": [
+        {
+          "name": "CompanyKeyStoring",
+          "methods": [
+            "generateKey",
+            "store",
+            "retrieve",
+            "delete"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "CompanyKeyStore",
+          "methods": [
+            "init",
+            "generateKey",
+            "store",
+            "retrieve",
+            "delete",
+            "baseQuery"
+          ],
+          "properties": [
+            "service"
+          ],
+          "exported": true,
+          "lineCount": 81
+        },
+        {
+          "name": "InMemoryCompanyKeyStore",
+          "methods": [
+            "init",
+            "generateKey",
+            "store",
+            "retrieve",
+            "delete"
+          ],
+          "properties": [
+            "lock",
+            "keys",
+            "storedKeyCount"
+          ],
+          "exported": true,
+          "lineCount": 41
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        },
+        {
+          "source": "Security",
+          "specifiers": [
+            "Security"
+          ]
+        }
+      ],
+      "exports": [
+        "generateKey",
+        "store",
+        "retrieve",
+        "delete",
+        "CompanyKeyStoring",
+        "CompanyKeyStore.init",
+        "generateKey",
+        "store",
+        "retrieve",
+        "delete",
+        "CompanyKeyStore",
+        "InMemoryCompanyKeyStore.init",
+        "generateKey",
+        "store",
+        "retrieve",
+        "delete",
+        "storedKeyCount",
+        "InMemoryCompanyKeyStore"
+      ],
+      "totalLines": 134,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Database/LegacyKeyMigrationService.swift": {
+      "filePath": "Avelo/Core/Database/LegacyKeyMigrationService.swift",
+      "contentHash": "828e443bc7695b10b7b25b6faf9b76775fe9c158851bf502c70d82a0ba8c609f",
+      "functions": [
+        {
+          "name": "LegacyKeyMigrationService.init",
+          "params": [
+            "keyStore"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "migrateIfNeeded",
+          "params": [
+            "companyId",
+            "fileURL"
+          ],
+          "returnType": "Data",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "detectSource",
+          "params": [
+            "fileURL"
+          ],
+          "returnType": "LegacySource",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "migrate",
+          "params": [
+            "companyId",
+            "fileURL",
+            "source",
+            "newKey"
+          ],
+          "exported": true,
+          "lineCount": 51
+        },
+        {
+          "name": "verify",
+          "params": [
+            "sourceDb",
+            "migratedDb"
+          ],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "cleanup",
+          "params": [
+            "url"
+          ],
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "classes": [
+        {
+          "name": "LegacyKeyMigrationService",
+          "methods": [
+            "init",
+            "migrateIfNeeded",
+            "detectSource",
+            "migrate",
+            "verify",
+            "cleanup"
+          ],
+          "properties": [
+            "keyStore"
+          ],
+          "exported": true,
+          "lineCount": 118
+        },
+        {
+          "name": "LegacySource",
+          "methods": [],
+          "properties": [
+            "plaintext",
+            "hardcodedPassphrase"
+          ],
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        }
+      ],
+      "exports": [
+        "keyStore",
+        "LegacyKeyMigrationService.init",
+        "migrateIfNeeded",
+        "detectSource",
+        "migrate",
+        "LegacyKeyMigrationService",
+        "LegacySource"
+      ],
+      "totalLines": 124,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/AccountGroupRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/AccountGroupRepository.swift",
+      "contentHash": "e3370653f56129f3c1f4e74729ef7a8d3a0d0027657b579d9ad86d5c008947b6",
+      "functions": [
+        {
+          "name": "findById",
+          "params": [
+            "id"
+          ],
+          "returnType": "AccountGroup?",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "listForCompany",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[AccountGroup]",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "listRootsForCompany",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[AccountGroup]",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "listChildren",
+          "params": [
+            "parentId"
+          ],
+          "returnType": "[AccountGroup]",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "listLeafGroupsForCompany",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[AccountGroup]",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "insert",
+          "params": [
+            "group"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "update",
+          "params": [
+            "group"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "delete",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "findById",
+        "listForCompany",
+        "listRootsForCompany",
+        "listChildren",
+        "listLeafGroupsForCompany",
+        "insert",
+        "update",
+        "delete"
+      ],
+      "totalLines": 117,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/AccountRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/AccountRepository.swift",
+      "contentHash": "b483f73abbfcef1bf16db51eb4114f103dcd74a02bbc6aa22dea740b763b69d1",
+      "functions": [
+        {
+          "name": "AccountRepository.init",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "findById",
+          "params": [
+            "id"
+          ],
+          "returnType": "Account?",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "findByCode",
+          "params": [
+            "code",
+            "companyId"
+          ],
+          "returnType": "Account?",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "findByCodes",
+          "params": [
+            "codes",
+            "companyId"
+          ],
+          "returnType": "[String: Account]",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "listForCompany",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[Account]",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "listLedgersForGroup",
+          "params": [
+            "groupId"
+          ],
+          "returnType": "[Account]",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "listActiveForCompany",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[Account]",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "listBankAccountsForCompany",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[Account]",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "insert",
+          "params": [
+            "account"
+          ],
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "update",
+          "params": [
+            "account"
+          ],
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "disable",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "markUsed",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "rowToAccount",
+          "params": [
+            "r"
+          ],
+          "returnType": "Account",
+          "exported": true,
+          "lineCount": 22
+        }
+      ],
+      "classes": [
+        {
+          "name": "AccountRepository",
+          "methods": [
+            "init",
+            "findById",
+            "findByCode",
+            "findByCodes",
+            "listForCompany",
+            "listLedgersForGroup",
+            "listActiveForCompany",
+            "listBankAccountsForCompany",
+            "insert",
+            "update",
+            "disable",
+            "markUsed",
+            "rowToAccount"
+          ],
+          "properties": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 195
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "db",
+        "AccountRepository.init",
+        "findById",
+        "findByCode",
+        "findByCodes",
+        "listForCompany",
+        "listLedgersForGroup",
+        "listActiveForCompany",
+        "listBankAccountsForCompany",
+        "insert",
+        "update",
+        "disable",
+        "markUsed",
+        "rowToAccount",
+        "AccountRepository"
+      ],
+      "totalLines": 198,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/AccountingWorkflowsRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/AccountingWorkflowsRepository.swift",
+      "contentHash": "bb092c3277cc164102b57fcdc275a054987b9f912172e1770b84d9b27ae6a4eb",
+      "functions": [
+        {
+          "name": "deleteForVoucher",
+          "params": [
+            "voucherId"
+          ],
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "workflowInputs",
+          "params": [
+            "voucherId"
+          ],
+          "returnType": "VoucherService.WorkflowInputs",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "insert",
+          "params": [
+            "a"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "insert",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "update",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "insert",
+          "params": [
+            "r"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "insert",
+          "params": [
+            "r"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "findCheque",
+          "params": [
+            "voucherId"
+          ],
+          "returnType": "Cheque?",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "findRepresentedCheque",
+          "params": [
+            "chequeId"
+          ],
+          "returnType": "Cheque?",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "listCheques",
+          "params": [
+            "companyId",
+            "status"
+          ],
+          "returnType": "[ChequeRegisterRow]",
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "findBillAllocation",
+          "params": [
+            "voucherId"
+          ],
+          "returnType": "BillAllocation?",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "listBillAllocations",
+          "params": [
+            "companyId",
+            "asOfDate",
+            "partyAccountId"
+          ],
+          "returnType": "[BillAllocation]",
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "rowToBillAllocation",
+          "params": [
+            "row"
+          ],
+          "returnType": "BillAllocation",
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "rowToCheque",
+          "params": [
+            "row"
+          ],
+          "returnType": "Cheque",
+          "exported": false,
+          "lineCount": 32
+        }
+      ],
+      "classes": [
+        {
+          "name": "ChequeRegisterRow",
+          "methods": [],
+          "properties": [
+            "cheque",
+            "voucherNumber",
+            "partyName",
+            "amountPaise",
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 7
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "deleteForVoucher",
+        "workflowInputs",
+        "insert",
+        "insert",
+        "update",
+        "insert",
+        "insert",
+        "findCheque",
+        "findRepresentedCheque",
+        "cheque",
+        "voucherNumber",
+        "partyName",
+        "amountPaise",
+        "id",
+        "ChequeRegisterRow",
+        "listCheques",
+        "findBillAllocation",
+        "listBillAllocations"
+      ],
+      "totalLines": 254,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/AuditRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/AuditRepository.swift",
+      "contentHash": "ed38ca2f22cbde429e3b3ce13f33dac2e19798617a982e16928e4205a5b7e141",
+      "functions": [
+        {
+          "name": "AuditRepository.init",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "append",
+          "params": [
+            "event"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "list",
+          "params": [
+            "filter"
+          ],
+          "returnType": "[AuditEvent]",
+          "exported": true,
+          "lineCount": 49
+        },
+        {
+          "name": "countForEntity",
+          "params": [
+            "entityType",
+            "entityId",
+            "companyId"
+          ],
+          "returnType": "Int",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "rowToEvent",
+          "params": [
+            "r"
+          ],
+          "returnType": "AuditEvent",
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "Filter.init",
+          "params": [
+            "companyId",
+            "action",
+            "entityType",
+            "entityId",
+            "searchText",
+            "fromDate",
+            "toDate",
+            "limit",
+            "offset"
+          ],
+          "exported": true,
+          "lineCount": 19
+        }
+      ],
+      "classes": [
+        {
+          "name": "AuditRepository",
+          "methods": [
+            "init",
+            "append",
+            "list",
+            "countForEntity",
+            "rowToEvent"
+          ],
+          "properties": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 148
+        },
+        {
+          "name": "Filter",
+          "methods": [
+            "init"
+          ],
+          "properties": [
+            "companyId",
+            "action",
+            "entityType",
+            "entityId",
+            "searchText",
+            "fromDate",
+            "toDate",
+            "limit",
+            "offset"
+          ],
+          "exported": true,
+          "lineCount": 31
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "db",
+        "AuditRepository.init",
+        "append",
+        "list",
+        "countForEntity",
+        "rowToEvent",
+        "AuditRepository",
+        "companyId",
+        "action",
+        "entityType",
+        "entityId",
+        "searchText",
+        "fromDate",
+        "toDate",
+        "limit",
+        "offset",
+        "Filter.init",
+        "Filter"
+      ],
+      "totalLines": 151,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/BOMRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/BOMRepository.swift",
+      "contentHash": "9189cb9899075dbddad43340c364a352c04a2e6449db6e904507ff515695f814",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 295,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/BankReconciliationRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/BankReconciliationRepository.swift",
+      "contentHash": "0d8c9529c04d80a46bb97c8f43c286bd091dd3e9dc30e97ca5bb48a97d73d56a",
+      "functions": [
+        {
+          "name": "StatementLine.init",
+          "params": [
+            "id",
+            "companyId",
+            "accountId",
+            "date",
+            "amountPaise",
+            "narration",
+            "matchedVoucherId",
+            "isCleared"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "upsert",
+          "params": [
+            "entry"
+          ],
+          "exported": true,
+          "lineCount": 28
+        },
+        {
+          "name": "list",
+          "params": [
+            "bankAccountId"
+          ],
+          "returnType": "[Entry]",
+          "exported": true,
+          "lineCount": 35
+        },
+        {
+          "name": "insertStatementLine",
+          "params": [
+            "companyId",
+            "accountId",
+            "date",
+            "amountPaise",
+            "narration",
+            "importBatchId"
+          ],
+          "exported": true,
+          "lineCount": 175
+        }
+      ],
+      "classes": [
+        {
+          "name": "Entry",
+          "methods": [],
+          "properties": [
+            "id",
+            "companyId",
+            "bankAccountId",
+            "voucherId",
+            "statementDate",
+            "statementAmountPaise",
+            "isCleared",
+            "clearedAt",
+            "note"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "StatementLine",
+          "methods": [
+            "init"
+          ],
+          "properties": [
+            "id",
+            "companyId",
+            "accountId",
+            "date",
+            "amountPaise",
+            "narration",
+            "matchedVoucherId",
+            "isCleared",
+            "isCleared"
+          ],
+          "exported": true,
+          "lineCount": 35
+        },
+        {
+          "name": "VoucherCandidate",
+          "methods": [],
+          "properties": [
+            "id",
+            "number",
+            "date",
+            "amountPaise"
+          ],
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "id",
+        "companyId",
+        "bankAccountId",
+        "voucherId",
+        "statementDate",
+        "statementAmountPaise",
+        "isCleared",
+        "clearedAt",
+        "note",
+        "Entry",
+        "id",
+        "companyId",
+        "accountId",
+        "date",
+        "amountPaise",
+        "narration",
+        "matchedVoucherId",
+        "isCleared",
+        "StatementLine.init",
+        "isCleared",
+        "StatementLine",
+        "id",
+        "number",
+        "date",
+        "amountPaise",
+        "VoucherCandidate",
+        "upsert",
+        "list",
+        "insertStatementLine"
+      ],
+      "totalLines": 309,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/CompanyRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/CompanyRepository.swift",
+      "contentHash": "0ef8f1ff8fa96eef4e40d996e80c2188602f24ea7f7c12348f9a1707317c58c4",
+      "functions": [
+        {
+          "name": "findById",
+          "params": [
+            "id"
+          ],
+          "returnType": "Company?",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "listForRegistry",
+          "params": [],
+          "returnType": "[Company]",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "insert",
+          "params": [
+            "company"
+          ],
+          "returnType": "Company",
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "update",
+          "params": [
+            "company"
+          ],
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "disable",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "findById",
+        "listForRegistry",
+        "insert",
+        "update",
+        "disable"
+      ],
+      "totalLines": 105,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/FinancialYearOpeningBalanceRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/FinancialYearOpeningBalanceRepository.swift",
+      "contentHash": "578e2cff7134993b077cec8adb7212985b66c2145887fa476d810e623b1914b4",
+      "functions": [
+        {
+          "name": "FinancialYearOpeningBalanceRepository.init",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "listForFinancialYear",
+          "params": [
+            "financialYearId"
+          ],
+          "returnType": "[Row]",
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "replaceForFinancialYear",
+          "params": [
+            "financialYearId",
+            "rows"
+          ],
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "deleteForFinancialYear",
+          "params": [
+            "financialYearId"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "Row.init",
+          "params": [
+            "financialYearId",
+            "sourceFinancialYearId",
+            "accountId",
+            "openingBalancePaise",
+            "openingBalanceSide"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "signedOpeningBalancePaise",
+          "params": [],
+          "returnType": "Int64",
+          "exported": true,
+          "lineCount": 12
+        }
+      ],
+      "classes": [
+        {
+          "name": "FinancialYearOpeningBalanceRepository",
+          "methods": [
+            "init",
+            "listForFinancialYear",
+            "replaceForFinancialYear",
+            "deleteForFinancialYear"
+          ],
+          "properties": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 102
+        },
+        {
+          "name": "Row",
+          "methods": [
+            "init",
+            "signedOpeningBalancePaise"
+          ],
+          "properties": [
+            "financialYearId",
+            "sourceFinancialYearId",
+            "accountId",
+            "openingBalancePaise",
+            "openingBalanceSide"
+          ],
+          "exported": true,
+          "lineCount": 32
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "db",
+        "FinancialYearOpeningBalanceRepository.init",
+        "listForFinancialYear",
+        "replaceForFinancialYear",
+        "deleteForFinancialYear",
+        "FinancialYearOpeningBalanceRepository",
+        "financialYearId",
+        "sourceFinancialYearId",
+        "accountId",
+        "openingBalancePaise",
+        "openingBalanceSide",
+        "Row.init",
+        "signedOpeningBalancePaise",
+        "Row"
+      ],
+      "totalLines": 105,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/FinancialYearRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/FinancialYearRepository.swift",
+      "contentHash": "d384a018b89cb40fa3b5b138f8562562bdcf5263ede81972689a07823af213ee",
+      "functions": [
+        {
+          "name": "FinancialYearRepository.init",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "findById",
+          "params": [
+            "id"
+          ],
+          "returnType": "FinancialYear?",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "listForCompany",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[FinancialYear]",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "findOpenForCompany",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[FinancialYear]",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "findMostRecent",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "FinancialYear?",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "insert",
+          "params": [
+            "fy"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "lock",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "unlock",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "markClosed",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "rowToFinancialYear",
+          "params": [
+            "r"
+          ],
+          "returnType": "FinancialYear",
+          "exported": true,
+          "lineCount": 15
+        }
+      ],
+      "classes": [
+        {
+          "name": "FinancialYearRepository",
+          "methods": [
+            "init",
+            "findById",
+            "listForCompany",
+            "findOpenForCompany",
+            "findMostRecent",
+            "insert",
+            "lock",
+            "unlock",
+            "markClosed",
+            "rowToFinancialYear"
+          ],
+          "properties": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 90
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "db",
+        "FinancialYearRepository.init",
+        "findById",
+        "listForCompany",
+        "findOpenForCompany",
+        "findMostRecent",
+        "insert",
+        "lock",
+        "unlock",
+        "markClosed",
+        "rowToFinancialYear",
+        "FinancialYearRepository"
+      ],
+      "totalLines": 93,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/InventoryOrderRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/InventoryOrderRepository.swift",
+      "contentHash": "607c0a7953f510f916dca1f0ec3c2b710a615cb8bb6cad29439ef6e3b945c599",
+      "functions": [
+        {
+          "name": "InventoryOrderRepository.init",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "insertOrder",
+          "params": [
+            "order",
+            "lines"
+          ],
+          "exported": true,
+          "lineCount": 42
+        },
+        {
+          "name": "listOrders",
+          "params": [
+            "companyId",
+            "orderType",
+            "status"
+          ],
+          "returnType": "[InventoryOrder]",
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "findOrder",
+          "params": [
+            "id",
+            "companyId"
+          ],
+          "returnType": "InventoryOrder?",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "linesForOrder",
+          "params": [
+            "orderId",
+            "companyId"
+          ],
+          "returnType": "[InventoryOrderLine]",
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "findOrderLine",
+          "params": [
+            "id",
+            "companyId"
+          ],
+          "returnType": "InventoryOrderLine?",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "updateLineFulfillment",
+          "params": [
+            "lineId",
+            "companyId",
+            "fulfilledQuantity"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "updateOrderStatus",
+          "params": [
+            "orderId",
+            "companyId",
+            "status"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "rowToOrder",
+          "params": [
+            "row"
+          ],
+          "returnType": "InventoryOrder",
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "pendingLines",
+          "params": [
+            "companyId",
+            "orderType"
+          ],
+          "returnType": "[PendingInventoryOrderLine]",
+          "exported": true,
+          "lineCount": 38
+        },
+        {
+          "name": "upsertReorderLevel",
+          "params": [
+            "level"
+          ],
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "reorderAlerts",
+          "params": [
+            "companyId",
+            "asOfDate"
+          ],
+          "returnType": "[ReorderAlert]",
+          "exported": true,
+          "lineCount": 33
+        }
+      ],
+      "classes": [
+        {
+          "name": "InventoryOrderRepository",
+          "methods": [
+            "init",
+            "insertOrder",
+            "listOrders",
+            "findOrder",
+            "linesForOrder",
+            "findOrderLine",
+            "updateLineFulfillment",
+            "updateOrderStatus",
+            "rowToOrder",
+            "pendingLines",
+            "upsertReorderLevel",
+            "reorderAlerts"
+          ],
+          "properties": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 251
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "db",
+        "InventoryOrderRepository.init",
+        "insertOrder",
+        "listOrders",
+        "findOrder",
+        "linesForOrder",
+        "findOrderLine",
+        "updateLineFulfillment",
+        "updateOrderStatus",
+        "pendingLines",
+        "upsertReorderLevel",
+        "reorderAlerts",
+        "InventoryOrderRepository"
+      ],
+      "totalLines": 254,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/InventoryRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/InventoryRepository.swift",
+      "contentHash": "c7e3a61d10179c4aa3eb33b6b3a3d388850333d39ae015e92190e6b0e670781f",
+      "functions": [
+        {
+          "name": "ItemFilter.init",
+          "params": [
+            "companyId",
+            "includeArchived",
+            "searchText",
+            "limit",
+            "offset"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "findItemById",
+          "params": [
+            "id"
+          ],
+          "returnType": "InventoryItem?",
+          "exported": true,
+          "lineCount": 582
+        }
+      ],
+      "classes": [
+        {
+          "name": "ItemFilter",
+          "methods": [
+            "init"
+          ],
+          "properties": [
+            "companyId",
+            "includeArchived",
+            "searchText",
+            "limit",
+            "offset"
+          ],
+          "exported": true,
+          "lineCount": 19
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "companyId",
+        "includeArchived",
+        "searchText",
+        "limit",
+        "offset",
+        "ItemFilter.init",
+        "ItemFilter",
+        "findItemById"
+      ],
+      "totalLines": 617,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/LedgerLineRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/LedgerLineRepository.swift",
+      "contentHash": "f8768f212d6bb3de3666b2e90ba904a828eff86a3cd5e513a5874b31f238c650",
+      "functions": [
+        {
+          "name": "findForVoucher",
+          "params": [
+            "voucherId"
+          ],
+          "returnType": "[LedgerLine]",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "insertBindings",
+          "params": [
+            "line"
+          ],
+          "returnType": "[SQLValue]",
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "deleteForVoucher",
+          "params": [
+            "voucherId"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "AggregationFilter.init",
+          "params": [
+            "companyId",
+            "accountId",
+            "fromDate",
+            "toDate",
+            "includeVouchersByReversalFlag"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "Totals.init",
+          "params": [
+            "debit",
+            "credit"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "aggregate",
+          "params": [
+            "filter"
+          ],
+          "returnType": "Totals",
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "rowToLine",
+          "params": [
+            "r"
+          ],
+          "returnType": "LedgerLine",
+          "exported": true,
+          "lineCount": 27
+        }
+      ],
+      "classes": [
+        {
+          "name": "AggregationFilter",
+          "methods": [
+            "init"
+          ],
+          "properties": [
+            "companyId",
+            "accountId",
+            "fromDate",
+            "toDate",
+            "includeVouchersByReversalFlag"
+          ],
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "Totals",
+          "methods": [
+            "init"
+          ],
+          "properties": [
+            "debitPaise",
+            "creditPaise"
+          ],
+          "exported": true,
+          "lineCount": 8
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "findForVoucher",
+        "deleteForVoucher",
+        "companyId",
+        "accountId",
+        "fromDate",
+        "toDate",
+        "includeVouchersByReversalFlag",
+        "AggregationFilter.init",
+        "AggregationFilter",
+        "debitPaise",
+        "creditPaise",
+        "Totals.init",
+        "Totals",
+        "aggregate",
+        "rowToLine"
+      ],
+      "totalLines": 174,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/MasterDataRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/MasterDataRepository.swift",
+      "contentHash": "184fce95516591d39adbef743f966473987c0ef9732240c6b0b77453b7037ebb",
+      "functions": [
+        {
+          "name": "MasterDataRepository.init",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 1
+        },
+        {
+          "name": "insert",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "insert",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "update",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "update",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "disableCostCentre",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "disableCostCategory",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "insert",
+          "params": [
+            "b"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "listCostCentres",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[CostCentre]",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "listCostCategories",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[CostCategory]",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "insert",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "update",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "update",
+          "params": [
+            "c"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "disableCostCentre",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "disableCostCategory",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "insert",
+          "params": [
+            "b"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "listCostCentres",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[CostCentre]",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "listCostCategories",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[CostCategory]",
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "classes": [
+        {
+          "name": "MasterDataRepository",
+          "methods": [
+            "init",
+            "insert",
+            "insert",
+            "update",
+            "update",
+            "disableCostCentre",
+            "disableCostCategory",
+            "insert",
+            "listCostCentres",
+            "listCostCategories",
+            "insert",
+            "update",
+            "update",
+            "disableCostCentre",
+            "disableCostCategory",
+            "insert",
+            "listCostCentres",
+            "listCostCategories"
+          ],
+          "properties": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 86
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "db",
+        "MasterDataRepository.init",
+        "insert",
+        "insert",
+        "update",
+        "update",
+        "disableCostCentre",
+        "disableCostCategory",
+        "insert",
+        "listCostCentres",
+        "listCostCategories",
+        "insert",
+        "update",
+        "update",
+        "disableCostCentre",
+        "disableCostCategory",
+        "insert",
+        "listCostCentres",
+        "listCostCategories",
+        "MasterDataRepository"
+      ],
+      "totalLines": 89,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/PartyProfileRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/PartyProfileRepository.swift",
+      "contentHash": "e75baf704af9610a5f9f77e3ea3be4858f42bf5839dcdf708eace47770da4be9",
+      "functions": [
+        {
+          "name": "PartyProfileRepository.init",
+          "params": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "find",
+          "params": [
+            "accountId",
+            "companyId"
+          ],
+          "returnType": "PartyProfile?",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "list",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[PartyProfile]",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "usageByAccountId",
+          "params": [
+            "companyId"
+          ],
+          "returnType": "[Account.ID: PartyUsage]",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "upsert",
+          "params": [
+            "profile"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "rowToProfile",
+          "params": [
+            "row"
+          ],
+          "returnType": "PartyProfile",
+          "exported": false,
+          "lineCount": 17
+        }
+      ],
+      "classes": [
+        {
+          "name": "PartyProfileRepository",
+          "methods": [
+            "init",
+            "find",
+            "list",
+            "usageByAccountId",
+            "upsert",
+            "rowToProfile"
+          ],
+          "properties": [
+            "db"
+          ],
+          "exported": true,
+          "lineCount": 87
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "db",
+        "PartyProfileRepository.init",
+        "find",
+        "list",
+        "usageByAccountId",
+        "upsert",
+        "PartyProfileRepository"
+      ],
+      "totalLines": 90,
+      "hasStructuralAnalysis": true
+    },
+    "Avelo/Core/Repositories/PayrollRepository.swift": {
+      "filePath": "Avelo/Core/Repositories/PayrollRepository.swift",
+      "contentHash": "aa6fc9c599c4072f00c126d2e18776a3144c71836be6b0d68afc1265cc064bfb",
+      "functions": [
+        {
+          "name": "findEmployee",
+          "params": [
+            "id"
+          ],
+          "returnType": "PayrollEmployee?",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "listEmployeesForCompany",
+          "params": [
+            "companyId",
+            "includeInactive"
+          ],
+          "returnType": "[PayrollEmployee]",
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "listEmployees",
+          "params": [
+            "companyId",
+            "activeOnly"
+          ],
+          "returnType": "[PayrollEmployee]",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "insertEmployee",
+          "params": [
+            "e"
+          ],
+          "exported": true,
+          "lineCount": 33
+        },
+        {
+          "name": "updateEmployee",
+          "params": [
+            "e"
+          ],
+          "exported": true,
+          "lineCount": 33
+        },
+        {
+          "name": "deactivateEmployee",
+          "params": [
+            "id"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "terminateEmployee",
+          "params": [
+            "id",
+            "endDate"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "insertEntry",
+          "params": [
+            "e"
+          ],
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "EntryFilter.init",
+          "params": [
+            "companyId",
+            "employeeId",
+            "financialYearId",
+            "year",
+            "month",
+            "monthYear",
+            "limit",
+            "offset"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "listEntries",
+          "params": [
+            "filter"
+          ],
+          "returnType": "[PayrollEntry]",
+          "exported": true,
+          "lineCount": 55
+        },
+        {
+          "name": "rowToEmployee",
+          "params": [
+            "r"
+          ],
+          "returnType": "PayrollEmployee",
+          "exported": true,
+          "lineCount": 44
+        },
+        {
+          "name": "rowToEntry",
+          "params": [
+            "r"
+          ],
+          "returnType": "PayrollEntry",
+          "exported": true,
+          "lineCount": 47
+        }
+      ],
+      "classes": [
+        {
+          "name": "EntryFilter",
+          "methods": [
+            "init"
+          ],
+          "properties": [
+            "companyId",
+            "employeeId",
+            "financialYearId",
+            "year",
+            "month",
+            "monthYear",
+            "limit",
+            "offset"
+          ],
+          "exported": true,
+          "lineCount": 28
+        }
+      ],
+      "imports": [
+        {
+          "source": "Foundation",
+          "specifiers": [
+            "Foundation"
+          ]
+        }
+      ],
+      "exports": [
+        "findEmployee",
+        "listEmployeesForCompany",
+        "listEmployees",
+        "insertEmployee",
+        "updateEmployee",
+        "deactivateEmployee",
+        "terminateEmployee",
+        "insertEntry",
+        "companyId",
+        "employeeId",
+        "financialYearId",
+        "year",
+        "month",
+        "monthYear",
+        "limit",
+        "offset",
+        "EntryFilter.init",
+        "EntryFilter",
+        "listEntries",
+        "rowToEmployee",
+        "rowToEntry"
+      ],
+      "totalLines": 348,
+      "hasStructuralAnalysis": true
+    }
+  }
+}
