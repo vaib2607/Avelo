@@ -4866,7 +4866,6 @@
       "target": "config:file-Makefile",
       "type": "related",
       "weight": 0.6,
-      "label": "excludes build artifacts referenced by Makefile",
       "direction": "forward"
     },
     {
@@ -4874,7 +4873,6 @@
       "target": "document:file-README.md",
       "type": "related",
       "weight": 0.5,
-      "label": "excludes generated and machine-local files from repository",
       "direction": "forward"
     },
     {
@@ -4882,7 +4880,6 @@
       "target": "document:file-CHANGELOG.md",
       "type": "related",
       "weight": 0.75,
-      "label": "references changelog as documentation synchronization target for user-visible release changes",
       "direction": "forward"
     },
     {
@@ -4890,7 +4887,6 @@
       "target": "config:file-Makefile",
       "type": "related",
       "weight": 0.9,
-      "label": "defines supported make targets (setup, dev, test, rule-audit, bundle, verify, launch-smoke, benchmark) used for verification gates",
       "direction": "forward"
     },
     {
@@ -4898,7 +4894,6 @@
       "target": "document:file-LICENSE",
       "type": "related",
       "weight": 0.4,
-      "label": "project is proprietary (Karbonteck) per license terms",
       "direction": "forward"
     },
     {
@@ -4906,7 +4901,6 @@
       "target": "document:file-README.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "documents unreleased features and changes described in README feature tables",
       "direction": "forward"
     },
     {
@@ -4914,7 +4908,6 @@
       "target": "config:file-Makefile",
       "type": "related",
       "weight": 0.8,
-      "label": "recommends make test and make verify as pre-PR validation commands",
       "direction": "forward"
     },
     {
@@ -4922,7 +4915,6 @@
       "target": "document:file-README.md",
       "type": "related",
       "weight": 0.6,
-      "label": "references README as part of release-path change documentation requirements",
       "direction": "forward"
     },
     {
@@ -4930,7 +4922,6 @@
       "target": "document:file-README.md",
       "type": "defines_schema",
       "weight": 0.7,
-      "label": "declares proprietary license terms displayed in README footer",
       "direction": "forward"
     },
     {
@@ -4938,7 +4929,6 @@
       "target": "document:file-README.md",
       "type": "depends_on",
       "weight": 0.9,
-      "label": "Makefile targets (build, bundle, verify) produce the distributable app described in README",
       "direction": "forward"
     },
     {
@@ -4946,7 +4936,6 @@
       "target": "document:file-AGENTS.md",
       "type": "related",
       "weight": 0.65,
-      "label": "README documentation table references AGENTS.md indirectly via Docs directory structure",
       "direction": "forward"
     },
     {
@@ -4954,7 +4943,6 @@
       "target": "document:file-CONTRIBUTING.md",
       "type": "related",
       "weight": 0.7,
-      "label": "README docs table links to CONTRIBUTING.md for contributor guidance",
       "direction": "forward"
     },
     {
@@ -4962,7 +4950,6 @@
       "target": "document:Docs/Avelo_Master_PRD.md",
       "type": "related",
       "weight": 0.9,
-      "label": "Lists PRD as authoritative product spec",
       "direction": "forward"
     },
     {
@@ -4970,7 +4957,6 @@
       "target": "document:Docs/Avelo_Architecture.md",
       "type": "related",
       "weight": 0.9,
-      "label": "Lists Architecture as layer/naming/dependency spec",
       "direction": "forward"
     },
     {
@@ -4978,7 +4964,6 @@
       "target": "document:Docs/Avelo_Rules.md",
       "type": "related",
       "weight": 0.9,
-      "label": "Lists Rules as non-negotiable invariants",
       "direction": "forward"
     },
     {
@@ -4986,7 +4971,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "related",
       "weight": 0.9,
-      "label": "Lists Schema as frozen SQLite schema",
       "direction": "forward"
     },
     {
@@ -4994,7 +4978,6 @@
       "target": "document:Docs/Avelo_Module_Checklist.md",
       "type": "related",
       "weight": 0.8,
-      "label": "Lists Module Checklist as per-file completion tracker",
       "direction": "forward"
     },
     {
@@ -5002,7 +4985,6 @@
       "target": "document:Docs/Avelo_Naming_Freeze.md",
       "type": "related",
       "weight": 0.8,
-      "label": "Lists Naming Freeze as locked names",
       "direction": "forward"
     },
     {
@@ -5010,7 +4992,6 @@
       "target": "document:Docs/Avelo_Execution_Checklist.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Lists Execution Checklist in merge conflict section",
       "direction": "forward"
     },
     {
@@ -5018,7 +4999,6 @@
       "target": "document:Docs/Avelo_Release_Board.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Lists Release Board as canonical readiness source",
       "direction": "forward"
     },
     {
@@ -5026,7 +5006,6 @@
       "target": "document:Docs/Avelo_Phase0_Manual_Acceptance.md",
       "type": "related",
       "weight": 0.6,
-      "label": "Lists Phase0 Manual Acceptance as artifact-bound acceptance protocol",
       "direction": "forward"
     },
     {
@@ -5034,7 +5013,6 @@
       "target": "document:Docs/Avelo_Master_Product_Execution_Plan.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Lists Master Product Execution Plan as product roadmap",
       "direction": "forward"
     },
     {
@@ -5042,7 +5020,6 @@
       "target": "document:Docs/Avelo_Architecture.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Audit references architecture for data flow and layer boundaries",
       "direction": "forward"
     },
     {
@@ -5050,7 +5027,6 @@
       "target": "document:Docs/Avelo_Rules.md",
       "type": "related",
       "weight": 0.6,
-      "label": "Audit findings checked against non-negotiable rules",
       "direction": "forward"
     },
     {
@@ -5058,7 +5034,6 @@
       "target": "document:Docs/Avelo_Rules.md",
       "type": "validates",
       "weight": 1,
-      "label": "Architecture enforces Rules through dependency direction and layer contracts",
       "direction": "forward"
     },
     {
@@ -5066,7 +5041,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "contains",
       "weight": 0.9,
-      "label": "Architecture defines database access pattern; Schema owns the persistence contract",
       "direction": "forward"
     },
     {
@@ -5074,7 +5048,6 @@
       "target": "document:Docs/Avelo_Naming_Freeze.md",
       "type": "related",
       "weight": 0.6,
-      "label": "Architecture references naming freeze for type/method naming conventions",
       "direction": "forward"
     },
     {
@@ -5082,7 +5055,6 @@
       "target": "document:Docs/Avelo_Phase0_Manual_Acceptance.md",
       "type": "related",
       "weight": 0.8,
-      "label": "Human Phase 0 results recorded only in Phase0 Manual Acceptance",
       "direction": "forward"
     },
     {
@@ -5090,7 +5062,6 @@
       "target": "document:Docs/Avelo_Status_Checklist.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Execution Checklist and Status Checklist complement each other",
       "direction": "forward"
     },
     {
@@ -5098,7 +5069,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "related",
       "weight": 0.9,
-      "label": "PRD data model summary references full Schema",
       "direction": "forward"
     },
     {
@@ -5106,7 +5076,6 @@
       "target": "document:Docs/Avelo_Architecture.md",
       "type": "related",
       "weight": 0.7,
-      "label": "PRD build phases reference Architecture and Module Checklist",
       "direction": "forward"
     },
     {
@@ -5114,7 +5083,6 @@
       "target": "document:Docs/Avelo_Module_Checklist.md",
       "type": "related",
       "weight": 0.6,
-      "label": "PRD references Module Checklist for file map and acceptance criteria",
       "direction": "forward"
     },
     {
@@ -5122,7 +5090,6 @@
       "target": "document:Docs/Avelo_Master_PRD.md",
       "type": "related",
       "weight": 1,
-      "label": "Execution Plan explicitly defers to PRD for user-visible behavior",
       "direction": "forward"
     },
     {
@@ -5130,7 +5097,6 @@
       "target": "document:Docs/Avelo_Rules.md",
       "type": "related",
       "weight": 1,
-      "label": "Execution Plan explicitly defers to Rules for accounting/security/offline invariants",
       "direction": "forward"
     },
     {
@@ -5138,7 +5104,6 @@
       "target": "document:Docs/Avelo_Architecture.md",
       "type": "related",
       "weight": 1,
-      "label": "Execution Plan explicitly defers to Architecture for dependency/transaction boundaries",
       "direction": "forward"
     },
     {
@@ -5146,7 +5111,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "related",
       "weight": 0.8,
-      "label": "Execution Plan references Schema for persistence contract",
       "direction": "forward"
     },
     {
@@ -5154,7 +5118,6 @@
       "target": "document:Docs/Avelo_Release_Board.md",
       "type": "related",
       "weight": 1,
-      "label": "Execution Plan defers to Release Board for readiness and release verdict",
       "direction": "forward"
     },
     {
@@ -5162,7 +5125,6 @@
       "target": "document:Docs/Avelo_Execution_Checklist.md",
       "type": "related",
       "weight": 0.9,
-      "label": "Execution Plan references Execution Checklist for current executable queue",
       "direction": "forward"
     },
     {
@@ -5170,7 +5132,6 @@
       "target": "document:Docs/Avelo_Status_Checklist.md",
       "type": "related",
       "weight": 0.8,
-      "label": "Execution Plan references Status Checklist for human-readable evidence",
       "direction": "forward"
     },
     {
@@ -5178,7 +5139,6 @@
       "target": "document:Docs/Tally_Master_Study_Guide.md",
       "type": "related",
       "weight": 0.6,
-      "label": "Execution Plan supersedes Tally study guide as active source; study guide archived as research",
       "direction": "forward"
     },
     {
@@ -5186,7 +5146,6 @@
       "target": "document:Docs/Avelo_Architecture.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Module Checklist references Architecture for layer structure and naming",
       "direction": "forward"
     },
     {
@@ -5194,7 +5153,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "related",
       "weight": 0.6,
-      "label": "Module Checklist references Schema for database layer files",
       "direction": "forward"
     },
     {
@@ -5202,7 +5160,6 @@
       "target": "document:Docs/Avelo_Naming_Freeze.md",
       "type": "related",
       "weight": 0.6,
-      "label": "Module Checklist references Naming Freeze for Pass 0 docs",
       "direction": "forward"
     },
     {
@@ -5210,7 +5167,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "related",
       "weight": 0.9,
-      "label": "Naming Freeze SQL tables/columns must match Schema document exactly",
       "direction": "forward"
     },
     {
@@ -5218,7 +5174,6 @@
       "target": "document:Docs/Avelo_Rules.md",
       "type": "depends_on",
       "weight": 0.8,
-      "label": "Naming Freeze enforced by Rule R-14: ad-hoc renames rejected",
       "direction": "forward"
     },
     {
@@ -5226,7 +5181,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "related",
       "weight": 0.5,
-      "label": "Operator Guide references schema version in context of backup/restore",
       "direction": "forward"
     },
     {
@@ -5234,7 +5188,6 @@
       "target": "document:Docs/Avelo_Release_Board.md",
       "type": "validates",
       "weight": 0.9,
-      "label": "Phase 0 acceptance gates the Release Board verdict; all rows must PASS before READY",
       "direction": "forward"
     },
     {
@@ -5242,7 +5195,6 @@
       "target": "document:Docs/DX.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Phase 0 references DX.md for evidence capture script and artifact identity",
       "direction": "forward"
     },
     {
@@ -5250,7 +5202,6 @@
       "target": "document:Docs/Avelo_Execution_Checklist.md",
       "type": "related",
       "weight": 1,
-      "label": "Release Board and Execution Checklist are the canonical readiness pair",
       "direction": "forward"
     },
     {
@@ -5258,7 +5209,6 @@
       "target": "document:Docs/Avelo_Status_Checklist.md",
       "type": "related",
       "weight": 0.8,
-      "label": "Release Board (issue-level) and Status Checklist (human-readable) complement each other",
       "direction": "forward"
     },
     {
@@ -5266,7 +5216,6 @@
       "target": "document:Docs/DX.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Release Board references DX.md for distribution runbook and evidence format",
       "direction": "forward"
     },
     {
@@ -5274,7 +5223,6 @@
       "target": "document:Docs/Avelo_Phase0_Manual_Acceptance.md",
       "type": "related",
       "weight": 0.8,
-      "label": "Release Board references Phase 0 Manual Acceptance as canonical human protocol",
       "direction": "forward"
     },
     {
@@ -5282,7 +5230,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "validates",
       "weight": 0.9,
-      "label": "Rules (R-3, R-4, R-5, R-6, R-9, R-10) enforced through Schema triggers and constraints",
       "direction": "forward"
     },
     {
@@ -5290,7 +5237,6 @@
       "target": "document:Docs/Avelo_Naming_Freeze.md",
       "type": "validates",
       "weight": 0.8,
-      "label": "Rule R-14 enforces naming freeze: ad-hoc renames rejected",
       "direction": "forward"
     },
     {
@@ -5298,7 +5244,6 @@
       "target": "document:Docs/Avelo_Release_Board.md",
       "type": "related",
       "weight": 0.9,
-      "label": "Status Checklist references Release Board as canonical issue-level board",
       "direction": "forward"
     },
     {
@@ -5306,7 +5251,6 @@
       "target": "document:Docs/Avelo_Execution_Checklist.md",
       "type": "related",
       "weight": 0.9,
-      "label": "Status Checklist references Execution Checklist as remaining AVL-* delivery queue",
       "direction": "forward"
     },
     {
@@ -5314,7 +5258,6 @@
       "target": "document:Docs/Avelo_Master_Product_Execution_Plan.md",
       "type": "related",
       "weight": 0.8,
-      "label": "Status Checklist references Master Product Execution Plan as consolidated roadmap",
       "direction": "forward"
     },
     {
@@ -5322,7 +5265,6 @@
       "target": "document:Docs/Avelo_Phase0_Manual_Acceptance.md",
       "type": "related",
       "weight": 0.7,
-      "label": "Status Checklist references Phase 0 Manual Acceptance for human acceptance gates",
       "direction": "forward"
     },
     {
@@ -5330,7 +5272,6 @@
       "target": "document:Docs/Avelo_Master_PRD.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "DX ownership table defines PRD as owning user-visible behavior",
       "direction": "forward"
     },
     {
@@ -5338,7 +5279,6 @@
       "target": "document:Docs/Avelo_Rules.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "DX ownership table defines Rules as owning non-negotiable invariants",
       "direction": "forward"
     },
     {
@@ -5346,7 +5286,6 @@
       "target": "document:Docs/Avelo_Architecture.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "DX ownership table defines Architecture as owning dependency/transaction boundaries",
       "direction": "forward"
     },
     {
@@ -5354,7 +5293,6 @@
       "target": "document:Docs/Avelo_Schema.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "DX ownership table defines Schema as owning persistence contract",
       "direction": "forward"
     },
     {
@@ -5362,7 +5300,6 @@
       "target": "document:Docs/Avelo_Naming_Freeze.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "DX ownership table defines Naming Freeze as owning compatibility names",
       "direction": "forward"
     },
     {
@@ -5370,7 +5307,6 @@
       "target": "document:Docs/Avelo_Status_Checklist.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "DX ownership table defines Status Checklist as owning human-readable state",
       "direction": "forward"
     },
     {
@@ -5378,7 +5314,6 @@
       "target": "document:Docs/Avelo_Execution_Checklist.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "DX ownership table defines Execution Checklist as owning next actions",
       "direction": "forward"
     },
     {
@@ -5386,7 +5321,6 @@
       "target": "document:Docs/Avelo_Release_Board.md",
       "type": "documents",
       "weight": 0.8,
-      "label": "DX ownership table defines Release Board as owning readiness verdict",
       "direction": "forward"
     },
     {
@@ -5394,7 +5328,6 @@
       "target": "document:Docs/Avelo_Phase0_Manual_Acceptance.md",
       "type": "related",
       "weight": 0.7,
-      "label": "DX references Phase 0 evidence capture script and artifact identity",
       "direction": "forward"
     },
     {
@@ -5402,7 +5335,6 @@
       "target": "document:Docs/Avelo_Master_Product_Execution_Plan.md",
       "type": "documents",
       "weight": 0.7,
-      "label": "DX ownership table defines Master Product Execution Plan as coordinating normative documents",
       "direction": "forward"
     },
     {
@@ -5410,7 +5342,6 @@
       "target": "document:Docs/Avelo_Master_PRD.md",
       "type": "documents",
       "weight": 0.7,
-      "label": "Tally study guide informs PRD feature requirements and screen specifications",
       "direction": "forward"
     },
     {
@@ -5418,7 +5349,6 @@
       "target": "document:Docs/Avelo_Module_Checklist.md",
       "type": "documents",
       "weight": 0.6,
-      "label": "Tally gap analysis informs Module Checklist completion tracking",
       "direction": "forward"
     },
     {
@@ -5426,14 +5356,12 @@
       "target": "document:Docs/Avelo_Architecture.md",
       "type": "documents",
       "weight": 0.5,
-      "label": "Tally UX mapping informs Architecture sidebar/sheet navigation decisions",
       "direction": "forward"
     },
     {
       "source": "resource:res::generated-image-1",
       "target": "resource:res::generated-image-2",
       "type": "contains",
-      "label": "Dashboard navigates to Vouchers list",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5441,7 +5369,6 @@
       "source": "resource:res::generated-image-2",
       "target": "resource:res::generated-image-3",
       "type": "contains",
-      "label": "Vouchers data feeds into Trial Balance report",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5449,7 +5376,6 @@
       "source": "resource:res::generated-image-1",
       "target": "resource:res::generated-image-3",
       "type": "depends_on",
-      "label": "Dashboard Trial Balance widget is summary of full Trial Balance report",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5457,7 +5383,6 @@
       "source": "document:doc::vendor-sqlcipher-license-md",
       "target": "document:doc::vendor-sqlcipher-license-txt",
       "type": "related",
-      "label": "Same license in Markdown and plain-text formats",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5465,7 +5390,6 @@
       "source": "config:cfg::sqlcipher-modulemap",
       "target": "document:doc::vendor-sqlcipher-license-md",
       "type": "documents",
-      "label": "Module map governs usage under SQLCipher license",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5473,7 +5397,6 @@
       "source": "file:scripts/swiftw.sh",
       "target": "file:scripts/swift-env.sh",
       "type": "imports",
-      "description": "swiftw.sh sources swift-env.sh to set up isolated Swift caches and environment",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5481,7 +5404,6 @@
       "source": "file:scripts/bootstrap.sh",
       "target": "file:scripts/swiftw.sh",
       "type": "calls",
-      "description": "bootstrap.sh invokes swiftw.sh for build and test steps",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5489,7 +5411,6 @@
       "source": "file:scripts/bootstrap.sh",
       "target": "file:scripts/bundle.sh",
       "type": "calls",
-      "description": "bootstrap.sh calls bundle.sh to assemble the signed app bundle",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5497,7 +5418,6 @@
       "source": "file:scripts/bundle.sh",
       "target": "file:scripts/swiftw.sh",
       "type": "calls",
-      "description": "bundle.sh invokes swiftw.sh to build and get the bin path (HEAD branch)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5505,7 +5425,6 @@
       "source": "file:scripts/bundle.sh",
       "target": "config:DefaultChartOfAccounts.json",
       "type": "defines_schema",
-      "description": "bundle.sh copies seed resource into the app bundle Contents/Resources/",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5513,7 +5432,6 @@
       "source": "file:scripts/bundle.sh",
       "target": "config:Avelo.entitlements",
       "type": "related",
-      "description": "bundle.sh uses entitlements file for codesign --entitlements during ad-hoc signing",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5521,7 +5439,6 @@
       "source": "file:scripts/bundle_selftest.sh",
       "target": "file:scripts/validate_bundle.sh",
       "type": "calls",
-      "description": "bundle_selftest.sh calls validate_bundle.sh before running the self-test executable",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5529,7 +5446,6 @@
       "source": "file:scripts/launch_smoke.sh",
       "target": "file:scripts/validate_bundle.sh",
       "type": "calls",
-      "description": "launch_smoke.sh calls validate_bundle.sh to verify bundle structure",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5537,7 +5453,6 @@
       "source": "file:scripts/launch_smoke.sh",
       "target": "file:scripts/bundle_selftest.sh",
       "type": "calls",
-      "description": "launch_smoke.sh calls bundle_selftest.sh to run the self-test health check",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5545,7 +5460,6 @@
       "source": "file:scripts/benchmark.sh",
       "target": "config:Package.swift",
       "type": "depends_on",
-      "description": "benchmark.sh runs swift test which uses Package.swift to build and execute benchmark tests",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5553,7 +5467,6 @@
       "source": "file:scripts/swiftw.sh",
       "target": "config:Package.swift",
       "type": "depends_on",
-      "description": "swiftw.sh wraps the swift command which reads Package.swift for build/test/package operations",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5561,7 +5474,6 @@
       "source": "config:Package.swift",
       "target": "file:main.swift",
       "type": "depends_on",
-      "description": "Package.swift defines the Avelo executable target whose entry point is main.swift",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5569,7 +5481,6 @@
       "source": "config:Package.swift",
       "target": "schema:schema_v1.sql",
       "type": "related",
-      "description": "Package.swift excludes schema_v1.sql from the Avelo target compilation (used at runtime via migration)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5577,7 +5488,6 @@
       "source": "config:Package.swift",
       "target": "config:DefaultChartOfAccounts.json",
       "type": "depends_on",
-      "description": "Package.swift processes DefaultChartOfAccounts.json as a bundled resource via .process(\"Resources/Seed\")",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5585,7 +5495,6 @@
       "source": "config:Package.swift",
       "target": "config:Avelo.entitlements",
       "type": "related",
-      "description": "Package.swift excludes Avelo.entitlements from the Avelo target (used by bundle.sh for codesigning)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5593,7 +5502,6 @@
       "source": "file:orchestrator.py",
       "target": "config:Package.swift",
       "type": "depends_on",
-      "description": "orchestrator.py runs 'make build && make test' which depends on Package.swift",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5601,7 +5509,6 @@
       "source": "file:scripts/benchmark_diff.py",
       "target": "file:scripts/benchmark.sh",
       "type": "calls",
-      "description": "benchmark_diff.py compares JSON output files produced by benchmark.sh",
       "direction": "forward",
       "weight": 0.5
     },
@@ -5609,7 +5516,6 @@
       "source": "file:scripts/phase0_evidence.sh",
       "target": "file:scripts/bundle.sh",
       "type": "validates",
-      "description": "phase0_evidence.sh reads the .app bundle produced by bundle.sh to capture release evidence",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6150,7 +6056,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "opens and manages SQLiteDatabase instances for registry and companies",
       "direction": "forward"
     },
     {
@@ -6158,7 +6063,6 @@
       "target": "file:Avelo/Core/Database/MigrationRunner.swift",
       "type": "depends_on",
       "weight": 0.9,
-      "label": "runs migrations on open and create",
       "direction": "forward"
     },
     {
@@ -6166,7 +6070,6 @@
       "target": "file:Avelo/Core/Database/SchemaVersion.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads current schema version for migration gating",
       "direction": "forward"
     },
     {
@@ -6174,7 +6077,6 @@
       "target": "file:Avelo/Core/Database/DatabaseManager.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "uses manager for company registration and file operations",
       "direction": "forward"
     },
     {
@@ -6182,7 +6084,6 @@
       "target": "file:Avelo/Core/Database/MigrationRunner.swift",
       "type": "depends_on",
       "weight": 0.8,
-      "label": "runs migrations on restored database",
       "direction": "forward"
     },
     {
@@ -6190,7 +6091,6 @@
       "target": "file:Avelo/Core/Database/RecoveryKeyCodec.swift",
       "type": "depends_on",
       "weight": 0.8,
-      "label": "decodes and canonicalizes recovery keys",
       "direction": "forward"
     },
     {
@@ -6198,7 +6098,6 @@
       "target": "file:Avelo/Core/Database/CompanyKeyStore.swift",
       "type": "depends_on",
       "weight": 0.8,
-      "label": "generates and stores encryption keys for restored companies",
       "direction": "forward"
     },
     {
@@ -6206,7 +6105,6 @@
       "target": "file:Avelo/Core/Database/LegacyKeyMigrationService.swift",
       "type": "depends_on",
       "weight": 0.7,
-      "label": "migrates legacy encryption on plaintext/passphrase backups",
       "direction": "forward"
     },
     {
@@ -6214,7 +6112,6 @@
       "target": "file:Avelo/Core/Database/DatabaseManager.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "uses manager for company file URL and handle management",
       "direction": "forward"
     },
     {
@@ -6222,7 +6119,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "opens source and migrated databases via ATTACH/DETACH",
       "direction": "forward"
     },
     {
@@ -6230,7 +6126,6 @@
       "target": "file:Avelo/Core/Database/CompanyKeyStore.swift",
       "type": "depends_on",
       "weight": 0.8,
-      "label": "stores migrated encryption key",
       "direction": "forward"
     },
     {
@@ -6238,7 +6133,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "writes seed data via SQLiteDatabase transaction",
       "direction": "forward"
     },
     {
@@ -6246,7 +6140,6 @@
       "target": "file:Avelo/Core/Database/SchemaVersion.swift",
       "type": "depends_on",
       "weight": 0.7,
-      "label": "validates backup schema version against current",
       "direction": "forward"
     },
     {
@@ -6254,7 +6147,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_account_groups",
       "direction": "forward"
     },
     {
@@ -6262,7 +6154,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on avelo_account_groups",
       "direction": "forward"
     },
     {
@@ -6270,7 +6161,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE/DELETE on avelo_account_groups",
       "direction": "forward"
     },
     {
@@ -6278,7 +6168,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_accounts",
       "direction": "forward"
     },
     {
@@ -6286,7 +6175,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on avelo_accounts",
       "direction": "forward"
     },
     {
@@ -6294,7 +6182,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE/DELETE on avelo_accounts",
       "direction": "forward"
     },
     {
@@ -6302,7 +6189,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_bill_allocations, avelo_cheques",
       "direction": "forward"
     },
     {
@@ -6310,7 +6196,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on bill allocations, cheques, vouchers",
       "direction": "forward"
     },
     {
@@ -6318,7 +6203,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE/DELETE on bill allocations and cheques",
       "direction": "forward"
     },
     {
@@ -6326,7 +6210,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_audit_events",
       "direction": "forward"
     },
     {
@@ -6334,7 +6217,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on avelo_audit_events",
       "direction": "forward"
     },
     {
@@ -6342,7 +6224,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT into avelo_audit_events",
       "direction": "forward"
     },
     {
@@ -6350,7 +6231,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_boms, avelo_bom_components",
       "direction": "forward"
     },
     {
@@ -6358,7 +6238,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on BOMs and components with inventory item joins",
       "direction": "forward"
     },
     {
@@ -6366,7 +6245,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE/DELETE on avelo_boms and avelo_bom_components",
       "direction": "forward"
     },
     {
@@ -6374,7 +6252,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_bank_reconciliations, avelo_bank_statement_lines",
       "direction": "forward"
     },
     {
@@ -6382,7 +6259,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on reconciliations, statement lines, vouchers, ledger lines",
       "direction": "forward"
     },
     {
@@ -6390,7 +6266,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE on reconciliations and statement lines",
       "direction": "forward"
     },
     {
@@ -6398,7 +6273,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_companies",
       "direction": "forward"
     },
     {
@@ -6406,7 +6280,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on avelo_companies",
       "direction": "forward"
     },
     {
@@ -6414,7 +6287,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE on avelo_companies",
       "direction": "forward"
     },
     {
@@ -6422,7 +6294,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_financial_year_opening_balances",
       "direction": "forward"
     },
     {
@@ -6430,7 +6301,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on avelo_financial_year_opening_balances",
       "direction": "forward"
     },
     {
@@ -6438,7 +6308,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/DELETE on avelo_financial_year_opening_balances",
       "direction": "forward"
     },
     {
@@ -6446,7 +6315,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_financial_years",
       "direction": "forward"
     },
     {
@@ -6454,7 +6322,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on avelo_financial_years",
       "direction": "forward"
     },
     {
@@ -6462,7 +6329,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE on avelo_financial_years",
       "direction": "forward"
     },
     {
@@ -6470,7 +6336,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_inventory_orders, avelo_inventory_order_lines, avelo_inventory_reorder_levels",
       "direction": "forward"
     },
     {
@@ -6478,7 +6343,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on orders, lines, reorder levels with inventory/account joins",
       "direction": "forward"
     },
     {
@@ -6486,7 +6350,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE on orders, lines, and reorder levels",
       "direction": "forward"
     },
     {
@@ -6494,7 +6357,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_inventory_items, avelo_stock_movements",
       "direction": "forward"
     },
     {
@@ -6502,7 +6364,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on items and stock movements",
       "direction": "forward"
     },
     {
@@ -6510,7 +6371,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE on inventory items and stock movements",
       "direction": "forward"
     },
     {
@@ -6518,7 +6378,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_ledger_lines",
       "direction": "forward"
     },
     {
@@ -6526,7 +6385,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on ledger lines with voucher joins for aggregation",
       "direction": "forward"
     },
     {
@@ -6534,7 +6392,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/DELETE on avelo_ledger_lines",
       "direction": "forward"
     },
     {
@@ -6542,7 +6399,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_cost_centres, avelo_cost_categories, avelo_budgets",
       "direction": "forward"
     },
     {
@@ -6550,7 +6406,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.8,
-      "label": "SELECT queries on cost centres, cost categories, budgets",
       "direction": "forward"
     },
     {
@@ -6558,7 +6413,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.8,
-      "label": "INSERT/UPDATE on cost centres, cost categories, budgets",
       "direction": "forward"
     },
     {
@@ -6566,7 +6420,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_party_profiles",
       "direction": "forward"
     },
     {
@@ -6574,7 +6427,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on avelo_party_profiles",
       "direction": "forward"
     },
     {
@@ -6582,7 +6434,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "UPSERT on avelo_party_profiles",
       "direction": "forward"
     },
     {
@@ -6590,7 +6441,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "reads from and writes to avelo_payroll_employees, avelo_payroll_entries",
       "direction": "forward"
     },
     {
@@ -6598,7 +6448,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "reads",
       "weight": 0.9,
-      "label": "SELECT queries on payroll employees and entries with employee name joins",
       "direction": "forward"
     },
     {
@@ -6606,7 +6455,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "writes",
       "weight": 0.9,
-      "label": "INSERT/UPDATE on payroll employees and entries",
       "direction": "forward"
     },
     {
@@ -6614,7 +6462,6 @@
       "target": "file:Avelo/Core/Repositories/CompanyRepository.swift",
       "type": "depends_on",
       "weight": 0.7,
-      "label": "queries company list for duplicate detection and validation",
       "direction": "forward"
     },
     {
@@ -6622,7 +6469,6 @@
       "target": "file:Avelo/Core/Database/SQLiteDatabase.swift",
       "type": "depends_on",
       "weight": 1,
-      "label": "runs migrations on SQLiteDatabase instances",
       "direction": "forward"
     },
     {
@@ -6630,14 +6476,12 @@
       "target": "file:Avelo/Core/Database/SchemaVersion.swift",
       "type": "depends_on",
       "weight": 0.6,
-      "label": "embeds current schema version in backup manifest",
       "direction": "forward"
     },
     {
       "source": "class::Account",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6645,7 +6489,6 @@
       "source": "class::Account",
       "target": "class::AccountGroup",
       "type": "related",
-      "label": "groupId: AccountGroup.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6653,7 +6496,6 @@
       "source": "class::Account",
       "target": "class::OpeningBalanceSide",
       "type": "related",
-      "label": "openingBalanceSide",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6661,7 +6503,6 @@
       "source": "class::Account",
       "target": "class::GSTRegistrationType",
       "type": "related",
-      "label": "gstRegistrationType",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6669,7 +6510,6 @@
       "source": "class::AccountNature",
       "target": "class::EntrySide",
       "type": "related",
-      "label": "normalBalance: EntrySide",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6677,7 +6517,6 @@
       "source": "class::AccountGroup",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6685,7 +6524,6 @@
       "source": "class::BillAllocation",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6693,7 +6531,6 @@
       "source": "class::BillAllocation",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6701,7 +6538,6 @@
       "source": "class::BillAllocation",
       "target": "class::Account",
       "type": "related",
-      "label": "partyAccountId: Account.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6709,7 +6545,6 @@
       "source": "class::Cheque",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6717,7 +6552,6 @@
       "source": "class::Cheque",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6725,7 +6559,6 @@
       "source": "class::Cheque",
       "target": "class::Account",
       "type": "related",
-      "label": "bankAccountId: Account.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6733,7 +6566,6 @@
       "source": "class::TDSRecord",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6741,7 +6573,6 @@
       "source": "class::TDSRecord",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6749,7 +6580,6 @@
       "source": "class::TCSRecord",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6757,7 +6587,6 @@
       "source": "class::TCSRecord",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6765,7 +6594,6 @@
       "source": "class::AuditEvent",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6773,7 +6601,6 @@
       "source": "class::AuditEvent",
       "target": "class::AuditAction",
       "type": "related",
-      "label": "action: AuditAction",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6781,7 +6608,6 @@
       "source": "class::BillOfMaterials",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6789,7 +6615,6 @@
       "source": "class::BillOfMaterials",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "assemblyItemId: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6797,7 +6622,6 @@
       "source": "class::BOMComponent",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6805,7 +6629,6 @@
       "source": "class::BOMComponent",
       "target": "class::BillOfMaterials",
       "type": "related",
-      "label": "bomId: BillOfMaterials.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6813,7 +6636,6 @@
       "source": "class::BOMComponent",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "componentItemId: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6821,7 +6643,6 @@
       "source": "class::Company",
       "target": "class::InventoryLinkMode",
       "type": "related",
-      "label": "inventoryLinkMode: InventoryLinkMode",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6829,7 +6650,6 @@
       "source": "class::CompanyFeatureSet",
       "target": "class::Company",
       "type": "related",
-      "label": "init(company: Company)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6837,7 +6657,6 @@
       "source": "class::FinancialYear",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6845,7 +6664,6 @@
       "source": "class::InventoryItem",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6853,7 +6671,6 @@
       "source": "class::InventoryItem",
       "target": "class::Account",
       "type": "related",
-      "label": "linkedAccountId: Account.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6861,7 +6678,6 @@
       "source": "class::StockMovement",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6869,7 +6685,6 @@
       "source": "class::StockMovement",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "itemId: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6877,7 +6692,6 @@
       "source": "class::StockMovement",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6885,7 +6699,6 @@
       "source": "class::StockMovement",
       "target": "class::MovementType",
       "type": "related",
-      "label": "movementType: MovementType",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6893,7 +6706,6 @@
       "source": "class::InventoryOrder",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6901,7 +6713,6 @@
       "source": "class::InventoryOrder",
       "target": "class::Account",
       "type": "related",
-      "label": "partyAccountId: Account.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6909,7 +6720,6 @@
       "source": "class::InventoryOrder",
       "target": "class::InventoryOrderType",
       "type": "related",
-      "label": "orderType: InventoryOrderType",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6917,7 +6727,6 @@
       "source": "class::InventoryOrderLine",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6925,7 +6734,6 @@
       "source": "class::InventoryOrderLine",
       "target": "class::InventoryOrder",
       "type": "related",
-      "label": "orderId: InventoryOrder.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6933,7 +6741,6 @@
       "source": "class::InventoryOrderLine",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "itemId: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6941,7 +6748,6 @@
       "source": "class::InventoryReorderLevel",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6949,7 +6755,6 @@
       "source": "class::InventoryReorderLevel",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "itemId: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6957,7 +6762,6 @@
       "source": "class::PendingInventoryOrderLine",
       "target": "class::InventoryOrder",
       "type": "related",
-      "label": "orderId: InventoryOrder.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6965,7 +6769,6 @@
       "source": "class::PendingInventoryOrderLine",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "itemId: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6973,7 +6776,6 @@
       "source": "class::PendingInventoryOrderLine",
       "target": "class::InventoryOrderType",
       "type": "related",
-      "label": "orderType: InventoryOrderType",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6981,7 +6783,6 @@
       "source": "class::ReorderAlert",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "id: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6989,7 +6790,6 @@
       "source": "class::CostCentre",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -6997,7 +6797,6 @@
       "source": "class::CostCategory",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7005,7 +6804,6 @@
       "source": "class::Budget",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7013,7 +6811,6 @@
       "source": "class::Budget",
       "target": "class::FinancialYear",
       "type": "related",
-      "label": "financialYearId: FinancialYear.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7021,7 +6818,6 @@
       "source": "class::Budget",
       "target": "class::CostCentre",
       "type": "related",
-      "label": "costCentreId: CostCentre.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7029,7 +6825,6 @@
       "source": "class::PartyProfile",
       "target": "class::Account",
       "type": "related",
-      "label": "accountId: Account.ID (ID typealias)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7037,7 +6832,6 @@
       "source": "class::PartyProfile",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7045,7 +6839,6 @@
       "source": "class::PartyProfile",
       "target": "class::PartyUsage",
       "type": "related",
-      "label": "usage: PartyUsage",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7053,7 +6846,6 @@
       "source": "class::PayrollEmployee",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7061,7 +6853,6 @@
       "source": "class::PayrollEmployee",
       "target": "class::Account",
       "type": "related",
-      "label": "bankAccountId: Account.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7069,7 +6860,6 @@
       "source": "class::PayrollEntry",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7077,7 +6867,6 @@
       "source": "class::PayrollEntry",
       "target": "class::PayrollEmployee",
       "type": "related",
-      "label": "employeeId: PayrollEmployee.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7085,7 +6874,6 @@
       "source": "class::PayrollEntry",
       "target": "class::FinancialYear",
       "type": "related",
-      "label": "financialYearId: FinancialYear.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7093,7 +6881,6 @@
       "source": "class::PayrollEntry",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7101,7 +6888,6 @@
       "source": "class::ReportResult::ReportFilter",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7109,7 +6895,6 @@
       "source": "class::ReportResult::ReportFilter",
       "target": "class::FinancialYear",
       "type": "related",
-      "label": "financialYearId: FinancialYear.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7117,7 +6902,6 @@
       "source": "class::ReportResult::ReportFilter",
       "target": "class::Account",
       "type": "related",
-      "label": "accountId: Account.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7125,7 +6909,6 @@
       "source": "class::ReportResult::ReportFilter",
       "target": "class::VoucherType::Code",
       "type": "related",
-      "label": "voucherTypeCodes: Set<VoucherType.Code>",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7133,7 +6916,6 @@
       "source": "class::ReportResult::LedgerRow",
       "target": "class::VoucherType::Code",
       "type": "related",
-      "label": "voucherTypeCode: VoucherType.Code",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7141,7 +6923,6 @@
       "source": "class::ReportResult::LedgerRow",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7149,7 +6930,6 @@
       "source": "class::ReportResult::LedgerReport",
       "target": "class::Account",
       "type": "related",
-      "label": "accountId: Account.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7157,7 +6937,6 @@
       "source": "class::ReportResult::TrialBalanceRow",
       "target": "class::Account",
       "type": "related",
-      "label": "id: Account.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7165,7 +6944,6 @@
       "source": "class::ReportResult::DayBookRow",
       "target": "class::Voucher",
       "type": "related",
-      "label": "id: Voucher.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7173,7 +6951,6 @@
       "source": "class::ReportResult::DayBookRow",
       "target": "class::VoucherType::Code",
       "type": "related",
-      "label": "voucherTypeCode: VoucherType.Code",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7181,7 +6958,6 @@
       "source": "class::ReportResult::OutstandingRow",
       "target": "class::Account",
       "type": "related",
-      "label": "id: Account.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7189,7 +6965,6 @@
       "source": "class::ReportResult::StockValuationRow",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "id: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7197,7 +6972,6 @@
       "source": "class::Voucher",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7205,7 +6979,6 @@
       "source": "class::Voucher",
       "target": "class::FinancialYear",
       "type": "related",
-      "label": "financialYearId: FinancialYear.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7213,7 +6986,6 @@
       "source": "class::Voucher",
       "target": "class::VoucherType::Code",
       "type": "related",
-      "label": "voucherTypeCode: VoucherType.Code",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7221,7 +6993,6 @@
       "source": "class::Voucher",
       "target": "class::Account",
       "type": "related",
-      "label": "partyAccountId: Account.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7229,7 +7000,6 @@
       "source": "class::Voucher",
       "target": "class::VoucherStatus",
       "type": "related",
-      "label": "status: VoucherStatus",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7237,7 +7007,6 @@
       "source": "class::LedgerLine",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7245,7 +7014,6 @@
       "source": "class::LedgerLine",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7253,7 +7021,6 @@
       "source": "class::LedgerLine",
       "target": "class::Account",
       "type": "related",
-      "label": "accountId: Account.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7261,7 +7028,6 @@
       "source": "class::LedgerLine",
       "target": "class::EntrySide",
       "type": "related",
-      "label": "side: EntrySide",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7269,7 +7035,6 @@
       "source": "class::VoucherDraft",
       "target": "class::VoucherType::Code",
       "type": "related",
-      "label": "voucherTypeCode: VoucherType.Code",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7277,7 +7042,6 @@
       "source": "class::VoucherDraft",
       "target": "class::Account",
       "type": "related",
-      "label": "partyAccountId: Account.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7285,7 +7049,6 @@
       "source": "class::VoucherDraft::Line",
       "target": "class::Account",
       "type": "related",
-      "label": "accountId: Account.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7293,7 +7056,6 @@
       "source": "class::VoucherDraft::Line",
       "target": "class::EntrySide",
       "type": "related",
-      "label": "side: EntrySide",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7301,7 +7063,6 @@
       "source": "class::VoucherEntryDraft",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7309,7 +7070,6 @@
       "source": "class::VoucherEntryDraft",
       "target": "class::VoucherType::Code",
       "type": "related",
-      "label": "voucherTypeCode: VoucherType.Code",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7317,7 +7077,6 @@
       "source": "class::VoucherEntryDraft",
       "target": "class::Account",
       "type": "related",
-      "label": "partyAccountId: Account.ID?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7325,7 +7084,6 @@
       "source": "class::VoucherEntryDraft",
       "target": "class::VoucherDraft::BillReferenceType",
       "type": "related",
-      "label": "billReferenceType: VoucherDraft.BillReferenceType?",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7333,7 +7091,6 @@
       "source": "class::VoucherItemLine",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7341,7 +7098,6 @@
       "source": "class::VoucherItemLine",
       "target": "class::Voucher",
       "type": "related",
-      "label": "voucherId: Voucher.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7349,7 +7105,6 @@
       "source": "class::VoucherItemLine",
       "target": "class::InventoryItem",
       "type": "related",
-      "label": "itemId: InventoryItem.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7357,7 +7112,6 @@
       "source": "class::VoucherTemplate",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7365,7 +7119,6 @@
       "source": "class::VoucherTemplate",
       "target": "class::VoucherType::Code",
       "type": "related",
-      "label": "voucherTypeCode: VoucherType.Code",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7373,7 +7126,6 @@
       "source": "class::VoucherType",
       "target": "class::Company",
       "type": "related",
-      "label": "companyId: Company.ID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7381,7 +7133,6 @@
       "source": "class::VoucherType",
       "target": "class::VoucherType::Code",
       "type": "related",
-      "label": "code: Code",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7389,7 +7140,6 @@
       "source": "class::RegistryRepository",
       "target": "class::CompanyRegistryEntry",
       "type": "related",
-      "label": "returns [CompanyRegistryEntry]",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7397,7 +7147,6 @@
       "source": "file::Repositories/ReportRepository+ComplianceReports.swift",
       "target": "class::ReportResult::GstSummary",
       "type": "related",
-      "label": "produces GstSummary",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7405,7 +7154,6 @@
       "source": "file::Repositories/ReportRepository+ComplianceReports.swift",
       "target": "class::ReportResult::DayBookRow",
       "type": "related",
-      "label": "produces [DayBookRow]",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7413,7 +7161,6 @@
       "source": "file::Repositories/ReportRepository+ComplianceReports.swift",
       "target": "class::ReportResult::OutstandingReport",
       "type": "related",
-      "label": "produces OutstandingReport",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7421,7 +7168,6 @@
       "source": "file::Repositories/ReportRepository+ComplianceReports.swift",
       "target": "class::ReportResult::StockValuationReport",
       "type": "related",
-      "label": "produces StockValuationReport",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7429,7 +7175,6 @@
       "source": "file::Repositories/ReportRepository+FinancialStatements.swift",
       "target": "class::ReportResult::ProfitLoss",
       "type": "related",
-      "label": "produces ProfitLoss",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7437,7 +7182,6 @@
       "source": "file::Repositories/ReportRepository+FinancialStatements.swift",
       "target": "class::ReportResult::BalanceSheet",
       "type": "related",
-      "label": "produces BalanceSheet",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7445,7 +7189,6 @@
       "source": "class::Voucher",
       "target": "class::VoucherItemLine",
       "type": "contains",
-      "label": "one-to-many via voucherId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7453,7 +7196,6 @@
       "source": "class::Voucher",
       "target": "class::LedgerLine",
       "type": "contains",
-      "label": "one-to-many via voucherId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7461,7 +7203,6 @@
       "source": "class::Voucher",
       "target": "class::BillAllocation",
       "type": "contains",
-      "label": "one-to-many via voucherId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7469,7 +7210,6 @@
       "source": "class::Voucher",
       "target": "class::Cheque",
       "type": "contains",
-      "label": "one-to-many via voucherId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7477,7 +7217,6 @@
       "source": "class::Voucher",
       "target": "class::TDSRecord",
       "type": "contains",
-      "label": "one-to-many via voucherId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7485,7 +7224,6 @@
       "source": "class::Voucher",
       "target": "class::TCSRecord",
       "type": "contains",
-      "label": "one-to-many via voucherId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7493,7 +7231,6 @@
       "source": "class::Voucher",
       "target": "class::StockMovement",
       "type": "contains",
-      "label": "one-to-many via voucherId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7501,7 +7238,6 @@
       "source": "class::Voucher",
       "target": "class::PayrollEntry",
       "type": "contains",
-      "label": "one-to-many via voucherId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7509,7 +7245,6 @@
       "source": "class::InventoryOrder",
       "target": "class::InventoryOrderLine",
       "type": "contains",
-      "label": "one-to-many via orderId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7517,7 +7252,6 @@
       "source": "class::BillOfMaterials",
       "target": "class::BOMComponent",
       "type": "contains",
-      "label": "one-to-many via bomId",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7525,7 +7259,6 @@
       "source": "class::AccountService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "uses for audit trail",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7533,7 +7266,6 @@
       "source": "class::BOMService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records BOM create/update audit",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7541,7 +7273,6 @@
       "source": "class::BankReconciliationService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records bank statement import and line clear audit",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7549,7 +7280,6 @@
       "source": "class::CompanyService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records company created/updated/inventory mode changed",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7557,7 +7287,6 @@
       "source": "file:enum::DemoCompanySeeder",
       "target": "class::CompanyService",
       "type": "calls",
-      "label": "CompanyService.create to build demo company",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7565,7 +7294,6 @@
       "source": "file:enum::DemoCompanySeeder",
       "target": "class::AccountService",
       "type": "calls",
-      "label": "listGroups, listActiveAccounts, createAccount",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7573,7 +7301,6 @@
       "source": "file:enum::DemoCompanySeeder",
       "target": "class::FinancialYearService",
       "type": "calls",
-      "label": "mostRecent to get FY",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7581,7 +7308,6 @@
       "source": "file:enum::DemoCompanySeeder",
       "target": "class::VoucherService",
       "type": "calls",
-      "label": "post to create demo vouchers",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7589,7 +7315,6 @@
       "source": "file:enum::DemoCompanySeeder",
       "target": "class::InventoryService",
       "type": "calls",
-      "label": "createItem, recordMovement",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7597,7 +7322,6 @@
       "source": "file:enum::DemoCompanySeeder",
       "target": "class::PayrollService",
       "type": "calls",
-      "label": "createEmployee, postEntry",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7605,7 +7329,6 @@
       "source": "file:enum::DemoCompanySeeder",
       "target": "class::ReportService",
       "type": "calls",
-      "label": "trialBalance, balanceSheet, profitAndLoss, dayBook, ledger",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7613,7 +7336,6 @@
       "source": "class::FinancialYearService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records FY created/locked/unlocked/closed",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7621,7 +7343,6 @@
       "source": "class::GSTService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "available for audit",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7629,7 +7350,6 @@
       "source": "class::InventoryOrderService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records order created/fulfilled/status changed/reorder level set",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7637,7 +7357,6 @@
       "source": "class::InventoryService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records item created/updated/archived, stock moved, item account linked",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7645,7 +7364,6 @@
       "source": "class::InvoicePDFService",
       "target": "class::GSTService",
       "type": "calls",
-      "label": "voucherTaxBreakdown for tax detail",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7653,7 +7371,6 @@
       "source": "class::InvoicePDFService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records invoice PDF exported audit",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7661,7 +7378,6 @@
       "source": "class::ItemInvoiceService",
       "target": "class::VoucherService",
       "type": "calls",
-      "label": "post to create ledger voucher",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7669,7 +7385,6 @@
       "source": "class::ItemInvoiceService",
       "target": "class::InventoryService",
       "type": "calls",
-      "label": "recordMovement for stock in/out",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7677,7 +7392,6 @@
       "source": "class::PayrollService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records employee created/updated/deactivated, payroll entry posted",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7685,7 +7399,6 @@
       "source": "class::TransactionService",
       "target": "class::VoucherService",
       "type": "calls",
-      "label": "post to create vouchers",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7693,7 +7406,6 @@
       "source": "class::VoucherService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records voucher posted/edited/reversed",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7701,7 +7413,6 @@
       "source": "class::VoucherService",
       "target": "class::ReportService",
       "type": "depends_on",
-      "label": "invalidates report cache after post/edit/reverse",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7709,7 +7420,6 @@
       "source": "class::VoucherTemplateService",
       "target": "class::AuditService",
       "type": "depends_on",
-      "label": "records voucher template saved audit",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7717,7 +7427,6 @@
       "source": "file::Avelo/Core/Utilities/CheckedMath.swift",
       "target": "file::Avelo/Core/Validation/AppError.swift",
       "type": "calls",
-      "label": "throws AppError.businessRule on overflow",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7725,7 +7434,6 @@
       "source": "file::Avelo/Core/Utilities/ExactQuantity.swift",
       "target": "file::Avelo/Core/Utilities/CheckedMath.swift",
       "type": "calls",
-      "label": "uses CheckedMath for overflow-safe arithmetic",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7733,7 +7441,6 @@
       "source": "file::Avelo/Core/Utilities/ExactQuantity.swift",
       "target": "file::Avelo/Core/Validation/AppError.swift",
       "type": "calls",
-      "label": "throws AppError.validation for invalid quantities",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7741,7 +7448,6 @@
       "source": "file::Avelo/Core/Utilities/FiscalLockChecker.swift",
       "target": "file::Avelo/Core/Utilities/DateFormatters.swift",
       "type": "calls",
-      "label": "calls DateFormatters.formatIsoDate for date→string",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7749,7 +7455,6 @@
       "source": "file::Avelo/Core/Utilities/FiscalLockChecker.swift",
       "target": "file::Avelo/Core/Utilities/UUIDParsing.swift",
       "type": "calls",
-      "label": "calls UUIDParsing.optional for safe UUID deserialization",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7757,7 +7462,6 @@
       "source": "file::Avelo/Core/Utilities/FiscalLockChecker.swift",
       "target": "file::Avelo/Core/Validation/AppError.swift",
       "type": "calls",
-      "label": "throws AppError.businessRule when FY is locked",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7765,7 +7469,6 @@
       "source": "file::Avelo/Core/Utilities/UUIDParsing.swift",
       "target": "file::Avelo/Core/Validation/AppError.swift",
       "type": "calls",
-      "label": "throws AppError.database on invalid UUID",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7773,7 +7476,6 @@
       "source": "file::Avelo/Core/Utilities/VoucherNumberGenerator.swift",
       "target": "file::Avelo/Core/Utilities/IndianFinancialYear.swift",
       "type": "calls",
-      "label": "calls IndianFinancialYear.startYear for FY-short label",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7781,7 +7483,6 @@
       "source": "file::Avelo/Core/Validation/CompanyInputValidator.swift",
       "target": "file::Avelo/Core/Validation/AccountInputValidator.swift",
       "type": "calls",
-      "label": "calls AccountInputValidator.isValidGSTIN",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7789,7 +7490,6 @@
       "source": "file::Avelo/Core/Validation/ValidationResult.swift",
       "target": "file::Avelo/Core/Validation/ValidationError.swift",
       "type": "contains",
-      "label": "holds [ValidationError] in .invalid case",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7797,7 +7497,6 @@
       "source": "file::Avelo/Core/Validation/AppError.swift",
       "target": "file::Avelo/Core/Validation/ValidationError.swift",
       "type": "contains",
-      "label": "wraps ValidationError in .validation case",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7805,7 +7504,6 @@
       "source": "file::Avelo/Core/Validation/PayrollDraftValidator.swift",
       "target": "file::Avelo/Core/Utilities/CheckedMath.swift",
       "type": "calls",
-      "label": "calls CheckedMath.subtract for net salary calculation",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7813,7 +7511,6 @@
       "source": "file::Avelo/Core/Validation/StockMovementValidator.swift",
       "target": "file::Avelo/Core/Utilities/Currency.swift",
       "type": "calls",
-      "label": "calls Currency.formatPaise in error messages",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7821,7 +7518,6 @@
       "source": "file::Avelo/Core/Validation/VoucherDraftValidator.swift",
       "target": "file::Avelo/Core/Utilities/Currency.swift",
       "type": "calls",
-      "label": "calls Currency.formatPaise for balance mismatch messages",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7829,7 +7525,6 @@
       "source": "file::Avelo/Core/Validation/VoucherDraftValidator.swift",
       "target": "file::Avelo/Core/Utilities/DateFormatters.swift",
       "type": "calls",
-      "label": "calls DateFormatters.formatDisplayDate for error messages",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7837,7 +7532,6 @@
       "source": "file::Avelo/Core/Validation/LocalRCFlowRunner.swift",
       "target": "file::Avelo/Core/Utilities/DateFormatters.swift",
       "type": "calls",
-      "label": "calls DateFormatters.parseDate for date literals",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7845,7 +7539,6 @@
       "source": "file::Avelo/Core/Validation/LocalRCFlowRunner.swift",
       "target": "file::Avelo/Core/Utilities/CheckedMath.swift",
       "type": "calls",
-      "label": "calls CheckedMath.sum for trial balance totals",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7853,7 +7546,6 @@
       "source": "file::Avelo/Core/Validation/LocalRCFlowRunner.swift",
       "target": "file::Avelo/Core/Validation/AppError.swift",
       "type": "calls",
-      "label": "throws AppError on test failures",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7861,7 +7553,6 @@
       "source": "file::Avelo/Core/Actions/AppAction.swift",
       "target": "file::Avelo/Core/Validation/AccountEligibilityPolicy.swift",
       "type": "related",
-      "label": "mirrors AccountEligibility shape for AppActionAvailability",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7869,7 +7560,6 @@
       "source": "file::Avelo/Core/Actions/AppActionRegistry.swift",
       "target": "file::Avelo/Core/Actions/AppAction.swift",
       "type": "defines_schema",
-      "label": "creates and stores AppAction catalog entries",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7877,7 +7567,6 @@
       "source": "file::Avelo/Core/Cache/AccountTree.swift",
       "target": "file::Avelo/Core/Utilities/CheckedMath.swift",
       "type": "calls",
-      "label": "uses CheckedMath for overflow-safe balance computation",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7885,7 +7574,6 @@
       "source": "file:Avelo/App/AveloApp.swift",
       "target": "file:Avelo/App/AppEnvironment.swift",
       "type": "defines_schema",
-      "description": "AveloApp creates and owns the AppEnvironment instance",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7893,7 +7581,6 @@
       "source": "file:Avelo/App/AveloApp.swift",
       "target": "file:Avelo/App/AppRouter.swift",
       "type": "defines_schema",
-      "description": "AveloApp creates AppRouter (via AppEnvironment.init)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7901,7 +7588,6 @@
       "source": "file:Avelo/App/AveloApp.swift",
       "target": "file:Avelo/App/SelfTestHarness.swift",
       "type": "calls",
-      "description": "AveloApp checks SelfTestHarness.isRequested and calls runAndExit()",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7909,7 +7595,6 @@
       "source": "file:Avelo/App/AveloApp.swift",
       "target": "file:Avelo/App/RootView.swift",
       "type": "contains",
-      "description": "AveloApp presents RootView as the main scene content",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7917,7 +7602,6 @@
       "source": "file:Avelo/App/AppEnvironment.swift",
       "target": "file:Avelo/App/AppRouter.swift",
       "type": "contains",
-      "description": "AppEnvironment owns the AppRouter instance",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7925,7 +7609,6 @@
       "source": "file:Avelo/App/AppEnvironment.swift",
       "target": "file:Avelo/Core/Cache/AccountTreeCache.swift",
       "type": "contains",
-      "description": "AppEnvironment owns and manages the AccountTreeCache instance",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7933,7 +7616,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/App/CompanyPickerView.swift",
       "type": "contains",
-      "description": "RootView presents CompanyPickerView when no company is open",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7941,7 +7623,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/App/SidebarView.swift",
       "type": "contains",
-      "description": "RootView places SidebarView in the NavigationSplitView sidebar column",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7949,7 +7630,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/App/ErrorBannerHost.swift",
       "type": "contains",
-      "description": "RootView overlays ErrorBannerHost at the top",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7957,7 +7637,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/Features/Dashboard/DashboardView.swift",
       "type": "contains",
-      "description": "RootView routes .dashboard selection to DashboardView",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7965,7 +7644,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/Features/Accounts/AccountsView.swift",
       "type": "contains",
-      "description": "RootView routes .accounts selection to AccountsView",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7973,7 +7651,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/Features/Banking/BankingView.swift",
       "type": "contains",
-      "description": "RootView routes .banking selection to BankingView",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7981,7 +7658,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/Features/Audit/AuditView.swift",
       "type": "contains",
-      "description": "RootView routes .audit selection to AuditView",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7989,7 +7665,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/Features/GST/GSTView.swift",
       "type": "contains",
-      "description": "RootView routes .gst selection to GSTView",
       "direction": "forward",
       "weight": 0.5
     },
@@ -7997,7 +7672,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/Features/Accounts/NewAccountSheet.swift",
       "type": "contains",
-      "description": "RootView presents NewAccountSheet for .newAccount and .editAccount sheets",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8005,7 +7679,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/Features/Accounts/GroupMasterSheet.swift",
       "type": "contains",
-      "description": "RootView presents GroupMasterSheet for .newGroup and .editGroup sheets",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8013,7 +7686,6 @@
       "source": "file:Avelo/App/RootView.swift",
       "target": "file:Avelo/Features/Banking/ImportStatementSheet.swift",
       "type": "contains",
-      "description": "BankingView presents ImportStatementSheet (routed from RootView)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8021,7 +7693,6 @@
       "source": "file:Avelo/Features/Dashboard/DashboardView.swift",
       "target": "file:Avelo/Features/Dashboard/DashboardViewModel.swift",
       "type": "calls",
-      "description": "DashboardView creates DashboardViewModel and calls vm.reload(ctx:)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8029,7 +7700,6 @@
       "source": "file:Avelo/Features/Accounts/AccountsView.swift",
       "target": "file:Avelo/Features/Accounts/AccountsViewModel.swift",
       "type": "calls",
-      "description": "AccountsView creates AccountsViewModel and calls vm.reload(), vm.disable(), navigation actions",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8037,7 +7707,6 @@
       "source": "file:Avelo/Features/Audit/AuditView.swift",
       "target": "file:Avelo/Features/Audit/AuditViewModel.swift",
       "type": "calls",
-      "description": "AuditView creates AuditViewModel and calls vm.reload()",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8045,7 +7714,6 @@
       "source": "file:Avelo/Features/Banking/BankingView.swift",
       "target": "file:Avelo/Features/Banking/BankingViewModel.swift",
       "type": "calls",
-      "description": "BankingView creates BankingViewModel and calls vm.reload(), vm.reconcile()",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8053,7 +7721,6 @@
       "source": "file:Avelo/Features/Banking/BankingView.swift",
       "target": "file:Avelo/Features/Banking/ChequesViewModel.swift",
       "type": "calls",
-      "description": "BankingView creates ChequesViewModel for the cheques section",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8061,7 +7728,6 @@
       "source": "file:Avelo/Features/Banking/BankingView.swift",
       "target": "file:Avelo/Features/Banking/ImportStatementSheet.swift",
       "type": "contains",
-      "description": "BankingView presents ImportStatementSheet via sheet(isPresented:)",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8069,7 +7735,6 @@
       "source": "file:Avelo/Features/Banking/ChequesView.swift",
       "target": "file:Avelo/Features/Banking/ChequesViewModel.swift",
       "type": "calls",
-      "description": "ChequesView binds to ChequesViewModel and calls vm.reload(), vm.bounce(), vm.represent()",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8077,7 +7742,6 @@
       "source": "file:Avelo/Features/Inventory/BOMsView.swift",
       "target": "file:Avelo/Features/Inventory/BOMsViewModel.swift",
       "type": "depends_on",
-      "description": "BOMsView consumes BOMsViewModel for BOM list data and error state.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8085,7 +7749,6 @@
       "source": "file:Avelo/Features/Inventory/BOMsView.swift",
       "target": "file:Avelo/Features/Inventory/BOMEditorSheet.swift",
       "type": "calls",
-      "description": "BOMsView presents BOMEditorSheet for creating or editing a BOM.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8093,7 +7756,6 @@
       "source": "file:Avelo/Features/Inventory/BOMsViewModel.swift",
       "target": "file:Avelo/Features/Inventory/BOMsView.swift",
       "type": "calls",
-      "description": "BOMsViewModel provides data to BOMsView.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8101,7 +7763,6 @@
       "source": "file:Avelo/Features/Inventory/InventoryView.swift",
       "target": "file:Avelo/Features/Inventory/InventoryViewModel.swift",
       "type": "depends_on",
-      "description": "InventoryView creates and binds InventoryViewModel for inventory items list.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8109,7 +7770,6 @@
       "source": "file:Avelo/Features/Inventory/InventoryView.swift",
       "target": "file:Avelo/Features/Inventory/InventoryOrdersViewModel.swift",
       "type": "depends_on",
-      "description": "InventoryView creates and binds InventoryOrdersViewModel for orders section.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8117,7 +7777,6 @@
       "source": "file:Avelo/Features/Inventory/InventoryView.swift",
       "target": "file:Avelo/Features/Inventory/BOMsViewModel.swift",
       "type": "depends_on",
-      "description": "InventoryView creates and binds BOMsViewModel for BOM section.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8125,7 +7784,6 @@
       "source": "file:Avelo/Features/Inventory/InventoryView.swift",
       "target": "file:Avelo/Features/Inventory/StockMovementSheet.swift",
       "type": "calls",
-      "description": "InventoryView presents StockMovementSheet for an inventory item.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8133,7 +7791,6 @@
       "source": "file:Avelo/Features/Inventory/InventoryViewModel.swift",
       "target": "file:Avelo/Features/Inventory/InventoryView.swift",
       "type": "calls",
-      "description": "InventoryViewModel provides item list data to InventoryView.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8141,7 +7798,6 @@
       "source": "file:Avelo/Features/Inventory/OrdersView.swift",
       "target": "file:Avelo/Features/Inventory/InventoryOrdersViewModel.swift",
       "type": "depends_on",
-      "description": "OrdersView consumes InventoryOrdersViewModel for orders list data and operations.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8149,7 +7805,6 @@
       "source": "file:Avelo/Features/Inventory/OrdersView.swift",
       "target": "file:Avelo/Features/Inventory/NewOrderSheet.swift",
       "type": "calls",
-      "description": "OrdersView presents NewOrderSheet for creating purchase or sales orders.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8157,7 +7812,6 @@
       "source": "file:Avelo/Features/Inventory/OrdersView.swift",
       "target": "file:Avelo/Features/Inventory/OrderDetailSheet.swift",
       "type": "calls",
-      "description": "OrdersView presents OrderDetailSheet for viewing order details.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8165,7 +7819,6 @@
       "source": "file:Avelo/Features/Inventory/BOMEditorSheet.swift",
       "target": "file:Avelo/Features/Inventory/BOMsView.swift",
       "type": "calls",
-      "description": "BOMEditorSheet is presented by BOMsView.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8173,7 +7826,6 @@
       "source": "file:Avelo/Features/Inventory/NewOrderSheet.swift",
       "target": "file:Avelo/Features/Inventory/OrdersView.swift",
       "type": "calls",
-      "description": "NewOrderSheet is presented by OrdersView.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8181,7 +7833,6 @@
       "source": "file:Avelo/Features/Inventory/OrderDetailSheet.swift",
       "target": "file:Avelo/Features/Inventory/OrdersView.swift",
       "type": "calls",
-      "description": "OrderDetailSheet is presented by OrdersView.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8189,7 +7840,6 @@
       "source": "file:Avelo/Features/Inventory/StockMovementSheet.swift",
       "target": "file:Avelo/Features/Inventory/InventoryView.swift",
       "type": "calls",
-      "description": "StockMovementSheet is presented by InventoryView.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8197,7 +7847,6 @@
       "source": "file:Avelo/Features/Onboarding/NewCompanySheet.swift",
       "target": "file:Avelo/Features/Onboarding/OnboardingViewModel.swift",
       "type": "depends_on",
-      "description": "NewCompanySheet uses OnboardingViewModel for company creation form state and validation.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8205,7 +7854,6 @@
       "source": "file:Avelo/Features/Onboarding/OnboardingViewModel.swift",
       "target": "file:Avelo/Features/Onboarding/NewCompanySheet.swift",
       "type": "calls",
-      "description": "OnboardingViewModel provides form state to NewCompanySheet.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8213,7 +7861,6 @@
       "source": "file:Avelo/Features/Inventory/ManageInventorySheet.swift",
       "target": "file:Avelo/Features/Inventory/InventoryView.swift",
       "type": "related",
-      "description": "ManageInventorySheet is a settings-related sheet for the Inventory module.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8221,7 +7868,6 @@
       "source": "file:Avelo/Features/Payroll/ManagePayrollSheet.swift",
       "target": "file:Avelo/Features/Payroll/PayrollView.swift",
       "type": "related",
-      "description": "ManagePayrollSheet is a settings-related sheet for the Payroll module.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8229,7 +7875,6 @@
       "source": "file:Avelo/Features/Payroll/PayrollView.swift",
       "target": "file:Avelo/Features/Payroll/NewEmployeeSheet.swift",
       "type": "calls",
-      "description": "PayrollView presents NewEmployeeSheet for creating employees.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8237,7 +7882,6 @@
       "source": "file:Avelo/Features/Payroll/NewEmployeeSheet.swift",
       "target": "file:Avelo/Features/Payroll/PayrollView.swift",
       "type": "calls",
-      "description": "NewEmployeeSheet is presented by PayrollView.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8245,7 +7889,6 @@
       "source": "file:Avelo/Features/Onboarding/CommandPaletteSheet.swift",
       "target": "file:Avelo/Features/Onboarding/ShortcutHelpSheet.swift",
       "type": "related",
-      "description": "CommandPaletteSheet and ShortcutHelpSheet are both keyboard-driven navigation/help sheets.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8253,7 +7896,6 @@
       "source": "file:Avelo/Features/Onboarding/QuickSearchSheet.swift",
       "target": "file:Avelo/Features/Onboarding/CommandPaletteSheet.swift",
       "type": "related",
-      "description": "QuickSearchSheet and CommandPaletteSheet are both search/command UI sheets.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8261,7 +7903,6 @@
       "source": "file:Avelo/Features/Onboarding/BackupSheet.swift",
       "target": "file:Avelo/Features/Onboarding/RestoreSheet.swift",
       "type": "related",
-      "description": "BackupSheet and RestoreSheet are paired backup/restore operations.",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8269,7 +7910,6 @@
       "source": "file::ReportsView",
       "target": "file::ReportsViewModel",
       "type": "defines_schema",
-      "description": "ReportsView creates and manages ReportsViewModel instance",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8277,7 +7917,6 @@
       "source": "file::ReportsViewModel",
       "target": "file::ReportsBody+Activity",
       "type": "writes",
-      "description": "ReportsViewModel provides dayBook and ledger data consumed by ReportsBody+Activity",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8285,7 +7924,6 @@
       "source": "file::ReportsViewModel",
       "target": "file::ReportsBody+FinancialStatements",
       "type": "writes",
-      "description": "ReportsViewModel provides trialBalance, profitLoss, balanceSheet, cashFlow, and comparative data consumed by ReportsBody+FinancialStatements",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8293,7 +7931,6 @@
       "source": "file::ReportsViewModel",
       "target": "file::ReportsBody+GST",
       "type": "writes",
-      "description": "ReportsViewModel provides gstSummary data consumed by ReportsBody+GST",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8301,7 +7938,6 @@
       "source": "file::ReportsViewModel",
       "target": "file::ReportsBody+Inventory",
       "type": "writes",
-      "description": "ReportsViewModel provides stockMovements, stockRegisterRows, stockValuation, and stockAgeing data consumed by ReportsBody+Inventory",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8309,7 +7945,6 @@
       "source": "file::ReportsViewModel",
       "target": "file::ReportsBody+Outstanding",
       "type": "writes",
-      "description": "ReportsViewModel provides outstanding data consumed by ReportsBody+Outstanding",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8317,7 +7952,6 @@
       "source": "file::ReportsView+Content",
       "target": "file::ReportsBody+Activity",
       "type": "defines_schema",
-      "description": "ReportsBody in ReportsView+Content is extended by ReportsBody+Activity",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8325,7 +7959,6 @@
       "source": "file::ReportsView+Content",
       "target": "file::ReportsBody+FinancialStatements",
       "type": "defines_schema",
-      "description": "ReportsBody in ReportsView+Content is extended by ReportsBody+FinancialStatements",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8333,7 +7966,6 @@
       "source": "file::ReportsView+Content",
       "target": "file::ReportsBody+GST",
       "type": "defines_schema",
-      "description": "ReportsBody in ReportsView+Content is extended by ReportsBody+GST",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8341,7 +7973,6 @@
       "source": "file::ReportsView+Content",
       "target": "file::ReportsBody+Inventory",
       "type": "defines_schema",
-      "description": "ReportsBody in ReportsView+Content is extended by ReportsBody+Inventory",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8349,7 +7980,6 @@
       "source": "file::ReportsView+Content",
       "target": "file::ReportsBody+Navigation",
       "type": "defines_schema",
-      "description": "ReportsBody in ReportsView+Content is extended by ReportsBody+Navigation",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8357,7 +7987,6 @@
       "source": "file::ReportsView+Content",
       "target": "file::ReportsBody+Outstanding",
       "type": "defines_schema",
-      "description": "ReportsBody in ReportsView+Content is extended by ReportsBody+Outstanding",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8365,7 +7994,6 @@
       "source": "file::ReportsView",
       "target": "file::ReportsView+Content",
       "type": "contains",
-      "description": "ReportsView composes ReportsContent from ReportsView+Content",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8373,7 +8001,6 @@
       "source": "file::ReportsView",
       "target": "file::EditVoucherSheet",
       "type": "calls",
-      "description": "ReportsView navigates to EditVoucherSheet via ReportsNavigation.openVoucher",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8381,7 +8008,6 @@
       "source": "file::SettingsView",
       "target": "file::SettingsViewModel",
       "type": "defines_schema",
-      "description": "SettingsView creates and manages SettingsViewModel instance",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8389,7 +8015,6 @@
       "source": "file::SettingsView",
       "target": "file::CompanyInfoSheet",
       "type": "calls",
-      "description": "SettingsView presents CompanyInfoSheet for editing company info",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8397,7 +8022,6 @@
       "source": "file::SettingsView",
       "target": "file::NewFinancialYearSheet",
       "type": "calls",
-      "description": "SettingsView presents NewFinancialYearSheet for creating new FY",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8405,7 +8029,6 @@
       "source": "file::SettingsView",
       "target": "file::CloseFinancialYearSheet",
       "type": "calls",
-      "description": "SettingsView closes financial year via SettingsViewModel.close",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8413,7 +8036,6 @@
       "source": "file::SettingsViewModel",
       "target": "file::CloseFinancialYearSheet",
       "type": "calls",
-      "description": "SettingsViewModel delegates FY close to FinancialYearService",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8421,7 +8043,6 @@
       "source": "file::PostSalarySheet",
       "target": "file::PayrollViewModel",
       "type": "related",
-      "description": "PostSalarySheet and PayrollViewModel both use PayrollService for payroll operations",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8429,7 +8050,6 @@
       "source": "file::VouchersView",
       "target": "file::VouchersViewModel",
       "type": "defines_schema",
-      "description": "VouchersView creates and manages VouchersViewModel instance",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8437,7 +8057,6 @@
       "source": "file::VouchersView",
       "target": "file::NewVoucherSheet",
       "type": "calls",
-      "description": "VouchersView presents NewVoucherSheet for each voucher type",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8445,7 +8064,6 @@
       "source": "file::VouchersView",
       "target": "file::EditVoucherSheet",
       "type": "calls",
-      "description": "VouchersView presents EditVoucherSheet for editing vouchers",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8453,7 +8071,6 @@
       "source": "file::VouchersView",
       "target": "file::ReverseVoucherSheet",
       "type": "calls",
-      "description": "VouchersView presents ReverseVoucherSheet for reversing vouchers",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8461,7 +8078,6 @@
       "source": "file::NewVoucherSheet",
       "target": "file::VoucherEditViewModel",
       "type": "defines_schema",
-      "description": "NewVoucherSheet creates VoucherEditViewModel for new voucher entry",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8469,7 +8085,6 @@
       "source": "file::EditVoucherSheet",
       "target": "file::VoucherEditViewModel",
       "type": "defines_schema",
-      "description": "EditVoucherSheet creates VoucherEditViewModel for editing existing vouchers",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8477,7 +8092,6 @@
       "source": "file::VoucherEditViewModel",
       "target": "file::VouchersViewModel",
       "type": "related",
-      "description": "VoucherEditViewModel and VouchersViewModel both interact with VoucherService for voucher CRUD",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8485,7 +8099,6 @@
       "source": "file::Avelo/Core/Keyboard/KeyboardBridge.swift",
       "target": "file::Avelo/Core/Keyboard/KeyboardRouter.swift",
       "type": "depends_on",
-      "description": "Receives KeyboardCommands from dispatch and translates them to AppRouter actions",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8493,7 +8106,6 @@
       "source": "file::Avelo/Core/Keyboard/KeyboardMonitor.swift",
       "target": "file::Avelo/Core/Keyboard/KeyboardRouter.swift",
       "type": "depends_on",
-      "description": "Routes translated NSEvent commands to KeyboardRouter.handle()",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8501,7 +8113,6 @@
       "source": "file::Avelo/Shared/Components/SheetKeyboardCapture.swift",
       "target": "file::Avelo/Core/Keyboard/KeyboardMonitor.swift",
       "type": "depends_on",
-      "description": "Toggles KeyboardMonitor.shared.setSheetCapture on appear/disappear",
       "direction": "forward",
       "weight": 0.5
     },
@@ -8509,403 +8120,211 @@
       "source": "file::Models/Account.swift",
       "target": "class::Account",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/AccountGroup.swift",
       "target": "class::AccountGroup",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/AuditEvent.swift",
       "target": "class::AuditEvent",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/BillOfMaterials.swift",
       "target": "class::BillOfMaterials",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/Company.swift",
       "target": "class::Company",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/CompanyFeatureSet.swift",
       "target": "class::CompanyFeatureSet",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/CompanyRegistry.swift",
       "target": "class::CompanyRegistryEntry",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/FinancialYear.swift",
       "target": "class::FinancialYear",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/InventoryItem.swift",
       "target": "class::InventoryItem",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/InventoryOrder.swift",
       "target": "class::InventoryOrderType",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/MasterData.swift",
       "target": "class::MasterDataService",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/PartyProfile.swift",
       "target": "class::PartyProfile",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/PayrollEmployee.swift",
       "target": "class::PayrollEmployee",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/ReportResult.swift",
       "target": "class::ReportResult",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/ReportResult.swift",
       "target": "class::ReportResult::TrialBalance",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/ReportResult.swift",
       "target": "class::ReportResult::ProfitLossSection",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/ReportResult.swift",
       "target": "class::ReportResult::BalanceSheetSection",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/ReportResult.swift",
       "target": "class::ReportResult::GstBucket",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/Voucher.swift",
       "target": "class::VoucherStatus",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/VoucherDraft.swift",
       "target": "class::VoucherDraft",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/VoucherDraft.swift",
       "target": "class::VoucherDraft::Mode",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/VoucherEntryDraft.swift",
       "target": "class::VoucherEntryDraft",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/VoucherItemLine.swift",
       "target": "class::VoucherItemLine",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/VoucherTemplate.swift",
       "target": "class::VoucherTemplate",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/VoucherType.swift",
       "target": "class::VoucherType",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/WorkspaceConfiguration.swift",
       "target": "class::WorkspaceConfiguration",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/WorkspaceConfiguration.swift",
       "target": "class::WorkspaceConfiguration::ColumnConfiguration",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/WorkspaceConfiguration.swift",
       "target": "class::WorkspaceConfiguration::FilterRule",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/WorkspaceConfiguration.swift",
       "target": "class::WorkspaceConfiguration::PrintDefaults",
       "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     },
     {
       "source": "file::Models/WorkspaceConfiguration.swift",
       "target": "class::WorkspaceConfiguration::ExportDefaults",
       "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:ci-config",
-      "target": "file:PR_TEMPLATE.md",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:ci-config",
-      "target": "file:bug_report.md",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:ci-config",
-      "target": "file:feature_request.md",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "file::Models/AccountingWorkflows.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "class::BillAllocationKind",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "class::ChequeStatus",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "class::BOMQuantityFormat",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "class::BackupManifest",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "class::ValuationMethod",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "class::GSTTaxability",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "class::InventoryOrderStatus",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:models",
-      "target": "class::WorkspaceIdentifier",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:services",
-      "target": "file:struct::AuditChainIntegrity",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:services",
-      "target": "file:enum::AuditChainKeyProvider",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:services",
-      "target": "file:enum::BillAllocationEngine",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:services",
-      "target": "file:struct::GSTInvoiceCalculator",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:services",
-      "target": "file:struct::InventoryValuationEngine",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:services",
-      "target": "class::ValidationService",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:validation",
-      "target": "file::Avelo/Core/Validation/FinancialYearInputValidator.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:application",
-      "target": "file:Avelo/App/SidebarDestination.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:application",
-      "target": "file:Avelo/App/WindowState.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:features",
-      "target": "file:Avelo/Features/Inventory/NewItemSheet.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:features",
-      "target": "file:Avelo/Features/Onboarding/AboutSheet.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:features",
-      "target": "file:Avelo/Features/Onboarding/OpenCompanySheet.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:features",
-      "target": "file:Avelo/Features/Onboarding/PreferencesSheet.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:cache",
-      "target": "file::Avelo/Core/Cache/AccountTreeCache.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:repositories",
-      "target": "file::Avelo/Core/Repositories/ReportRepository.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:repositories",
-      "target": "file::Avelo/Core/Repositories/VoucherItemLineRepository.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:repositories",
-      "target": "file::Avelo/Core/Repositories/VoucherRepository.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:repositories",
-      "target": "file::Avelo/Core/Repositories/VoucherSequenceRepository.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:repositories",
-      "target": "file::Repositories/RegistryRepository.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:shared",
-      "target": "file::Avelo/Shared/Components/AccountPicker.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:shared",
-      "target": "file::Avelo/Shared/Components/KeyboardShortcutMap.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:shared",
-      "target": "file::Avelo/Shared/Components/MoneyTextField.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:shared",
-      "target": "file::Avelo/Shared/Components/PaginationControls.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:shared",
-      "target": "file::Avelo/Shared/Components/SearchBar.swift",
-      "type": "contains",
-      "weight": 1
-    },
-    {
-      "source": "layer:shared",
-      "target": "file::Avelo/Shared/Components/ShellContextBar.swift",
-      "type": "contains",
-      "weight": 1
+      "weight": 1,
+      "direction": "forward"
     }
   ],
   "layers": [
