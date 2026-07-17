@@ -31,9 +31,15 @@ public struct CommandPaletteSheet: View {
         func nav(_ title: String, _ symbol: String, _ dest: SidebarDestination) {
             out.append(Command(title: title, subtitle: "Go", symbol: symbol) { $0.go(dest) })
         }
+        func registryNav(_ id: AppActionID, subtitle: String) {
+            guard let action = AppActionRegistry.action(for: id) else { return }
+            out.append(Command(title: action.title, subtitle: subtitle, symbol: action.symbol) { router in
+                AppActionRegistry.perform(id, router: router)
+            })
+        }
         nav("Dashboard", "square.grid.2x2", .dashboard)
-        nav("Accounts", "book", .accounts)
-        nav("Vouchers", "doc.text", .vouchers)
+        registryNav(.accountsDisplay, subtitle: "Go")
+        registryNav(.vouchersDisplay, subtitle: "Go")
         nav("Reports", "chart.bar", .reports)
         if isInventoryEnabled { nav("Inventory", "shippingbox", .inventory) }
         nav("GST", "doc.text.magnifyingglass", .gst)
@@ -43,20 +49,23 @@ public struct CommandPaletteSheet: View {
         nav("Settings", "gearshape", .settings)
         out.append(Command(title: "Company Info", subtitle: "Edit local company profile", symbol: "building.2") { $0.present(.companyInfo) })
 
-        func voucher(_ title: String, _ key: String, _ sheet: RouterSheet) {
-            out.append(Command(title: "New \(title)", subtitle: "Voucher · \(key)", symbol: "plus.rectangle") { $0.present(sheet) })
+        func voucherCommand(_ type: VoucherType.Code) {
+            guard let action = AppActionRegistry.action(for: .voucherCreate(type)) else { return }
+            out.append(Command(title: action.title, subtitle: action.paletteSubtitle ?? "Voucher", symbol: action.symbol) { router in
+                AppActionRegistry.perform(.voucherCreate(type), router: router)
+            })
         }
-        voucher("Contra", "F4", .newContra)
-        voucher("Payment", "F5", .newPayment)
-        voucher("Receipt", "F6", .newReceipt)
-        voucher("Journal", "F7", .newJournal)
+        voucherCommand(.contra)
+        voucherCommand(.payment)
+        voucherCommand(.receipt)
+        voucherCommand(.journal)
         out.append(Command(title: "Memo", subtitle: "Journal-style note", symbol: "note.text") { $0.present(.newJournal) })
-        voucher("Sales", "F8", .newSales)
-        voucher("Purchase", "F9", .newPurchase)
-        voucher("Credit Note", "⌃F8", .newCreditNote)
-        voucher("Debit Note", "⌃F9", .newDebitNote)
+        voucherCommand(.sales)
+        voucherCommand(.purchase)
+        voucherCommand(.creditNote)
+        voucherCommand(.debitNote)
 
-        out.append(Command(title: "New Account", subtitle: "Create", symbol: "plus.circle") { $0.present(.newAccount) })
+        registryNav(.accountCreate, subtitle: "Create")
         out.append(Command(title: "Backup Company", subtitle: "Action", symbol: "externaldrive") { $0.present(.backup) })
         out.append(Command(title: "Financial Year Settings", subtitle: "Open Settings", symbol: "calendar") { $0.go(.settings) })
         if isInventoryEnabled {

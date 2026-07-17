@@ -287,11 +287,15 @@ Exit evidence: every P0 release-board row references passing automated and named
 
 Objective: establish one interaction and authorization platform so later features do not create isolated screens or duplicated business policy.
 
-1. [PLANNED] Action registry vertical slice:
-   - Define stable `AppActionID`, typed context, availability reason, result, and async dispatcher.
-   - Migrate Create/Display/Alter/Duplicate/Reverse/Cancel/Print/Export/Drill Down actions for Accounts, Vouchers, Trial Balance, and Day Book first.
-   - Drive menu items, toolbar, context strip, command palette, row actions, shortcut help, and deep-link authorization from the same definitions.
-   - Prove unavailable actions cannot be invoked through direct routes or services and text editing wins every collision.
+1. [PLANNED] Action registry vertical slice. Split into sub-slices; the registry core and most call-site migration have landed, the remainder is tracked below rather than striking the whole item through prematurely:
+   - ~~Define stable `AppActionID`, typed context, availability reason, result, and dispatcher in `Avelo/Core/Actions/`.~~ Dispatch is synchronous: every migrated action resolves to a router effect (`AppActionEffect`) with no awaiting work. Introduce `async` when an action first needs it, not before.
+   - ~~Migrate Create/Display/Alter/Duplicate/Reverse/Export/Drill Down actions for Accounts, Vouchers, Trial Balance, and Day Book into the registry catalog.~~ Cancel and Print have no existing call sites for these four types and were not invented.
+   - ~~Drive menu items, toolbar, command palette, shortcut help, and keyboard dispatch from the same definitions.~~ The hand-synced shortcut list was `ShortcutHelpSheet.swift`, not `KeyboardShortcutMap.swift` (the latter holds unrelated app-wide shortcuts).
+   - [PLANNED] Drive the remaining row actions from the same definitions: Day Book rows (`ReportsBody+Activity.swift`) and Trial Balance ledger drill-down (`ReportsBody+FinancialStatements.swift`) still self-wire. Both are deferred to item 5's report explorer, which restructures these views anyway; migrating them now would add gates that do not exist today (`DayBookRow` carries no `isReversal`) or a speculative effect type (Trial Balance mutates `ReportsViewModel` locally rather than routing).
+   - [PLANNED] Contextual action strip does not exist yet; it arrives with item 4's shell.
+   - ~~Prove unavailable actions cannot be invoked through direct routes, not merely hidden in UI: `AppAction.perform` checks availability before producing any effect, covered by `Tests/AveloTests/AppActionRegistryTests.swift`.~~
+   - [OPEN — manual] Keyboard collision and text-editing precedence acceptance for the migrated surfaces.
+   - Note: fiscal lock is enforced at save time (`VoucherDraftValidator`/`FiscalLockChecker`), never as a menu/shortcut gate. Action availability deliberately does not gate on it — doing so would newly block sheets that open today. Item 6's fiscal-lock proof axis is therefore not yet exercisable through the registry.
 2. [PLANNED] Capability and configuration foundation:
    - Introduce `CompanyFeatureSet` for inventory, bill-wise, cost, GST, payroll, banking, orders, batches/godowns, manufacturing, budgets, interest, and later currency support.
    - Introduce versioned `WorkspaceConfiguration` for density, labels, columns, grid behavior, filters, grouping, comparisons, focus behavior, and print/export defaults.

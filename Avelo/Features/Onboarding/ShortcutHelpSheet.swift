@@ -21,17 +21,7 @@ public struct ShortcutHelpSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     section("Navigation", rows: navigationRows)
 
-                    section("Vouchers (function keys)", rows: [
-                        ("F4", "New Contra voucher"),
-                        ("F5", "New Payment voucher"),
-                        ("F6", "New Receipt voucher"),
-                        ("F7", "New Journal voucher"),
-                        ("Cmd+K → Memo", "Journal-style memo entry"),
-                        ("F8", "New Sales voucher"),
-                        ("F9", "New Purchase voucher"),
-                        ("⌃F8", "New Credit Note"),
-                        ("⌃F9", "New Debit Note"),
-                    ])
+                    section("Vouchers (function keys)", rows: voucherRows)
 
                     section("Reports (Cmd+Opt)", rows: reportRows)
 
@@ -63,6 +53,30 @@ public struct ShortcutHelpSheet: View {
             ("Cmd+9", "Open Audit log"),
             ("Cmd+0", "Open Settings")
         ]
+        return rows
+    }
+
+    /// Sourced from `AppActionRegistry` so this list can't drift from the
+    /// Voucher menu/toolbar/palette. "Memo" has no registry entry (it's
+    /// `.newJournal` under another name), so it stays hand-written.
+    private var voucherRows: [(String, String)] {
+        var rows: [(String, String)] = []
+        for type: VoucherType.Code in [.contra, .payment, .receipt, .journal] {
+            if let action = AppActionRegistry.action(for: .voucherCreate(type)), let key = action.shortcutLabel {
+                rows.append((key, "\(action.title) voucher"))
+            }
+        }
+        rows.append(("Cmd+K → Memo", "Journal-style memo entry"))
+        for type: VoucherType.Code in [.sales, .purchase] {
+            if let action = AppActionRegistry.action(for: .voucherCreate(type)), let key = action.shortcutLabel {
+                rows.append((key, "\(action.title) voucher"))
+            }
+        }
+        for type: VoucherType.Code in [.creditNote, .debitNote] {
+            if let action = AppActionRegistry.action(for: .voucherCreate(type)), let key = action.shortcutLabel {
+                rows.append((key, action.title))
+            }
+        }
         return rows
     }
 

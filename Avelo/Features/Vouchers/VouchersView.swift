@@ -28,18 +28,25 @@ public struct VouchersView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem {
             Menu {
-                Button("New Journal") { env.router.present(.newJournal) }
-                Button("New Payment") { env.router.present(.newPayment) }
-                Button("New Receipt") { env.router.present(.newReceipt) }
-                Button("New Contra")  { env.router.present(.newContra) }
-                Button("New Purchase"){ env.router.present(.newPurchase) }
-                Button("New Sales")   { env.router.present(.newSales) }
+                newVoucherButton(.journal)
+                newVoucherButton(.payment)
+                newVoucherButton(.receipt)
+                newVoucherButton(.contra)
+                newVoucherButton(.purchase)
+                newVoucherButton(.sales)
                 Divider()
-                Button("New Credit Note") { env.router.present(.newCreditNote) }
-                Button("New Debit Note")  { env.router.present(.newDebitNote) }
+                newVoucherButton(.creditNote)
+                newVoucherButton(.debitNote)
             } label: {
                 Label("New", systemImage: "plus")
             }
+        }
+    }
+
+    @ViewBuilder
+    private func newVoucherButton(_ type: VoucherType.Code) -> some View {
+        if let action = AppActionRegistry.action(for: .voucherCreate(type)) {
+            Button(action.title) { AppActionRegistry.perform(.voucherCreate(type), router: env.router) }
         }
     }
 
@@ -89,7 +96,7 @@ private struct VouchersBody: View {
                 ],
                 primaryActionTitle: "New Sales",
                 primaryActionSystemImage: "plus",
-                primaryAction: { env.router.present(.newSales) }
+                primaryAction: { AppActionRegistry.perform(.voucherCreate(.sales), router: env.router) }
             )
             filterBar
             Divider()
@@ -99,7 +106,7 @@ private struct VouchersBody: View {
                     message: "Press F5 for Payment, F6 for Receipt, F7 for Journal, F4 for Contra — or use the New menu above.",
                     systemImage: "doc.text",
                     actionTitle: "New Journal",
-                    action: { env.router.present(.newJournal) }
+                    action: { AppActionRegistry.perform(.voucherCreate(.journal), router: env.router) }
                 )
             } else {
                 voucherTable
@@ -147,18 +154,19 @@ private struct VouchersBody: View {
                     }
                 }
                 TableColumn("Actions") { v in
+                    let context = AppActionContext(voucher: v)
                     HStack {
-                        Button("Edit") { env.router.present(.editVoucher(v.id)) }
-                            .disabled(v.isReversal)
-                        Button("Reverse") { env.router.present(.reverseVoucher(v.id)) }
-                            .disabled(v.isReversal)
+                        Button("Edit") { AppActionRegistry.perform(.voucherAlter, context: context, router: env.router) }
+                            .disabled(!AppActionRegistry.availability(for: .voucherAlter, in: context).isAvailable)
+                        Button("Reverse") { AppActionRegistry.perform(.voucherReverse, context: context, router: env.router) }
+                            .disabled(!AppActionRegistry.availability(for: .voucherReverse, in: context).isAvailable)
                         // No ⌥2 keyboard shortcut here: Table has no row
                         // selection binding, so a global shortcut would be
                         // ambiguous across rows. Mouse-only until selection
                         // state is added (tracked with AVL-P1-044).
                         Button("Duplicate") { duplicate(v) }
-                            .disabled(routerSheet(for: v.voucherTypeCode) == nil)
-                        if v.voucherTypeCode == .sales || v.voucherTypeCode == .purchase {
+                            .disabled(!AppActionRegistry.availability(for: .voucherDuplicate, in: context).isAvailable)
+                        if AppActionRegistry.availability(for: .voucherExportPDF, in: context).isAvailable {
                             Button("Export PDF…") { exportInvoicePDF(v) }
                         }
                     }
@@ -172,7 +180,7 @@ private struct VouchersBody: View {
         // the list's filter/scroll state is untouched because this never
         // calls reload()/reloadFirstPage().
         .background {
-            Button("") { env.router.present(.newJournal) }
+            Button("") { AppActionRegistry.perform(.voucherCreate(.journal), router: env.router) }
                 .keyboardShortcut("i", modifiers: [.control])
                 .hidden()
         }
@@ -183,7 +191,7 @@ private struct VouchersBody: View {
     /// draft-crash-recovery uses — no new persistence path, no
     /// `avelo_voucher_drafts` row, a brand-new voucher number on save.
     private func duplicate(_ voucher: Voucher) {
-        guard let ctx = env.companyContext, let sheet = routerSheet(for: voucher.voucherTypeCode) else { return }
+        guard let ctx = env.companyContext, let sheet = AppActionRegistry.creationSheet(for: voucher.voucherTypeCode) else { return }
         do {
             let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
             let lines = try svc.lines(for: voucher.id)
@@ -191,22 +199,6 @@ private struct VouchersBody: View {
             env.router.present(sheet)
         } catch {
             env.showError(AppError.wrap(error))
-        }
-    }
-
-    /// `.opening` and `.payroll` are system-generated and have no "New X"
-    /// sheet to duplicate into.
-    private func routerSheet(for typeCode: VoucherType.Code) -> RouterSheet? {
-        switch typeCode {
-        case .journal: return .newJournal
-        case .payment: return .newPayment
-        case .receipt: return .newReceipt
-        case .contra: return .newContra
-        case .purchase: return .newPurchase
-        case .sales: return .newSales
-        case .creditNote: return .newCreditNote
-        case .debitNote: return .newDebitNote
-        case .opening, .payroll: return nil
         }
     }
 

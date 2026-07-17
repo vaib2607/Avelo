@@ -23,7 +23,7 @@ public struct AccountsView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem {
             Button {
-                env.router.present(.newAccount)
+                AppActionRegistry.perform(.accountCreate, router: env.router)
             } label: {
                 Label("New Account", systemImage: "plus")
             }
@@ -89,7 +89,7 @@ private struct AccountsBody: View {
                 ],
                 primaryActionTitle: "New Account",
                 primaryActionSystemImage: "plus",
-                primaryAction: { env.router.present(.newAccount) }
+                primaryAction: { AppActionRegistry.perform(.accountCreate, router: env.router) }
             )
             HStack {
                 Text("Groups").font(.headline)
@@ -184,13 +184,13 @@ private struct AccountsBody: View {
                     Spacer()
                     Text(Currency.formatPaise(account.openingBalancePaise)).monospacedDigit()
                     Button {
-                        env.router.present(.editAccount(account.id))
+                        AppActionRegistry.perform(.accountAlter, context: AppActionContext(accountId: account.id), router: env.router)
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
                     .buttonStyle(.borderless)
                     Button {
-                        env.router.openLedger(account.id)
+                        AppActionRegistry.perform(.accountDrillDown, context: AppActionContext(accountId: account.id), router: env.router)
                     } label: {
                         Label("Ledger", systemImage: "list.bullet.rectangle")
                     }

@@ -55,8 +55,8 @@ public final class KeyboardBridge {
         lastCommand = command
         switch command {
         case .openDashboard:     router?.go(.dashboard)
-        case .openAccounts:      router?.go(.accounts)
-        case .openVouchers:      router?.go(.vouchers)
+        case .openAccounts:      performRegistryAction(.accountsDisplay)
+        case .openVouchers:      performRegistryAction(.vouchersDisplay)
         case .openReports:       router?.go(.reports)
         case .openInventory:
             router?.setInventoryEnabled(isInventoryEnabled)
@@ -68,9 +68,9 @@ public final class KeyboardBridge {
         case .openSettings:      router?.go(.settings)
 
         case .newVoucher(let type):
-            router?.present(sheet(for: type))
+            performRegistryAction(voucherCreateActionId(for: type))
 
-        case .newAccount:        router?.present(.newAccount)
+        case .newAccount:        performRegistryAction(.accountCreate)
         case .newItem:
             router?.setInventoryEnabled(isInventoryEnabled)
             if isInventoryEnabled { router?.present(.newItem) }
@@ -88,18 +88,18 @@ public final class KeyboardBridge {
     public func dismissQuickSearch()    { quickSearchActive = false }
     public func dismissShortcutHelp()   { shortcutHelpActive = false }
 
-    private func sheet(for type: VoucherType.Code) -> RouterSheet {
+    private func performRegistryAction(_ id: AppActionID) {
+        guard let router else { return }
+        AppActionRegistry.perform(id, router: router)
+    }
+
+    /// `.opening`/`.payroll` have no "New X" sheet in the registry (nothing
+    /// dispatches them today — no keycode maps to those types — but this
+    /// keeps the old `sheet(for:)` fallback to Journal exact if that ever changes).
+    private func voucherCreateActionId(for type: VoucherType.Code) -> AppActionID {
         switch type {
-        case .journal:     return .newJournal
-        case .payment:     return .newPayment
-        case .receipt:     return .newReceipt
-        case .contra:      return .newContra
-        case .purchase:    return .newPurchase
-        case .sales:       return .newSales
-        case .creditNote:  return .newCreditNote
-        case .debitNote:   return .newDebitNote
-        case .opening, .payroll:
-            return .newJournal
+        case .opening, .payroll: return .voucherCreate(.journal)
+        default: return .voucherCreate(type)
         }
     }
 }

@@ -104,10 +104,8 @@ struct AveloApp: App {
                 CommandMenu("Go") {
                     Button("Dashboard") { environment.router.go(.dashboard) }
                         .keyboardShortcut("1", modifiers: .command)
-                    Button("Vouchers")  { environment.router.go(.vouchers) }
-                        .keyboardShortcut("2", modifiers: .command)
-                    Button("Accounts")  { environment.router.go(.accounts) }
-                        .keyboardShortcut("3", modifiers: .command)
+                    actionButton(.vouchersDisplay, environment: environment)
+                    actionButton(.accountsDisplay, environment: environment)
                     Button("Reports")   { environment.router.go(.reports) }
                         .keyboardShortcut("4", modifiers: .command)
                     if environment.companyContext?.isInventoryEnabled == true {
@@ -126,8 +124,7 @@ struct AveloApp: App {
                         .keyboardShortcut("0", modifiers: .command)
                 }
                 CommandMenu("Masters") {
-                    Button("New Account…") { environment.router.present(.newAccount) }
-                        .keyboardShortcut("a", modifiers: [.command, .shift])
+                    actionButton(.accountCreate, environment: environment)
                     Button("New Group…") { environment.router.present(.newGroup) }
                         .keyboardShortcut("g", modifiers: [.command, .shift])
                     if environment.companyContext?.isInventoryEnabled == true {
@@ -143,27 +140,25 @@ struct AveloApp: App {
                     Button("New Cost Category…") { environment.router.present(.newCostCategory) }
                 }
                 CommandMenu("Voucher") {
-                    Button("Contra (F4)")     { environment.router.present(.newContra) }
-                    Button("Payment (F5)")    { environment.router.present(.newPayment) }
-                    Button("Receipt (F6)")    { environment.router.present(.newReceipt) }
-                    Button("Journal (F7)")    { environment.router.present(.newJournal) }
+                    voucherActionButton(.contra, environment: environment)
+                    voucherActionButton(.payment, environment: environment)
+                    voucherActionButton(.receipt, environment: environment)
+                    voucherActionButton(.journal, environment: environment)
                     Button("Memo")            { environment.router.present(.newJournal) }
-                    Button("Sales (F8)")      { environment.router.present(.newSales) }
-                    Button("Purchase (F9)")   { environment.router.present(.newPurchase) }
-                    Button("Credit Note (⌃F8)") { environment.router.present(.newCreditNote) }
-                    Button("Debit Note (⌃F9)")  { environment.router.present(.newDebitNote) }
+                    voucherActionButton(.sales, environment: environment)
+                    voucherActionButton(.purchase, environment: environment)
+                    voucherActionButton(.creditNote, environment: environment)
+                    voucherActionButton(.debitNote, environment: environment)
                 }
                 CommandMenu("Reports") {
-                    Button("Trial Balance") { environment.router.openReport(.trialBalance) }
-                        .keyboardShortcut("1", modifiers: [.command, .option])
+                    actionButton(.trialBalanceDisplay, environment: environment)
                     Button("Profit & Loss") { environment.router.openReport(.profitLoss) }
                         .keyboardShortcut("2", modifiers: [.command, .option])
                     Button("Balance Sheet") { environment.router.openReport(.balanceSheet) }
                         .keyboardShortcut("3", modifiers: [.command, .option])
                     Button("GST Summary") { environment.router.openReport(.gstSummary) }
                         .keyboardShortcut("4", modifiers: [.command, .option])
-                    Button("Day Book") { environment.router.openReport(.dayBook) }
-                        .keyboardShortcut("5", modifiers: [.command, .option])
+                    actionButton(.dayBookDisplay, environment: environment)
                     Button("Ledger") { environment.router.openReport(.ledger) }
                         .keyboardShortcut("6", modifiers: [.command, .option])
                     Button("Cash Book") { environment.router.openReport(.cashBook) }
@@ -189,6 +184,33 @@ struct AveloApp: App {
                     }
                 }
             }
+        }
+    }
+}
+
+/// Menu button for a global-shortcut action in `AppActionRegistry`.
+@ViewBuilder
+private func actionButton(_ id: AppActionID, environment: AppEnvironment) -> some View {
+    if let action = AppActionRegistry.action(for: id) {
+        let button = Button(action.title) {
+            AppActionRegistry.perform(id, router: environment.router)
+        }
+        if let key = action.key {
+            button.keyboardShortcut(key, modifiers: action.modifiers)
+        } else {
+            button
+        }
+    }
+}
+
+/// Voucher menu button: registry title plus its function-key label, matching
+/// the menu's original "Contra (F4)"-style wording.
+@ViewBuilder
+private func voucherActionButton(_ type: VoucherType.Code, environment: AppEnvironment) -> some View {
+    if let action = AppActionRegistry.action(for: .voucherCreate(type)) {
+        let label = action.shortcutLabel.map { "\(action.title) (\($0))" } ?? action.title
+        Button(label) {
+            AppActionRegistry.perform(.voucherCreate(type), router: environment.router)
         }
     }
 }
