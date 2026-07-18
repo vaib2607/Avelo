@@ -150,7 +150,7 @@ bankStatementImported, bankStatementLineCleared,
 inventoryOrderCreated, inventoryOrderFulfilled, inventoryOrderStatusChanged,
 inventoryReorderLevelSet,
 billOfMaterialsCreated, billOfMaterialsUpdated, voucherTemplateSaved,
-gstReportExported, invoicePDFExported
+gstReportExported, invoicePDFExported, inventoryCostAllocated, itemInvoiceReturnPosted
 ```
 
 This list reflects current persisted raw values, not adequate production coverage. Any future action name must be added through a forward migration and frozen here before use. Missing action families and service coverage remain `AVL-P0-034`.
@@ -164,6 +164,8 @@ voucherDateOutsideFY, voucherFYLocked, voucherMissingParty,
 voucherMissingNarration, accountNameBlank, accountCodeDuplicate,
 accountGroupRequired, accountOpeningBalanceRequired,
 financialYearOverlap, financialYearGapNotAllowed, financialYearZeroLength,
+reportFinancialYearMissing, reportFinancialYearCompanyMismatch,
+reportAsOfBeforeFinancialYear, reportAsOfAfterFinancialYear,
 companyNameBlank, companyGstinInvalid, companyPanInvalid,
 payrollNetMismatch, payrollEmployeeTerminated,
 stockMovementQuantityZero, stockMovementCostMismatch, quantityExceedsStock,
@@ -193,7 +195,7 @@ RestoreService
 
 `SQLiteError` lives in `Core/Validation/AppError.swift`; it is not declared by `SQLiteDatabase.swift`.
 
-Migration types are frozen as `MigrationV001` through `MigrationV025`. The next persistent change uses `MigrationV026`; an existing migration is never renumbered, edited to mean something else, or removed from `MigrationRunner.defaultMigrations`.
+Migration types are frozen as `MigrationV001` through `MigrationV030`. The next persistent change uses `MigrationV031`; an existing migration is never renumbered, edited to mean something else, or removed from `MigrationRunner.defaultMigrations`.
 
 ## 5. Repository names
 
@@ -322,7 +324,7 @@ Registry table:
 avelo_registry_companies
 ```
 
-Company tables through schema v22:
+Company tables through schema v27:
 
 ```text
 avelo_companies
@@ -340,6 +342,7 @@ avelo_voucher_item_lines
 avelo_bill_allocations
 avelo_cheques
 avelo_inventory_items
+avelo_inventory_locations
 avelo_inventory_orders
 avelo_inventory_order_lines
 avelo_inventory_reorder_levels
@@ -352,6 +355,9 @@ avelo_bank_reconciliations
 avelo_bank_statement_lines
 avelo_audit_events
 avelo_migrations
+trn_accounting
+trn_inventory
+trn_inventory_cost_allocations
 ```
 
 `Avelo_Schema.md` gives the readable column contract. Executable migrations remain authoritative for exact DDL. Any new company-scoped table must also update restore/remap coverage; `avelo_voucher_item_lines` currently exposes the missing-remap blocker `AVL-P0-036`.

@@ -27,13 +27,17 @@ public final class ItemInvoiceService: Sendable {
 
     public struct ItemLineInput: Sendable {
         public let itemId: InventoryItem.ID
-        public let quantity: Int64
+        public let quantity: ExactQuantity
         public let ratePaise: Int64
 
-        public init(itemId: InventoryItem.ID, quantity: Int64, ratePaise: Int64) {
+        public init(itemId: InventoryItem.ID, quantity: ExactQuantity, ratePaise: Int64) {
             self.itemId = itemId
             self.quantity = quantity
             self.ratePaise = ratePaise
+        }
+
+        public init(itemId: InventoryItem.ID, quantity: Int64, ratePaise: Int64) {
+            self.init(itemId: itemId, quantity: try! ExactQuantity.whole(quantity), ratePaise: ratePaise)
         }
     }
 
@@ -63,6 +67,18 @@ public final class ItemInvoiceService: Sendable {
         guard !items.isEmpty else {
             throw AppError.validation(.init(code: .internal, field: "items", message: "Add at least one item line."))
         }
+
+        // Fast user-facing rejection. The same facts are re-read inside the
+        // write lock before the voucher number or any track row is created.
+        try validateCurrentPostingState(
+            voucherTypeCode: voucherTypeCode,
+            date: date,
+            partyAccountId: partyAccountId,
+            salesOrPurchaseLedgerId: salesOrPurchaseLedgerId,
+            items: items,
+            financialYear: fy,
+            database: db
+        )
 
         let accountRepo = AccountRepository(db: db)
         guard let company = try CompanyRepository(db: db).findById(companyId) else {
@@ -117,14 +133,17 @@ public final class ItemInvoiceService: Sendable {
         var totalCESS: Int64 = 0
 
         for input in items {
-            guard input.quantity > 0 else {
-                throw AppError.validation(.init(code: .internal, field: "quantity", message: "Quantity must be greater than zero."))
+            guard !input.quantity.isZero else {
+                throw AppError.validation(.init(code: .stockMovementQuantityZero, field: "quantity", message: "Quantity must be greater than zero."))
             }
-            guard let item = try inventoryRepo.findItemById(input.itemId), item.companyId == companyId else {
-                throw AppError.notFound("Inventory item")
+            guard let wholeQuantity = input.quantity.wholeValue else {
+                throw AppError.validation(.init(code: .itemInvoiceQuantityUnsupported, field: "quantity", message: "Fractional item-invoice quantities are not yet supported."))
+            }
+            guard let item = try inventoryRepo.findItemById(input.itemId), item.companyId == companyId, item.isActive else {
+                throw AppError.validation(.init(code: .inventoryItemUnavailable, field: "itemId", message: "Inventory item is missing, inactive, or belongs to another company."))
             }
             let result = try GSTInvoiceCalculator.computeLine(
-                .init(quantity: input.quantity, ratePaise: input.ratePaise,
+                .init(quantity: wholeQuantity, ratePaise: input.ratePaise,
                       gstRateBps: item.gstRateBps, cessRateBps: item.gstCessRateBps, taxability: item.gstTaxability),
                 supplyType: supplyType
             )
@@ -162,6 +181,7 @@ public final class ItemInvoiceService: Sendable {
 
         let draft = VoucherDraft(
             mode: .create,
+            entryMode: .itemInvoice,
             voucherTypeCode: voucherTypeCode,
             date: date,
             partyAccountId: partyAccountId,
@@ -171,11 +191,24 @@ public final class ItemInvoiceService: Sendable {
             lines: draftLines
         )
 
-        let voucherService = VoucherService(db: db, companyId: companyId)
         var voucher: Voucher!
         var itemLines: [VoucherItemLine] = []
-        try db.write { _ in
-            voucher = try voucherService.post(draft: draft, in: fy).voucher
+        try db.write { tx in
+            try validateCurrentPostingState(
+                voucherTypeCode: voucherTypeCode,
+                date: date,
+                partyAccountId: partyAccountId,
+                salesOrPurchaseLedgerId: salesOrPurchaseLedgerId,
+                items: items,
+                financialYear: fy,
+                database: tx
+            )
+            voucher = try VoucherService(db: tx, companyId: companyId).postInCurrentTransaction(
+                draft: draft,
+                in: fy,
+                workflow: nil,
+                recordAudit: false
+            ).voucher
 
             itemLines = computations.enumerated().map { (idx, c) in
                 VoucherItemLine(
@@ -194,23 +227,44 @@ public final class ItemInvoiceService: Sendable {
                     lineOrder: idx
                 )
             }
-            try VoucherItemLineRepository(db: db).insertBatch(itemLines)
+            try VoucherItemLineRepository(db: tx).insertBatch(itemLines)
 
-            if company.isInventoryEnabled {
-                let inventoryService = InventoryService(db: db, companyId: companyId)
-                for c in computations {
-                    _ = try inventoryService.recordMovement(
-                        itemId: c.item.id,
+            // The invoice owns the outer transaction and its one composite
+            // audit event. Reuse transaction-scoped inventory posting so
+            // authoritative valuation is republished without a second audit.
+            let inventoryService = InventoryService(db: tx, companyId: companyId)
+            for (index, computation) in computations.enumerated() {
+                let evidence = itemLines[index]
+                let movementType: InventoryItem.MovementType = isSales ? .stockOut : .stockIn
+                let totalValue = isSales ? 0 : computation.result.taxableValuePaise
+                _ = try inventoryService.recordMovementInCurrentTransaction(
+                    StockMovement(
+                        companyId: companyId,
+                        itemId: computation.item.id,
                         date: date,
-                        type: isSales ? .stockOut : .stockIn,
-                        quantity: c.input.quantity,
-                        ratePaise: c.input.ratePaise,
+                        movementType: movementType,
+                        quantity: computation.input.quantity,
+                        unitCostPaise: computation.input.ratePaise,
+                        totalValuePaise: totalValue,
                         voucherId: voucher.id,
-                        notes: "Item invoice \(voucher.number)"
-                    )
-                }
+                        referenceVoucherNumber: voucher.number,
+                        reason: "Item invoice \(voucher.number)"
+                    ),
+                    item: computation.item,
+                    sourceItemLineId: evidence.id,
+                    recordAudit: false,
+                    transactionDatabase: tx
+                )
             }
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .voucherPosted,
+                entityType: "item_invoice",
+                entityId: voucher.id.uuidString,
+                snapshotAfter: voucher
+            )
         }
+
+        ReportService.invalidateCache(companyId: companyId)
 
         return Result(
             voucher: voucher,
@@ -222,5 +276,156 @@ public final class ItemInvoiceService: Sendable {
             totalCESSPaise: totalCESS,
             invoiceValuePaise: invoiceValue
         )
+    }
+
+    /// Reverses an item invoice as one canonical composite mutation. Unlike
+    /// the ledger-only voucher path it recreates invoice evidence and writes
+    /// the matching opposite inventory movements before publishing one audit.
+    public func reverse(_ voucherId: Voucher.ID, reason: String? = nil) throws -> Voucher {
+        var reversal: Voucher?
+        try db.write { tx in
+            let voucherRepo = VoucherRepository(db: tx)
+            guard let original = try voucherRepo.findById(voucherId), original.companyId == companyId else {
+                throw AppError.notFound("Voucher")
+            }
+            guard !original.isReversal, original.status != .cancelled, !(try voucherRepo.hasReversal(for: voucherId)) else {
+                throw AppError.businessRule("This item invoice cannot be reversed.")
+            }
+            let evidence = try VoucherItemLineRepository(db: tx).findForVoucher(voucherId)
+            guard !evidence.isEmpty else { throw AppError.businessRule("Voucher is not an item invoice.") }
+            let voucherService = VoucherService(db: tx, companyId: companyId)
+            let originalLines = try LedgerLineRepository(db: tx).findForVoucher(voucherId)
+            let created = try voucherService.createReversal(for: original, originalLines: originalLines, reason: reason)
+            let flipped = voucherService.buildFlippedLines(from: originalLines, reversalId: created.id)
+            try voucherRepo.insert(created)
+            try LedgerLineRepository(db: tx).insertBatch(flipped)
+            try voucherService.mirrorBillAllocation(from: original, to: created, originalLines: originalLines, workflowRepo: AccountingWorkflowsRepository(db: tx))
+
+            let copiedEvidence = evidence.enumerated().map { index, line in
+                VoucherItemLine(companyId: companyId, voucherId: created.id, itemId: line.itemId, quantity: line.exactQuantity,
+                                ratePaise: line.ratePaise, taxableValuePaise: line.taxableValuePaise, hsnCode: line.hsnCode,
+                                gstRateBps: line.gstRateBps, cgstPaise: line.cgstPaise, sgstPaise: line.sgstPaise,
+                                igstPaise: line.igstPaise, cessPaise: line.cessPaise, lineOrder: index)
+            }
+            try VoucherItemLineRepository(db: tx).insertBatch(copiedEvidence)
+            let originalMovements = try InventoryRepository(db: tx).listMovements(forVoucher: voucherId)
+            guard originalMovements.count == copiedEvidence.count else {
+                throw AppError.validation(.init(code: .canonicalTrackCoherenceFailure, field: "inventory", message: "Item evidence and inventory movements do not reconcile."))
+            }
+            let inventory = InventoryService(db: tx, companyId: companyId)
+            for (index, originalMovement) in originalMovements.enumerated() {
+                guard let item = try InventoryRepository(db: tx).findItemById(originalMovement.itemId) else { throw AppError.notFound("Inventory item") }
+                let reverseType: InventoryItem.MovementType = originalMovement.movementType == .stockIn ? .stockOut : .stockIn
+                let reverse = StockMovement(companyId: companyId, itemId: originalMovement.itemId, date: created.date,
+                                            movementType: reverseType, quantity: originalMovement.quantity,
+                                            unitCostPaise: originalMovement.unitCostPaise,
+                                            totalValuePaise: reverseType == .stockIn ? originalMovement.totalValuePaise : 0,
+                                            voucherId: created.id, enteredUnit: originalMovement.enteredUnit,
+                                            reversedMovementId: originalMovement.id, referenceVoucherNumber: created.number,
+                                            reason: "Reversal of item invoice \(original.number)")
+                _ = try inventory.recordMovementInCurrentTransaction(reverse, item: item, sourceItemLineId: copiedEvidence[index].id, recordAudit: false, transactionDatabase: tx)
+            }
+            try AuditService(db: tx, companyId: companyId).record(action: .voucherReversed, entityType: "item_invoice", entityId: created.id.uuidString, snapshotBefore: original, snapshotAfter: created, reason: reason)
+            reversal = created
+        }
+        guard let reversal else { throw AppError.unexpected("Item invoice reversal did not complete.") }
+        ReportService.invalidateCache(companyId: companyId)
+        return reversal
+    }
+
+    /// Cancels an item invoice by creating its canonical composite reversal
+    /// and marking the original cancelled inside one outer write scope.
+    public func cancel(_ voucherId: Voucher.ID, reason: String, actor: String = "user") throws -> Voucher {
+        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw AppError.validation(.init(code: .internal, field: "reason", message: "Cancellation reason is required."))
+        }
+        var cancelled: Voucher?
+        try db.write { tx in
+            let repository = VoucherRepository(db: tx)
+            guard let original = try repository.findById(voucherId), original.companyId == companyId else {
+                throw AppError.notFound("Voucher")
+            }
+            guard original.status != .cancelled else { throw AppError.businessRule("This voucher has already been cancelled.") }
+            let reversal = try self.reverse(voucherId, reason: "Cancellation: \(trimmed)")
+            var updated = original
+            updated.status = .cancelled
+            updated.cancelledAt = reversal.createdAt
+            updated.cancelledBy = actor
+            updated.cancellationReason = trimmed
+            updated.cancellationVoucherId = reversal.id
+            updated.updatedAt = reversal.createdAt
+            try repository.markCancelled(updated)
+            try AuditService(db: tx, companyId: companyId).record(
+                action: .voucherCancelled,
+                entityType: "item_invoice",
+                entityId: updated.id.uuidString,
+                snapshotBefore: original,
+                snapshotAfter: updated,
+                reason: trimmed
+            )
+            cancelled = updated
+        }
+        guard let cancelled else { throw AppError.unexpected("Item invoice cancellation did not complete.") }
+        ReportService.invalidateCache(companyId: companyId)
+        return cancelled
+    }
+
+    private func validateCurrentPostingState(voucherTypeCode: VoucherType.Code,
+                                             date: Date,
+                                             partyAccountId: Account.ID,
+                                             salesOrPurchaseLedgerId: Account.ID,
+                                             items: [ItemLineInput],
+                                             financialYear: FinancialYear,
+                                             database: SQLiteDatabase) throws {
+        guard let currentFY = try FinancialYearRepository(db: database).findById(financialYear.id),
+              currentFY.companyId == companyId,
+              currentFY.contains(date: date) else {
+            throw AppError.validation(.init(code: .canonicalTrackCoherenceFailure, field: "date", message: "Item invoice date and financial year must belong to the active company."))
+        }
+        guard !currentFY.isLocked else {
+            throw AppError.validation(.init(code: .canonicalTrackFYLocked, field: "date", message: "Financial year is locked."))
+        }
+        guard let company = try CompanyRepository(db: database).findById(companyId), company.isInventoryEnabled else {
+            throw AppError.featureUnavailable("Inventory is disabled for this company.")
+        }
+        let accountRepo = AccountRepository(db: database)
+        let groups = try AccountGroupRepository(db: database).listForCompany(companyId)
+        let policy = try AccountEligibilityPolicy.loading(db: database, companyId: companyId)
+        guard let party = try accountRepo.findById(partyAccountId),
+              policy.evaluate(account: party, for: .itemInvoiceParty(voucherTypeCode), company: company, groups: groups).isEligible else {
+            throw AppError.validation(.init(code: .voucherAccountInactive, field: "partyAccountId", message: "Party account is missing, inactive, or belongs to another company."))
+        }
+        let tradeContext: AccountSelectionContext = voucherTypeCode == .sales ? .salesLedger : .purchaseLedger
+        guard let tradeLedger = try accountRepo.findById(salesOrPurchaseLedgerId),
+              policy.evaluate(account: tradeLedger, for: tradeContext, company: company, groups: groups).isEligible else {
+            throw AppError.validation(.init(code: .voucherAccountInactive, field: "salesOrPurchaseLedgerId", message: "Sales or purchase ledger is missing, inactive, or belongs to another company."))
+        }
+        let inventoryRepo = InventoryRepository(db: database)
+        guard try inventoryRepo.hasActiveMainLocation(companyId: companyId) else {
+            throw AppError.validation(.init(code: .inventoryLocationUnavailable, field: "location", message: "The active Main inventory location is unavailable."))
+        }
+        let companyStateCode = company.gstin.flatMap(GSTStateCode.code(forGSTIN:))
+        let partyStateCode = party.gstin.flatMap(GSTStateCode.code(forGSTIN:)) ?? party.stateCode
+        let supplyType = try GSTInvoiceCalculator.resolveSupplyType(companyStateCode: companyStateCode, partyStateCode: partyStateCode)
+        for input in items {
+            guard !input.quantity.isZero else {
+                throw AppError.validation(.init(code: .stockMovementQuantityZero, field: "quantity", message: "Quantity must be greater than zero."))
+            }
+            guard let wholeQuantity = input.quantity.wholeValue else {
+                throw AppError.validation(.init(code: .itemInvoiceQuantityUnsupported, field: "quantity", message: "Fractional item-invoice quantities are not yet supported."))
+            }
+            guard let item = try inventoryRepo.findItemById(input.itemId), item.companyId == companyId, item.isActive else {
+                throw AppError.validation(.init(code: .inventoryItemUnavailable, field: "itemId", message: "Inventory item is missing, inactive, or belongs to another company."))
+            }
+            do {
+                _ = try GSTInvoiceCalculator.computeLine(
+                    .init(quantity: wholeQuantity, ratePaise: input.ratePaise, gstRateBps: item.gstRateBps, cessRateBps: item.gstCessRateBps, taxability: item.gstTaxability),
+                    supplyType: supplyType
+                )
+            } catch {
+                throw AppError.validation(.init(code: .itemInvoiceConfigurationInvalid, field: "items", message: "Item GST configuration is invalid for this invoice."))
+            }
+        }
     }
 }

@@ -310,6 +310,7 @@ public final class AppEnvironment {
                 database: ctx.database,
                 featureSet: ctx.featureSet
             )
+            router.clearBrowseReturnContexts()
             accountTree = AccountTreeCache(companyId: ctx.companyId, database: ctx.database, financialYearId: fy.id)
             notifyDataChanged()
             accountTreeReloadTask?.cancel()

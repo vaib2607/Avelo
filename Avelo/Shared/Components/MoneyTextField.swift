@@ -13,6 +13,8 @@ public struct MoneyTextField: View {
     /// `AccountPicker.isFocusedExternally` — lets a Tally-style Enter
     /// cascade move the caret into this field programmatically.
     public var isFocusedExternally: Binding<Bool>? = nil
+    public var inputCommitter: InputCommitter? = nil
+    public var inputCommitterID: AnyHashable? = nil
 
     @State private var text: String = ""
     @FocusState private var isFocused: Bool
@@ -27,13 +29,17 @@ public struct MoneyTextField: View {
                 alignment: TextAlignment = .trailing,
                 isEditable: Bool = true,
                 onCommit: (() -> Void)? = nil,
-                isFocusedExternally: Binding<Bool>? = nil) {
+                isFocusedExternally: Binding<Bool>? = nil,
+                inputCommitter: InputCommitter? = nil,
+                inputCommitterID: AnyHashable? = nil) {
         self._paise = paise
         self.placeholder = placeholder
         self.alignment = alignment
         self.isEditable = isEditable
         self.onCommit = onCommit
         self.isFocusedExternally = isFocusedExternally
+        self.inputCommitter = inputCommitter
+        self.inputCommitterID = inputCommitterID
     }
 
     public var body: some View {
@@ -43,7 +49,15 @@ public struct MoneyTextField: View {
             .font(AppTypography.monoDigitFont)
             .disabled(!isEditable)
             .focused($isFocused)
-            .onAppear { text = format(paise) }
+            .onAppear {
+                text = format(paise)
+                if let inputCommitter, let inputCommitterID {
+                    inputCommitter.register(id: inputCommitterID) { commitFromText() }
+                }
+            }
+            .onDisappear {
+                if let inputCommitterID { inputCommitter?.unregister(id: inputCommitterID) }
+            }
             .onChange(of: paise) { _, newValue in
                 let formatted = format(newValue)
                 if !isFocused, text != formatted { text = formatted }
@@ -91,7 +105,7 @@ public struct MoneyTextField: View {
 }
 
 extension MoneyTextField {
-    public init(label: String, text: Binding<String>, onCommit: (() -> Void)? = nil, isFocusedExternally: Binding<Bool>? = nil) {
+    public init(label: String, text: Binding<String>, onCommit: (() -> Void)? = nil, isFocusedExternally: Binding<Bool>? = nil, inputCommitter: InputCommitter? = nil, inputCommitterID: AnyHashable? = nil) {
         let paiseBinding = Binding<Int64>(
             get: { Currency.parseRupeeInput(text.wrappedValue) ?? 0 },
             set: { newValue in
@@ -103,7 +117,7 @@ extension MoneyTextField {
                 }
             }
         )
-        self.init(paise: paiseBinding, placeholder: label, onCommit: onCommit, isFocusedExternally: isFocusedExternally)
+        self.init(paise: paiseBinding, placeholder: label, onCommit: onCommit, isFocusedExternally: isFocusedExternally, inputCommitter: inputCommitter, inputCommitterID: inputCommitterID)
         self.liveTextMirror = text
     }
 }

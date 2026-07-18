@@ -1,5 +1,7 @@
 # Avelo Master Product and Execution Plan
 
+Snapshot: 2026-07-19
+
 ## Authority
 
 This is the single authoritative product roadmap and dependency-ordered execution plan for Avelo. It supersedes the old V2 execution draft, agent task boards, and disconnected Tally-parity roadmaps.
@@ -15,6 +17,16 @@ It does not replace the normative documents:
 - `Avelo_Status_Checklist.md` owns human-readable evidence and remaining acceptance.
 
 Older narrative plans may be removed only after their unique requirements are represented here or in the correct normative document. Historical research remains archived for traceability.
+
+## Maintenance contract
+
+This document owns durable product direction, phase order, scope, and exit criteria. It must not duplicate volatile issue counts, test counts, commit hashes, or artifact checksums; those belong to the release board and status checklist.
+
+- Add or materially change roadmap scope here only when product direction, phase order, an architectural dependency, or a phase exit criterion changes.
+- Track every executable unresolved slice under one stable `AVL-P0-*`, `AVL-P1-*`, or `AVL-P2-*` identifier in the release board and execution checklist.
+- Represent partial delivery as landed scope plus explicit residual scope. Never mark a whole phase item complete because one model, migration, route, or test exists.
+- Persistence work references `SchemaVersion.current` and the schema document as the live version authority. Version-specific prose is historical evidence and must include an as-of date.
+- Run `make docs-check` whenever source files, migrations, backlog rows, or any of these five coordination documents change.
 
 ## Product direction
 
@@ -51,7 +63,7 @@ Avelo will not pixel-clone legacy Tally. It will adopt its useful operating idea
 
 ## Current-state safety and progress notation
 
-The formerly active Claude audit work is now settled into the current worktree. `MigrationV023` introduces the expanded audit taxonomy, `MigrationV024` adds company-owned party profiles, and `MigrationV025` adds dedicated cheque bounce/re-presentation actions without rewriting earlier migrations. The readable schema, naming freeze, restore remapping, and compatibility tests are synchronized through schema version 25.
+The V023–V025 audit/profile work is settled historical baseline. As of 2026-07-19, the active worktree advances `SchemaVersion.current` to V029: V027 introduces canonical accounting and inventory tracks, V028 completes item-invoice draft recovery, and V029 extends fiscal-lock protection and locked-write prerequisite revalidation to the canonical tracks. This slice is tracked as `AVL-P1-045`; implementation is present, while full migration/restore, reconciliation, GUI, operator, and accountant proof remains open.
 
 Roadmap notation:
 
@@ -61,7 +73,7 @@ Roadmap notation:
 - `[PLANNED]` has not yet met its phase exit criteria.
 - Evidence and readiness status remain authoritative in `Avelo_Release_Board.md`; this plan explains sequence and scope.
 
-Current local candidate evidence, captured on 2026-07-17:
+Historical local candidate evidence, captured on 2026-07-18 for clean `main` at `93eb199`:
 
 - ~~498 tests executed with 8 explicit skips and 0 failures.~~
 - ~~Automated network, observation, placeholder, and money-path rule audit passed.~~
@@ -71,6 +83,8 @@ Current local candidate evidence, captured on 2026-07-17:
 - ~~Bundle identity is centralized in `ReleaseVersion.env` as v1.1 build 3.~~
 - [OPEN — manual] Accountant, operator, keyboard, VoiceOver, visual, PDF, and physical-printer acceptance in `Avelo_Phase0_Manual_Acceptance.md`.
 - [OPEN — external] Developer ID signing, notarization, stapling, and clean-machine install/upgrade proof. The current artifact is ad-hoc signed and Gatekeeper-rejected.
+
+The active V027–V029 worktree is newer than that evidence. The release board and status checklist must keep affected rows at least `Proof remaining` until the supported proof set is rerun against one identified final worktree and artifact.
 
 ## Architecture contracts
 

@@ -29,6 +29,7 @@ public struct NewVoucherSheet: View {
     // closes. Post/save errors must surface locally, on this same
     // presentation, instead of routing through the app-wide error channel.
     @State private var postError: AppError?
+    @State private var recoveryError: AppError?
     let initialType: VoucherType.Code
 
     public init(initialType: VoucherType.Code) {
@@ -42,6 +43,9 @@ public struct NewVoucherSheet: View {
             .task(id: env.companyContext?.companyId) { setup() }
             .alert(item: $postError) { err in
                 Alert(title: Text("Couldn't post voucher"), message: Text(err.localizedMessage), dismissButton: .default(Text("OK")))
+            }
+            .alert(item: $recoveryError) { err in
+                Alert(title: Text("Couldn't recover voucher draft"), message: Text(err.localizedMessage), dismissButton: .default(Text("OK")))
             }
     }
 
@@ -62,16 +66,27 @@ public struct NewVoucherSheet: View {
             model.load(accounts: accounts, groups: groups, initialDate: ctx.financialYear.startDate)
             if ctx.isInventoryEnabled && (initialType == .sales || initialType == .purchase) {
                 model.items = (try? InventoryService(db: ctx.database, companyId: ctx.companyId).listItems()) ?? []
+                // A fresh eligible Sales/Purchase entry begins in the explicit
+                // item workflow. The user can still switch to ledger mode,
+                // while recovered drafts retain their saved ledger workflow.
+                model.itemInvoiceMode = !model.items.isEmpty
             }
             // Consume a pending draft recovery (AVL-P0-018) exactly once: if
             // the user chose "Resume" on the recovery prompt for this same
             // voucher type, preload the saved fields instead of starting
             // blank, then clear the pending value so it is never replayed.
             if let recovered = env.pendingDraftRecovery, recovered.voucherTypeCode == initialType {
-                model.loadFromRecoveredDraft(recovered)
-                env.pendingDraftRecovery = nil
+                do {
+                    try model.loadFromRecoveredDraft(recovered)
+                    env.pendingDraftRecovery = nil
+                } catch {
+                    // Keep malformed scratch data for inspection/retry; never
+                    // silently discard it during recovery.
+                    recoveryError = AppError.wrap(error)
+                }
             }
             model.revalidate()
+            model.captureCleanEditorState()
             vm = model
         } catch {
             vm = nil
@@ -135,8 +150,12 @@ private enum VoucherField: Hashable {
     case party
     case narration
     case accountLedger
+    case salesPurchaseLedger
     case line(UUID)
     case amount(UUID)
+    case item(UUID)
+    case quantity(UUID)
+    case rate(UUID)
 }
 
 @MainActor
@@ -152,10 +171,23 @@ private struct NewVoucherBody: View {
     @State private var accountCreationEligibility: (Account) -> Bool = { _ in true }
     @State private var accountIDsBeforeCreation: Set<Account.ID> = []
     @State private var accountCreationRouter = AppRouter()
+    @State private var inputCommitter = InputCommitter()
     @FocusState private var focusedField: VoucherField?
 
     var body: some View {
         editorContent
+            .onAppear { router.dirtyStateProvider = vm }
+            .onDisappear {
+                // Normal sheet dismissal is an explicit cancel/post path, so
+                // never recreate a draft after its delete. A replacement
+                // presentation still preserves crash-recovery state.
+                if router.presentedSheet == nil {
+                    vm.deleteDraft()
+                } else {
+                    vm.persistDraftImmediately()
+                }
+                router.clearDirtyStateProvider(vm)
+            }
             .sheet(item: $accountCreationSheet, onDismiss: finishAccountCreation) { sheet in
                 if case .newAccount = sheet {
                     NewAccountSheet().environment(accountCreationRouter)
@@ -224,7 +256,7 @@ private struct NewVoucherBody: View {
                         env.showError(AppError.wrap(error))
                     }
                 }
-                Button { vm.deleteDraft(); router.presentedSheet = nil } label: {
+                Button { router.dismissPresentedSheet() } label: {
                     Image(systemName: "xmark.circle.fill")
                 }
                 .buttonStyle(.plain)
@@ -276,7 +308,14 @@ private struct NewVoucherBody: View {
                               accounts: vm.accounts,
                               placeholder: initialType == .sales ? "Sales ledger…" : "Purchase ledger…",
                               eligibility: { vm.eligibility($0, for: initialType == .sales ? .salesLedger : .purchaseLedger) },
-                              onCreate: { beginAccountCreation(for: .salesOrPurchaseLedger) })
+                              onCreate: { beginAccountCreation(for: .salesOrPurchaseLedger) },
+                              onCommitSelection: {
+                                  if let first = vm.itemLines.first { focusedField = .item(first.id) }
+                              },
+                              isFocusedExternally: Binding(
+                                  get: { focusedField == .salesPurchaseLedger },
+                                  set: { if $0 { focusedField = .salesPurchaseLedger } }
+                              ))
                 HStack {
                     Text("Item").frame(maxWidth: .infinity, alignment: .leading)
                     Text("Qty").frame(width: 90, alignment: .leading)
@@ -298,7 +337,8 @@ private struct NewVoucherBody: View {
     }
 
     private func itemLineRow(line: Binding<VoucherEditViewModel.ItemLineRow>) -> some View {
-        HStack {
+        let lineId = line.wrappedValue.id
+        return HStack {
             Picker("", selection: line.itemId) {
                 Text("Choose item…").tag(InventoryItem.ID?.none)
                 ForEach(vm.items) { item in
@@ -307,9 +347,20 @@ private struct NewVoucherBody: View {
             }
             .labelsHidden()
             .frame(maxWidth: .infinity, alignment: .leading)
+            .focused($focusedField, equals: .item(lineId))
+            .onChange(of: line.itemId.wrappedValue) { _, itemId in
+                if itemId != nil { focusedField = .quantity(lineId) }
+            }
             TextField("", text: line.quantity)
                 .frame(width: 90)
-            MoneyTextField(label: "", text: line.rate, onCommit: {})
+                .focused($focusedField, equals: .quantity(lineId))
+                .onSubmit { focusedField = .rate(lineId) }
+            MoneyTextField(label: "", text: line.rate, onCommit: {
+                advanceFocusAfterRate(lineId: lineId)
+            }, isFocusedExternally: Binding(
+                get: { focusedField == .rate(lineId) },
+                set: { if $0 { focusedField = .rate(lineId) } }
+            ), inputCommitter: inputCommitter, inputCommitterID: VoucherField.rate(lineId))
                 .frame(width: 120)
             Button { vm.removeItemLine(line.wrappedValue.id) } label: {
                 Image(systemName: "minus.circle")
@@ -527,7 +578,7 @@ private struct NewVoucherBody: View {
             }, isFocusedExternally: Binding(
                 get: { focusedField == .amount(lineId) },
                 set: { if $0 { focusedField = .amount(lineId) } }
-            ))
+            ), inputCommitter: inputCommitter, inputCommitterID: VoucherField.amount(lineId))
                 .frame(width: 160)
             Button { vm.removeLine(lineId) } label: {
                 Image(systemName: "minus.circle")
@@ -555,6 +606,20 @@ private struct NewVoucherBody: View {
         }
         vm.addLine()
         if let newLine = vm.lines.last { focusedField = .line(newLine.id) }
+    }
+
+    /// Item invoices use their own row collection and completion predicate.
+    /// A zero rate is valid; only item plus positive quantity permits moving
+    /// forward and adding a new blank row.
+    private func advanceFocusAfterRate(lineId: UUID) {
+        guard let index = vm.itemLines.firstIndex(where: { $0.id == lineId }),
+              vm.isCompleteItemLine(vm.itemLines[index]) else { return }
+        if let nextBlank = vm.itemLines[(index + 1)...].first(where: { $0.itemId == nil }) {
+            focusedField = .item(nextBlank.id)
+            return
+        }
+        vm.addItemLine()
+        if let newLine = vm.itemLines.last { focusedField = .item(newLine.id) }
     }
 
     private var validationSection: some View {
@@ -608,7 +673,7 @@ private struct NewVoucherBody: View {
     private var bottomBar: some View {
         HStack {
             Spacer()
-            Button("Cancel") { vm.deleteDraft(); router.presentedSheet = nil }
+            Button("Cancel") { router.dismissPresentedSheet() }
                 .keyboardShortcut(.cancelAction)
             // Deliberately NOT gated on `vm.canPost`: a button disabled for
             // validation reasons swallows both mouse clicks and its
@@ -618,7 +683,7 @@ private struct NewVoucherBody: View {
             // Enter and clicking Post while a field was still missing.
             // `attemptSubmit()` always responds: posts if valid, otherwise
             // shows exactly what's missing.
-            Button("Post") { attemptSubmit() }
+            Button("Post") { flushAndPost() }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(submitGate.isInFlight)
@@ -647,6 +712,13 @@ private struct NewVoucherBody: View {
         } else {
             env.showError(AppError.businessRule("This voucher isn't ready to post yet — check the required fields above."))
         }
+    }
+
+    /// Makes command-post deterministic even when a custom field retains an
+    /// internal edit buffer. Native bound TextFields are already live.
+    private func flushAndPost() {
+        inputCommitter.commitAll()
+        attemptSubmit()
     }
 
     private func focus(_ error: ValidationError) {

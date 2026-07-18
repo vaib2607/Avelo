@@ -86,6 +86,7 @@ private struct EditVoucherEditor: View {
             let accounts = try AccountService(db: ctx.database, companyId: ctx.companyId).listActiveAccounts()
             model.load(accounts: accounts, initialDate: payload.voucher.date)
             model.revalidate()
+            model.captureCleanEditorState()
             vm = model
         } catch {
             vm = nil
@@ -146,6 +147,8 @@ private struct EditInner: View {
     var body: some View {
         if let vm {
             EditVoucherBody(vm: vm, voucherNumber: voucherNumber, onSave: onSave)
+                .onAppear { router.dirtyStateProvider = vm }
+                .onDisappear { router.clearDirtyStateProvider(vm) }
         } else {
             ProgressView()
         }
@@ -201,7 +204,7 @@ private struct EditVoucherBody: View {
             )
             HStack {
                 Spacer()
-                Button { router.presentedSheet = nil } label: { Image(systemName: "xmark.circle.fill") }
+                Button { router.dismissPresentedSheet() } label: { Image(systemName: "xmark.circle.fill") }
                     .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
@@ -378,7 +381,7 @@ private struct EditVoucherBody: View {
     private var bottomBar: some View {
         HStack {
             Spacer()
-            Button("Cancel") { router.presentedSheet = nil }.keyboardShortcut(.cancelAction)
+            Button("Cancel") { router.dismissPresentedSheet() }.keyboardShortcut(.cancelAction)
             // Not gated on `vm.canPost` — same fix as NewVoucherSheet's Post
             // button (see its comment): a disabled button swallows both the
             // click and the keyboard shortcut with zero feedback. `⌘Return`

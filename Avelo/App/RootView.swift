@@ -71,6 +71,15 @@ public struct RootView: View {
                   message: Text(err.localizedMessage),
                   dismissButton: .default(Text("OK")) { env.globalError = nil })
         }
+        .alert("Unsaved changes", isPresented: Binding(
+            get: { router.requiresDirtyNavigationDecision },
+            set: { if !$0 { router.keepEditing() } }
+        )) {
+            Button("Keep Editing", role: .cancel) { router.keepEditing() }
+            Button("Discard", role: .destructive) { router.discardAndContinueNavigation() }
+        } message: {
+            Text("Discard unsaved changes and continue navigation?")
+        }
         .alert(item: Binding(
             get: { env.pendingDraftRecovery },
             set: { env.pendingDraftRecovery = $0 }

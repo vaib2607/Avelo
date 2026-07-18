@@ -2,8 +2,56 @@ import Foundation
 import Observation
 
 @MainActor
+public protocol RouterDirtyStateProviding: AnyObject {
+    var hasUnsavedChanges: Bool { get }
+    func discardUnsavedChanges()
+}
+
+public enum BrowseSurface: Hashable, Sendable {
+    case dayBook(day: Date)
+    case report(ReportSelection)
+    case accountLedger(accountId: Account.ID, period: ReportPeriodScope)
+}
+
+public struct BrowseReturnContext: Hashable, Sendable {
+    public let companyId: Company.ID
+    public let financialYearId: FinancialYear.ID?
+    public let surface: BrowseSurface
+    public let primary: ReportPeriodScope?
+    public let comparative: ReportPeriodScope?
+    public let focusedAccountId: Account.ID?
+    public let selectedVoucherId: Voucher.ID?
+    public let dataRevision: Int
+
+    public init(companyId: Company.ID,
+                financialYearId: FinancialYear.ID?,
+                surface: BrowseSurface,
+                primary: ReportPeriodScope? = nil,
+                comparative: ReportPeriodScope? = nil,
+                focusedAccountId: Account.ID? = nil,
+                selectedVoucherId: Voucher.ID? = nil,
+                dataRevision: Int) {
+        self.companyId = companyId
+        self.financialYearId = financialYearId
+        self.surface = surface
+        self.primary = primary
+        self.comparative = comparative
+        self.focusedAccountId = focusedAccountId
+        self.selectedVoucherId = selectedVoucherId
+        self.dataRevision = dataRevision
+    }
+}
+
+@MainActor
 @Observable
 public final class AppRouter {
+
+    private enum PendingNavigation {
+        case reset
+        case go(SidebarDestination)
+        case present(RouterSheet)
+        case dismissSheet
+    }
 
     public var selection: SidebarDestination = .dashboard {
         didSet {
@@ -20,6 +68,10 @@ public final class AppRouter {
         }
     }
     public var presentedAlert: RouterAlert?
+    public private(set) var browseReturnStack: [BrowseReturnContext] = []
+    public private(set) var requiresDirtyNavigationDecision: Bool = false
+    public weak var dirtyStateProvider: (any RouterDirtyStateProviding)?
+    private var pendingNavigation: PendingNavigation?
 
     /// Set when another screen requests the Reports view open a specific
     /// account's ledger. Consumed (and cleared) by `ReportsView`.
@@ -41,16 +93,23 @@ public final class AppRouter {
     public init() {}
 
     public func reset() {
+        guard requestNavigation(.reset) else { return }
+        applyReset()
+    }
+
+    private func applyReset() {
         selection = .dashboard
         presentedSheet = nil
         presentedAlert = nil
         pendingLedgerAccountId = nil
         pendingReportSelection = nil
+        browseReturnStack.removeAll()
         capabilityRevision &+= 1
     }
 
     public func go(_ destination: SidebarDestination) {
         guard destination != .inventory || isInventoryEnabled else { return }
+        guard requestNavigation(.go(destination)) else { return }
         selection = destination
     }
 
@@ -68,7 +127,15 @@ public final class AppRouter {
 
     public func present(_ sheet: RouterSheet) {
         guard !sheet.requiresInventory || isInventoryEnabled else { return }
+        guard requestNavigation(.present(sheet)) else { return }
         presentedSheet = sheet
+    }
+
+    /// Dismisses the active sheet through the same unsaved-editor gate used
+    /// for route, sheet, and reset navigation.
+    public func dismissPresentedSheet() {
+        guard requestNavigation(.dismissSheet) else { return }
+        presentedSheet = nil
     }
 
     public func setInventoryEnabled(_ enabled: Bool) {
@@ -88,6 +155,54 @@ public final class AppRouter {
             if pendingReportSelection?.requiresInventory == true { pendingReportSelection = nil }
             if presentedSheet?.requiresInventory == true { presentedSheet = nil }
         }
+    }
+
+    public func pushBrowseReturnContext(_ context: BrowseReturnContext) {
+        browseReturnStack.append(context)
+    }
+
+    @discardableResult
+    public func popBrowseReturnContext() -> BrowseReturnContext? {
+        browseReturnStack.popLast()
+    }
+
+    public func clearBrowseReturnContexts() {
+        browseReturnStack.removeAll()
+    }
+
+    public func keepEditing() {
+        pendingNavigation = nil
+        requiresDirtyNavigationDecision = false
+    }
+
+    /// Called by an editor as it leaves the sheet hierarchy. Identity checking
+    /// prevents an older sheet disappearance from unregistering a newer
+    /// editor, and also prevents a stale pending action from firing later.
+    public func clearDirtyStateProvider(_ provider: any RouterDirtyStateProviding) {
+        guard dirtyStateProvider === provider else { return }
+        dirtyStateProvider = nil
+        keepEditing()
+    }
+
+    public func discardAndContinueNavigation() {
+        guard let pendingNavigation else { return }
+        self.pendingNavigation = nil
+        requiresDirtyNavigationDecision = false
+        dirtyStateProvider?.discardUnsavedChanges()
+        switch pendingNavigation {
+        case .reset: applyReset()
+        case .go(let destination): selection = destination
+        case .present(let sheet): presentedSheet = sheet
+        case .dismissSheet: presentedSheet = nil
+        }
+    }
+
+    private func requestNavigation(_ navigation: PendingNavigation) -> Bool {
+        guard dirtyStateProvider?.hasUnsavedChanges == true else { return true }
+        guard pendingNavigation == nil else { return false }
+        pendingNavigation = navigation
+        requiresDirtyNavigationDecision = true
+        return false
     }
 
     public func alert(_ alert: RouterAlert) {

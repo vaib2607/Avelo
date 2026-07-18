@@ -250,7 +250,7 @@ extension ReportRepository {
         var sql = """
             WITH cash_lines AS (
                 SELECT l.voucher_id, l.side, l.amount_paise
-                FROM avelo_ledger_lines l
+                FROM trn_accounting_compat l
                 JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
                 WHERE l.company_id = ?
                   AND v.is_posted = 1
@@ -267,7 +267,7 @@ extension ReportRepository {
                        WHEN cl.side = 'credit' AND l.side = 'debit' THEN l.amount_paise
                        ELSE 0 END), 0) AS outflow
             FROM cash_lines cl
-            JOIN avelo_ledger_lines l ON l.voucher_id = cl.voucher_id AND l.company_id = ?
+            JOIN trn_accounting_compat l ON l.voucher_id = cl.voucher_id AND l.company_id = ?
             JOIN avelo_accounts a ON a.id = l.account_id AND a.company_id = l.company_id
             JOIN avelo_account_groups g ON g.id = a.group_id AND g.company_id = a.company_id
             WHERE a.id NOT IN (\(cashPlaceholders))

@@ -109,7 +109,7 @@ public final class GSTService: Sendable {
                    COALESCE(SUM(CASE WHEN tax.code = 'SGST_OUTPUT' THEN l.amount_paise ELSE 0 END), 0) AS sgst,
                    COALESCE(SUM(CASE WHEN tax.code = 'CESS' THEN l.amount_paise ELSE 0 END), 0) AS cess
             FROM avelo_vouchers v
-            JOIN avelo_ledger_lines l ON l.voucher_id = v.id AND l.company_id = v.company_id
+            JOIN trn_accounting_compat l ON l.voucher_id = v.id AND l.company_id = v.company_id
             JOIN avelo_accounts tax ON tax.id = l.account_id
             WHERE v.company_id = ?
               AND v.id = ?
@@ -145,7 +145,7 @@ public final class GSTService: Sendable {
                    COALESCE(SUM(CASE WHEN tax.code = 'CESS' THEN l.amount_paise ELSE 0 END), 0) AS cess,
                    COALESCE(SUM(CASE WHEN l.side = 'debit' THEN l.amount_paise ELSE 0 END), 0) AS invoice_value
             FROM avelo_vouchers v
-            JOIN avelo_ledger_lines l ON l.voucher_id = v.id AND l.company_id = v.company_id
+            JOIN trn_accounting_compat l ON l.voucher_id = v.id AND l.company_id = v.company_id
             JOIN avelo_accounts tax ON tax.id = l.account_id
             LEFT JOIN avelo_accounts pa ON pa.id = v.party_account_id
             WHERE v.company_id = ?

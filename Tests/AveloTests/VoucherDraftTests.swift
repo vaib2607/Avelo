@@ -76,6 +76,25 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertFalse(d.isBalanced)
     }
 
+    @MainActor
+    func testItemInvoiceCompletionAllowsZeroRateButRequiresItemAndPositiveQuantity() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        var row = VoucherEditViewModel.ItemLineRow()
+        row.itemId = UUID()
+        row.quantity = "2"
+        row.rate = "0.00"
+
+        XCTAssertTrue(vm.isCompleteItemLine(row))
+        let input = try XCTUnwrap(vm.itemLineInput(row))
+        XCTAssertEqual(input.itemId, row.itemId)
+        XCTAssertEqual(input.quantity, try ExactQuantity.whole(2))
+        XCTAssertEqual(input.ratePaise, 0)
+
+        row.quantity = "0"
+        XCTAssertFalse(vm.isCompleteItemLine(row))
+    }
+
     func testCheckedTotalsThrowOnOverflow() {
         let d = draft([line(Int64.max, .debit), line(1, .debit), line(Int64.max, .credit)])
         XCTAssertThrowsError(try d.checkedTotals()) { error in
@@ -174,7 +193,7 @@ final class VoucherDraftTests: XCTestCase {
         let duplicateEntry = VoucherEditViewModel.duplicateDraft(from: posted, lines: lines)
 
         let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
-        vm.loadFromRecoveredDraft(duplicateEntry)
+        try vm.loadFromRecoveredDraft(duplicateEntry)
 
         XCTAssertEqual(vm.narration, "Original sale")
         XCTAssertEqual(vm.partyAccountId, tc.customerId)
@@ -266,7 +285,7 @@ final class VoucherDraftTests: XCTestCase {
 
         let duplicate = VoucherEditViewModel.duplicateDraft(from: voucher, lines: sourceLines)
         let vm = singleEntryVM(tc, type: type)
-        vm.loadFromRecoveredDraft(duplicate)
+        try vm.loadFromRecoveredDraft(duplicate)
 
         XCTAssertEqual(duplicate.accountLedgerId, cashBankAccountId)
         XCTAssertEqual(vm.accountLedgerId, cashBankAccountId)
@@ -300,7 +319,7 @@ final class VoucherDraftTests: XCTestCase {
             linesJSON: #"[{"accountId":null,"amount":"250.00","side":"credit","taxCode":null,"costCenter":null}]"#
         )
 
-        vm.loadFromRecoveredDraft(entry)
+        try vm.loadFromRecoveredDraft(entry)
 
         XCTAssertNotEqual(vm.draftId, originalDraftId, "continuing to edit a resumed draft must update its own row, not a fresh one")
         XCTAssertEqual(vm.draftId, entry.id)
@@ -322,9 +341,59 @@ final class VoucherDraftTests: XCTestCase {
         let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
         let entry = VoucherEntryDraft(companyId: tc.companyId, voucherTypeCode: .journal, date: Date(), linesJSON: "[]")
 
-        vm.loadFromRecoveredDraft(entry)
+        try vm.loadFromRecoveredDraft(entry)
 
         XCTAssertEqual(vm.lines.count, 1, "the default blank line is kept when the recovered draft had no lines")
+    }
+
+    @MainActor
+    func testLoadFromRecoveredItemInvoiceDraftPreservesRowsOrderAndCleanState() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        let firstItem = UUID()
+        let secondItem = UUID()
+        let entry = VoucherEntryDraft(
+            companyId: tc.companyId,
+            voucherTypeCode: .sales,
+            entryMode: .itemInvoice,
+            date: DateFormatters.parseDate("2024-05-01")!,
+            partyAccountId: tc.customerId,
+            narration: "Recovered item invoice",
+            billReferenceType: .newRef,
+            billReferenceNumber: "INV-1",
+            chequeNumber: "CHQ-1",
+            salesPurchaseLedgerId: tc.salesId,
+            linesJSON: "[]",
+            itemLinesJSON: #"[{"itemId":"\#(firstItem.uuidString)","quantity":"2","rate":"12.50"},{"itemId":"\#(secondItem.uuidString)","quantity":"3","rate":"0.00"}]"#
+        )
+
+        try vm.loadFromRecoveredDraft(entry)
+        vm.captureCleanEditorState()
+
+        XCTAssertTrue(vm.itemInvoiceMode)
+        XCTAssertEqual(vm.salesOrPurchaseLedgerId, tc.salesId)
+        XCTAssertEqual(vm.itemLines.map(\.itemId), [firstItem, secondItem])
+        XCTAssertEqual(vm.itemLines.map(\.quantity), ["2", "3"])
+        XCTAssertEqual(vm.itemLines.map(\.rate), ["12.50", "0.00"])
+        XCTAssertFalse(vm.hasUnsavedChanges)
+        vm.itemLines[0].rate = "13.00"
+        XCTAssertTrue(vm.hasUnsavedChanges)
+    }
+
+    @MainActor
+    func testLoadFromRecoveredItemInvoiceDraftRejectsMalformedQuantity() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        let entry = VoucherEntryDraft(
+            companyId: tc.companyId,
+            voucherTypeCode: .sales,
+            entryMode: .itemInvoice,
+            date: Date(),
+            linesJSON: "[]",
+            itemLinesJSON: #"[{"itemId":null,"quantity":"1.5","rate":"10.00"}]"#
+        )
+
+        XCTAssertThrowsError(try vm.loadFromRecoveredDraft(entry))
     }
 
     @MainActor
@@ -360,6 +429,33 @@ final class VoucherDraftTests: XCTestCase {
     }
 
     @MainActor
+    func testScheduleAutosavePersistsCompleteItemInvoiceDraft() async throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        let firstItem = UUID()
+        let secondItem = UUID()
+        vm.itemInvoiceMode = true
+        vm.partyAccountId = tc.customerId
+        vm.salesOrPurchaseLedgerId = tc.salesId
+        vm.itemLines = [
+            .init(itemId: firstItem, quantity: "2", rate: "12.50"),
+            .init(itemId: secondItem, quantity: "3", rate: "0.00")
+        ]
+
+        vm.scheduleAutosave()
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+
+        let saved = try XCTUnwrap(VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
+        XCTAssertEqual(saved.entryMode, .itemInvoice)
+        XCTAssertEqual(saved.salesPurchaseLedgerId, tc.salesId)
+        let recovered = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        try recovered.loadFromRecoveredDraft(saved)
+        XCTAssertEqual(recovered.itemLines.map(\.itemId), [firstItem, secondItem])
+        XCTAssertEqual(recovered.itemLines.map(\.quantity), ["2", "3"])
+        XCTAssertEqual(recovered.itemLines.map(\.rate), ["12.50", "0.00"])
+    }
+
+    @MainActor
     func testScheduleAutosaveDoesNothingInEditMode() async throws {
         let tc = try TestCompany.make()
         let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal, existingId: UUID())
@@ -381,6 +477,54 @@ final class VoucherDraftTests: XCTestCase {
 
         vm.deleteDraft()
 
+        XCTAssertNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
+    }
+
+    @MainActor
+    func testEditorSnapshotTracksRawLedgerAndItemFieldsWithoutDateTimeNoise() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        vm.date = DateFormatters.parseDate("2024-05-01")!.addingTimeInterval(13 * 60 * 60)
+        vm.lines = [.init(accountId: tc.customerId, amount: "1,000.00", side: .debit)]
+        vm.itemInvoiceMode = true
+        vm.salesOrPurchaseLedgerId = tc.salesId
+        vm.itemLines = [.init()]
+        vm.itemLines[0].itemId = UUID()
+        vm.itemLines[0].quantity = "2"
+        vm.itemLines[0].rate = "0.00"
+        vm.captureCleanEditorState()
+
+        vm.date = vm.date.addingTimeInterval(2 * 60 * 60)
+        XCTAssertFalse(vm.hasUnsavedChanges)
+
+        vm.narration = "Changed narration"
+        XCTAssertTrue(vm.hasUnsavedChanges)
+        vm.narration = ""
+        vm.lines[0].amount = "1000.00"
+        XCTAssertTrue(vm.hasUnsavedChanges, "raw amount changes must be preserved in dirty detection")
+        vm.lines[0].amount = "1,000.00"
+        vm.itemLines[0].rate = "15.50"
+        XCTAssertTrue(vm.hasUnsavedChanges)
+    }
+
+    @MainActor
+    func testDiscardUnsavedChangesDeletesOnlyCreateDraft() async throws {
+        let tc = try TestCompany.make()
+        let create = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        create.narration = "Scratch"
+        create.scheduleAutosave()
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+        XCTAssertNotNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
+
+        create.discardUnsavedChanges()
+        XCTAssertNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
+
+        let edit = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id,
+                                         initialType: .journal, existingId: UUID())
+        edit.narration = "Local edit"
+        edit.captureCleanEditorState()
+        edit.narration = "Changed local edit"
+        edit.discardUnsavedChanges()
         XCTAssertNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
     }
 

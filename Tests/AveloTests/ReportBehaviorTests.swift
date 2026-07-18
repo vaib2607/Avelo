@@ -607,11 +607,11 @@ final class ReportBehaviorTests: XCTestCase {
                 [.integer(19000), .timestamp(changedAt), .text(activity.debtorSale.id.uuidString)]
             )
             try tx.execute(
-                "UPDATE avelo_ledger_lines SET amount_paise = ? WHERE voucher_id = ? AND account_id = ?",
+                "UPDATE trn_accounting SET amount_paise = ? WHERE voucher_id = ? AND ledger_id = ?",
                 [.integer(19000), .text(activity.debtorSale.id.uuidString), .text(tc.debtorsId.uuidString)]
             )
             try tx.execute(
-                "UPDATE avelo_ledger_lines SET amount_paise = ? WHERE voucher_id = ? AND account_id = ?",
+                "UPDATE trn_accounting SET amount_paise = ? WHERE voucher_id = ? AND ledger_id = ?",
                 [.integer(19000), .text(activity.debtorSale.id.uuidString), .text(tc.salesId.uuidString)]
             )
         }

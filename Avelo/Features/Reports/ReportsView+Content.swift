@@ -34,7 +34,7 @@ struct ReportsBody: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
-            if let error = vm.error {
+            if let error = vm.error, vm.selection != .balanceSheet {
                 Text(error.localizedMessage)
                     .font(.caption)
                     .foregroundStyle(AppColors.error)
@@ -48,6 +48,7 @@ struct ReportsBody: View {
                     .frame(minWidth: 540)
             }
         }
+        .onChange(of: vm.selection) { _, _ in vm.reload() }
         .safeAreaInset(edge: .bottom) {
             ModuleFooterBar(items: [
                 .init(title: "Next", detail: "Select a report on the left, then drill into account or voucher rows."),
@@ -106,7 +107,13 @@ struct ReportsBody: View {
             switch vm.selection {
             case .trialBalance, .balanceSheet, .outstanding, .stockValuation, .stockAgeing:
                 DatePicker("As of", selection: $vm.asOf, displayedComponents: .date)
-            case .profitLoss, .gstSummary, .gstFiling, .dayBook, .ledger, .cashBook, .bankBook, .receivables, .payables, .stockMovement, .stockRegister, .cashFlow:
+                    .onChange(of: vm.asOf) { _, _ in vm.reload() }
+            case .dayBook:
+                Button("Previous day") { vm.previousDay() }
+                DatePicker("Day", selection: $vm.selectedDay, displayedComponents: .date)
+                    .onChange(of: vm.selectedDay) { _, day in vm.loadDayBook(day: day) }
+                Button("Next day") { vm.nextDay() }
+            case .profitLoss, .gstSummary, .gstFiling, .ledger, .cashBook, .bankBook, .receivables, .payables, .stockMovement, .stockRegister, .cashFlow:
                 DatePicker("From", selection: $vm.fromDate, displayedComponents: .date)
                 DatePicker("To", selection: $vm.toDate, displayedComponents: .date)
             }

@@ -89,6 +89,24 @@ final class BalanceSheetReconciliationTests: XCTestCase {
         ), in: tc.fy)
     }
 
+    private func makeFinancialYear(db: SQLiteDatabase,
+                                   companyId: Company.ID,
+                                   label: String,
+                                   start: String,
+                                   end: String) throws -> FinancialYear {
+        let startDate = try XCTUnwrap(DateFormatters.parseDate(start))
+        let endDate = try XCTUnwrap(DateFormatters.parseDate(end))
+        let financialYear = FinancialYear(
+            companyId: companyId,
+            label: label,
+            startDate: startDate,
+            endDate: endDate,
+            booksBeginDate: startDate
+        )
+        try FinancialYearRepository(db: db).insert(financialYear)
+        return financialYear
+    }
+
     func testBalanceSheetSeededTotalsMatchExpectedFixture() throws {
         let tc = try makeSeededCompany()
         try seedActivity(tc)
@@ -129,7 +147,7 @@ final class BalanceSheetReconciliationTests: XCTestCase {
                    COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
             FROM avelo_accounts a
             JOIN avelo_account_groups g ON g.id = a.group_id
-            LEFT JOIN avelo_ledger_lines l ON l.account_id = a.id
+            LEFT JOIN trn_accounting_compat l ON l.account_id = a.id
             LEFT JOIN avelo_vouchers v ON v.id = l.voucher_id
             WHERE a.company_id = ?
               AND a.is_active = 1
@@ -211,5 +229,136 @@ final class BalanceSheetReconciliationTests: XCTestCase {
 
         XCTAssertEqual(report.totalAssetsPaise, 1_000)
         XCTAssertTrue(report.assets.flatMap(\.rows).contains { $0.id == account.id })
+    }
+
+    func testBalanceSheetScopesMovementsToSelectedFinancialYearAndUsesPriorOpening() throws {
+        let tc = try makeSeededCompany()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try service.post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            narration: "FY1 receipt",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 10_000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit)
+            ]
+        ), in: tc.fy)
+        let secondFY = try makeFinancialYear(
+            db: tc.db,
+            companyId: tc.companyId,
+            label: "2025-26",
+            start: "2025-04-01",
+            end: "2026-03-31"
+        )
+        _ = try service.post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2025-06-01")!,
+            narration: "FY2 receipt",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 20_000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 20_000, side: .credit)
+            ]
+        ), in: secondFY)
+
+        let reports = ReportService(db: tc.db, companyId: tc.companyId)
+        let fy1 = try reports.balanceSheet(asOfDate: tc.fy.endDate, financialYearId: tc.fy.id)
+        let fy2 = try reports.balanceSheet(
+            asOfDate: DateFormatters.parseDate("2025-06-30")!,
+            financialYearId: secondFY.id
+        )
+
+        XCTAssertEqual(fy1.totalAssetsPaise, 10_000)
+        XCTAssertEqual(fy2.totalAssetsPaise, 30_000)
+    }
+
+    func testBalanceSheetRejectsOutOfScopeDateBeforeCacheLookup() throws {
+        let tc = try makeSeededCompany()
+
+        XCTAssertThrowsError(
+            try ReportService(db: tc.db, companyId: tc.companyId).balanceSheet(
+                asOfDate: DateFormatters.parseDate("2024-03-31")!,
+                financialYearId: tc.fy.id
+            )
+        ) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected a typed validation error")
+            }
+            XCTAssertEqual(validation.code, .reportAsOfBeforeFinancialYear)
+        }
+    }
+
+    func testBalanceSheetSelectedFYIgnoresPriorFYVoucherImbalance() throws {
+        let tc = try makeSeededCompany()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        let firstVoucher = try service.post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            narration: "FY1 receipt",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 10_000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit)
+            ]
+        ), in: tc.fy)
+        let secondFY = try makeFinancialYear(
+            db: tc.db,
+            companyId: tc.companyId,
+            label: "2025-26",
+            start: "2025-04-01",
+            end: "2026-03-31"
+        )
+        _ = try service.post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2025-06-01")!,
+            narration: "FY2 receipt",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 20_000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 20_000, side: .credit)
+            ]
+        ), in: secondFY)
+        try tc.db.execute(
+            "UPDATE trn_accounting SET amount_paise = ? WHERE voucher_id = ? AND debit_or_credit = 'debit'",
+            [.integer(9_999), .text(firstVoucher.voucher.id.uuidString)]
+        )
+
+        XCTAssertNoThrow(
+            try ReportService(db: tc.db, companyId: tc.companyId).balanceSheet(
+                asOfDate: DateFormatters.parseDate("2025-06-30")!,
+                financialYearId: secondFY.id
+            )
+        )
+    }
+
+    func testBalanceSheetRejectsSelectedFYVoucherImbalance() throws {
+        let tc = try makeSeededCompany()
+        let result = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            narration: "Unbalanced fixture",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 10_000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit)
+            ]
+        ), in: tc.fy)
+        try tc.db.execute(
+            "UPDATE trn_accounting SET amount_paise = ? WHERE voucher_id = ? AND debit_or_credit = 'debit'",
+            [.integer(9_999), .text(result.voucher.id.uuidString)]
+        )
+
+        XCTAssertThrowsError(
+            try ReportService(db: tc.db, companyId: tc.companyId).balanceSheet(
+                asOfDate: tc.fy.endDate,
+                financialYearId: tc.fy.id
+            )
+        ) { error in
+            guard case AppError.database(.schemaMismatch(let message)) = error else {
+                return XCTFail("Expected scoped reconciliation failure")
+            }
+            XCTAssertEqual(message, "Posted vouchers do not reconcile to paise.")
+        }
     }
 }

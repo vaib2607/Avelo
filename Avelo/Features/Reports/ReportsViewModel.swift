@@ -14,6 +14,9 @@ public final class ReportsViewModel {
     public var balanceSheet: ReportResult.BalanceSheet?
     public var gstSummary: ReportResult.GstSummary?
     public var dayBook: [ReportResult.DayBookRow] = []
+    public var selectedDay: Date = Date()
+    public var selectedDayBookVoucherId: Voucher.ID?
+    public var dayBookError: AppError?
     public var ledger: ReportResult.LedgerReport?
     public var outstanding: ReportResult.OutstandingReport?
     public var stockValuation: ReportResult.StockValuationReport?
@@ -48,7 +51,16 @@ public final class ReportsViewModel {
     }
 
     public func reload() {
+        guard selection != .balanceSheet else {
+            loadBalanceSheet()
+            return
+        }
+        guard selection != .dayBook else {
+            loadDayBook(day: selectedDay)
+            return
+        }
         isLoading = true
+        error = nil
         defer { isLoading = false }
         do {
             let svc = ReportService(db: db, companyId: companyId)
@@ -68,22 +80,23 @@ public final class ReportsViewModel {
             case .trialBalance:
                 trialBalance = try svc.trialBalance(asOfDate: asOf, financialYearId: fyId).rows
                 comparativeTrialBalance = comparativeEnabled
-                    ? try svc.trialBalance(asOfDate: priorYear(asOf), financialYearId: fyId).rows
+                    ? try svc.trialBalance(asOfDate: priorYear(asOf), financialYearId: financialYearID(containing: priorYear(asOf))).rows
                     : []
             case .profitLoss:
                 profitLoss = try svc.profitAndLoss(fromDate: fromDate, toDate: toDate, financialYearId: fyId)
                 comparativeProfitLoss = comparativeEnabled
-                    ? try svc.profitAndLoss(fromDate: priorYear(fromDate), toDate: priorYear(toDate), financialYearId: fyId)
+                    ? try svc.profitAndLoss(
+                        fromDate: priorYear(fromDate),
+                        toDate: priorYear(toDate),
+                        financialYearId: financialYearID(containing: priorYear(fromDate))
+                    )
                     : nil
             case .balanceSheet:
-                balanceSheet = try svc.balanceSheet(asOfDate: asOf, financialYearId: fyId)
-                comparativeBalanceSheet = comparativeEnabled
-                    ? try svc.balanceSheet(asOfDate: priorYear(asOf), financialYearId: fyId)
-                    : nil
+                break
             case .gstSummary:
                 gstSummary = try svc.gstSummary(fromDate: fromDate, toDate: toDate)
             case .dayBook:
-                dayBook = try svc.dayBook(fromDate: fromDate, toDate: toDate)
+                break
             case .ledger:
                 if let aid = ledgerAccountId {
                     ledger = try svc.ledger(accountId: aid, financialYearId: fyId, fromDate: fromDate, toDate: toDate)
@@ -144,6 +157,72 @@ public final class ReportsViewModel {
     public func toggleComparative() {
         comparativeEnabled.toggle()
         reload()
+    }
+
+    private func loadBalanceSheet() {
+        isLoading = true
+        balanceSheet = nil
+        comparativeBalanceSheet = nil
+        error = nil
+        defer { isLoading = false }
+        do {
+            let service = ReportService(db: db, companyId: companyId)
+            balanceSheet = try service.balanceSheet(asOfDate: asOf, financialYearId: fyId)
+            if comparativeEnabled {
+                let comparativeAsOf = priorYear(asOf)
+                let comparativeFYId = try financialYearID(containing: comparativeAsOf)
+                comparativeBalanceSheet = try service.balanceSheet(
+                    asOfDate: comparativeAsOf,
+                    financialYearId: comparativeFYId
+                )
+            }
+        } catch {
+            self.error = AppError.wrap(error)
+            balanceSheet = nil
+            comparativeBalanceSheet = nil
+        }
+    }
+
+    public func loadDayBook(day: Date) {
+        isLoading = true
+        dayBook = []
+        dayBookError = nil
+        error = nil
+        defer { isLoading = false }
+        do {
+            let rows = try ReportService(db: db, companyId: companyId).dayBook(fromDate: day, toDate: day)
+            dayBook = rows
+            if let selectedDayBookVoucherId,
+               !rows.contains(where: { $0.id == selectedDayBookVoucherId }) {
+                self.selectedDayBookVoucherId = nil
+            }
+        } catch {
+            dayBookError = AppError.wrap(error)
+            dayBook = []
+        }
+    }
+
+    public func previousDay() {
+        selectedDay = DateFormatters.utcCalendar.date(byAdding: .day, value: -1, to: selectedDay) ?? selectedDay
+        loadDayBook(day: selectedDay)
+    }
+
+    public func nextDay() {
+        selectedDay = DateFormatters.utcCalendar.date(byAdding: .day, value: 1, to: selectedDay) ?? selectedDay
+        loadDayBook(day: selectedDay)
+    }
+
+    private func financialYearID(containing date: Date) throws -> FinancialYear.ID {
+        let matches = try FinancialYearRepository(db: db).containing(date: date, companyId: companyId)
+        guard matches.count == 1, let financialYear = matches.first else {
+            throw AppError.validation(.init(
+                code: .reportFinancialYearMissing,
+                field: "asOfDate",
+                message: "No unique financial year contains the comparative Balance Sheet date.",
+                suggestedFix: "Create or select the financial year containing \(DateFormatters.formatIsoDate(date))."
+            ))
+        }
+        return financialYear.id
     }
 
     private func priorYear(_ date: Date) -> Date {

@@ -43,6 +43,8 @@ public final class ReportService: Sendable {
     }
 
     public func trialBalance(asOfDate: Date, financialYearId: FinancialYear.ID? = nil) throws -> ReportResult.TrialBalance {
+        try verifyDualTrackIntegrity()
+        try validate(periodScope: .init(companyId: companyId, financialYearId: financialYearId, kind: .asOf(asOfDate)))
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "trial_balance", financialYearId: financialYearId, toDate: asOfDate)
         if let cached: ReportResult.TrialBalance = try Self.cache.value(for: key, db: db) { return cached }
@@ -57,6 +59,8 @@ public final class ReportService: Sendable {
     }
 
     public func profitAndLoss(fromDate: Date, toDate: Date, financialYearId: FinancialYear.ID? = nil) throws -> ReportResult.ProfitLoss {
+        try verifyDualTrackIntegrity()
+        try validate(periodScope: .init(companyId: companyId, financialYearId: financialYearId, kind: .range(from: fromDate, to: toDate)))
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "profit_loss", financialYearId: financialYearId, fromDate: fromDate, toDate: toDate)
         if let cached: ReportResult.ProfitLoss = try Self.cache.value(for: key, db: db) { return cached }
@@ -68,22 +72,32 @@ public final class ReportService: Sendable {
     }
 
     public func balanceSheet(asOfDate: Date, financialYearId: FinancialYear.ID? = nil) throws -> ReportResult.BalanceSheet {
+        try verifyDualTrackIntegrity()
+        let financialYear = try validate(periodScope: .init(companyId: companyId, financialYearId: financialYearId, kind: .asOf(asOfDate)))
         let f = makeFilter(financialYearId: financialYearId)
         let key = ReportCache.Key(companyId: companyId, reportType: "balance_sheet", financialYearId: financialYearId, toDate: asOfDate)
         if let cached: ReportResult.BalanceSheet = try Self.cache.value(for: key, db: db) { return cached }
         let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
         let report = try repository.balanceSheet(asOfDate: asOfDate, filter: f)
-        try ReconciliationCheck.verifyPostedVouchersBalance(db: db, companyId: companyId, toDate: asOfDate)
+        try ReconciliationCheck.verifyPostedVouchersBalance(
+            db: db,
+            companyId: companyId,
+            financialYearId: financialYearId,
+            fromDate: financialYear?.startDate,
+            toDate: asOfDate
+        )
         try Self.cache.store(report, for: key, changeToken: changeToken)
         return report
     }
 
     public func gstSummary(fromDate: Date, toDate: Date) throws -> ReportResult.GstSummary {
+        try verifyDualTrackIntegrity()
         let f = makeFilter()
         return try repository.gstSummary(fromDate: fromDate, toDate: toDate, filter: f)
     }
 
     public func dayBook(fromDate: Date, toDate: Date) throws -> [ReportResult.DayBookRow] {
+        try verifyDualTrackIntegrity()
         let f = makeFilter()
         return try repository.dayBook(fromDate: fromDate, toDate: toDate, filter: f)
     }
@@ -94,6 +108,7 @@ public final class ReportService: Sendable {
     }
 
     public func stockValuation(asOfDate: Date) throws -> ReportResult.StockValuationReport {
+        try verifyDualTrackIntegrity()
         try requireInventoryEnabled()
         let f = makeFilter()
         return try repository.stockValuation(asOfDate: asOfDate, filter: f)
@@ -114,10 +129,71 @@ public final class ReportService: Sendable {
         cache.invalidate(companyId: companyId)
     }
 
+    private func verifyDualTrackIntegrity() throws {
+        try DualTrackReconciliationService(db: db, companyId: companyId).verify()
+    }
+
     private func requireInventoryEnabled() throws {
         guard try CompanyRepository(db: db).findById(companyId)?.isInventoryEnabled == true else {
             throw AppError.featureUnavailable("Inventory is disabled for this company.")
         }
+    }
+
+    @discardableResult
+    public func validate(periodScope: ReportPeriodScope) throws -> FinancialYear? {
+        guard periodScope.companyId == companyId else {
+            throw AppError.validation(.init(
+                code: .reportFinancialYearCompanyMismatch,
+                field: "companyId",
+                message: "Report scope belongs to another company.",
+                suggestedFix: "Reload the report for the active company."
+            ))
+        }
+        let financialYearId = periodScope.financialYearId
+        guard let financialYearId else { return nil }
+        let repository = FinancialYearRepository(db: db)
+        guard let financialYear = try repository.findById(financialYearId) else {
+            throw AppError.validation(.init(
+                code: .reportFinancialYearMissing,
+                field: "financialYearId",
+                message: "Select an existing financial year before opening Balance Sheet.",
+                suggestedFix: "Choose a financial year for the active company."
+            ))
+        }
+        guard financialYear.companyId == companyId else {
+            throw AppError.validation(.init(
+                code: .reportFinancialYearCompanyMismatch,
+                field: "financialYearId",
+                message: "Selected financial year belongs to another company.",
+                suggestedFix: "Choose a financial year for the active company."
+            ))
+        }
+        let dates: [Date]
+        switch periodScope.kind {
+        case .asOf(let asOf): dates = [asOf]
+        case .range(let from, let to):
+            guard from <= to else {
+                throw AppError.businessRule("Report start date must not be after end date.")
+            }
+            dates = [from, to]
+        }
+        guard dates.allSatisfy({ $0 >= financialYear.startDate }) else {
+            throw AppError.validation(.init(
+                code: .reportAsOfBeforeFinancialYear,
+                field: "asOfDate",
+                message: "Balance Sheet date is before the selected financial year.",
+                suggestedFix: "Choose a date on or after \(DateFormatters.formatIsoDate(financialYear.startDate))."
+            ))
+        }
+        guard dates.allSatisfy({ $0 <= financialYear.endDate }) else {
+            throw AppError.validation(.init(
+                code: .reportAsOfAfterFinancialYear,
+                field: "asOfDate",
+                message: "Balance Sheet date is after the selected financial year.",
+                suggestedFix: "Choose a date on or before \(DateFormatters.formatIsoDate(financialYear.endDate))."
+            ))
+        }
+        return financialYear
     }
 }
 
@@ -214,13 +290,14 @@ public enum ReconciliationCheck {
 
     public static func verifyPostedVouchersBalance(db: SQLiteDatabase,
                                                    companyId: Company.ID,
+                                                   financialYearId: FinancialYear.ID? = nil,
                                                    fromDate: Date? = nil,
                                                    toDate: Date? = nil) throws {
         var sql = """
             SELECT
               COALESCE(SUM(CASE WHEN l.side = 'debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
               COALESCE(SUM(CASE WHEN l.side = 'credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
-            FROM avelo_ledger_lines l
+            FROM trn_accounting_compat l
             JOIN avelo_vouchers v ON v.id = l.voucher_id
             WHERE l.company_id = ? AND v.company_id = ? AND v.is_posted = 1
         """
@@ -232,6 +309,10 @@ public enum ReconciliationCheck {
         if let toDate {
             sql += " AND v.date <= ?"
             bind.append(.date(toDate))
+        }
+        if let financialYearId {
+            sql += " AND v.financial_year_id = ?"
+            bind.append(.text(financialYearId.uuidString))
         }
         let row = try db.queryOne(sql, bind: bind) { ($0.int("dr"), $0.int("cr")) }
         guard row?.0 == row?.1 else {

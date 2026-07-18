@@ -1,10 +1,20 @@
 # AVELO Master Execution Checklist
 
-Snapshot: 2026-07-15
+Snapshot: 2026-07-19
 
 ## Summary
 
+- [ ] UI audit #9b manual acceptance: Balance Sheet selection/as-of/comparative/Refresh use one scoped load path; selected-FY errors render locally with retry and no global alert. Automated FY-scope, malformed-current-FY, malformed-prior-FY, and ViewModel error-state proof passes. Accountant verifies the bundled macOS workflow.
+
 This file is the remaining-work execution queue. It tracks only unfinished `AVL-*` backlog items from `Docs/Avelo_Release_Board.md`, grouped into dependency-ordered waves through P2.
+
+Queue maintenance contract:
+
+- Every row must reuse a canonical board ID; temporary migration/audit names belong in the action text, never in the ID column.
+- One board row appears at most once in the queue. Detailed evidence logs may reference it again but must not create a second state.
+- `Next concrete action` is the smallest dependency-safe action that can advance the row. `Proof still missing` lists automated, artifact, and named human evidence separately when applicable.
+- Reorder rows when dependencies change; do not encode execution order by renumbering IDs.
+- Run `make docs-check` after board or queue changes. The check rejects unknown IDs, duplicate queue rows, and stale module inventory assumptions.
 
 The dependency order is governed by `Docs/Avelo_Master_Product_Execution_Plan.md`: v1.1 correctness, account eligibility, shared interaction, masters, voucher workstation, inventory/orders/banking, reports/charts, documents/exports, compliance/payroll, reliability/import/scale, advanced accounting, then the offline Avelo Extension Language.
 
@@ -135,8 +145,8 @@ Daily bookkeeping and Tally-replacement core before filing breadth.
 | AVL-P1-011 | Implementation remaining | AVL-P1-010 | Add cost categories for parallel allocation dimensions. | Parallel-dimension fixtures, full `swift test`, and accountant category acceptance. |
 | AVL-P1-034 | Implementation remaining | AVL-P1-010 | Implement Voucher Classes for deterministic ledger/tax/freight expansion. | Class-version fixtures, full `swift test`, and accountant fast-entry acceptance. |
 | AVL-P1-035 | Implementation remaining | AVL-P0-003 | Implement simple/advanced ledger interest policies with posting rules. | Interest-schedule fixtures, full `swift test`, and accountant overdue-interest acceptance. |
-| AVL-P1-036 | Implementation remaining | None | Add comparative report columns and period-selection model. | Multi-period reconciliation fixtures, full `swift test`, and accountant comparative-report acceptance. |
-| AVL-P1-037 | Implementation remaining | AVL-P0-032 | Build editable universal Day Book with inline drill-down, cancel, and date navigation. | Browse-to-correction fixtures, full `swift test`, and accountant Day Book acceptance. |
+| AVL-P1-036 | Implementation remaining | None | Extend landed prior-year comparison (`d405772`) into general multi-period selection/configuration. | Prior-year trial balance/P&L/balance-sheet reconciliation tests pass; multi-period fixtures and accountant comparative-report acceptance remain. |
+| AVL-P1-037 | Implementation remaining | AVL-P0-032 | Extend landed Day Book Edit/Reverse row actions (`017ad13`) into universal drill, cancel, date-navigation, and return-state workflow. | Browse-to-correction fixtures, full `swift test`, and accountant Day Book acceptance. |
 | AVL-P1-038 | Implementation remaining | AVL-P0-020 and AVL-P1-010 | Build continuous multi-account voucher entry with inline cost allocation and no submodal dependency. | Complex keyboard-only voucher fixtures, full `swift test`, and accountant continuous-entry acceptance. |
 | AVL-P1-040 | Implementation remaining | AVL-P0-022 baseline invoice behavior | Implement orders and logistics vouchers with fulfillment linkage. | Partial fulfillment/rejection/count fixtures, full `swift test`, and accountant stock-flow acceptance. |
 | AVL-P1-041 | Implementation remaining | AVL-P0-032 | Implement voucher/invoice mode split and post-dated voucher lifecycle distinct from cheque state. | Mode/post-date lifecycle fixtures, full `swift test`, and accountant post-dated acceptance. |
@@ -160,7 +170,7 @@ Daily bookkeeping and Tally-replacement core before filing breadth.
 
 | ID | State | Dependency gate | Next concrete action | Proof still missing |
 | --- | --- | --- | --- | --- |
-| AVL-P1-017 | Implementation remaining | AVL-P0-016 | Add multi-window company/editor isolation and restoration. | Two-window stress fixtures, full `swift test`, and operator multi-window acceptance. |
+| AVL-P1-017 | Proof remaining | AVL-P0-016 | Extend the landed registry stale-read fix (`6549675`) from independent company-context proof into full multi-window editor/draft isolation and restoration. | `AppEnvironmentFlowTests.testTwoIndependentEnvironmentsOnSharedStorageDoNotLeakCompanyContext`, full suite, and RC proof pass; two-window stress fixtures and operator acceptance remain. |
 | AVL-P1-018 | Implementation remaining | AVL-P0-030 | Add optimistic locking/conflict handling for concurrent edits. | Stale-write conflict fixtures, full `swift test`, and operator concurrent-edit acceptance. |
 | AVL-P1-019 | Implementation remaining | AVL-P0-013 | Detect symlinks, external/network drives, and unsupported filesystems. | File-placement matrix, full `swift test`, and operator storage-policy acceptance. |
 | AVL-P1-020 | Implementation remaining | AVL-P0-017 | Add WAL checkpoint management with bounded growth and surfaced failures. | Long-session/crash fixtures, full `swift test`, and operator durability acceptance. |
@@ -168,8 +178,9 @@ Daily bookkeeping and Tally-replacement core before filing breadth.
 | AVL-P1-022 | Implementation remaining | None | Strip CSV BOM safely. | UTF BOM fixtures, full `swift test`, and import acceptance. |
 | AVL-P1-023 | Implementation remaining | None | Support nested quotes and embedded delimiters in CSV imports. | RFC-style CSV fixtures, full `swift test`, and import acceptance. |
 | AVL-P1-024 | Implementation remaining | None | Support quoted/embedded line breaks in TSV. | Multiline TSV fixtures, full `swift test`, and import acceptance. |
-| AVL-P1-025 | Implementation remaining | AVL-P0-016 | Fix undo/redo model-view resync in voucher grids. | Undo/redo stress fixtures, full `swift test`, and keyboard-edit acceptance. |
-| AVL-P1-026 | Implementation remaining | AVL-P0-020 | Add mid-voucher master creation flow with focus return and audit. | Alt+C keyboard fixtures, full `swift test`, and accountant draft-preservation acceptance. |
+| AVL-P1-025 | Implementation remaining | AVL-P0-016 | Add undo/redo model-view resync in voucher grids; no `UndoManager` integration exists. | Undo/redo stress fixtures, full `swift test`, and keyboard-edit acceptance. |
+| AVL-P1-045 | Proof remaining | AVL-P0-026, AVL-P0-030, and AVL-P0-036 | V027–V030 canonical-track work includes repositories/backfill/compatibility paths, draft recovery, ownership/FY locks, locked revalidation, exact-quantity landed-cost allocation, partial returns, and composite item-invoice reverse/cancel. `V027MigrationParityTests` proves realistic V026 canonical backfill and malformed/unbalanced fail-closed rollback; `RestoreServiceTests/testRestorePreservesCanonicalTracksAndAllocationLinks` proves canonical restore/remap; allocation/return audit-abort tests prove composite rollback. `make test`, `make rule-audit`, `make rc-local`, bundle validation/self-test, and launch smoke passed on 2026-07-19. | Complete direct FK/CHECK/staged-boundary and valuation/reversal/export reconciliation matrices; retain fractional-item-invoice design/proof as deferred; record GUI/operator/accountant acceptance. |
+| AVL-P1-026 | Manual acceptance remaining | AVL-P0-020 | Run bundled-GUI acceptance for the landed Alt+C flow. | `NewVoucherAccountCreationTests` prove eligibility and preserved draft; full suite and RC proof pass. Keyboard focus-return, audit visibility, and accountant draft-preservation acceptance remain. |
 | AVL-P1-027 | Implementation remaining | None | Build Tally importer with dry run, mapping, resumability, and reconciliation report. | Representative import fixtures, full `swift test`, and accountant import acceptance. |
 | AVL-P1-032 | Implementation remaining | AVL-P0-012 | Complete audit coverage for FY unlocks, bank ops, inventory orders, repair, exports, printing, signing, and email. | Mutation-inventory fixtures, full `swift test`, and audit review acceptance. |
 | AVL-P1-039 | Implementation remaining | AVL-P0-012 and AVL-P0-031 | Build repair/reindex with dry run, backup requirement, progress, verification, and audit. | Corrupt-index repair fixtures, full `swift test`, and operator repair acceptance. |
@@ -187,9 +198,9 @@ Execute only after P0 release readiness is real and P1 rollout blockers are clos
 
 | ID | State | Dependency gate | Next concrete action | Proof still missing |
 | --- | --- | --- | --- | --- |
-| AVL-P2-011 | Implementation remaining | AVL-P0-032 | Add duplicate voucher flow with lineage and fresh numbering. | Duplicate/edit/save fixtures, full `swift test`, and accountant copy-flow acceptance. |
-| AVL-P2-012 | Implementation remaining | AVL-P0-018 | Add narration recall with privacy-aware history rules. | Recall fixtures, full `swift test`, and keyboard acceptance. |
-| AVL-P2-013 | Implementation remaining | AVL-P1-037 | Add insert-while-browsing and PgUp/PgDn voucher navigation. | Browse/insert navigation fixtures, full `swift test`, and accountant browse-flow acceptance. |
+| AVL-P2-011 | Proof remaining | AVL-P0-032 | Add posted-flow proof for the landed duplicate draft flow (`Alt+2`) and preserve explicit lineage/fresh numbering. | Draft-copy coverage exists; duplicate/edit/save fixture and accountant copy-flow acceptance remain. |
+| AVL-P2-012 | Proof remaining | AVL-P0-018 | Add editor-flow proof for the landed company-scoped narration recall (`Ctrl+R`). | Repository scope/order/limit coverage exists; shortcut-context/privacy and keyboard acceptance remain. |
+| AVL-P2-013 | Implementation remaining | AVL-P1-037 | Extend landed Ctrl+I/PgUp/PgDn page-local navigation (`1d0be6d`) to selection, scroll, unsaved-state, and context-safe browse flow. | View-model filter/page preservation coverage exists; full browse-flow and accountant acceptance remain. |
 | AVL-P2-014 | Implementation remaining | AVL-P0-011 | Add inline calculator in amount fields without float drift. | Expression fixtures, full `swift test`, and keyboard acceptance. |
 | AVL-P2-015 | Implementation remaining | AVL-P1-036 | Add report-line zoom and restore prior context. | Drill-return fixtures, full `swift test`, and report-usage acceptance. |
 | AVL-P2-016 | Implementation remaining | AVL-P0-022 | Add explicit-confirmation email dispatch with PDF attachment. | Cancel/auth/retry fixtures, full `swift test`, and operator send-flow acceptance. |

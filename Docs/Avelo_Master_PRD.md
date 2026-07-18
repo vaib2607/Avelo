@@ -69,12 +69,12 @@ Avelo assumes one local user at a time. Multi-window/concurrent-editor behavior 
 
 - One registry database discovers many companies; it stores no financial data.
 - One company owns many FYs, groups, ledgers, voucher types, vouchers, items, employees, banking rows, and audit events.
-- One voucher owns two or more ledger lines and may own bill allocations, cheque state, item-invoice lines, cancellation/reversal lineage, and stock effects.
+- One voucher owns two or more accounting-track rows and may own bill allocations, cheque state, item-invoice lines, cancellation/reversal lineage, and inventory-track effects.
 - One FY close owns carried opening rows for the next FY; it does not rewrite historical ledger-master openings.
 - One inventory item owns exact unit metadata and stock/valuation history; a finished item may own a BOM recipe.
 - Audit events are immutable, ordered, HMAC-linked evidence for a specific company.
 
-The readable schema is `Avelo_Schema.md`; current executable schema is v22.
+The readable schema is `Avelo_Schema.md`; current executable schema is v27.
 
 ## 5. Default company seed
 

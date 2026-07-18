@@ -220,9 +220,9 @@ public final class PayrollService: Sendable {
             for line in lines {
                 try tx.execute(
                     """
-                    INSERT INTO avelo_ledger_lines
-                    (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO trn_accounting
+                    (id, company_id, voucher_id, ledger_id, amount_paise, debit_or_credit, tax_code, cost_center, line_order, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     [
                         .text(line.id.uuidString),
@@ -233,7 +233,8 @@ public final class PayrollService: Sendable {
                         .text(line.side.rawValue),
                         .optionalText(line.taxCode),
                         .optionalText(line.costCenter),
-                        .integer(Int64(line.lineOrder))
+                        .integer(Int64(line.lineOrder)),
+                        .timestamp(now)
                     ]
                 )
             }

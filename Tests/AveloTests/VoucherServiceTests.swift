@@ -47,7 +47,7 @@ final class VoucherServiceTests: XCTestCase {
             """
             SELECT COALESCE(SUM(CASE WHEN side='debit' THEN amount_paise ELSE 0 END),0) AS dr,
                    COALESCE(SUM(CASE WHEN side='credit' THEN amount_paise ELSE 0 END),0) AS cr
-            FROM avelo_ledger_lines WHERE account_id = ?
+            FROM trn_accounting_compat WHERE account_id = ?
             """,
             bind: [.text(account.uuidString)]
         ) { ($0.int("dr"), $0.int("cr")) }
@@ -101,7 +101,7 @@ final class VoucherServiceTests: XCTestCase {
             """
             SELECT COALESCE(SUM(CASE WHEN side='debit' THEN amount_paise ELSE 0 END),0) AS dr,
                    COALESCE(SUM(CASE WHEN side='credit' THEN amount_paise ELSE 0 END),0) AS cr
-            FROM avelo_ledger_lines
+            FROM trn_accounting_compat
             """
         ) { ($0.int("dr"), $0.int("cr")) }
         XCTAssertEqual(totals?.0, totals?.1)
@@ -144,7 +144,7 @@ final class VoucherServiceTests: XCTestCase {
             SELECT COALESCE(SUM(CASE WHEN side='debit' THEN amount_paise ELSE 0 END),0) AS dr,
                    COALESCE(SUM(CASE WHEN side='credit' THEN amount_paise ELSE 0 END),0) AS cr,
                    COUNT(DISTINCT voucher_id) AS c
-            FROM avelo_ledger_lines
+            FROM trn_accounting_compat
             """
         ) { ($0.int("dr"), $0.int("cr"), $0.int("c")) }
         XCTAssertEqual(totals?.0, totals?.1)
@@ -253,7 +253,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertThrowsError(try svc.postBatch(drafts, in: tc.fy))
 
         let voucherCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_vouchers") { $0.int(0) } ?? 0
-        let lineCount = try tc.db.queryOne("SELECT COUNT(*) FROM avelo_ledger_lines") { $0.int(0) } ?? 0
+        let lineCount = try tc.db.queryOne("SELECT COUNT(*) FROM trn_accounting_compat") { $0.int(0) } ?? 0
         XCTAssertEqual(voucherCount, 500)
         XCTAssertEqual(lineCount, 1000)
 
@@ -1207,7 +1207,7 @@ final class VoucherServiceTests: XCTestCase {
         ]), in: tc.fy)
 
         let beforeDeleteCount = try tc.db.queryOne(
-            "SELECT COUNT(*) FROM avelo_ledger_lines WHERE voucher_id = ?",
+            "SELECT COUNT(*) FROM trn_accounting_compat WHERE voucher_id = ?",
             bind: [.text(posted.voucher.id.uuidString)]
         ) { $0.int(0) }
         XCTAssertEqual(beforeDeleteCount, 2)
@@ -1232,7 +1232,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(voucherCount, 1)
 
         let afterDeleteCount = try tc.db.queryOne(
-            "SELECT COUNT(*) FROM avelo_ledger_lines WHERE voucher_id = ?",
+            "SELECT COUNT(*) FROM trn_accounting_compat WHERE voucher_id = ?",
             bind: [.text(posted.voucher.id.uuidString)]
         ) { $0.int(0) }
         XCTAssertEqual(afterDeleteCount, 2)
@@ -1283,7 +1283,7 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(voucherCount, 0)
 
         let lineCount = try tc.db.queryOne(
-            "SELECT COUNT(*) FROM avelo_ledger_lines",
+            "SELECT COUNT(*) FROM trn_accounting_compat",
             row: { $0.int(0) }
         )
         XCTAssertEqual(lineCount, 0)

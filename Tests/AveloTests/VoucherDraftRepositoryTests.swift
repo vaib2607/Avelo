@@ -67,6 +67,31 @@ final class VoucherDraftRepositoryTests: XCTestCase {
         XCTAssertNil(found?.accountLedgerId)
     }
 
+    func testUpsertThenFindRoundTripsItemInvoiceDraftFields() throws {
+        let tc = try TestCompany.make()
+        let repo = VoucherDraftRepository(db: tc.db)
+        let ledgerId = UUID()
+        let itemId = UUID()
+        let draft = VoucherEntryDraft(
+            companyId: tc.companyId,
+            voucherTypeCode: .sales,
+            entryMode: .itemInvoice,
+            date: DateFormatters.parseDate("2024-05-01")!,
+            partyAccountId: tc.customerId,
+            narration: "Item recovery",
+            salesPurchaseLedgerId: ledgerId,
+            linesJSON: "[]",
+            itemLinesJSON: #"[{"itemId":"\#(itemId.uuidString)","quantity":"2","rate":"125.50"}]"#
+        )
+
+        try repo.upsert(draft)
+        let found = try repo.mostRecent(companyId: tc.companyId)
+
+        XCTAssertEqual(found?.entryMode, .itemInvoice)
+        XCTAssertEqual(found?.salesPurchaseLedgerId, ledgerId)
+        XCTAssertEqual(found?.itemLinesJSON, draft.itemLinesJSON)
+    }
+
     func testUpsertingSameIdReplacesRatherThanDuplicates() throws {
         let tc = try TestCompany.make()
         let repo = VoucherDraftRepository(db: tc.db)

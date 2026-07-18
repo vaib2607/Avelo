@@ -129,7 +129,7 @@ public final class AccountTreeCache {
                 SELECT l.account_id,
                        COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
                        COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
-                FROM avelo_ledger_lines l
+                FROM trn_accounting_compat l
                 JOIN avelo_vouchers v ON v.id = l.voucher_id
                 WHERE l.account_id IN (\(placeholders))
             """

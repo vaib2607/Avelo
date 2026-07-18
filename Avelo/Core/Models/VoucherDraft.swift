@@ -1,6 +1,13 @@
 import Foundation
 
 public struct VoucherDraft: Sendable, Hashable {
+    /// Entry presentation is independent of the lifecycle (`Mode`) so draft
+    /// recovery and edit identity never have to infer an item invoice from UI
+    /// state or voucher type.
+    public enum EntryMode: String, Sendable, Hashable, Codable {
+        case ledger
+        case itemInvoice
+    }
     public enum BillReferenceType: String, CaseIterable, Sendable, Hashable, Codable, Identifiable {
         case newRef = "New Ref"
         case agstRef = "Agst Ref"
@@ -49,6 +56,7 @@ public struct VoucherDraft: Sendable, Hashable {
     }
 
     public var mode: Mode
+    public var entryMode: EntryMode
     public var voucherTypeCode: VoucherType.Code
     public var date: Date
     public var partyAccountId: Account.ID?
@@ -58,6 +66,7 @@ public struct VoucherDraft: Sendable, Hashable {
     public var lines: [Line]
 
     public init(mode: Mode,
+                entryMode: EntryMode = .ledger,
                 voucherTypeCode: VoucherType.Code,
                 date: Date,
                 partyAccountId: Account.ID? = nil,
@@ -66,6 +75,7 @@ public struct VoucherDraft: Sendable, Hashable {
                 narration: String = "",
                 lines: [Line] = []) {
         self.mode = mode
+        self.entryMode = entryMode
         self.voucherTypeCode = voucherTypeCode
         self.date = date
         self.partyAccountId = partyAccountId

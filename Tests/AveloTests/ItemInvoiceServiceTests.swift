@@ -125,6 +125,95 @@ final class ItemInvoiceServiceTests: XCTestCase {
         XCTAssertEqual(movements.first?.movementType, .stockOut)
     }
 
+    func testItemInvoiceWritesCanonicalTracksWithExactQuantityOnly() throws {
+        let fx = try makeFixture()
+        let inventory = InventoryService(db: fx.tc.db, companyId: fx.tc.companyId)
+        _ = try inventory.recordMovement(itemId: fx.itemId, date: DateFormatters.parseDate("2024-05-01")!, type: .stockIn, quantity: 5, ratePaise: 10_000)
+        let legacyStockBefore = try fx.tc.db.queryOne("SELECT COUNT(*) FROM avelo_stock_movements") { $0.int(0) } ?? 0
+        let legacyAccountingBefore = try fx.tc.db.queryOne("SELECT COUNT(*) FROM avelo_ledger_lines") { $0.int(0) } ?? 0
+        let auditFilter = AuditRepository.Filter(companyId: fx.tc.companyId)
+        let auditBefore = try AuditRepository(db: fx.tc.db).list(filter: auditFilter).count
+
+        let result = try ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId).post(
+            voucherTypeCode: .sales,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: fx.customerId,
+            salesOrPurchaseLedgerId: fx.tc.salesId,
+            items: [.init(itemId: fx.itemId, quantity: try ExactQuantity.whole(2), ratePaise: 10_000)],
+            in: fx.tc.fy
+        )
+
+        let evidence = try XCTUnwrap(VoucherItemLineRepository(db: fx.tc.db).findForVoucher(result.voucher.id).first)
+        XCTAssertEqual(evidence.exactQuantity, try ExactQuantity.whole(2))
+        let inventoryRows = try InventoryRepository(db: fx.tc.db).listMovements(forVoucher: result.voucher.id)
+        XCTAssertEqual(inventoryRows.first?.quantity, try ExactQuantity.whole(2))
+        XCTAssertEqual(try fx.tc.db.queryOne("SELECT COUNT(*) FROM avelo_stock_movements") { $0.int(0) } ?? 0, legacyStockBefore)
+        XCTAssertEqual(try fx.tc.db.queryOne("SELECT COUNT(*) FROM avelo_ledger_lines") { $0.int(0) } ?? 0, legacyAccountingBefore)
+        let newAudit = try AuditRepository(db: fx.tc.db).list(filter: auditFilter)
+        XCTAssertEqual(newAudit.count, auditBefore + 1)
+        XCTAssertEqual(newAudit.first(where: { $0.entityId == result.voucher.id.uuidString })?.entityType, "item_invoice")
+    }
+
+    func testItemInvoiceRejectsFractionalQuantityUntilGSTSupportsIt() throws {
+        let fx = try makeFixture()
+        let quantity = try ExactQuantity(numerator: 3, denominator: 2)
+
+        XCTAssertThrowsError(try ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId).post(
+            voucherTypeCode: .purchase,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: fx.supplierId,
+            salesOrPurchaseLedgerId: fx.purchaseId,
+            items: [.init(itemId: fx.itemId, quantity: quantity, ratePaise: 10_000)],
+            in: fx.tc.fy
+        )) { error in
+            guard case .validation(let validation) = AppError.wrap(error) else {
+                return XCTFail("Expected typed validation error, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .itemInvoiceQuantityUnsupported)
+        }
+    }
+
+    func testItemInvoiceRejectsInactiveItemWithTypedError() throws {
+        let fx = try makeFixture()
+        try InventoryRepository(db: fx.tc.db).disableItem(fx.itemId)
+
+        XCTAssertThrowsError(try ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId).post(
+            voucherTypeCode: .purchase,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: fx.supplierId,
+            salesOrPurchaseLedgerId: fx.purchaseId,
+            items: [.init(itemId: fx.itemId, quantity: 1, ratePaise: 10_000)],
+            in: fx.tc.fy
+        )) { error in
+            guard case .validation(let validation) = AppError.wrap(error) else {
+                return XCTFail("Expected typed validation error, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .inventoryItemUnavailable)
+        }
+    }
+
+    func testItemInvoiceRejectsUnavailableMainLocationWithTypedError() throws {
+        let fx = try makeFixture()
+        try fx.tc.db.execute(
+            "UPDATE avelo_inventory_locations SET is_active = 0 WHERE company_id = ? AND code = 'MAIN'",
+            [.text(fx.tc.companyId.uuidString)]
+        )
+
+        XCTAssertThrowsError(try ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId).post(
+            voucherTypeCode: .purchase,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: fx.supplierId,
+            salesOrPurchaseLedgerId: fx.purchaseId,
+            items: [.init(itemId: fx.itemId, quantity: 1, ratePaise: 10_000)],
+            in: fx.tc.fy
+        )) { error in
+            guard case .validation(let validation) = AppError.wrap(error) else {
+                return XCTFail("Expected typed validation error, got \(error)")
+            }
+            XCTAssertEqual(validation.code, .inventoryLocationUnavailable)
+        }
+    }
+
     // MARK: - Purchase, intra-state (company MH, party also MH)
 
     func testPurchaseItemInvoiceSplitsCGSTSGSTForIntraState() throws {
@@ -270,5 +359,29 @@ final class ItemInvoiceServiceTests: XCTestCase {
         )) { error in
             guard case AppError.businessRule = error else { return XCTFail("Expected businessRule, got \(error)") }
         }
+    }
+
+    func testPurchasePartialReturnPostsDebitNoteAndHonorsLockedFY() throws {
+        let fx = try makeFixture(partyGSTIN: "27AAGCB7383J1Z4")
+        let purchase = try ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId).post(
+            voucherTypeCode: .purchase, date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: fx.supplierId, salesOrPurchaseLedgerId: fx.purchaseId,
+            items: [.init(itemId: fx.itemId, quantity: 4, ratePaise: 10_000)], narration: "purchase", in: fx.tc.fy
+        )
+        let source = try XCTUnwrap(InventoryRepository(db: fx.tc.db).listMovements(forVoucher: purchase.voucher.id).first)
+        let draft = VoucherDraft(
+            mode: .create, entryMode: .itemInvoice, voucherTypeCode: .debitNote,
+            date: DateFormatters.parseDate("2024-06-02")!, partyAccountId: fx.supplierId, narration: "return",
+            lines: [
+                .init(accountId: fx.supplierId, amountPaise: 20_000, side: .debit, lineOrder: 0),
+                .init(accountId: fx.purchaseId, amountPaise: 20_000, side: .credit, lineOrder: 1)
+            ]
+        )
+        let service = ItemInvoiceReturnService(db: fx.tc.db, companyId: fx.tc.companyId)
+        let returned = try service.post(.init(draft: draft, financialYear: fx.tc.fy, lines: [.init(sourceInventoryId: source.id, quantity: try ExactQuantity.whole(2))], reason: "damaged"))
+        XCTAssertEqual(returned.voucher.voucherTypeCode, .debitNote)
+        XCTAssertEqual(returned.movements.first?.movementType, .stockOut)
+        try FinancialYearRepository(db: fx.tc.db).lock(fx.tc.fy.id)
+        XCTAssertThrowsError(try service.post(.init(draft: draft, financialYear: fx.tc.fy, lines: [.init(sourceInventoryId: source.id, quantity: try ExactQuantity.whole(1))], reason: "locked")))
     }
 }

@@ -233,7 +233,7 @@ public struct InventoryOrderRepository: Sendable {
                        ELSE 0 END), 0) AS on_hand
             FROM avelo_inventory_reorder_levels r
             JOIN avelo_inventory_items i ON i.id = r.item_id AND i.company_id = r.company_id
-            LEFT JOIN avelo_stock_movements m ON m.item_id = i.id AND m.company_id = i.company_id AND m.date <= ?
+            LEFT JOIN trn_inventory_compat m ON m.item_id = i.id AND m.company_id = i.company_id AND m.date <= ?
             WHERE r.company_id = ?
               AND i.is_active = 1
             GROUP BY i.id, i.name, r.minimum_quantity, r.reorder_quantity

@@ -26,6 +26,8 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
     case stockItemDisabled
     case stockMovementPosted
     case stockMovementReversed
+    case inventoryCostAllocated
+    case itemInvoiceReturnPosted
     case payrollEmployeeCreated
     case payrollEmployeeUpdated
     case payrollEmployeeTerminated
@@ -75,6 +77,8 @@ public enum AuditAction: String, CaseIterable, Sendable, Codable, Identifiable {
         case .stockItemDisabled:        return "Stock item disabled"
         case .stockMovementPosted:      return "Stock movement posted"
         case .stockMovementReversed:    return "Stock movement reversed"
+        case .inventoryCostAllocated:   return "Inventory cost allocated"
+        case .itemInvoiceReturnPosted:  return "Item invoice return posted"
         case .payrollEmployeeCreated:   return "Employee created"
         case .payrollEmployeeUpdated:   return "Employee updated"
         case .payrollEmployeeTerminated:return "Employee terminated"

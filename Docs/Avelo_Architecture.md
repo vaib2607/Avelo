@@ -143,7 +143,13 @@ The service returns the durable voucher. Legacy automatic inventory-link enum va
 
 ### 9.2 Item invoice
 
-`ItemInvoiceService` accepts explicit Sales/Purchase item inputs and deterministically derives tax, round-off, ledger, item-line, and inventory effects. Voucher header, ledger lines, `avelo_voucher_item_lines`, stock effects, workflow rows, sequence, and audit commit atomically.
+`ItemInvoiceService` accepts explicit Sales/Purchase item inputs and deterministically derives tax, round-off, accounting-track, item-line, and inventory-track effects. Voucher header, `trn_accounting`, `avelo_voucher_item_lines`, `trn_inventory`, workflow rows, sequence, and audit commit atomically in one re-entrant `SQLiteDatabase.write` scope.
+
+Scratch item-invoice drafts persist only the selected item IDs and raw quantity/rate editor text. Recovery restores that state, validates its structure visibly, and recomputes GST from current item masters before posting; a draft never carries authoritative tax, stock value, or landed-cost state.
+
+Before item-invoice posting, and again inside the outer write transaction, Avelo revalidates the current company, FY/lock, party and trade-ledger eligibility, active `Main` location, active company-owned items, whole-item quantity policy, and GST configuration. Canonical accounting, inventory, and allocation rows have their own FY-lock triggers in addition to service validation.
+
+Explicit landed-cost allocation is service-owned and canonical-only: one selected freight or irrecoverable-tax accounting row is distributed across selected inbound movements by exact quantity with stable residual-paise order, then audited in the same write transaction. Partial item returns are new Credit/Debit Note vouchers with canonical inventory reversal lineage; original posted records remain immutable.
 
 Editing, reversal, cancellation, PDF generation, and restore must preserve the same item/tax lineage. Ledger-mode auto-link and item-invoice mode are separate workflows and must not be conflated.
 

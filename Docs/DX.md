@@ -19,7 +19,7 @@ Use repo-owned commands so local, CI, and release evidence mean the same thing. 
 
 The product roadmap is `Avelo_Master_Product_Execution_Plan.md`. It coordinates the normative documents and release board; it does not replace them.
 
-Roadmap verification uses repository-owned commands: `make build`, `make test`, `make net-check`, `make rule-audit`, `make verify` or `make rc-local`, `make benchmark`, `make benchmark-million`, and `make launch-smoke` as applicable. Historical agent instructions are not an active source of commands or release status.
+Roadmap verification uses repository-owned commands: `make build`, `make test`, `make net-check`, `make docs-check`, `make rule-audit`, `make verify` or `make rc-local`, `make benchmark`, `make benchmark-million`, and `make launch-smoke` as applicable. Historical agent instructions are not an active source of commands or release status.
 
 When documents conflict, fix the owner instead of duplicating a second rule elsewhere.
 
@@ -154,6 +154,8 @@ Capture the exact Phase 0 candidate before human testing:
 Copy its output into `Docs/Avelo_Phase0_Manual_Acceptance.md`. A changed executable checksum invalidates prior acceptance and requires a new record.
 
 ## Documentation release check
+
+Run `make docs-check` before recording release evidence. It verifies canonical backlog IDs, board counts, execution-queue cross-references, the V027–V029 coordination ID, and the module checklist's live-inventory contract. `make rule-audit` includes this check.
 
 Before tagging:
 

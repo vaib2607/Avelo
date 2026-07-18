@@ -3,6 +3,83 @@ import XCTest
 
 final class FiscalLockEnforcementTests: XCTestCase {
 
+    func testCanonicalOwnershipTriggersRejectCrossCompanyReferences() throws {
+        let tc = try TestCompany.make()
+        let other = try TestCompany.seed(into: tc.db, companyId: UUID(), companyName: "Other Co")
+        let voucher = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1_000, .debit),
+                tc.line(tc.salesId, 1_000, .credit)
+            ]),
+            in: tc.fy
+        ).voucher
+
+        XCTAssertThrowsError(try tc.db.execute(
+            """
+            INSERT INTO trn_accounting (id, company_id, voucher_id, ledger_id, amount_paise, debit_or_credit, line_order, created_at)
+            VALUES (?, ?, ?, ?, 1, 'debit', 99, ?)
+            """,
+            [.text(UUID().uuidString), .text(tc.companyId.uuidString), .text(voucher.id.uuidString), .text(other.cashId.uuidString), .timestamp(Date())]
+        )) { assertDatabaseMessageContains($0, substring: "same company") }
+
+        let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(code: "OWN-1", name: "Owned", unit: "NOS")
+        let otherMain = try XCTUnwrap(tc.db.queryOne(
+            "SELECT id FROM avelo_inventory_locations WHERE company_id = ? AND code = 'MAIN'",
+            bind: [.text(other.companyId.uuidString)]
+        ) { try $0.requiredText("id") })
+        XCTAssertThrowsError(try tc.db.execute(
+            """
+            INSERT INTO trn_inventory (id, company_id, voucher_id, stock_item_id, warehouse_location_id, item_line_id, date, movement_type, quantity_numerator, quantity_denominator, unit_cost_paise, base_value_paise, landed_cost_paise, created_at)
+            VALUES (?, ?, NULL, ?, ?, NULL, ?, 'in', 1, 1, 1, 1, 0, ?)
+            """,
+            [.text(UUID().uuidString), .text(tc.companyId.uuidString), .text(item.id.uuidString), .text(otherMain), .date(DateFormatters.parseDate("2024-06-01")!), .timestamp(Date())]
+        )) { assertDatabaseMessageContains($0, substring: "same company") }
+    }
+
+    func testCanonicalTrackTriggersRejectLockedFinancialYearMutations() throws {
+        let tc = try TestCompany.make()
+        let voucher = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1_000, .debit),
+                tc.line(tc.salesId, 1_000, .credit)
+            ]),
+            in: tc.fy
+        ).voucher
+        let accounting = try XCTUnwrap(LedgerLineRepository(db: tc.db).findForVoucher(voucher.id).first)
+        let item = try InventoryService(db: tc.db, companyId: tc.companyId).createItem(code: "CAN-LOCK", name: "Canonical Lock", unit: "NOS")
+        let movement = StockMovement(
+            companyId: tc.companyId,
+            itemId: item.id,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            movementType: .stockIn,
+            quantity: try ExactQuantity.whole(1),
+            unitCostPaise: 1_000,
+            totalValuePaise: 1_000
+        )
+        try InventoryRepository(db: tc.db).insertMovement(movement)
+        let allocation = try InventoryCostAllocation(
+            companyId: tc.companyId,
+            accountingId: accounting.id,
+            inventoryId: movement.id,
+            allocatedPaise: 1
+        )
+        try InventoryCostAllocationRepository(db: tc.db).insert(allocation)
+        try FinancialYearRepository(db: tc.db).lock(tc.fy.id)
+
+        XCTAssertThrowsError(try tc.db.execute(
+            "UPDATE trn_accounting SET amount_paise = amount_paise WHERE id = ?",
+            [.text(accounting.id.uuidString)]
+        )) { assertDatabaseMessageContains($0, substring: "Financial year is locked") }
+        XCTAssertThrowsError(try tc.db.execute(
+            "UPDATE trn_inventory SET reason = 'locked' WHERE id = ?",
+            [.text(movement.id.uuidString)]
+        )) { assertDatabaseMessageContains($0, substring: "Financial year is locked") }
+        XCTAssertThrowsError(try tc.db.execute(
+            "UPDATE trn_inventory_cost_allocations SET allocated_paise = allocated_paise WHERE id = ?",
+            [.text(allocation.id.uuidString)]
+        )) { assertDatabaseMessageContains($0, substring: "Financial year is locked") }
+    }
+
     func testInventoryServiceRejectsStockMovementInLockedFinancialYear() throws {
         let tc = try TestCompany.make()
         let service = InventoryService(db: tc.db, companyId: tc.companyId)

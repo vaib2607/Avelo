@@ -54,7 +54,7 @@ extension ReportRepository {
             SELECT
                 COALESCE(SUM(CASE WHEN v.voucher_type_code IN ('sales', 'creditNote') AND l.side = 'credit' THEN l.amount_paise ELSE 0 END), 0) AS output_cess,
                 COALESCE(SUM(CASE WHEN v.voucher_type_code IN ('purchase', 'debitNote') AND l.side = 'debit' THEN l.amount_paise ELSE 0 END), 0) AS input_cess
-            FROM avelo_ledger_lines l
+            FROM trn_accounting_compat l
             JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
             JOIN avelo_accounts a ON a.id = l.account_id AND a.company_id = l.company_id
             WHERE l.company_id = ? AND a.code = 'CESS' AND v.is_posted = 1
@@ -134,7 +134,7 @@ extension ReportRepository {
                    COALESCE(SUM(CASE WHEN l.side = 'credit' THEN l.amount_paise ELSE 0 END), 0) AS total_credit
             FROM avelo_vouchers v
             LEFT JOIN avelo_accounts pa ON pa.id = v.party_account_id
-            LEFT JOIN avelo_ledger_lines l ON l.voucher_id = v.id AND l.company_id = v.company_id
+            LEFT JOIN trn_accounting_compat l ON l.voucher_id = v.id AND l.company_id = v.company_id
             WHERE v.company_id = ? AND v.is_posted = 1 AND v.date BETWEEN ? AND ?
             GROUP BY v.id, v.created_at, v.number, v.voucher_type_code, v.narration, pa.name
             ORDER BY v.date ASC, v.created_at ASC, v.number ASC
@@ -215,7 +215,7 @@ extension ReportRepository {
             FROM avelo_bill_allocations ba
             JOIN avelo_vouchers v ON v.id = ba.voucher_id AND v.company_id = ba.company_id
             JOIN avelo_accounts a ON a.id = ba.party_account_id AND a.company_id = ba.company_id
-            JOIN avelo_ledger_lines l ON l.voucher_id = ba.voucher_id
+            JOIN trn_accounting_compat l ON l.voucher_id = ba.voucher_id
                 AND l.company_id = ba.company_id
                 AND l.account_id = ba.party_account_id
             WHERE ba.company_id = ? AND v.is_posted = 1
@@ -365,7 +365,7 @@ extension ReportRepository {
                        WHEN movement_type = 'in' THEN total_value_paise
                        WHEN movement_type = 'out' THEN -total_value_paise
                        ELSE 0 END), 0) AS value_paise
-            FROM avelo_stock_movements
+            FROM trn_inventory_compat
             WHERE company_id = ? AND item_id IN (\(placeholders)) AND date <= ?
             GROUP BY item_id
         """

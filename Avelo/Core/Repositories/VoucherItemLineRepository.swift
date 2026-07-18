@@ -8,7 +8,7 @@ public struct VoucherItemLineRepository: Sendable {
         self.db = db
     }
 
-    private static let columns = "id, company_id, voucher_id, item_id, quantity, rate_paise, taxable_value_paise, hsn_code, gst_rate_bps, cgst_paise, sgst_paise, igst_paise, cess_paise, line_order, created_at"
+    private static let columns = "id, company_id, voucher_id, item_id, quantity, quantity_numerator, quantity_denominator, rate_paise, taxable_value_paise, hsn_code, gst_rate_bps, cgst_paise, sgst_paise, igst_paise, cess_paise, line_order, created_at"
 
     public func findForVoucher(_ voucherId: Voucher.ID) throws -> [VoucherItemLine] {
         try db.query(
@@ -17,13 +17,20 @@ public struct VoucherItemLineRepository: Sendable {
         ) { try Self.rowToLine($0) }
     }
 
+    public func findById(_ id: VoucherItemLine.ID) throws -> VoucherItemLine? {
+        try db.queryOne(
+            "SELECT \(Self.columns) FROM avelo_voucher_item_lines WHERE id = ?",
+            bind: [.text(id.uuidString)]
+        ) { try Self.rowToLine($0) }
+    }
+
     public func insertBatch(_ lines: [VoucherItemLine]) throws {
         for line in lines {
             try db.execute(
                 """
                 INSERT INTO avelo_voucher_item_lines
-                (id, company_id, voucher_id, item_id, quantity, rate_paise, taxable_value_paise, hsn_code, gst_rate_bps, cgst_paise, sgst_paise, igst_paise, cess_paise, line_order, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, company_id, voucher_id, item_id, quantity, quantity_numerator, quantity_denominator, rate_paise, taxable_value_paise, hsn_code, gst_rate_bps, cgst_paise, sgst_paise, igst_paise, cess_paise, line_order, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     .text(line.id.uuidString),
@@ -31,6 +38,8 @@ public struct VoucherItemLineRepository: Sendable {
                     .text(line.voucherId.uuidString),
                     .text(line.itemId.uuidString),
                     .integer(line.quantity),
+                    .integer(line.exactQuantity.numerator),
+                    .integer(line.exactQuantity.denominator),
                     .integer(line.ratePaise),
                     .integer(line.taxableValuePaise),
                     .optionalText(line.hsnCode),
@@ -63,7 +72,7 @@ public struct VoucherItemLineRepository: Sendable {
             companyId: companyId,
             voucherId: voucherId,
             itemId: itemId,
-            quantity: try r.requiredInt("quantity"),
+            quantity: try ExactQuantity(numerator: try r.requiredInt("quantity_numerator"), denominator: try r.requiredInt("quantity_denominator")),
             ratePaise: try r.requiredInt("rate_paise"),
             taxableValuePaise: try r.requiredInt("taxable_value_paise"),
             hsnCode: try r.checkedOptionalText("hsn_code"),

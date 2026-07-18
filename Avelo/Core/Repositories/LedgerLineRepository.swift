@@ -11,8 +11,9 @@ public struct LedgerLineRepository: Sendable {
     public func findForVoucher(_ voucherId: Voucher.ID) throws -> [LedgerLine] {
         try db.query(
             """
-            SELECT id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order
-            FROM avelo_ledger_lines
+            SELECT id, company_id, voucher_id, ledger_id AS account_id, amount_paise,
+                   debit_or_credit AS side, tax_code, cost_center, line_order
+            FROM trn_accounting
             WHERE voucher_id = ?
             ORDER BY line_order ASC
             """,
@@ -20,22 +21,33 @@ public struct LedgerLineRepository: Sendable {
         ) { try Self.rowToLine($0) }
     }
 
+    public func findById(_ id: LedgerLine.ID) throws -> LedgerLine? {
+        try db.queryOne(
+            """
+            SELECT id, company_id, voucher_id, ledger_id AS account_id, amount_paise,
+                   debit_or_credit AS side, tax_code, cost_center, line_order
+            FROM trn_accounting WHERE id = ?
+            """,
+            bind: [.text(id.uuidString)]
+        ) { try Self.rowToLine($0) }
+    }
+
     public func insertBatch(_ lines: [LedgerLine]) throws {
-        let maximumRowsPerStatement = 99 // 99 rows * 9 columns = 891 bindings
+        let maximumRowsPerStatement = 90 // 90 rows * 10 columns = 900 bindings
         var start = lines.startIndex
         while start < lines.endIndex {
             let end = lines.index(start, offsetBy: maximumRowsPerStatement, limitedBy: lines.endIndex) ?? lines.endIndex
-            let rowPlaceholder = "(" + Array(repeating: "?", count: 9).joined(separator: ", ") + ")"
+            let rowPlaceholder = "(" + Array(repeating: "?", count: 10).joined(separator: ", ") + ")"
             let values = Array(repeating: rowPlaceholder, count: lines.distance(from: start, to: end)).joined(separator: ", ")
             var bindings: [SQLValue] = []
-            bindings.reserveCapacity(lines.distance(from: start, to: end) * 9)
+            bindings.reserveCapacity(lines.distance(from: start, to: end) * 10)
             for line in lines[start..<end] {
                 bindings.append(contentsOf: Self.insertBindings(for: line))
             }
             try db.execute(
                 """
-                INSERT INTO avelo_ledger_lines
-                (id, company_id, voucher_id, account_id, amount_paise, side, tax_code, cost_center, line_order)
+                INSERT INTO trn_accounting
+                (id, company_id, voucher_id, ledger_id, amount_paise, debit_or_credit, tax_code, cost_center, line_order, created_at)
                 VALUES \(values)
                 """,
                 bindings
@@ -54,13 +66,14 @@ public struct LedgerLineRepository: Sendable {
             .text(line.side.rawValue),
             .optionalText(line.taxCode),
             .optionalText(line.costCenter),
-            .integer(Int64(line.lineOrder))
+            .integer(Int64(line.lineOrder)),
+            .timestamp(Date())
         ]
     }
 
     public func deleteForVoucher(_ voucherId: Voucher.ID) throws {
         try db.execute(
-            "DELETE FROM avelo_ledger_lines WHERE voucher_id = ?",
+            "DELETE FROM trn_accounting WHERE voucher_id = ?",
             [.text(voucherId.uuidString)]
         )
     }
@@ -97,11 +110,11 @@ public struct LedgerLineRepository: Sendable {
     public func aggregate(filter: AggregationFilter) throws -> Totals {
         var sql = """
             SELECT
-                COALESCE(SUM(CASE WHEN l.side = 'debit'  THEN l.amount_paise ELSE 0 END), 0) AS dr,
-                COALESCE(SUM(CASE WHEN l.side = 'credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
-            FROM avelo_ledger_lines l
+                COALESCE(SUM(CASE WHEN l.debit_or_credit = 'debit'  THEN l.amount_paise ELSE 0 END), 0) AS dr,
+                COALESCE(SUM(CASE WHEN l.debit_or_credit = 'credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
+            FROM trn_accounting l
             JOIN avelo_vouchers v ON v.id = l.voucher_id
-            WHERE l.company_id = ? AND l.account_id = ?
+            WHERE l.company_id = ? AND l.ledger_id = ?
         """
         var bind: [SQLValue] = [.text(filter.companyId.uuidString), .text(filter.accountId.uuidString)]
         if let from = filter.fromDate {
@@ -121,10 +134,10 @@ public struct LedgerLineRepository: Sendable {
     }
 
     static func rowToLine(_ r: Row) throws -> LedgerLine {
-        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_ledger_lines.id")
-        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_ledger_lines.company_id")
-        let voucherId = try UUIDParsing.required(r.requiredText("voucher_id"), field: "avelo_ledger_lines.voucher_id")
-        let accountId = try UUIDParsing.required(r.requiredText("account_id"), field: "avelo_ledger_lines.account_id")
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "trn_accounting.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "trn_accounting.company_id")
+        let voucherId = try UUIDParsing.required(r.requiredText("voucher_id"), field: "trn_accounting.voucher_id")
+        let accountId = try UUIDParsing.required(r.requiredText("account_id"), field: "trn_accounting.ledger_id")
         let side: EntrySide = try r.enumValue("side")
         return LedgerLine(
             id: id,

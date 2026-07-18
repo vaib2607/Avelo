@@ -160,7 +160,19 @@ extension ReportsBody {
     }
     @ViewBuilder
     var balanceSheetSection: some View {
-        if let bs = vm.balanceSheet {
+        if vm.isLoading {
+            ProgressView("Loading Balance Sheet…")
+                .frame(maxWidth: .infinity, minHeight: 160)
+        } else if let error = vm.error {
+            ContentUnavailableView(
+                "Balance Sheet unavailable",
+                systemImage: "exclamationmark.triangle",
+                description: Text("\(error.localizedMessage)\nAs of \(DateFormatters.formatIsoDate(vm.asOf)).")
+            )
+            .frame(maxWidth: .infinity, minHeight: 160)
+            Button("Refresh") { vm.reload() }
+                .keyboardShortcut("r", modifiers: .command)
+        } else if let bs = vm.balanceSheet {
             let comparativeAssets = Dictionary(uniqueKeysWithValues: (vm.comparativeBalanceSheet?.assets.flatMap { $0.rows } ?? []).map { ($0.id, $0) })
             let comparativeLiabilities = Dictionary(uniqueKeysWithValues: (vm.comparativeBalanceSheet?.liabilities.flatMap { $0.rows } ?? []).map { ($0.id, $0) })
             let comparativeEquity = Dictionary(uniqueKeysWithValues: (vm.comparativeBalanceSheet?.equity.flatMap { $0.rows } ?? []).map { ($0.id, $0) })

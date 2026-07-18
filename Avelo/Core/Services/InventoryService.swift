@@ -199,40 +199,68 @@ public final class InventoryService: Sendable {
         )
         var publication: RecalculationPublication?
         try db.write { tx in
-            let repo = InventoryRepository(db: tx)
-            let onHand = try repo.runningBalance(itemId: itemId, asOf: date).onHandQuantity
-            let currentOnHand = onHand.isZero ? try ExactQuantity.whole(0) : onHand.magnitude
-            let authoritativeMovement = try authoritativeMovementForInsertion(
-                draft: movement,
+            publication = try recordMovementInCurrentTransaction(
+                movement,
                 item: item,
-                repository: repo
+                sourceItemLineId: nil,
+                recordAudit: true,
+                transactionDatabase: tx
             )
-            let validation = StockMovementValidator().validate(StockMovementValidator.Input(
-                itemId: itemId,
-                date: date,
-                movementType: type,
-                quantity: baseQuantity,
-                unitCostPaise: ratePaise,
-                totalValuePaise: authoritativeMovement.totalValuePaise,
-                currentOnHandQty: currentOnHand
-            ))
-            if case .invalid(let errs) = validation {
-                throw AppError.validation(errs[0])
-            }
-            try repo.insertMovement(authoritativeMovement)
-            publication = try republishAuthoritativeValuation(
-                item: item,
-                effectiveFromDate: date,
-                repository: repo
-            )
-            try AuditService(db: tx, companyId: companyId).record(
+        }
+        return publication ?? .init(itemId: itemId, effectiveFromDate: date, affectedMovementIds: [], phase: .published, publishedAt: Date())
+    }
+
+    /// Inserts and revalues a movement inside a caller-owned write transaction.
+    /// Item invoices use this to retain authoritative valuation while their
+    /// enclosing voucher transaction owns the single composite audit record.
+    @discardableResult
+    func recordMovementInCurrentTransaction(_ movement: StockMovement,
+                                            item: InventoryItem,
+                                            sourceItemLineId: VoucherItemLine.ID?,
+                                            recordAudit: Bool,
+                                            transactionDatabase: SQLiteDatabase) throws -> RecalculationPublication {
+        guard item.companyId == companyId, item.isActive else {
+            throw AppError.notFound("Inventory item")
+        }
+        let repo = InventoryRepository(db: transactionDatabase)
+        let onHand = try repo.runningBalance(itemId: movement.itemId, asOf: movement.date).onHandQuantity
+        let currentOnHand = onHand.isZero ? try ExactQuantity.whole(0) : onHand.magnitude
+        let authoritativeMovement = try authoritativeMovementForInsertion(
+            draft: movement,
+            item: item,
+            repository: repo
+        )
+        let validation = StockMovementValidator().validate(.init(
+            itemId: movement.itemId,
+            date: movement.date,
+            movementType: movement.movementType,
+            quantity: movement.quantity,
+            unitCostPaise: movement.unitCostPaise,
+            totalValuePaise: authoritativeMovement.totalValuePaise,
+            currentOnHandQty: currentOnHand,
+            // Return/reversal movements restore an authoritative historic
+            // layer value which can legitimately differ from quantity × the
+            // display rate after FIFO/weighted-average consumption.
+            allowAuthoritativeTotalOverride: movement.reversedMovementId != nil
+        ))
+        if case .invalid(let errors) = validation {
+            throw AppError.validation(errors[0])
+        }
+        try repo.insertMovement(authoritativeMovement, sourceItemLineId: sourceItemLineId)
+        let publication = try republishAuthoritativeValuation(
+            item: item,
+            effectiveFromDate: movement.date,
+            repository: repo
+        )
+        if recordAudit {
+            try AuditService(db: transactionDatabase, companyId: companyId).record(
                 action: .stockMovementPosted,
                 entityType: "stock_movement",
                 entityId: authoritativeMovement.id.uuidString,
                 snapshotAfter: authoritativeMovement
             )
         }
-        return publication ?? .init(itemId: itemId, effectiveFromDate: date, affectedMovementIds: [], phase: .published, publishedAt: Date())
+        return publication
     }
 
     public func reverseMovement(_ movementId: StockMovement.ID, reason: String? = nil) throws -> ReversalResult {

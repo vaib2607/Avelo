@@ -12,12 +12,13 @@ public struct VoucherDraftRepository: Sendable {
         try db.execute(
             """
             INSERT INTO avelo_voucher_drafts
-            (id, company_id, voucher_type_code, date, party_account_id, narration,
+            (id, company_id, voucher_type_code, entry_mode, date, party_account_id, narration,
              bill_reference_type, bill_reference_number, cheque_number, cheque_due_date,
-             account_ledger_id, lines_json, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             account_ledger_id, sales_purchase_ledger_id, lines_json, item_lines_json, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 voucher_type_code = excluded.voucher_type_code,
+                entry_mode = excluded.entry_mode,
                 date = excluded.date,
                 party_account_id = excluded.party_account_id,
                 narration = excluded.narration,
@@ -26,13 +27,16 @@ public struct VoucherDraftRepository: Sendable {
                 cheque_number = excluded.cheque_number,
                 cheque_due_date = excluded.cheque_due_date,
                 account_ledger_id = excluded.account_ledger_id,
+                sales_purchase_ledger_id = excluded.sales_purchase_ledger_id,
                 lines_json = excluded.lines_json,
+                item_lines_json = excluded.item_lines_json,
                 updated_at = excluded.updated_at
             """,
             [
                 .text(entry.id.uuidString),
                 .text(entry.companyId.uuidString),
                 .text(entry.voucherTypeCode.rawValue),
+                .text(entry.entryMode.rawValue),
                 .timestamp(entry.date),
                 .optionalText(entry.partyAccountId?.uuidString),
                 .text(entry.narration),
@@ -41,7 +45,9 @@ public struct VoucherDraftRepository: Sendable {
                 .optionalText(entry.chequeNumber),
                 .optionalTimestamp(entry.chequeDueDate),
                 .optionalText(entry.accountLedgerId?.uuidString),
+                .optionalText(entry.salesPurchaseLedgerId?.uuidString),
                 .text(entry.linesJSON),
+                .optionalText(entry.itemLinesJSON),
                 .timestamp(entry.updatedAt)
             ]
         )
@@ -54,9 +60,9 @@ public struct VoucherDraftRepository: Sendable {
     public func mostRecent(companyId: Company.ID) throws -> VoucherEntryDraft? {
         try db.queryOne(
             """
-            SELECT id, company_id, voucher_type_code, date, party_account_id, narration,
+            SELECT id, company_id, voucher_type_code, entry_mode, date, party_account_id, narration,
                    bill_reference_type, bill_reference_number, cheque_number, cheque_due_date,
-                   account_ledger_id, lines_json, updated_at
+                   account_ledger_id, sales_purchase_ledger_id, lines_json, item_lines_json, updated_at
             FROM avelo_voucher_drafts
             WHERE company_id = ?
             ORDER BY updated_at DESC
@@ -80,6 +86,7 @@ public struct VoucherDraftRepository: Sendable {
             id: try UUIDParsing.required(r.requiredText("id"), field: "avelo_voucher_drafts.id"),
             companyId: try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_voucher_drafts.company_id"),
             voucherTypeCode: try r.enumValue("voucher_type_code"),
+            entryMode: (try r.optionalEnumValue("entry_mode")) ?? .ledger,
             date: try r.timestamp("date"),
             partyAccountId: try UUIDParsing.optional(try r.checkedOptionalText("party_account_id"), field: "avelo_voucher_drafts.party_account_id"),
             narration: try r.requiredText("narration"),
@@ -88,7 +95,9 @@ public struct VoucherDraftRepository: Sendable {
             chequeNumber: try r.checkedOptionalText("cheque_number"),
             chequeDueDate: try r.optionalTimestamp("cheque_due_date"),
             accountLedgerId: try UUIDParsing.optional(try r.checkedOptionalText("account_ledger_id"), field: "avelo_voucher_drafts.account_ledger_id"),
+            salesPurchaseLedgerId: try UUIDParsing.optional(try r.checkedOptionalText("sales_purchase_ledger_id"), field: "avelo_voucher_drafts.sales_purchase_ledger_id"),
             linesJSON: try r.requiredText("lines_json"),
+            itemLinesJSON: try r.checkedOptionalText("item_lines_json"),
             updatedAt: try r.timestamp("updated_at")
         )
     }

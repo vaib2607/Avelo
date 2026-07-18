@@ -11,6 +11,8 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
     public let id: ID
     public let companyId: Company.ID
     public var voucherTypeCode: VoucherType.Code
+    /// Missing values in pre-V027 recovery rows decode as `.ledger`.
+    public var entryMode: VoucherDraft.EntryMode
     public var date: Date
     public var partyAccountId: Account.ID?
     public var narration: String
@@ -19,12 +21,18 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
     public var chequeNumber: String?
     public var chequeDueDate: Date?
     public var accountLedgerId: Account.ID?
+    /// Explicit Sales/Purchase ledger for item-invoice entry mode. Scratch
+    /// only: it is revalidated when the recovered draft is posted.
+    public var salesPurchaseLedgerId: Account.ID?
     public var linesJSON: String
+    /// Ordered raw item editor rows for item-invoice recovery.
+    public var itemLinesJSON: String?
     public var updatedAt: Date
 
     public init(id: ID = UUID(),
                 companyId: Company.ID,
                 voucherTypeCode: VoucherType.Code,
+                entryMode: VoucherDraft.EntryMode = .ledger,
                 date: Date,
                 partyAccountId: Account.ID? = nil,
                 narration: String = "",
@@ -33,11 +41,14 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
                 chequeNumber: String? = nil,
                 chequeDueDate: Date? = nil,
                 accountLedgerId: Account.ID? = nil,
+                salesPurchaseLedgerId: Account.ID? = nil,
                 linesJSON: String,
+                itemLinesJSON: String? = nil,
                 updatedAt: Date = Date()) {
         self.id = id
         self.companyId = companyId
         self.voucherTypeCode = voucherTypeCode
+        self.entryMode = entryMode
         self.date = date
         self.partyAccountId = partyAccountId
         self.narration = narration
@@ -46,7 +57,9 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
         self.chequeNumber = chequeNumber
         self.chequeDueDate = chequeDueDate
         self.accountLedgerId = accountLedgerId
+        self.salesPurchaseLedgerId = salesPurchaseLedgerId
         self.linesJSON = linesJSON
+        self.itemLinesJSON = itemLinesJSON
         self.updatedAt = updatedAt
     }
 }

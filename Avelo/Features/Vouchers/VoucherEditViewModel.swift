@@ -47,18 +47,28 @@ public final class VoucherEditViewModel {
     // quantities instead of ledger lines, and `ItemInvoiceService` computes
     // GST and posts both the ledger voucher and the item lines/stock
     // movements server-side. Only offered for Sales/Purchase.
-    public var itemInvoiceMode: Bool = false
+    public var itemInvoiceMode: Bool = false {
+        didSet { draft.entryMode = itemInvoiceMode ? .itemInvoice : .ledger }
+    }
     public var items: [InventoryItem] = []
     public var salesOrPurchaseLedgerId: Account.ID?
     public var itemLines: [ItemLineRow] = [ItemLineRow()]
 
     public struct ItemLineRow: Identifiable, Equatable {
-        public let id = UUID()
+        public let id: UUID
         public var itemId: InventoryItem.ID?
-        public var quantity: String = ""
-        public var rate: String = "0.00"
+        public var quantity: String
+        public var rate: String
 
-        public init() {}
+        public init(id: UUID = UUID(),
+                    itemId: InventoryItem.ID? = nil,
+                    quantity: String = "",
+                    rate: String = "0.00") {
+            self.id = id
+            self.itemId = itemId
+            self.quantity = quantity
+            self.rate = rate
+        }
     }
 
     public func addItemLine() { itemLines.append(ItemLineRow()) }
@@ -70,12 +80,19 @@ public final class VoucherEditViewModel {
     /// Item lines with both an item and a positive quantity picked; blank
     /// trailing rows (same UX as the ledger-line grid) are silently dropped.
     public func buildItemLineInputs() -> [ItemInvoiceService.ItemLineInput] {
-        itemLines.compactMap { row in
-            guard let itemId = row.itemId,
-                  let qty = Int64(row.quantity.trimmingCharacters(in: .whitespaces)), qty > 0 else { return nil }
-            let rate = Currency.parseRupeeInput(row.rate) ?? 0
-            return .init(itemId: itemId, quantity: qty, ratePaise: rate)
-        }
+        itemLines.compactMap(itemLineInput)
+    }
+
+    /// Shared by posting and keyboard traversal: zero-rate items are valid,
+    /// but an item and positive whole quantity are required.
+    public func itemLineInput(_ row: ItemLineRow) -> ItemInvoiceService.ItemLineInput? {
+        guard let itemId = row.itemId,
+              let qty = Int64(row.quantity.trimmingCharacters(in: .whitespaces)), qty > 0 else { return nil }
+        return .init(itemId: itemId, quantity: qty, ratePaise: Currency.parseRupeeInput(row.rate) ?? 0)
+    }
+
+    public func isCompleteItemLine(_ row: ItemLineRow) -> Bool {
+        itemLineInput(row) != nil
     }
 
     public var itemInvoiceValidationErrors: [String] {
@@ -132,6 +149,43 @@ public final class VoucherEditViewModel {
     /// continuing to edit a resumed draft keeps updating that same row.
     public private(set) var draftId: UUID = UUID()
     private var autosaveTask: Task<Void, Never>?
+    private var draftPersistenceSuppressed = false
+    private var cleanEditorSnapshot: EditorSnapshot?
+
+    private struct EditorSnapshot: Equatable {
+        struct LedgerLine: Equatable {
+            let accountId: Account.ID?
+            let amount: String
+            let side: LedgerSide
+            let taxCode: String?
+            let costCenter: String?
+        }
+
+        struct ItemLine: Equatable {
+            let itemId: InventoryItem.ID?
+            let quantity: String
+            let rate: String
+        }
+
+        let voucherTypeCode: VoucherType.Code
+        let date: Date
+        let partyAccountId: Account.ID?
+        let billReferenceType: VoucherDraft.BillReferenceType?
+        let billReferenceNumber: String
+        let chequeNumber: String
+        let chequeDueDate: Date?
+        let tdsSectionCode: String
+        let tdsTaxAmount: String
+        let tcsSectionCode: String
+        let tcsTaxAmount: String
+        let narration: String
+        let singleEntryMode: Bool
+        let accountLedgerId: Account.ID?
+        let lines: [LedgerLine]
+        let itemInvoiceMode: Bool
+        let salesOrPurchaseLedgerId: Account.ID?
+        let itemLines: [ItemLine]
+    }
 
     public init(companyId: Company.ID, db: SQLiteDatabase, fyId: FinancialYear.ID, initialType: VoucherType.Code, existingId: Voucher.ID? = nil) {
         self.companyId = companyId
@@ -157,6 +211,29 @@ public final class VoucherEditViewModel {
                 lines: []
             )
         }
+    }
+
+    /// Marks the fully configured editor as clean. Call this only after load
+    /// or recovery has populated the raw UI text, so formatter output cannot
+    /// cause a phantom dirty prompt.
+    public func captureCleanEditorState() {
+        cleanEditorSnapshot = editorSnapshot()
+    }
+
+    public var hasUnsavedChanges: Bool {
+        guard let cleanEditorSnapshot else { return hasMeaningfulCreateInput }
+        return editorSnapshot() != cleanEditorSnapshot
+    }
+
+    /// Discards only this editor session. Create-mode scratch data is removed;
+    /// edit mode never writes, deletes, or otherwise mutates posted history.
+    public func discardUnsavedChanges() {
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        if case .create = mode {
+            deleteDraft()
+        }
+        cleanEditorSnapshot = editorSnapshot()
     }
 
     public struct LineRow: Identifiable, Equatable {
@@ -308,6 +385,7 @@ public final class VoucherEditViewModel {
     /// does not trigger a database write on every keystroke.
     public func scheduleAutosave() {
         guard case .create = mode else { return }
+        guard !draftPersistenceSuppressed else { return }
         autosaveTask?.cancel()
         let snapshot = currentDraftSnapshot()
         let db = self.db
@@ -320,11 +398,22 @@ public final class VoucherEditViewModel {
         }
     }
 
+    /// Used when an editor is about to leave the view hierarchy. Unlike the
+    /// debounce this captures the latest create-mode state synchronously so a
+    /// route or sheet replacement cannot beat the 800 ms recovery timer.
+    public func persistDraftImmediately() {
+        guard case .create = mode else { return }
+        guard !draftPersistenceSuppressed else { return }
+        autosaveTask?.cancel()
+        try? VoucherDraftRepository(db: db).upsert(currentDraftSnapshot())
+    }
+
     /// Removes the autosaved draft. Called after a successful post (the
     /// draft is superseded by the real voucher) and on explicit cancel (the
     /// user chose to discard it) so drafts never outlive the session that
     /// created them except across a crash.
     public func deleteDraft() {
+        draftPersistenceSuppressed = true
         autosaveTask?.cancel()
         autosaveTask = nil
         guard case .create = mode else { return }
@@ -334,7 +423,8 @@ public final class VoucherEditViewModel {
     /// Restores editor state from a previously autosaved draft, reusing its
     /// id so further autosaves continue updating the same row rather than
     /// creating a duplicate.
-    public func loadFromRecoveredDraft(_ entry: VoucherEntryDraft) {
+    public func loadFromRecoveredDraft(_ entry: VoucherEntryDraft) throws {
+        draftPersistenceSuppressed = false
         draftId = entry.id
         date = entry.date
         partyAccountId = entry.partyAccountId
@@ -344,9 +434,11 @@ public final class VoucherEditViewModel {
         chequeNumber = entry.chequeNumber ?? ""
         chequeDueDate = entry.chequeDueDate
         accountLedgerId = entry.accountLedgerId
-        if let data = entry.linesJSON.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode([DraftLineDTO].self, from: data),
-           !decoded.isEmpty {
+        salesOrPurchaseLedgerId = entry.salesPurchaseLedgerId
+        draft.entryMode = entry.entryMode
+        itemInvoiceMode = entry.entryMode == .itemInvoice
+        let decoded = try decodeDraftLines(entry.linesJSON)
+        if !decoded.isEmpty {
             let recoveredLines: [DraftLineDTO]
             if entry.accountLedgerId == nil,
                let sourceIndex = Self.singleEntrySourceIndex(
@@ -375,6 +467,9 @@ public final class VoucherEditViewModel {
                     )
                 }
             }
+        }
+        if entry.entryMode == .itemInvoice {
+            itemLines = try decodeItemLines(entry.itemLinesJSON)
         }
     }
 
@@ -448,6 +543,7 @@ public final class VoucherEditViewModel {
             id: draftId,
             companyId: companyId,
             voucherTypeCode: draft.voucherTypeCode,
+            entryMode: draft.entryMode,
             date: date,
             partyAccountId: partyAccountId,
             narration: narration,
@@ -456,9 +552,75 @@ public final class VoucherEditViewModel {
             chequeNumber: chequeNumber.isEmpty ? nil : chequeNumber,
             chequeDueDate: chequeDueDate,
             accountLedgerId: accountLedgerId,
+            salesPurchaseLedgerId: salesOrPurchaseLedgerId,
             linesJSON: encodedLines,
+            itemLinesJSON: encodedItemLines(),
             updatedAt: Date()
         )
+    }
+
+    private func encodedItemLines() -> String? {
+        guard itemInvoiceMode else { return nil }
+        let rows = itemLines.map {
+            DraftItemLineDTO(itemId: $0.itemId?.uuidString, quantity: $0.quantity, rate: $0.rate)
+        }
+        guard let data = try? JSONEncoder().encode(rows),
+              let json = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return json
+    }
+
+    private func decodeDraftLines(_ json: String) throws -> [DraftLineDTO] {
+        guard let data = json.data(using: .utf8) else {
+            throw AppError.validation(.init(code: .internal, field: "linesJSON", message: "Recovered voucher draft contains invalid ledger-line data."))
+        }
+        do {
+            let rows = try JSONDecoder().decode([DraftLineDTO].self, from: data)
+            for row in rows where row.accountId != nil && UUID(uuidString: row.accountId!) == nil {
+                throw AppError.validation(.init(code: .internal, field: "linesJSON", message: "Recovered voucher draft contains an invalid account identifier."))
+            }
+            return rows
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.validation(.init(code: .internal, field: "linesJSON", message: "Recovered voucher draft contains malformed ledger-line data."))
+        }
+    }
+
+    private func decodeItemLines(_ json: String?) throws -> [ItemLineRow] {
+        guard let json else { return [ItemLineRow()] }
+        guard let data = json.data(using: .utf8) else {
+            throw AppError.validation(.init(code: .internal, field: "itemLinesJSON", message: "Recovered item invoice contains invalid item-line data."))
+        }
+        do {
+            let rows = try JSONDecoder().decode([DraftItemLineDTO].self, from: data)
+            let restored = try rows.map { row -> ItemLineRow in
+                let itemId = try row.itemId.map {
+                    guard let id = UUID(uuidString: $0) else {
+                        throw AppError.validation(.init(code: .internal, field: "itemLinesJSON", message: "Recovered item invoice contains an invalid item identifier."))
+                    }
+                    return id
+                }
+                let quantity = row.quantity.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !quantity.isEmpty {
+                    let exact = try ExactQuantity.parse(decimal: quantity)
+                    guard !exact.isZero, exact.wholeValue != nil else {
+                        throw AppError.validation(.init(code: .stockMovementQuantityZero, field: "quantity", message: "Recovered item invoice quantity must be a positive whole value."))
+                    }
+                }
+                let rate = row.rate.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !rate.isEmpty, Currency.parseRupeeInput(rate) == nil {
+                    throw AppError.validation(.init(code: .internal, field: "rate", message: "Recovered item invoice contains an invalid rate."))
+                }
+                return ItemLineRow(itemId: itemId, quantity: row.quantity, rate: row.rate)
+            }
+            return restored.isEmpty ? [ItemLineRow()] : restored
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.validation(.init(code: .internal, field: "itemLinesJSON", message: "Recovered item invoice contains malformed item-line data."))
+        }
     }
 
     public func removeLine(_ id: UUID) {
@@ -576,7 +738,50 @@ public final class VoucherEditViewModel {
         if case .valid = validation { return isBalanced }
         return false
     }
+
+    private var hasMeaningfulCreateInput: Bool {
+        !narration.isEmpty || partyAccountId != nil || accountLedgerId != nil ||
+            !billReferenceNumber.isEmpty || !chequeNumber.isEmpty ||
+            !tdsSectionCode.isEmpty || !tdsTaxAmount.isEmpty ||
+            !tcsSectionCode.isEmpty || !tcsTaxAmount.isEmpty ||
+            lines.contains { $0.accountId != nil || $0.amount != "0.00" } ||
+            itemLines.contains { $0.itemId != nil || !$0.quantity.isEmpty || $0.rate != "0.00" }
+    }
+
+    private func editorSnapshot() -> EditorSnapshot {
+        EditorSnapshot(
+            voucherTypeCode: draft.voucherTypeCode,
+            date: normalizedDate(date),
+            partyAccountId: partyAccountId,
+            billReferenceType: billReferenceType,
+            billReferenceNumber: billReferenceNumber,
+            chequeNumber: chequeNumber,
+            chequeDueDate: chequeDueDate.map(normalizedDate),
+            tdsSectionCode: tdsSectionCode,
+            tdsTaxAmount: tdsTaxAmount,
+            tcsSectionCode: tcsSectionCode,
+            tcsTaxAmount: tcsTaxAmount,
+            narration: narration,
+            singleEntryMode: singleEntryMode,
+            accountLedgerId: accountLedgerId,
+            lines: lines.map {
+                .init(accountId: $0.accountId, amount: $0.amount, side: $0.side,
+                      taxCode: $0.taxCode, costCenter: $0.costCenter)
+            },
+            itemInvoiceMode: itemInvoiceMode,
+            salesOrPurchaseLedgerId: salesOrPurchaseLedgerId,
+            itemLines: itemLines.map {
+                .init(itemId: $0.itemId, quantity: $0.quantity, rate: $0.rate)
+            }
+        )
+    }
+
+    private func normalizedDate(_ value: Date) -> Date {
+        DateFormatters.utcCalendar.startOfDay(for: value)
+    }
 }
+
+extension VoucherEditViewModel: RouterDirtyStateProviding {}
 
 private extension Array {
     subscript(safe index: Int) -> Element? {
@@ -590,4 +795,10 @@ private struct DraftLineDTO: Codable {
     let side: String
     let taxCode: String?
     let costCenter: String?
+}
+
+private struct DraftItemLineDTO: Codable {
+    let itemId: String?
+    let quantity: String
+    let rate: String
 }

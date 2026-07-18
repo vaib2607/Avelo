@@ -20,12 +20,16 @@ public struct RestoreService: Sendable {
         "avelo_cheques",
         "avelo_ledger_lines",
         "avelo_inventory_items",
+        "avelo_inventory_locations",
         "avelo_boms",
         "avelo_bom_components",
         "avelo_inventory_order_lines",
         "avelo_inventory_orders",
         "avelo_inventory_reorder_levels",
         "avelo_stock_movements",
+        "trn_accounting",
+        "trn_inventory",
+        "trn_inventory_cost_allocations",
         "avelo_payroll_employees",
         "avelo_payroll_entries",
         "avelo_audit_events",
@@ -753,13 +757,16 @@ public struct RestoreService: Sendable {
     }
 
     private static func dropLockedFinancialYearTriggers(db: SQLiteDatabase) throws {
-        for triggerName in lockedFinancialYearTriggerNames {
+        for triggerName in lockedFinancialYearTriggerNames + MigrationV029.triggerNames {
             try db.execute("DROP TRIGGER IF EXISTS \(triggerName)")
         }
     }
 
     private static func recreateLockedFinancialYearTriggers(db: SQLiteDatabase) throws {
         for sql in lockedFinancialYearTriggerSQL {
+            try db.execute(sql)
+        }
+        for sql in MigrationV029.triggerSQL {
             try db.execute(sql)
         }
     }

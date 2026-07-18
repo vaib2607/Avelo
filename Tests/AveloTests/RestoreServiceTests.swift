@@ -327,7 +327,7 @@ final class RestoreServiceTests: XCTestCase {
             unit: "NOS"
         )
         try VoucherItemLineRepository(db: tc.db).insertBatch([
-            VoucherItemLine(
+            try VoucherItemLine(
                 companyId: tc.companyId,
                 voucherId: posted.voucher.id,
                 itemId: item.id,
@@ -684,6 +684,39 @@ final class RestoreServiceTests: XCTestCase {
             filter: .init(companyId: restored.id, action: .backupImported)
         )
         XCTAssertEqual(restoreAudit.count, 1)
+    }
+
+    func testRestorePreservesCanonicalTracksAndAllocationLinks() async throws {
+        let sourceRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let targetRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: sourceRoot); try? FileManager.default.removeItem(at: targetRoot) }
+        let manager = try DatabaseManager(appSupportDirectory: sourceRoot, keyStore: InMemoryCompanyKeyStore())
+        let company = try await CompanyService.create(companyInput: .init(name: "Canonical Restore", gstin: nil, pan: nil), fyInput: .init(label: "2024-25", startDate: DateFormatters.parseDate("2024-04-01")!, endDate: DateFormatters.parseDate("2025-03-31")!, booksBeginDate: DateFormatters.parseDate("2024-04-01")!), seedDefaults: true, manager: manager)
+        let handle = try await manager.openCompany(id: company.id)
+        var inventoryCompany = try XCTUnwrap(CompanyRepository(db: handle.db).findById(company.id))
+        inventoryCompany.isInventoryEnabled = true
+        try CompanyRepository(db: handle.db).update(inventoryCompany)
+        let fy = try XCTUnwrap(FinancialYearRepository(db: handle.db).findMostRecent(company.id))
+        let accounts = AccountRepository(db: handle.db)
+        let cash = try XCTUnwrap(accounts.findByCode("CASH_IN_HAND", companyId: company.id))
+        let sales = try XCTUnwrap(accounts.findByCode("SALES", companyId: company.id))
+        let voucher = try VoucherService(db: handle.db, companyId: company.id).post(draft: VoucherDraft(mode: .create, voucherTypeCode: .journal, date: DateFormatters.parseDate("2024-06-01")!, narration: "canonical", lines: [.init(accountId: cash.id, amountPaise: 100, side: .debit), .init(accountId: sales.id, amountPaise: 100, side: .credit)]), in: fy).voucher
+        let item = try InventoryService(db: handle.db, companyId: company.id).createItem(code: "REST-CAN", name: "Canonical", unit: "NOS")
+        _ = try InventoryService(db: handle.db, companyId: company.id).recordMovement(itemId: item.id, date: DateFormatters.parseDate("2024-06-01")!, type: .stockIn, quantity: 1, ratePaise: 100)
+        let movement = try XCTUnwrap(InventoryRepository(db: handle.db).listMovementsChronologically(companyId: company.id, itemId: item.id).first)
+        let accounting = try XCTUnwrap(LedgerLineRepository(db: handle.db).findForVoucher(voucher.id).first)
+        _ = try InventoryCostAllocationService(db: handle.db, companyId: company.id).allocate(.init(accountingId: accounting.id, inventoryIds: [movement.id], kind: .freight))
+        let backupURL = sourceRoot.appendingPathComponent("canonical.avelobackup")
+        _ = try await BackupService(manager: manager).export(companyId: company.id, companyName: company.name, to: backupURL)
+        let restoreManager = try DatabaseManager(appSupportDirectory: targetRoot, keyStore: InMemoryCompanyKeyStore())
+        let restored = try await RestoreService(manager: restoreManager).restore(from: backupURL, recoveryKey: try await manager.recoveryKey(for: company.id))
+        let restoredHandle = try await restoreManager.openCompany(id: restored.id)
+        XCTAssertEqual(try restoredHandle.db.queryOne("SELECT COUNT(*) FROM trn_accounting") { $0.int(0) }, 2)
+        XCTAssertEqual(try restoredHandle.db.queryOne("SELECT COUNT(*) FROM trn_inventory") { $0.int(0) }, 1)
+        XCTAssertEqual(try restoredHandle.db.queryOne("SELECT COUNT(*) FROM trn_inventory_cost_allocations") { $0.int(0) }, 1)
+        XCTAssertEqual(try restoredHandle.db.queryOne("SELECT landed_cost_paise FROM trn_inventory") { $0.int(0) }, 100)
     }
 
     func testRestoreRejectsBackupWithOverlappingFinancialYears() async throws {

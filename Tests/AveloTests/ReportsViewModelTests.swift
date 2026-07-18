@@ -4,6 +4,19 @@ import XCTest
 @MainActor
 final class ReportsViewModelTests: XCTestCase {
 
+    private func priorFinancialYear(for tc: TestCompany) throws -> FinancialYear {
+        let start = DateFormatters.parseDate("2023-04-01")!
+        let financialYear = FinancialYear(
+            companyId: tc.companyId,
+            label: "2023-24",
+            startDate: start,
+            endDate: DateFormatters.parseDate("2024-03-31")!,
+            booksBeginDate: start
+        )
+        try FinancialYearRepository(db: tc.db).insert(financialYear)
+        return financialYear
+    }
+
     func testLedgerSelectionLoadsRequestedAccountLedger() throws {
         let tc = try TestCompany.make()
         let service = VoucherService(db: tc.db, companyId: tc.companyId)
@@ -27,13 +40,36 @@ final class ReportsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.ledger?.rows.first?.voucherId, try XCTUnwrap(vm.ledger?.rows.first?.voucherId))
     }
 
+    func testBalanceSheetSelectionLoadsReportAndClearsPriorError() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try service.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 25_000, .debit),
+            tc.line(tc.salesId, 25_000, .credit)
+        ]), in: tc.fy)
+
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.error = .notFound("Previous report failure")
+
+        vm.selection = .balanceSheet
+        vm.asOf = tc.fy.endDate
+        vm.reload()
+
+        XCTAssertNotNil(vm.balanceSheet)
+        XCTAssertNil(vm.error)
+    }
+
     // AVL-P1-036 (Alt+N comparative columns): the comparative column must
     // reconcile exactly to what the same report returns standalone for that
     // prior period — no separate math, no drift.
 
     func testComparativeTrialBalanceReconcilesToStandaloneRunForPriorYear() throws {
         let tc = try TestCompany.make()
+        let priorFY = try priorFinancialYear(for: tc)
         let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try service.post(draft: tc.draft(on: "2023-06-01", lines: [
+            tc.line(tc.cashId, 25_000, .debit), tc.line(tc.salesId, 25_000, .credit)
+        ]), in: priorFY)
         _ = try service.post(draft: tc.draft(on: "2024-06-01", lines: [
             tc.line(tc.cashId, 25000, .debit),
             tc.line(tc.salesId, 25000, .credit)
@@ -49,7 +85,7 @@ final class ReportsViewModelTests: XCTestCase {
         vm.reload()
 
         let standalone = try ReportService(db: tc.db, companyId: tc.companyId)
-            .trialBalance(asOfDate: priorAsOf, financialYearId: tc.fy.id).rows
+            .trialBalance(asOfDate: priorAsOf, financialYearId: priorFY.id).rows
 
         XCTAssertEqual(vm.comparativeTrialBalance, standalone)
     }
@@ -72,7 +108,11 @@ final class ReportsViewModelTests: XCTestCase {
 
     func testComparativeProfitLossReconcilesToStandaloneRunForPriorYear() throws {
         let tc = try TestCompany.make()
+        let priorFY = try priorFinancialYear(for: tc)
         let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try service.post(draft: tc.draft(on: "2023-06-01", lines: [
+            tc.line(tc.cashId, 25_000, .debit), tc.line(tc.salesId, 25_000, .credit)
+        ]), in: priorFY)
         _ = try service.post(draft: tc.draft(on: "2024-06-01", lines: [
             tc.line(tc.cashId, 25000, .debit),
             tc.line(tc.salesId, 25000, .credit)
@@ -92,7 +132,7 @@ final class ReportsViewModelTests: XCTestCase {
         vm.reload()
 
         let standalone = try ReportService(db: tc.db, companyId: tc.companyId)
-            .profitAndLoss(fromDate: priorFrom, toDate: priorTo, financialYearId: tc.fy.id)
+            .profitAndLoss(fromDate: priorFrom, toDate: priorTo, financialYearId: priorFY.id)
 
         XCTAssertEqual(vm.comparativeProfitLoss, standalone)
     }
@@ -100,6 +140,18 @@ final class ReportsViewModelTests: XCTestCase {
     func testComparativeBalanceSheetReconcilesToStandaloneRunForPriorYear() throws {
         let tc = try TestCompany.make()
         let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        let priorFY = FinancialYear(
+            companyId: tc.companyId,
+            label: "2023-24",
+            startDate: DateFormatters.parseDate("2023-04-01")!,
+            endDate: DateFormatters.parseDate("2024-03-31")!,
+            booksBeginDate: DateFormatters.parseDate("2023-04-01")!
+        )
+        try FinancialYearRepository(db: tc.db).insert(priorFY)
+        _ = try service.post(draft: tc.draft(on: "2023-06-01", lines: [
+            tc.line(tc.cashId, 12_000, .debit),
+            tc.line(tc.salesId, 12_000, .credit)
+        ]), in: priorFY)
         _ = try service.post(draft: tc.draft(on: "2024-06-01", lines: [
             tc.line(tc.cashId, 25000, .debit),
             tc.line(tc.salesId, 25000, .credit)
@@ -115,9 +167,25 @@ final class ReportsViewModelTests: XCTestCase {
         vm.reload()
 
         let standalone = try ReportService(db: tc.db, companyId: tc.companyId)
-            .balanceSheet(asOfDate: priorAsOf, financialYearId: tc.fy.id)
+            .balanceSheet(asOfDate: priorAsOf, financialYearId: priorFY.id)
 
         XCTAssertEqual(vm.comparativeBalanceSheet, standalone)
+    }
+
+    func testBalanceSheetScopeFailureClearsResultAndSurfacesLocalError() throws {
+        let tc = try TestCompany.make()
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .balanceSheet
+        vm.asOf = DateFormatters.parseDate("2024-03-31")!
+
+        vm.reload()
+
+        XCTAssertNil(vm.balanceSheet)
+        XCTAssertFalse(vm.isLoading)
+        guard case .validation(let error) = vm.error else {
+            return XCTFail("Expected typed Balance Sheet scope error")
+        }
+        XCTAssertEqual(error.code, .reportAsOfBeforeFinancialYear)
     }
 
     func testLedgerSelectionWithoutAccountClearsLedgerResult() throws {

@@ -1,6 +1,6 @@
 # Avelo Status Checklist
 
-Snapshot: 2026-07-17
+Snapshot: 2026-07-19
 
 This is the human-readable progress checklist for Avelo. It complements:
 
@@ -11,9 +11,19 @@ The consolidated product and execution roadmap is `Docs/Avelo_Master_Product_Exe
 
 Checkboxes show evidence, not aspiration: `[x]` means implemented with recorded automated evidence, not necessarily release-accepted; `[ ]` still needs implementation, re-verification, or human acceptance. A feature is not release-ready until current-worktree automated proof and every required accountant, operator, keyboard, accessibility, visual, and distribution gate are complete.
 
-## 0. Current worktree — evidence recorded on 2026-07-17
+Status maintenance contract:
 
-The worktree is intentionally uncommitted. No commit, tag, or release artifact has been created by this pass.
+- The first section always identifies branch/base commit, clean or dirty state, schema version, evidence timestamp/timezone, commands, skipped tests, and artifact identity.
+- Evidence from an older commit or artifact is labelled historical; it never receives the word `current` after source, migration, test, resource, entitlement, or build-setting changes.
+- Feature summaries reuse canonical `AVL-*` IDs and separate implementation, automated proof, manual acceptance, and external distribution state.
+- Test counts are evidence snapshots, not durable product facts. Prefer command/result plus identity, and retain old counts only when needed for provenance.
+- Update this file after the release board and execution checklist, then run `make docs-check`.
+
+## 0. Active worktree and evidence identity — 2026-07-19
+
+Active state: `main` based at `93eb199`, with an intentionally dirty V027–V030 accounting/inventory/report/voucher slice. `SchemaVersion.current` is V030. Current automated evidence: `make test`, `make rule-audit`, and `make rc-local` passed on 2026-07-19 Asia/Kolkata; `make bundle`, validation, bundle self-test, and `make launch-smoke` passed. Bundle executable SHA-256: `25a702c569d0fcfbe0986d6ff5da18499a6e36abf10b162f3f70bc94aa22e8ec`; it remains ad-hoc signed. V027 remains `Proof remaining` because direct integrity/parity matrices and all human acceptance gates are not complete.
+
+The checked evidence immediately below was captured on 2026-07-18 Asia/Kolkata for clean `main` at `93eb199`. It is retained as historical baseline and does not prove the active V027–V029 worktree.
 
 - [x] Stabilized high-volume voucher posting: transaction-scoped draft validation, bounded multi-row voucher/ledger/audit inserts, and contiguous HMAC audit-chain batching now preserve per-voucher accounting and rollback semantics while removing the prior encrypted batch-post performance regression.
 - [x] Added audit-chain safeguards and regression coverage: checked sequence arithmetic, one-company batch validation, duplicate-event rollback, cross-chunk continuity, and post-failure next-sequence checks.
@@ -22,14 +32,31 @@ The worktree is intentionally uncommitted. No commit, tag, or release artifact h
 - [x] Targeted audit/voucher regression command passed: 54 tests, 0 failures.
 - [x] All opt-in `PerformanceBenchmarkTests` passed: account-tree reload 0.094s; encrypted post-batch 10k 5.246s (limit 9.037s); encrypted post-batch 100k 98.944s (limit 106.381s); encrypted 50k reporting checks passed.
 - [x] `git diff --check` passed for the current tracked diff.
-- [x] Current full suite passed on 2026-07-17 after V023/V025 audit taxonomy, V024 party profiles, mutation contracts, inventory capability/link policy, historical restore, keyboard routing, and the exhaustive account-context/import/regrouping proof: 498 tests executed, 8 explicitly skipped, 0 failures.
-- [x] Current `make rule-audit` passed on 2026-07-17: network, R-16, R-15, and automated R-4 checks clean; the rule audit still names its required manual checks.
-- [x] `make rc-local` passed on 2026-07-17: rule audit, 498-test suite, release bundle assembly, bundle validation, and two balanced backup/restore self-test passes.
-- [x] `make launch-smoke` passed against `dist/Avelo.app` on 2026-07-17.
+- [x] Baseline `make test` passed on 2026-07-18. The test catalogue contained 524 XCTest cases; no skipped or failed case was reported by the supported command.
+- [x] Baseline `make rule-audit` and `make rc-local` passed on 2026-07-18: network, R-16, R-15, and automated R-4 checks clean; release bundle assembly, validation, and bundle self-test passed. The rule audit still names its required manual checks.
+- [x] `make benchmark` and `make benchmark-million` passed on 2026-07-18. Sandbox-only SwiftPM cache warnings and existing vendored SQLCipher `MIN`/`MAX` macro warnings occurred; neither failed the gates.
+- [x] `make launch-smoke` passed against `dist/Avelo.app` on 2026-07-18. It validates and self-tests the bundle; it does not open a GUI window.
+- [x] Evidence identity: 2026-07-18 Asia/Kolkata; `main` `93eb199`; macOS 15.4.1 (24E263), Xcode 16.4, Swift 6.1.2, x86_64; `dist/Avelo.app` executable SHA-256 `19a6335d8687e3e9659b2b36732786af6010628e4d2d2b03a837150f39e7d3af`, ad-hoc signature, no Team ID.
+- [x] UI audit #9b Balance Sheet pass: selection, as-of change, comparative mode, Refresh, and shortcuts use one load path. A failed selected-FY/as-of request clears prior rows and renders a local Reports error with retry; it never renders empty success or uses a global alert. Balance Sheet validates the selected company/FY/as-of scope before cache/query and reconciles only that scope. `BalanceSheetReconciliationTests` 7/0 and `ReportsViewModelTests` 11/0 pass. Manual macOS keyboard, visual, and accountant acceptance remain.
 - [x] Warning-free production compilation passed with `-Xswiftc -warnings-as-errors`; warnings found by a clean benchmark build were removed and focused regressions passed.
 - [x] Standard benchmark passed: 25k fixture 118.149s, 500 additional posts 2.272s, report bundle 6.048s, backup export 0.018s, and restore 0.038s.
 - [x] The explicit 500k large-data gate passed: batched posting 760.548s, financial report pass 21.969s, balanced books, approximately 140 MB reported resident memory, and no test failure.
 - [ ] Developer ID signing, hardened-runtime/entitlement review, notarization, stapling, downloadable-artifact verification, and clean-machine install/upgrade acceptance remain external distribution gates.
+
+### 0.1 Reconciled post-`dee4ac6` workflow status
+
+| ID / scope | State | Evidence on `main` | Residual work |
+| --- | --- | --- | --- |
+| `AVL-P1-017` multi-window | Proof remaining | `6549675`; `AppEnvironmentFlowTests.testTwoIndependentEnvironmentsOnSharedStorageDoNotLeakCompanyContext` passed. | Editor/draft restoration and two-window stress/acceptance remain. |
+| `AVL-P1-025` undo/redo | Implementation remaining | No `UndoManager` or voucher-grid resync implementation exists. | Design and implement the complete feature. |
+| `AVL-P1-026` Alt+C master creation | Manual acceptance remaining | `NewVoucherAccountCreationTests` 2/0 proves eligibility rejection plus select-and-preserve-draft flow; full suite and RC proof pass. | Keyboard focus-return, audit visibility, and draft-preservation acceptance in bundled GUI. |
+| `AVL-P1-036` comparative reports | Implementation remaining | `d405772`; `ReportsViewModelTests` 9/0 proves prior-year trial balance, P&L, and balance-sheet reconciliation. | General multi-period selection/configuration and accountant report acceptance. |
+| `AVL-P1-037` Day Book | Implementation remaining | `017ad13` adds Edit/Reverse row actions. | Universal voucher coverage, cancel/date navigation, drill/return state, tests, and accountant acceptance. |
+| `AVL-P2-011` duplicate voucher | Proof remaining | Draft-copy implementation and `VoucherDraftTests` coverage exist. | Explicit posted-flow lineage/fresh-number proof and accountant acceptance. |
+| `AVL-P2-012` narration recall | Proof remaining | Company-scoped repository query and repository coverage exist. | Editor shortcut-context/privacy acceptance. |
+| `AVL-P2-013` Ctrl+I, PgUp/PgDn | Implementation remaining | `1d0be6d`; `VouchersViewModelTests` 6/0 proves page-local navigation/filter preservation. | List selection/scroll state, unsaved-state guard, text-input precedence, and accountant browse-flow acceptance. |
+| UI audit `07bbfb1` plus #9b/#10 | Implemented / manual acceptance remaining | Fixes #1–#9a and #11 are on `main`; #9b now validates selected company/FY/as-of scope and surfaces local report failures instead of empty success. Eligible new Sales/Purchase vouchers now default to explicit item-invoice mode while retaining the visible ledger-mode toggle. | Visual, keyboard, and accountant report acceptance remain. |
+| `AVL-P1-045` V027–V030 canonical tracks | Proof remaining | `trn_accounting` and `trn_inventory` are canonical repository/report sources; V028 completes item-invoice draft recovery; V029 adds canonical FY locks; V030 adds audited exact-quantity landed-cost allocation and service-only partial-return commands. `V027MigrationParityTests` proves populated V026 backfill plus unbalanced/malformed-ID fail-closed rollback; `RestoreServiceTests/testRestorePreservesCanonicalTracksAndAllocationLinks` proves canonical remap; `InventoryCostAllocationServiceTests` and `ItemInvoiceReturnServiceTests` prove allocation/return rollback, cross-company rejection, partial return, item-invoice reverse/cancel. `make test` and `make rule-audit` pass. | Full direct FK/CHECK/staged-boundary matrix, full valuation/reversal/export reconciliation proof, final RC/bundle benchmark evidence, and manual accountant/operator/GUI/keyboard/accessibility acceptance remain. |
 
 ## 1. Foundation and safety — implemented; release acceptance pending
 

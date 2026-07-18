@@ -18,6 +18,10 @@ public enum ValidationErrorCode: String, CaseIterable, Sendable, Codable, Identi
     case financialYearOverlap
     case financialYearGapNotAllowed
     case financialYearZeroLength
+    case reportFinancialYearMissing
+    case reportFinancialYearCompanyMismatch
+    case reportAsOfBeforeFinancialYear
+    case reportAsOfAfterFinancialYear
     case companyNameBlank
     case companyGstinInvalid
     case companyPanInvalid
@@ -26,6 +30,14 @@ public enum ValidationErrorCode: String, CaseIterable, Sendable, Codable, Identi
     case stockMovementQuantityZero
     case stockMovementCostMismatch
     case quantityExceedsStock
+    case inventoryItemUnavailable
+    case inventoryLocationUnavailable
+    case itemInvoiceQuantityUnsupported
+    case itemInvoiceConfigurationInvalid
+    case canonicalTrackCoherenceFailure
+    case canonicalTrackFYLocked
+    case inventoryCostSourceInvalid
+    case inventoryReturnInvalid
     case arithmeticOverflow
     case `internal`
 
@@ -50,6 +62,10 @@ public enum ValidationErrorCode: String, CaseIterable, Sendable, Codable, Identi
         case .financialYearOverlap:        return "Financial year overlap"
         case .financialYearGapNotAllowed:  return "Financial year gap"
         case .financialYearZeroLength:     return "Financial year zero length"
+        case .reportFinancialYearMissing:  return "Report financial year missing"
+        case .reportFinancialYearCompanyMismatch: return "Report financial year belongs to another company"
+        case .reportAsOfBeforeFinancialYear: return "Report date before financial year"
+        case .reportAsOfAfterFinancialYear: return "Report date after financial year"
         case .companyNameBlank:            return "Company name blank"
         case .companyGstinInvalid:         return "GSTIN invalid"
         case .companyPanInvalid:           return "PAN invalid"
@@ -58,6 +74,14 @@ public enum ValidationErrorCode: String, CaseIterable, Sendable, Codable, Identi
         case .stockMovementQuantityZero:   return "Stock movement qty zero"
         case .stockMovementCostMismatch:   return "Stock movement cost mismatch"
         case .quantityExceedsStock:        return "Quantity exceeds stock"
+        case .inventoryItemUnavailable:    return "Inventory item unavailable"
+        case .inventoryLocationUnavailable:return "Inventory location unavailable"
+        case .itemInvoiceQuantityUnsupported:return "Item invoice quantity unsupported"
+        case .itemInvoiceConfigurationInvalid:return "Item invoice configuration invalid"
+        case .canonicalTrackCoherenceFailure:return "Canonical track coherence failure"
+        case .canonicalTrackFYLocked:      return "Canonical track financial year locked"
+        case .inventoryCostSourceInvalid:  return "Inventory cost source invalid"
+        case .inventoryReturnInvalid:      return "Inventory return invalid"
         case .arithmeticOverflow:          return "Arithmetic overflow"
         case .`internal`:                  return "Internal error"
         }

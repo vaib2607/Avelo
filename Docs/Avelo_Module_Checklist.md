@@ -1,227 +1,54 @@
 # Avelo Module Checklist
 
-The file-by-file gap map and per-slice acceptance criteria. Every Swift file in the project is listed here. When a pass is complete, every file in that pass's slice is checked off in code review.
+Snapshot: 2026-07-19
 
-Out of scope for this checklist: cloud sync, remote login, remote protection, and other network-dependent features.
+This is the layer/capability review map and per-slice acceptance checklist. The live filesystem is the authority for file inventory; this document deliberately does not copy every Swift filename because a handwritten manifest becomes stale as files are added, renamed, split, or removed.
 
-Legend: `[ ]` pending · `[x]` done · `[-]` deferred (with reason) · `[!]` blocked on something
+Out of scope: cloud sync, remote login, remote protection, and other network-dependent features prohibited by Avelo's offline rule.
 
----
+Legend: `[ ]` pending · `[x]` evidence recorded · `[-]` deferred with reason · `[!]` blocked with dependency
 
-## Pass 0 — Docs
+## Maintenance contract
 
-- [x] `Docs/Avelo_Master_PRD.md` — product, screens, fields, errors, shortcuts
-- [x] `Docs/Avelo_Architecture.md` — layers, naming, dependency rules
-- [x] `Docs/Avelo_Rules.md` — non-negotiables
-- [x] `Docs/Avelo_Schema.md` — SQLite schema, constraints, indexes
-- [x] `Docs/Avelo_Module_Checklist.md` — this file
-- [x] `Docs/Avelo_Naming_Freeze.md` — every name locked
+- Review changed files through their owning layer and product slice below; a checked directory never implies every future file in it is automatically accepted.
+- New directories under `Avelo/` or new top-level feature families require an explicit owner row here and architecture review.
+- New migrations require schema, naming-freeze, restore, compatibility, and schema-drift proof in the same slice.
+- New files are discovered by `make docs-check`; no manual filename inventory update is required.
+- Checkboxes record review evidence for an identified worktree. Source changes invalidate only the affected layer/slice, not unrelated historical checks.
+- Readiness state and execution order remain in the release board and execution checklist; this file does not create parallel backlog IDs.
 
-## Pass 1 — Shared
+## Layer ownership map
 
-### Theme
-- [x] `Shared/Theme/AppColors.swift` — semantic colors (success, error, warning, debit, credit, sidebar bg, etc.)
-- [x] `Shared/Theme/AppTypography.swift` — SF Pro / monospaced digit stack, sizes
-- [x] `Shared/Theme/AppMetrics.swift` — corner radii, padding, row heights, sidebar widths
+| Layer | Live path | Review focus | Current state |
+| --- | --- | --- | --- |
+| Composition and routing | `Avelo/App/` | lifecycle, environment construction, company/FY context, routing, capability invalidation | [ ] Re-review affected files on active worktree |
+| Actions and keyboard | `Avelo/Core/Actions/`, `Avelo/Core/Keyboard/` | one-shot dispatch, context, text precedence, shortcut collisions | [ ] Manual keyboard proof remains |
+| Models | `Avelo/Core/Models/` | plain value semantics, checked money/quantity, strict decoding, ownership identifiers | [ ] Re-review V027–V029 models |
+| Database and migrations | `Avelo/Core/Database/` | forward migration, triggers, restore, encryption, valid-old-or-new failure behavior | [ ] V027–V029 proof remains under `AVL-P1-045` |
+| Repositories | `Avelo/Core/Repositories/` | SQL only, strict mapping, ownership/FY scope, no invented business rules | [ ] Re-review canonical-track queries |
+| Services | `Avelo/Core/Services/` | business rules, atomic writes/audits, typed errors, locks, rollback | [ ] Re-review affected posting/report/inventory services |
+| Validation and utilities | `Avelo/Core/Validation/`, `Avelo/Core/Utilities/` | reusable policy, checked arithmetic, no silent fallback | [ ] Re-review affected validation paths |
+| Shared UI | `Avelo/Shared/` | reusable components, native behavior, focus, accessibility, themes | [ ] Input and money-field manual proof remains |
+| Feature UI | `Avelo/Features/` | ViewModel/service boundary, keyboard flow, errors, loading/empty states, VoiceOver | [ ] Reports and vouchers changed in active worktree |
+| Resources | `Avelo/Resources/` | schema/seed equivalence, deterministic bundled data | [x] No active resource change detected |
+| Tests | `Tests/AveloTests/` | observable behavior, regression, real SQLite fixtures, failure/rollback paths | [ ] Final full-suite and RC proof remains |
+| Build/release | `Package.swift`, `Makefile`, `Scripts/`, `ReleaseVersion.env` | offline dependencies, reproducible commands, bundle/signing/artifact identity | [ ] Public-distribution acceptance remains |
+| Product/release docs | `Docs/` | owner consistency, evidence identity, no aspirational completion | [ ] Synchronize active V027–V029 slice |
 
-### Components
-- [x] `Shared/Components/EmptyStateView.swift`
-- [x] `Shared/Components/SearchBar.swift`
-- [x] `Shared/Components/FilterChip.swift`
-- [x] `Shared/Components/StatusBadge.swift`
-- [x] `Shared/Components/ConfirmationDialog.swift`
-- [x] `Shared/Components/MoneyTextField.swift`
-- [x] `Shared/Components/AccountPicker.swift`
-- [x] `Shared/Components/KeyboardShortcutMap.swift`
-- [x] `Shared/Components/ErrorBanner.swift`
+## Capability review map
 
-## Pass 2 — Models
-
-- [x] `Core/Models/Company.swift`
-- [x] `Core/Models/FinancialYear.swift`
-- [x] `Core/Models/AccountGroup.swift`
-- [x] `Core/Models/Account.swift`
-- [x] `Core/Models/VoucherType.swift`
-- [x] `Core/Models/Voucher.swift`
-- [x] `Core/Models/LedgerLine.swift`
-- [x] `Core/Models/InventoryItem.swift`
-- [x] `Core/Models/StockMovement.swift`
-- [x] `Core/Models/PayrollEmployee.swift`
-- [x] `Core/Models/PayrollEntry.swift`
-- [x] `Core/Models/AuditEvent.swift`
-- [x] `Core/Models/ReportResult.swift`
-- [x] `Core/Models/CompanyRegistry.swift`
-- [x] `Core/Models/VoucherDraft.swift` — input-only struct used by ViewModels
-- [x] `Core/Models/BannerKind.swift` — UI feedback model
-
-## Pass 3 — Database
-
-- [x] `Core/Database/SQLiteDatabase.swift` — C API wrapper
-- [x] `Core/Database/DatabaseManager.swift` — actor; registry + per-company handles
-- [x] `Core/Database/MigrationRunner.swift`
-- [x] `Core/Database/SchemaVersion.swift`
-- [x] `Core/Database/SeedLoader.swift`
-- [x] `Core/Database/BackupService.swift`
-- [x] `Core/Database/RestoreService.swift`
-- [x] `Core/Database/CompanyKeyStore.swift`
-- [x] `Core/Database/LegacyKeyMigrationService.swift`
-- [x] `Core/Database/RecoveryKeyCodec.swift`
-- [x] `Core/Database/Migrations/MigrationV001.swift` — full schema
-
-## Pass 4 — Resources
-
-- [x] `Resources/SQL/schema_v1.sql` — source of truth used by `MigrationV001`
-- [x] `Resources/Seed/DefaultChartOfAccounts.json` — 13 groups + 28 ledgers + 10 voucher types
-
-## Pass 5 — Repositories
-
-- [x] `Core/Repositories/CompanyRepository.swift`
-- [x] `Core/Repositories/FinancialYearRepository.swift`
-- [x] `Core/Repositories/AccountRepository.swift`
-- [x] `Core/Repositories/AccountGroupRepository.swift`
-- [x] `Core/Repositories/VoucherRepository.swift`
-- [x] `Core/Repositories/LedgerLineRepository.swift`
-- [x] `Core/Repositories/VoucherSequenceRepository.swift`
-- [x] `Core/Repositories/InventoryRepository.swift`
-- [x] `Core/Repositories/PayrollRepository.swift`
-- [x] `Core/Repositories/AuditRepository.swift`
-- [x] `Core/Repositories/ReportRepository.swift`
-- [x] `Core/Repositories/ReportRepository+FinancialStatements.swift`
-- [x] `Core/Repositories/ReportRepository+ComplianceReports.swift`
-- [x] `Core/Repositories/RegistryRepository.swift`
-- [x] `Core/Repositories/BankReconciliationRepository.swift`
-
-## Pass 6 — Services
-
-- [x] `Core/Services/CompanyService.swift`
-- [x] `Core/Services/FinancialYearService.swift`
-- [x] `Core/Services/AccountService.swift`
-- [x] `Core/Services/VoucherService.swift`
-- [x] `Core/Services/TransactionService.swift` — thin wrapper over VoucherService for double-entry writes
-- [x] `Core/Services/ReportService.swift`
-- [x] `Core/Services/InventoryService.swift`
-- [x] `Core/Services/PayrollService.swift`
-- [x] `Core/Services/GSTService.swift`
-- [x] `Core/Services/InvoicePDFService.swift`
-- [x] `Core/Services/BankReconciliationService.swift`
-- [x] `Core/Services/AuditService.swift`
-- [x] `Core/Services/ValidationService.swift`
-
-## Pass 7 — Validation
-
-- [x] `Core/Validation/ValidationError.swift`
-- [x] `Core/Validation/ValidationResult.swift`
-- [x] `Core/Validation/Validator.swift` — protocol
-- [x] `Core/Validation/VoucherDraftValidator.swift`
-- [x] `Core/Validation/AccountInputValidator.swift`
-- [x] `Core/Validation/FinancialYearInputValidator.swift`
-- [x] `Core/Validation/CompanyInputValidator.swift`
-- [x] `Core/Validation/PayrollDraftValidator.swift`
-- [x] `Core/Validation/StockMovementValidator.swift`
-- [x] `Core/Utilities/Currency.swift`
-- [x] `Core/Utilities/IndianFinancialYear.swift`
-- [x] `Core/Utilities/DateFormatters.swift`
-- [x] `Core/Utilities/VoucherNumberGenerator.swift`
-- [x] `Core/Utilities/FiscalLockChecker.swift`
-
-## Pass 8 — App shell
-
-- [x] `App/AveloApp.swift`
-- [x] `App/AppEnvironment.swift`
-- [x] `App/AppRouter.swift`
-- [x] `App/SidebarDestination.swift`
-- [x] `App/WindowState.swift`
-- [x] `App/RootView.swift`
-- [x] `App/SidebarView.swift`
-- [x] `App/CompanyPickerView.swift`
-- [x] `App/ErrorBannerHost.swift`
-
-## Pass 9 — Features
-
-### Onboarding
-- [x] `Features/Onboarding/CompanySetupView.swift`
-- [x] `Features/Onboarding/FinancialYearSetupView.swift`
-- [x] `Features/Onboarding/OpeningBalancesView.swift`
-- [x] `Features/Onboarding/CompanySetupViewModel.swift`
-- [x] `Features/Onboarding/FinancialYearSetupViewModel.swift`
-- [x] `Features/Onboarding/OpeningBalancesViewModel.swift`
-
-### Dashboard
-- [x] `Features/Dashboard/DashboardView.swift`
-- [x] `Features/Dashboard/DashboardViewModel.swift`
-
-### Accounts
-- [x] `Features/Accounts/AccountsListView.swift`
-- [x] `Features/Accounts/AccountEditorView.swift`
-- [x] `Features/Accounts/AccountGroupEditorView.swift`
-- [x] `Features/Accounts/AccountsViewModel.swift`
-- [x] `Features/Accounts/AccountEditorViewModel.swift`
-
-### Vouchers
-- [x] `Features/Vouchers/VoucherListView.swift`
-- [x] `Features/Vouchers/VoucherEntryView.swift`
-- [x] `Features/Vouchers/VoucherEditorRowView.swift`
-- [x] `Features/Vouchers/VoucherViewModel.swift`
-- [x] `Features/Vouchers/VoucherEntryViewModel.swift`
-- [x] `Features/Vouchers/VoucherListViewModel.swift`
-- [x] `Features/Vouchers/InventoryLinkPromptView.swift`
-
-### Reports
-- [x] `Features/Reports/ReportsHomeView.swift`
-- [x] `Features/Reports/LedgerReportView.swift`
-- [x] `Features/Reports/TrialBalanceView.swift`
-- [x] `Features/Reports/ProfitLossView.swift`
-- [x] `Features/Reports/BalanceSheetView.swift`
-- [x] `Features/Reports/GSTSummaryView.swift`
-- [x] `Features/Reports/DayBookView.swift`
-- [x] `Features/Reports/OutstandingView.swift`
-- [x] `Features/Reports/ReportDrillDownView.swift`
-- [x] `Features/Reports/ReportsViewModel.swift`
-- [x] `Features/Reports/ReportsBody+FinancialStatements.swift`
-- [x] `Features/Reports/ReportsBody+GST.swift`
-- [x] `Features/Reports/ReportsBody+Activity.swift`
-- [x] `Features/Reports/ReportsBody+Outstanding.swift`
-- [x] `Features/Reports/ReportsBody+Inventory.swift`
-- [x] `Features/Reports/ReportsBody+Navigation.swift`
-
-### Inventory
-- [x] `Features/Inventory/InventoryHomeView.swift`
-- [x] `Features/Inventory/StockItemListView.swift`
-- [x] `Features/Inventory/StockItemEditorView.swift`
-- [x] `Features/Inventory/StockMovementView.swift`
-- [x] `Features/Inventory/InventoryViewModel.swift`
-- [x] `Features/Inventory/StockItemEditorViewModel.swift`
-- [x] `Features/Inventory/StockMovementViewModel.swift`
-
-### Payroll
-- [x] `Features/Payroll/PayrollHomeView.swift`
-- [x] `Features/Payroll/EmployeeListView.swift`
-- [x] `Features/Payroll/EmployeeEditorView.swift`
-- [x] `Features/Payroll/SalaryVoucherView.swift`
-- [x] `Features/Payroll/PayrollViewModel.swift`
-- [x] `Features/Payroll/EmployeeEditorViewModel.swift`
-- [x] `Features/Payroll/SalaryVoucherViewModel.swift`
-
-### Banking
-- [x] `Features/Banking/BankReconciliationView.swift`
-- [x] `Features/Banking/BankReconciliationViewModel.swift`
-
-### Audit
-- [x] `Features/Audit/AuditLogView.swift`
-- [x] `Features/Audit/AuditFilterView.swift`
-- [x] `Features/Audit/AuditViewModel.swift`
-
-### Settings
-- [x] `Features/Settings/SettingsView.swift`
-- [x] `Features/Settings/CompanyInfoView.swift`
-- [x] `Features/Settings/BackupRestoreView.swift`
-- [x] `Features/Settings/SettingsViewModel.swift`
-
-## Pass 10 — Project root
-
-- [x] `README.md`
-- [x] `Docs/Avelo_ASSEMBLY.md`
-- [x] `.gitignore`
+| Capability | Primary layers | Required proof before acceptance |
+| --- | --- | --- |
+| Company/FY lifecycle | App, Database, Repositories, Services, Onboarding/Settings | ownership, overlap/lock, migration, backup/restore, operator acceptance |
+| Accounts and masters | Models, Repositories, Services, Accounts | hierarchy, eligibility, audit, inline creation, keyboard/VoiceOver |
+| Vouchers and drafts | Models, Repositories, Services, Vouchers | balance, numbering, locks, audit, recovery, duplicate submission, accountant keyboard flow |
+| Reports | Repositories, Services, Reports | live reconciliation, period scope, malformed-data failure, drill/return, accountant acceptance |
+| Inventory/manufacturing/orders | Models, Repositories, Services, Inventory | quantity/value reconciliation, ownership/locks, reversal, restore, accountant acceptance |
+| GST/compliance/payroll | Models, Services, GST/Payroll, documents/exports | checked calculations, statutory fixtures, provenance, offline policy, accountant acceptance |
+| Banking | Repositories, Services, Banking | selected-bank-leg semantics, idempotency, audit, signed direction, accountant acceptance |
+| Audit/security/recovery | Database, Repositories, Services, Audit | chain integrity, encryption, corruption failure, restore, operator acceptance |
+| Shell/actions/configuration | App, Actions, Keyboard, Shared, Onboarding | capability invalidation, context, shortcut collisions, focus, accessibility |
+| Bundle/distribution | Build scripts and docs | warnings-as-errors, RC gates, GUI smoke, signing/notarization, clean-machine install/upgrade |
 
 ---
 

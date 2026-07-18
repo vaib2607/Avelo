@@ -1,10 +1,18 @@
 # AVELO Release Board
 
-Snapshot: 2026-07-15
+Snapshot: 2026-07-19
 
 **Canonical verdict: NOT READY FOR PUBLIC PRODUCTION.**
 
 This is the repo-tracked `P0/P1/P2` source of truth for readiness. Each unresolved issue appears once, carries one severity, and maps to `Docs/Avelo_Execution_Checklist.md`. Feature presence, an old green test log, or a locally launchable ad-hoc bundle does not override this verdict.
+
+Board maintenance contract:
+
+- Every unresolved unit has exactly one stable `AVL-P0-*`, `AVL-P1-*`, or `AVL-P2-*` identifier; migrations, audits, and temporary slice names do not bypass this rule.
+- IDs are never renumbered or reused. Scope can be refined in place; a severity change is recorded as a superseding/cross-reference note rather than silently changing identity.
+- Counts in headings describe unresolved rows in this canonical catalogue and must be refreshed by `make docs-check` whenever rows change.
+- A state may advance only from current-worktree evidence. Dirty-worktree or older-artifact evidence remains provenance and cannot close a row.
+- The execution checklist may reorder work and expand proof steps, but it may not invent an unresolved item absent from this board.
 
 The complete product roadmap and requirement crosswalk is `Docs/Avelo_Master_Product_Execution_Plan.md`. This board remains the authority for current status and proof.
 
@@ -69,6 +77,7 @@ Release split rule:
 - Encrypted `postBatch` failure semantics remain chunked at 500 drafts: completed chunks persist, failing chunk rolls back, later chunks are not attempted.
 - `AccountTreeCache.reload()` with 500 added ledgers and FY-scoped balances: 0.095s.
 - 50k-voucher encrypted report timings: trial balance 0.736s, P&L 0.270s, balance sheet 0.297s, GST summary 0.000s, cash flow 0.951s, stock ageing 0.001s.
+- UI audit #9b implementation is landed: Balance Sheet validates company/FY/as-of before cache/query, reconciles only that displayed scope, and reports failures locally with a retry action rather than an empty state or global alert. Focused reconciliation and ViewModel suites pass; bundled macOS/accountant acceptance remains.
 - `ReportRepository+Statements.swift` was split into financial-statement and compliance-report extensions, and `ReportsView+Content.swift` report sections were split into focused `ReportsBody+...` extensions without changing `ReportService` cache keys or invalidation behavior.
 - Release mechanics re-run on 2026-06-21: `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES swift build` passed, `make net-check` reported 0 matches, release build and bundle validation passed, and `Scripts/bundle_selftest.sh` passed for company setup, voucher CRUD, FY lock, reports, backup, and recovery-key restore.
 
@@ -193,7 +202,7 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P0-036 | Manual acceptance remaining | AVL-P0-030, AVL-P0-031 | Restore remaps item-invoice and party-profile rows and discards drafts. The automated real-schema V14–V22 matrix upgrades FY openings, bills, cheques, BOMs, vouchers, ledger/stock/item/profile rows, dynamically scans every current `company_id` table for source-ID leakage, checks foreign keys, and proves exactly one restore event. | Focused restore tests and the 485-test full suite pass; operator must still perform cross-machine recovery-key restore, confirm the draft-discard notice, and reconcile restored reports. |
 | AVL-P0-037 | Manual acceptance remaining | AVL-P0-020, AVL-P0-033, AVL-P0-034 | The central ancestry-aware policy drives voucher batch/single validation and pickers, item invoices, orders, banking, payroll, report selection, and the shipped bank-statement import. V024 adds company-owned customer/supplier/both profiles used by service and UI policy loading and remapped on restore. Regrouped and newly created accounts reload the same policy immediately; retained invalid selections remain visible with a reason. | The exhaustive core voucher-field context matrix, ancestry, profile, inactive/foreign, service/batch, import rejection, regrouping, Alt+C new-account, retained-selection, migration/restore, 498-test full-suite, and rule-audit proof pass. No account-master importer ships before the Phase 8 Tally importer, so there is no additional current import bypass; accountant picker and retained-selection acceptance remains. |
 
-### P1 — Fix Before Broad Rollout (44 open)
+### P1 — Fix Before Broad Rollout (45 unresolved)
 
 | ID | Status | Depends | Requirement | Proof of done |
 | --- | --- | --- | --- | --- |
@@ -213,7 +222,7 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P1-014 | Open | AVL-P0-009, AVL-P0-010 | By-product and scrap lines in manufacturing vouchers. | BOM production fixtures balance input, output, scrap, and cost allocation. |
 | AVL-P1-015 | Open | AVL-P0-010 | Configurable negative-stock valuation and later receipt adjustment. | Negative-to-positive timelines recalculate deterministically. |
 | AVL-P1-016 | Open | AVL-P1-007 | Debit/credit-note linkage across GST periods. | Amendment fixtures reconcile original document, note, return period, and IRN state. |
-| AVL-P1-017 | Open | AVL-P0-016 | Multi-window company/editor isolation and restoration. | Two-window stress proves no context or draft leakage. |
+| AVL-P1-017 | Proof remaining | AVL-P0-016 | `6549675` fixes the registry write/read split and proves independent company context; editor/draft isolation and restoration remain. | Two-window stress proves no context or draft leakage. |
 | AVL-P1-018 | Open | AVL-P0-030 | Optimistic locking for concurrent editors/users. | Stale writes produce merge/conflict UI and never overwrite silently. |
 | AVL-P1-019 | Open | AVL-P0-013 | Detect symlinks, external/network drives, and unsupported filesystem semantics. | File-placement matrix warns or rejects according to policy. |
 | AVL-P1-020 | Open | AVL-P0-017 | WAL checkpoint scheduling, failure visibility, and bounded WAL growth. | Long-session and crash tests preserve data with bounded sidecars. |
@@ -221,8 +230,9 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P1-022 | Open | None | Strip CSV BOM safely. | UTF-8/UTF-16 BOM fixtures parse without contaminating headers. |
 | AVL-P1-023 | Open | None | Standards-compliant CSV nested quotes and embedded delimiters. | RFC-style fixtures preserve exact field content. |
 | AVL-P1-024 | Open | None | TSV quoted/embedded line-break handling. | Multiline paste fixtures preserve row and field boundaries. |
-| AVL-P1-025 | Open | AVL-P0-016 | Cmd+Z/redo model-view resynchronization for voucher grids. | Undo/redo stress preserves focus, totals, validation, and saved state. |
-| AVL-P1-026 | Open | AVL-P0-020 | Create ledger/master mid-voucher through `Alt+C` without losing the draft. | Keyboard flow creates, selects, audits, and returns focus to the originating field. |
+| AVL-P1-025 | Implementation remaining | AVL-P0-016 | Cmd+Z/redo model-view resynchronization for voucher grids; no `UndoManager` integration exists. | Undo/redo stress preserves focus, totals, validation, and saved state. |
+| AVL-P1-045 | Proof remaining | AVL-P0-026, AVL-P0-030, AVL-P0-036 | V027 introduces canonical accounting/inventory tracks and legacy backfill; V028 completes persisted item-invoice draft recovery; V029 extends ownership/FY locks; V030 adds audited exact-quantity freight/irrecoverable-tax allocation, partial return notes, and canonical item-invoice reverse/cancel. `V027MigrationParityTests` and `RestoreServiceTests/testRestorePreservesCanonicalTracksAndAllocationLinks` prove V026 upgrade and canonical restore/remap; allocation/return audit-abort fixtures prove rollback. Current `make test`, rule audit, RC, bundle validation/self-test, and launch-smoke evidence passed on 2026-07-19. | Complete direct FK/CHECK/staged-boundary and valuation/reversal/export reconciliation proof; fractional-item-invoice design/proof remains deferred; visual/keyboard/operator/accountant acceptance required. |
+| AVL-P1-026 | Manual acceptance remaining | AVL-P0-020 | Landed Alt+C flow preserves eligibility and draft state; bundled-GUI focus/audit acceptance remains. | Keyboard flow creates, selects, audits, and returns focus to the originating field. |
 | AVL-P1-027 | Open | None | Tally importer with dry run, mapping, resumability, and reconciliation report. | Representative company fixtures import idempotently with explicit exceptions. |
 | AVL-P1-028 | Open | AVL-P0-010 | Bank reconciliation using the selected bank leg, signed direction, persisted matches, import fingerprints, and idempotency. | Duplicate imports do not duplicate lines; match/clear/unmatch round-trips reconcile book and bank balances. |
 | AVL-P1-029 | Open | AVL-P0-010 | Consumable stock-ageing layers whose buckets sum to on-hand quantity/value. | FIFO consumption fixtures prove no bucket exceeds surviving stock. |
@@ -232,8 +242,8 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P1-033 | Open | AVL-P0-009, AVL-P0-010 | Replace BOM, bill allocation, cheque, TDS/TCS, and cost-centre stubs with real guarded workflows. | No shipped-path test treats `featureUnavailable` as successful readiness evidence. |
 | AVL-P1-034 | Open | AVL-P1-010 | Voucher Classes that expand configured ledgers, tax, freight, and charges deterministically. | Class-version fixtures produce explainable balanced drafts and preserve overrides. |
 | AVL-P1-035 | Open | AVL-P0-003 | Simple/advanced ledger interest with rate periods, day-count convention, grace, and posting policy. | Overdue/partial-payment/leap-period fixtures reconcile interest schedules. |
-| AVL-P1-036 | Open | None | Comparative report columns for multiple periods (`Alt+N`). | Month/quarter/year columns reconcile individually and as a whole. |
-| AVL-P1-037 | Open | AVL-P0-032 | Universal Day Book with every voucher type, inline drill-down, edit/cancel, and date navigation. | Accountant QA completes browse-to-correction without leaving the continuous flow. |
+| AVL-P1-036 | Implementation remaining | None | `d405772` lands prior-year columns for Trial Balance, P&L, and Balance Sheet; general multi-period selection/configuration remains. | Month/quarter/year columns reconcile individually and as a whole. |
+| AVL-P1-037 | Implementation remaining | AVL-P0-032 | `017ad13` lands Day Book Edit/Reverse actions; universal drill, cancel, date navigation, and return-state flow remain. | Accountant QA completes browse-to-correction without leaving the continuous flow. |
 | AVL-P1-038 | Open | AVL-P0-020, AVL-P1-010 | Continuous multi-account voucher grid with cost allocations and no submodal dependency. | Complex payment fixture is completed keyboard-only in one editor. |
 | AVL-P1-039 | Open | AVL-P0-012, AVL-P0-031 | Books repair/reindex with immutable dry run, backup requirement, progress, verification, and audit (`Ctrl+Alt+R`). | Corrupt-index fixtures repair safely; unrecoverable corruption leaves original untouched. |
 | AVL-P1-040 | Open | AVL-P0-022 | Sales/Purchase Orders, Stock Journal, Physical Stock, Rejection In/Out, Delivery Note, and Receipt Note with fulfilment linkage. | Partial fulfilment, rejection, transit, count, and invoice-conversion fixtures reconcile. |
@@ -256,9 +266,9 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | AVL-P2-008 | Open | AVL-P0-030 | Multi-company consolidation and elimination entries. | Intercompany fixtures reconcile consolidated statements. |
 | AVL-P2-009 | Open | None | XLSX export formatting fidelity. | Golden workbook tests verify values, formats, widths, and formulas. |
 | AVL-P2-010 | Open | None | Hardware-independent licensing and recovery. | Device replacement/offline-grace fixtures preserve access policy. |
-| AVL-P2-011 | Open | AVL-P0-032 | Duplicate voucher (`Alt+2`) with explicit source lineage and fresh number. | Duplicate/edit/save flow never aliases IDs or audit history. |
-| AVL-P2-012 | Open | AVL-P0-018 | Narration recall (`Ctrl+R`) with privacy-aware history. | Keyboard flow recalls the correct scoped narration without altering prior vouchers. |
-| AVL-P2-013 | Open | AVL-P1-037 | Insert while browsing (`Ctrl+I`) and PgUp/PgDn voucher navigation. | Keyboard-only sequence preserves filters, position, and unsaved-state warnings. |
+| AVL-P2-011 | Proof remaining | AVL-P0-032 | Landed duplicate draft flow (`Alt+2`) needs posted-flow lineage/fresh-number proof. | Duplicate/edit/save flow never aliases IDs or audit history. |
+| AVL-P2-012 | Proof remaining | AVL-P0-018 | Landed company-scoped narration recall (`Ctrl+R`) needs editor shortcut-context/privacy proof. | Keyboard flow recalls the correct scoped narration without altering prior vouchers. |
+| AVL-P2-013 | Implementation remaining | AVL-P1-037 | `1d0be6d` lands Ctrl+I/PgUp/PgDn page-local navigation; selection, scroll, unsaved-state, and context-safe browse flow remain. | Keyboard-only sequence preserves filters, position, and unsaved-state warnings. |
 | AVL-P2-014 | Open | AVL-P0-011 | Inline calculator (`Ctrl+N`) usable from amount fields. | Expression/rounding tests insert paise without floating-point drift. |
 | AVL-P2-015 | Open | AVL-P1-036 | Report line zoom (`Alt+Z`). | Drill/return preserves report context and accessibility. |
 | AVL-P2-016 | Open | AVL-P0-022 | Direct email with generated PDF attachment (`Alt+M`) and explicit confirmation. | Cancel/auth/retry tests never send twice or silently. |
@@ -277,20 +287,20 @@ This is the single normalized readiness catalogue. Existing completed `RB-*` ent
 | Alt+F7 | Stock Journal / Physical Stock | AVL-P1-040 | Open. |
 | Alt+F5 / Alt+F6 | Receipt/Delivery/Rejection logistics flows | AVL-P1-040 | Open; resolve by active inventory context. |
 | Ctrl+V | Voucher/invoice mode | AVL-P1-041 | Open. |
-| Alt+C | Create master in field | AVL-P1-026 | Open. |
-| Alt+2 | Duplicate voucher | AVL-P2-011 | Open. |
-| Ctrl+R | Recall narration | AVL-P2-012 | Open; context must distinguish existing reverse commands. |
-| Ctrl+I | Insert voucher while browsing | AVL-P2-013 | Open; context must distinguish narration focus. |
+| Alt+C | Create master in field | AVL-P1-026 | Manual acceptance remaining. |
+| Alt+2 | Duplicate voucher | AVL-P2-011 | Proof remaining. |
+| Ctrl+R | Recall narration | AVL-P2-012 | Proof remaining; context must distinguish existing reverse commands. |
+| Ctrl+I | Insert voucher while browsing | AVL-P2-013 | Partial implementation; context must distinguish narration focus. |
 | Alt+X | Audit-safe cancel | AVL-P0-032 | Open. |
 | Ctrl+Alt+R | Repair/reindex books | AVL-P1-039 | Open. |
 | Ctrl+N | Calculator | AVL-P2-014 | Open; current Cmd+N remains New. |
-| PgUp / PgDn | Previous/next voucher | AVL-P2-013 | Open. |
+| PgUp / PgDn | Previous/next voucher | AVL-P2-013 | Partial implementation. |
 | Alt+F6 | Cost allocation selection | AVL-P1-010 / AVL-P1-011 | Open; allocation context takes precedence over logistics. |
 | Alt+Z | Zoom/report detail | AVL-P2-015 | Open. |
 | Alt+E | Structured export | AVL-P1-043 / AVL-P2-017 | Open. |
 | Alt+M | Confirmed email dispatch | AVL-P2-016 | Open. |
 | Alt+S / Ctrl+T | Post-date voucher | AVL-P1-041 | Open. |
-| Alt+N | Comparative columns | AVL-P1-036 | Open. |
+| Alt+N | Comparative columns | AVL-P1-036 | Partial implementation; prior-year comparison landed. |
 
 Binding rules: aliases resolve by the active keyboard context; existing macOS bindings remain valid; plain text input wins unless the active editor explicitly owns the command; email and DSC operations always require confirmation; conflicts must be visible in shortcut help.
 

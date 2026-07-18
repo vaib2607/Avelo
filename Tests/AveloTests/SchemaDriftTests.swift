@@ -49,6 +49,7 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_financial_year_opening_balances",
             "avelo_financial_years",
             "avelo_inventory_items",
+            "avelo_inventory_locations",
             "avelo_inventory_order_lines",
             "avelo_inventory_orders",
             "avelo_inventory_reorder_levels",
@@ -64,7 +65,10 @@ final class SchemaDriftTests: XCTestCase {
             "avelo_voucher_templates",
             "avelo_voucher_types",
             "avelo_vouchers",
-            "avelo_workspace_configurations"
+            "avelo_workspace_configurations",
+            "trn_accounting",
+            "trn_inventory",
+            "trn_inventory_cost_allocations"
         ]
 
         XCTAssertEqual(try userTables(in: db), expected)
@@ -265,7 +269,9 @@ final class SchemaDriftTests: XCTestCase {
             "igst_paise",
             "cess_paise",
             "line_order",
-            "created_at"
+            "created_at",
+            "quantity_numerator",
+            "quantity_denominator"
         ])
         XCTAssertEqual(try columns("avelo_payroll_entries", in: db), [
             "id",
@@ -321,6 +327,8 @@ final class SchemaDriftTests: XCTestCase {
             "stockItemDisabled",
             "stockMovementPosted",
             "stockMovementReversed",
+            "inventoryCostAllocated",
+            "itemInvoiceReturnPosted",
             "payrollEmployeeCreated",
             "payrollEmployeeUpdated",
             "payrollEmployeeTerminated",

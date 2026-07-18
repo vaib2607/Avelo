@@ -4,7 +4,7 @@
 SRC_DIR := .
 SWIFT := ./Scripts/swiftw.sh
 
-.PHONY: all setup dev build bundle verify validate-bundle launch-smoke bundle-selftest benchmark benchmark-million rc-local test net-check rule-audit board todo count help
+.PHONY: all setup dev build bundle verify validate-bundle launch-smoke bundle-selftest benchmark benchmark-million rc-local test net-check rule-audit docs-check board todo count help
 
 all: net-check build test
 
@@ -99,10 +99,14 @@ r4-check:
 	  $(SRC_DIR)/Avelo | grep -v ".build" || echo "PASS: R-4 check clean (manual review still needed)"
 
 # Full rule audit
-rule-audit: net-check r16-check r15-check r4-check
+rule-audit: net-check r16-check r15-check r4-check docs-check
 	@echo ""
 	@echo "Manual checks still needed: R-2, R-3, R-5, R-6, R-8, R-9, R-10, R-11, R-12, R-13, R-17, R-18"
 	@echo "See Docs/Avelo_Rules.md"
+
+# Verify roadmap/board/queue/status/module-document contracts and cross-references
+docs-check:
+	@./Scripts/docs_drift_check.sh
 
 # Show canonical release board
 board:
@@ -133,6 +137,7 @@ help:
 	@echo "  benchmark        Run the core benchmark suite"
 	@echo "  benchmark-million Run the large benchmark suite"
 	@echo "  rule-audit       Run offline, TODO, and money-path checks"
+	@echo "  docs-check       Verify planning-document contracts and backlog cross-references"
 	@echo "  net-check        Verify the shipped app contains zero network calls"
 	@echo "  board            Show the full task board"
 	@echo "  todo             Show incomplete task-board items"

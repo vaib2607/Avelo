@@ -32,7 +32,7 @@ public struct ReportRepository: Sendable {
             SELECT l.account_id AS aid,
                    COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
                    COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
-            FROM avelo_ledger_lines l
+            FROM trn_accounting_compat l
             JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
             WHERE l.company_id = ? AND l.account_id IN (\(placeholders))
               AND v.is_posted = 1
@@ -84,7 +84,7 @@ public struct ReportRepository: Sendable {
         var sql = """
             SELECT v.id AS vid, v.date AS vdate, v.number AS vnum, v.voucher_type_code AS vtype,
                    v.narration AS vnarration, l.amount_paise AS amt, l.side AS lside, l.line_order AS ord
-            FROM avelo_ledger_lines l
+            FROM trn_accounting_compat l
             JOIN avelo_vouchers v ON v.id = l.voucher_id AND v.company_id = l.company_id
             WHERE l.company_id = ? AND l.account_id = ?
               AND v.is_posted = 1
@@ -167,7 +167,7 @@ public struct ReportRepository: Sendable {
                 SELECT l.account_id AS aid,
                        SUM(CASE WHEN l.side = 'debit'  THEN l.amount_paise ELSE 0 END) AS dr,
                        SUM(CASE WHEN l.side = 'credit' THEN l.amount_paise ELSE 0 END) AS cr
-                FROM avelo_ledger_lines l
+                FROM trn_accounting_compat l
                 JOIN avelo_vouchers v ON v.id = l.voucher_id
                 WHERE l.company_id = ? AND v.date <= ?
                 GROUP BY l.account_id

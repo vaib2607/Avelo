@@ -9,7 +9,7 @@ public struct InventoryRepository: Sendable {
     }
 
     private static let itemColumns = "id, company_id, code, name, unit, alternate_unit, alt_unit_base_numerator, alt_unit_base_denominator, valuation_method, is_active, hsn_code, gst_rate_bps, gst_cess_rate_bps, gst_taxability, created_at"
-    private static let movementColumns = "id, company_id, item_id, voucher_id, date, movement_type, quantity, quantity_numerator, quantity_denominator, entered_unit, unit_cost_paise, total_value_paise, reversed_movement_id, reference_voucher_number, reason, created_at"
+    private static let movementColumns = "id, company_id, stock_item_id AS item_id, voucher_id, date, movement_type, quantity_numerator AS quantity, quantity_numerator, quantity_denominator, entered_unit, unit_cost_paise, base_value_paise + landed_cost_paise AS total_value_paise, reversal_of_inventory_id AS reversed_movement_id, reference_voucher_number, reason, created_at"
 
     public struct ItemFilter: Sendable {
         public var companyId: Company.ID
@@ -91,6 +91,16 @@ public struct InventoryRepository: Sendable {
         try findItemById(id)
     }
 
+    /// The V027 single-location contract. Item-invoice posting resolves this
+    /// explicitly before any write so a missing/inactive location is a typed
+    /// service failure rather than a later SQL NULL/foreign-key failure.
+    public func hasActiveMainLocation(companyId: Company.ID) throws -> Bool {
+        (try db.queryOne(
+            "SELECT 1 FROM avelo_inventory_locations WHERE company_id = ? AND code = 'MAIN' AND is_active = 1",
+            bind: [.text(companyId.uuidString)]
+        ) { $0.int(0) }) != nil
+    }
+
     public func archiveItem(_ id: InventoryItem.ID) throws {
         try disableItem(id)
     }
@@ -160,28 +170,31 @@ public struct InventoryRepository: Sendable {
         )
     }
 
-    public func insertMovement(_ m: StockMovement) throws {
+    public func insertMovement(_ m: StockMovement, sourceItemLineId: VoucherItemLine.ID? = nil) throws {
         try db.execute(
             """
-            INSERT INTO avelo_stock_movements
-            (id, company_id, item_id, voucher_id, date, movement_type, quantity,
-             quantity_numerator, quantity_denominator, entered_unit,
-             unit_cost_paise, total_value_paise, reversed_movement_id, reference_voucher_number, reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO trn_inventory
+            (id, company_id, voucher_id, stock_item_id, warehouse_location_id, item_line_id, date, movement_type,
+             quantity_numerator, quantity_denominator, entered_unit, unit_cost_paise, base_value_paise,
+             landed_cost_paise, reversal_of_inventory_id, reference_voucher_number, reason, created_at)
+            VALUES (?, ?, ?, ?, (SELECT id FROM avelo_inventory_locations WHERE company_id = ? AND code = 'MAIN'), ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 .text(m.id.uuidString),
                 .text(m.companyId.uuidString),
-                .text(m.itemId.uuidString),
                 .optionalText(m.voucherId?.uuidString),
+                .text(m.itemId.uuidString),
+                .text(m.companyId.uuidString),
+                .optionalText(sourceItemLineId?.uuidString),
                 .date(m.date),
                 .text(m.movementType.rawValue),
-                .integer(m.quantity.wholeValue ?? m.quantity.numerator),
                 .integer(m.quantity.numerator),
                 .integer(m.quantity.denominator),
                 .optionalText(m.enteredUnit),
                 .integer(m.unitCostPaise),
                 .integer(m.totalValuePaise),
+                .integer(0),
                 .optionalText(m.reversedMovementId?.uuidString),
                 .optionalText(m.referenceVoucherNumber),
                 .optionalText(m.reason),
@@ -192,18 +205,48 @@ public struct InventoryRepository: Sendable {
 
     public func findMovement(id: StockMovement.ID) throws -> StockMovement? {
         try db.queryOne(
-            "SELECT \(Self.movementColumns) FROM avelo_stock_movements WHERE id = ?",
+            "SELECT \(Self.movementColumns) FROM trn_inventory WHERE id = ?",
             bind: [.text(id.uuidString)]
         ) { try Self.rowToMovement($0) }
+    }
+
+    public func listMovements(reversing movementId: StockMovement.ID) throws -> [StockMovement] {
+        try db.query(
+            "SELECT \(Self.movementColumns) FROM trn_inventory WHERE reversal_of_inventory_id = ? ORDER BY date ASC, created_at ASC, id ASC",
+            bind: [.text(movementId.uuidString)]
+        ) { try Self.rowToMovement($0) }
+    }
+
+    public func sourceItemLineId(for movementId: StockMovement.ID) throws -> VoucherItemLine.ID? {
+        let values: [String?] = try db.query(
+            "SELECT item_line_id FROM trn_inventory WHERE id = ?",
+            bind: [.text(movementId.uuidString)]
+        ) { try $0.checkedOptionalText("item_line_id") }
+        guard let value = values.first ?? nil else { return nil }
+        return try UUIDParsing.required(value, field: "trn_inventory.item_line_id")
+    }
+
+    public func landedCostPaise(for movementId: StockMovement.ID) throws -> Int64? {
+        try db.queryOne(
+            "SELECT landed_cost_paise FROM trn_inventory WHERE id = ?",
+            bind: [.text(movementId.uuidString)]
+        ) { try $0.requiredInt("landed_cost_paise") }
+    }
+
+    public func addLandedCostPaise(_ amount: Int64, to movementId: StockMovement.ID, companyId: Company.ID) throws {
+        try db.execute(
+            "UPDATE trn_inventory SET landed_cost_paise = landed_cost_paise + ? WHERE id = ? AND company_id = ?",
+            [.integer(amount), .text(movementId.uuidString), .text(companyId.uuidString)]
+        )
     }
 
     public func updateMovement(_ movement: StockMovement) throws {
         try db.execute(
             """
-            UPDATE avelo_stock_movements SET
-                item_id = ?, voucher_id = ?, date = ?, movement_type = ?, quantity = ?,
+            UPDATE trn_inventory SET
+                stock_item_id = ?, voucher_id = ?, date = ?, movement_type = ?,
                 quantity_numerator = ?, quantity_denominator = ?, entered_unit = ?,
-                unit_cost_paise = ?, total_value_paise = ?, reversed_movement_id = ?, reference_voucher_number = ?, reason = ?
+                unit_cost_paise = ?, base_value_paise = ?, reversal_of_inventory_id = ?, reference_voucher_number = ?, reason = ?
             WHERE id = ? AND company_id = ?
             """,
             [
@@ -211,7 +254,6 @@ public struct InventoryRepository: Sendable {
                 .optionalText(movement.voucherId?.uuidString),
                 .date(movement.date),
                 .text(movement.movementType.rawValue),
-                .integer(movement.quantity.wholeValue ?? movement.quantity.numerator),
                 .integer(movement.quantity.numerator),
                 .integer(movement.quantity.denominator),
                 .optionalText(movement.enteredUnit),
@@ -228,7 +270,7 @@ public struct InventoryRepository: Sendable {
 
     public func updateMovementTotalValue(id: StockMovement.ID, companyId: Company.ID, totalValuePaise: Int64) throws {
         try db.execute(
-            "UPDATE avelo_stock_movements SET total_value_paise = ? WHERE id = ? AND company_id = ?",
+            "UPDATE trn_inventory SET base_value_paise = ? WHERE id = ? AND company_id = ?",
             [.integer(totalValuePaise), .text(id.uuidString), .text(companyId.uuidString)]
         )
     }
@@ -262,7 +304,7 @@ public struct InventoryRepository: Sendable {
     public func listMovements(filter: MovementFilter) throws -> [StockMovement] {
         var sql = """
             SELECT \(Self.movementColumns)
-            FROM avelo_stock_movements
+            FROM trn_inventory
             WHERE company_id = ?
         """
         var bind: [SQLValue] = [.text(filter.companyId.uuidString)]
@@ -293,7 +335,7 @@ public struct InventoryRepository: Sendable {
     /// for inventory-linked sales/purchase vouchers.
     public func listMovements(forVoucher voucherId: Voucher.ID) throws -> [StockMovement] {
         try db.query(
-            "SELECT \(Self.movementColumns) FROM avelo_stock_movements WHERE voucher_id = ? ORDER BY created_at ASC",
+            "SELECT \(Self.movementColumns) FROM trn_inventory WHERE voucher_id = ? ORDER BY created_at ASC",
             bind: [.text(voucherId.uuidString)]
         ) { try Self.rowToMovement($0) }
     }
@@ -369,11 +411,11 @@ public struct InventoryRepository: Sendable {
     }
 
     static func rowToMovement(_ r: Row) throws -> StockMovement {
-        let id = try UUIDParsing.required(r.requiredText("id"), field: "avelo_stock_movements.id")
-        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "avelo_stock_movements.company_id")
-        let itemId = try UUIDParsing.required(r.requiredText("item_id"), field: "avelo_stock_movements.item_id")
-        let voucherId = try UUIDParsing.optional(try r.checkedOptionalText("voucher_id"), field: "avelo_stock_movements.voucher_id")
-        let reversedMovementId = try UUIDParsing.optional(try r.checkedOptionalText("reversed_movement_id"), field: "avelo_stock_movements.reversed_movement_id")
+        let id = try UUIDParsing.required(r.requiredText("id"), field: "trn_inventory.id")
+        let companyId = try UUIDParsing.required(r.requiredText("company_id"), field: "trn_inventory.company_id")
+        let itemId = try UUIDParsing.required(r.requiredText("item_id"), field: "trn_inventory.stock_item_id")
+        let voucherId = try UUIDParsing.optional(try r.checkedOptionalText("voucher_id"), field: "trn_inventory.voucher_id")
+        let reversedMovementId = try UUIDParsing.optional(try r.checkedOptionalText("reversed_movement_id"), field: "trn_inventory.reversal_of_inventory_id")
         let mt: MovementType = try r.enumValue("movement_type")
         let quantityNumerator = try r.checkedOptionalInt("quantity_numerator") ?? r.int("quantity")
         let quantityDenominator = try r.checkedOptionalInt("quantity_denominator") ?? 1

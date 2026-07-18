@@ -193,7 +193,7 @@ public struct BankReconciliationRepository: Sendable {
             """
             SELECT v.id, v.number, v.date, v.total_paise
             FROM avelo_vouchers v
-            JOIN avelo_ledger_lines l ON l.voucher_id = v.id
+            JOIN trn_accounting_compat l ON l.voucher_id = v.id
             WHERE l.account_id = ? AND v.date <= ?
             GROUP BY v.id
             ORDER BY v.date ASC
@@ -215,7 +215,7 @@ public struct BankReconciliationRepository: Sendable {
             SELECT COALESCE(SUM(CASE WHEN l.side = 'debit' THEN l.amount_paise
                                      WHEN l.side = 'credit' THEN -l.amount_paise
                                      ELSE 0 END), 0) AS bal
-            FROM avelo_ledger_lines l
+            FROM trn_accounting_compat l
             JOIN avelo_vouchers v ON v.id = l.voucher_id
             WHERE l.account_id = ? AND v.date <= ?
             """,

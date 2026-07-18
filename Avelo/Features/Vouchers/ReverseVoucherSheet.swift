@@ -48,8 +48,14 @@ public struct ReverseVoucherSheet: View {
     private func run() {
         guard let ctx = env.companyContext else { return }
         do {
-            _ = try VoucherService(db: ctx.database, companyId: ctx.companyId)
-                .reverse(voucherId, reason: reason.isEmpty ? nil : reason)
+            let hasItemEvidence = !(try VoucherItemLineRepository(db: ctx.database).findForVoucher(voucherId)).isEmpty
+            if hasItemEvidence {
+                _ = try ItemInvoiceService(db: ctx.database, companyId: ctx.companyId)
+                    .reverse(voucherId, reason: reason.isEmpty ? nil : reason)
+            } else {
+                _ = try VoucherService(db: ctx.database, companyId: ctx.companyId)
+                    .reverse(voucherId, reason: reason.isEmpty ? nil : reason)
+            }
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher reversed.")

@@ -41,6 +41,8 @@ final class AuditMutationContractTests: XCTestCase {
         .init(operation: "VoucherService.representCheque", actions: [.chequeRepresented], snapshots: .beforeAndAfter, reasonRequired: true),
         .init(operation: "VoucherService.cancel", actions: [.voucherReversed, .voucherCancelled], snapshots: .beforeAndAfter, reasonRequired: true),
         .init(operation: "ItemInvoiceService.post", actions: [.voucherPosted, .stockMovementPosted], snapshots: .after, reasonRequired: false),
+        .init(operation: "InventoryCostAllocationService.allocate", actions: [.inventoryCostAllocated], snapshots: .after, reasonRequired: false),
+        .init(operation: "ItemInvoiceReturnService.post", actions: [.itemInvoiceReturnPosted], snapshots: .after, reasonRequired: true),
         .init(operation: "InventoryService.createItem", actions: [.stockItemCreated], snapshots: .after, reasonRequired: false),
         .init(operation: "InventoryService.updateItem", actions: [.stockItemUpdated], snapshots: .beforeAndAfter, reasonRequired: false),
         .init(operation: "InventoryService.archiveItem", actions: [.stockItemDisabled], snapshots: .beforeAndAfter, reasonRequired: false),

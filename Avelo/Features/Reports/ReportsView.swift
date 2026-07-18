@@ -25,6 +25,7 @@ public struct ReportsView: View {
         if vm == nil || vm?.companyId != ctx.companyId {
             let model = ReportsViewModel(companyId: ctx.companyId, db: ctx.database, fyId: ctx.financialYear.id)
             model.asOf = ctx.financialYear.endDate
+            model.selectedDay = ctx.financialYear.startDate
             model.fromDate = ctx.financialYear.startDate
             model.toDate = ctx.financialYear.endDate
             model.reload()

@@ -5,7 +5,18 @@ extension ReportsBody {
     @ViewBuilder
     var dayBookSection: some View {
         let rows = vm.dayBook
-        if rows.isEmpty {
+        if vm.isLoading {
+            ProgressView("Loading Day Book…")
+                .frame(maxWidth: .infinity, minHeight: 160)
+        } else if let error = vm.dayBookError {
+            ContentUnavailableView(
+                "Day Book unavailable",
+                systemImage: "exclamationmark.triangle",
+                description: Text("\(error.localizedMessage)\nDay: \(DateFormatters.formatIsoDate(vm.selectedDay)).")
+            )
+            .frame(maxWidth: .infinity, minHeight: 160)
+            Button("Refresh") { vm.loadDayBook(day: vm.selectedDay) }
+        } else if rows.isEmpty {
             EmptyStateView(
                 title: "No day book entries",
                 message: "No vouchers were posted in the selected date range.",
@@ -14,7 +25,7 @@ extension ReportsBody {
                 action: { vm.reload() }
             )
         } else {
-            Table(rows) {
+            Table(rows, selection: $vm.selectedDayBookVoucherId) {
                 TableColumn("Date") { r in
                     Text(DateFormatters.userDate.string(from: r.date))
                 }

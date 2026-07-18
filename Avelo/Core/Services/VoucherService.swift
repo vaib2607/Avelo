@@ -222,6 +222,28 @@ public final class VoucherService: Sendable {
     private func postWithoutCacheInvalidation(draft: VoucherDraft,
                                               in fy: FinancialYear,
                                               workflow: WorkflowInputs?) throws -> PostResult {
+        var result: PostResult?
+        try db.write { tx in
+            result = try VoucherService(db: tx, companyId: companyId).postInCurrentTransaction(
+                draft: draft,
+                in: fy,
+                workflow: workflow,
+                recordAudit: true
+            )
+        }
+        guard let result else {
+            throw AppError.validation(.init(code: .internal, message: "Voucher posting did not produce a result."))
+        }
+        return result
+    }
+
+    /// Transaction-neutral posting primitive. The caller owns the surrounding
+    /// `SQLiteDatabase.write` scope and chooses whether this voucher records
+    /// its own audit event or participates in a composite workflow audit.
+    func postInCurrentTransaction(draft: VoucherDraft,
+                                  in fy: FinancialYear,
+                                  workflow: WorkflowInputs?,
+                                  recordAudit: Bool) throws -> PostResult {
         let normalizedDraft = try normalizedDraftForPosting(draft, accountRepo: AccountRepository(db: db))
         let result = try validate(draft: normalizedDraft, in: fy)
         if case .invalid(let errs) = result {
@@ -248,14 +270,12 @@ public final class VoucherService: Sendable {
                 lineOrder: idx
             )
         }
-        var voucher: Voucher?
-        try db.write { tx in
-            let number = try VoucherSequenceRepository(db: tx).nextNumber(
+        let number = try VoucherSequenceRepository(db: db).nextNumber(
                 companyId: companyId,
                 financialYearId: fy.id,
                 typeCode: normalizedDraft.voucherTypeCode
             )
-            let postedVoucher = Voucher(
+        let postedVoucher = Voucher(
                 id: voucherId,
                 companyId: companyId,
                 financialYearId: fy.id,
@@ -271,44 +291,40 @@ public final class VoucherService: Sendable {
                 createdAt: now,
                 updatedAt: now
             )
-            let vRepo = VoucherRepository(db: tx)
-            let lRepo = LedgerLineRepository(db: tx)
-            let accountRepo = AccountRepository(db: tx)
-            let workflowRepo = AccountingWorkflowsRepository(db: tx)
-            try vRepo.insert(postedVoucher)
-            try lRepo.insertBatch(lines)
-            if let billAllocation = try billAllocation(
+        let vRepo = VoucherRepository(db: db)
+        let lRepo = LedgerLineRepository(db: db)
+        let accountRepo = AccountRepository(db: db)
+        let workflowRepo = AccountingWorkflowsRepository(db: db)
+        try vRepo.insert(postedVoucher)
+        try lRepo.insertBatch(lines)
+        if let billAllocation = try billAllocation(
                 for: postedVoucher,
                 draft: normalizedDraft,
                 lines: lines,
                 workflow: workflow,
                 createdAt: now
             ) {
-                try workflowRepo.insert(billAllocation)
-            }
-            if let cheque = try cheque(
+            try workflowRepo.insert(billAllocation)
+        }
+        if let cheque = try cheque(
                 for: postedVoucher,
                 workflow: workflow,
                 representedFromChequeId: nil,
                 createdAt: now
             ) {
-                try workflowRepo.insert(cheque)
-            }
-            try AuditService(db: tx, companyId: companyId).record(
+            try workflowRepo.insert(cheque)
+        }
+        if recordAudit {
+            try AuditService(db: db, companyId: companyId).record(
                 action: .voucherPosted,
                 entityType: "voucher",
                 entityId: postedVoucher.id.uuidString,
                 snapshotAfter: VoucherAuditSnapshot(voucher: postedVoucher, lines: lines)
             )
-            try markAccountsUsed(accountRepo, lines: lines)
-            voucher = postedVoucher
         }
-
-        guard let voucher else {
-            throw AppError.validation(.init(code: .internal, message: "Voucher posting did not produce a voucher."))
-        }
-        let prompt = try inventoryPromptContext(for: voucher)
-        return PostResult(voucher: voucher, inventoryPrompt: prompt)
+        try markAccountsUsed(accountRepo, lines: lines)
+        let prompt = try inventoryPromptContext(for: postedVoucher)
+        return PostResult(voucher: postedVoucher, inventoryPrompt: prompt)
     }
 
     private func inventoryPromptContext(for _: Voucher) throws -> InventoryPromptContext? {
@@ -422,6 +438,9 @@ public final class VoucherService: Sendable {
         }
         guard original.companyId == companyId else {
             throw AppError.notFound("Voucher")
+        }
+        if !(try VoucherItemLineRepository(db: db).findForVoucher(voucherId)).isEmpty {
+            throw AppError.businessRule("Item-invoice vouchers must be reversed through the item-invoice lifecycle service.")
         }
         if original.status == .cancelled {
             throw AppError.businessRule("Cancelled vouchers cannot be reversed again.")
@@ -736,6 +755,9 @@ public final class VoucherService: Sendable {
         guard original.companyId == companyId else {
             throw AppError.notFound("Voucher")
         }
+        if !(try VoucherItemLineRepository(db: db).findForVoucher(voucherId)).isEmpty {
+            throw AppError.businessRule("Item-invoice vouchers must be cancelled through the item-invoice lifecycle service.")
+        }
         guard original.status != .cancelled else {
             throw AppError.businessRule("This voucher has already been cancelled.")
         }
@@ -986,7 +1008,7 @@ public final class VoucherService: Sendable {
         try workflowRepo.insert(copiedAllocation)
     }
 
-    private func mirrorBillAllocation(from original: Voucher,
+    func mirrorBillAllocation(from original: Voucher,
                                       to reversal: Voucher,
                                       originalLines: [LedgerLine],
                                       workflowRepo: AccountingWorkflowsRepository) throws {
@@ -999,7 +1021,7 @@ public final class VoucherService: Sendable {
         )
     }
 
-    private func reversalFinancialYear(for originalFY: FinancialYear) throws -> FinancialYear {
+    func reversalFinancialYear(for originalFY: FinancialYear) throws -> FinancialYear {
         guard originalFY.companyId == companyId else {
             throw AppError.notFound("Financial year")
         }
@@ -1014,7 +1036,7 @@ public final class VoucherService: Sendable {
         return target
     }
 
-    private func createReversal(for original: Voucher,
+    func createReversal(for original: Voucher,
                                 originalLines: [LedgerLine],
                                 reason: String? = nil) throws -> Voucher {
         guard original.companyId == companyId else {
@@ -1084,7 +1106,7 @@ public final class VoucherService: Sendable {
         )
     }
 
-    private func buildFlippedLines(from originalLines: [LedgerLine], reversalId: Voucher.ID) -> [LedgerLine] {
+    func buildFlippedLines(from originalLines: [LedgerLine], reversalId: Voucher.ID) -> [LedgerLine] {
         originalLines.enumerated().map { (idx, line) in
             LedgerLine(
                 id: UUID(),

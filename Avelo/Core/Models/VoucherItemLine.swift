@@ -13,7 +13,10 @@ public struct VoucherItemLine: Identifiable, Hashable, Sendable, Codable {
     public let companyId: Company.ID
     public var voucherId: Voucher.ID
     public var itemId: InventoryItem.ID
-    public var quantity: Int64
+    /// Canonical physical quantity snapshot. `quantity` remains a
+    /// whole-unit compatibility accessor for older report/export callers.
+    public var exactQuantity: ExactQuantity
+    public var quantity: Int64 { exactQuantity.numerator }
     public var ratePaise: Int64
     public var taxableValuePaise: Int64
     public var hsnCode: String?
@@ -29,7 +32,7 @@ public struct VoucherItemLine: Identifiable, Hashable, Sendable, Codable {
                 companyId: Company.ID,
                 voucherId: Voucher.ID,
                 itemId: InventoryItem.ID,
-                quantity: Int64,
+                quantity: ExactQuantity,
                 ratePaise: Int64,
                 taxableValuePaise: Int64,
                 hsnCode: String? = nil,
@@ -44,7 +47,7 @@ public struct VoucherItemLine: Identifiable, Hashable, Sendable, Codable {
         self.companyId = companyId
         self.voucherId = voucherId
         self.itemId = itemId
-        self.quantity = quantity
+        self.exactQuantity = quantity
         self.ratePaise = ratePaise
         self.taxableValuePaise = taxableValuePaise
         self.hsnCode = hsnCode
@@ -55,6 +58,30 @@ public struct VoucherItemLine: Identifiable, Hashable, Sendable, Codable {
         self.cessPaise = cessPaise
         self.lineOrder = lineOrder
         self.createdAt = createdAt
+    }
+
+    public init(id: ID = UUID(),
+                companyId: Company.ID,
+                voucherId: Voucher.ID,
+                itemId: InventoryItem.ID,
+                quantity: Int64,
+                ratePaise: Int64,
+                taxableValuePaise: Int64,
+                hsnCode: String? = nil,
+                gstRateBps: Int? = nil,
+                cgstPaise: Int64 = 0,
+                sgstPaise: Int64 = 0,
+                igstPaise: Int64 = 0,
+                cessPaise: Int64 = 0,
+                lineOrder: Int = 0,
+                createdAt: Date = Date()) throws {
+        self.init(id: id, companyId: companyId, voucherId: voucherId,
+                       itemId: itemId,
+                       quantity: try ExactQuantity(numerator: quantity, denominator: 1),
+                       ratePaise: ratePaise, taxableValuePaise: taxableValuePaise,
+                       hsnCode: hsnCode, gstRateBps: gstRateBps, cgstPaise: cgstPaise,
+                       sgstPaise: sgstPaise, igstPaise: igstPaise, cessPaise: cessPaise,
+                       lineOrder: lineOrder, createdAt: createdAt)
     }
 
     public var totalTaxPaise: Int64 {

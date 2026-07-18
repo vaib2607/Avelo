@@ -542,6 +542,9 @@ Autosaved, in-progress "new voucher" entries (AVL-P0-018), added in V18. Deliber
 | cheque_number | TEXT | nullable |
 | cheque_due_date | TEXT | nullable |
 | lines_json | TEXT | NOT NULL — JSON array of `{accountId, amount, side, taxCode?, costCenter?}` |
+| entry_mode | TEXT | NOT NULL, defaults to `ledger`; independent of draft lifecycle mode. |
+| sales_purchase_ledger_id | TEXT | nullable scratch Sales/Purchase ledger selection for item-invoice recovery; revalidated on resume. |
+| item_lines_json | TEXT | nullable ordered raw item rows of `{itemId?, quantity, rate}`; values are revalidated on resume and never carry authoritative GST or valuation. |
 | updated_at | TEXT | NOT NULL |
 
 Index: `idx_avelo_voucher_drafts_company` on `(company_id, updated_at)`.
@@ -755,12 +758,25 @@ Per-company, per-workspace saved presentation settings (density, labels, columns
 
 `idx_avelo_workspace_configurations_company` supports company-scoped loading. Restore remaps this table with the other company-scoped tables. Saving a configuration does not emit an audit event: presentation settings are not a financially meaningful mutation, and the CHECK-constrained audit action taxonomy is not extended for them.
 
-## 32. Migration policy
+## 32. Canonical dual-track transactions (v27)
 
-- `SchemaVersion.current = 26` and `MigrationRunner.defaultMigrations` contains `MigrationV001` through `MigrationV026` in order.
+`avelo_ledger_lines` and `avelo_stock_movements` remain immutable forensic history after upgrade. New posting, valuation, and report repository paths use the canonical tables below.
+
+| Table | Contract |
+|---|---|
+| `avelo_inventory_locations` | Company-owned physical locations. V027 creates one active `MAIN`/`Main` location for every existing and newly created company. |
+| `trn_accounting` | Voucher financial legs: positive paise, debit/credit side, ordered unique per voucher, and same-company account/voucher trigger checks. |
+| `trn_inventory` | Physical movements: exact positive rational quantity, company-owned item/location, optional voucher/item-line/reversal lineage, base value, and explicit landed cost. |
+| `trn_inventory_cost_allocations` | Traceable allocation from one accounting row to one or more inventory rows; positive paise and unique accounting/inventory pair. Allocation services distribute selected freight or irrecoverable tax by exact inbound quantity. |
+
+Foreign keys use `ON DELETE RESTRICT`; ownership triggers reject cross-company references. Reports may use read-only compatibility views (`trn_accounting_compat`, `trn_inventory_compat`) while keeping canonical tables as the only live source.
+
+## 33. Migration policy
+
+- `SchemaVersion.current = 30` and `MigrationRunner.defaultMigrations` contains `MigrationV001` through `MigrationV030` in order. V030 extends immutable audit actions for canonical landed-cost allocation and item-invoice return posting.
 - `MigrationRunner` reads `PRAGMA user_version` and `avelo_migrations`, then applies each pending migration in its own `SQLiteDatabase.write` transaction.
 - Each migration is a `struct: Migration` with a numeric version, description, and `up(_ db: SQLiteDatabase) throws` body.
 - Migrations are append-only. Never edit a past migration.
-- Fresh databases begin at v1 and converge through the same ordered migrations as upgraded databases. Fresh-create and representative historical fixtures must have identical v26 tables, columns, indexes, triggers, strict-decoding behavior, and restore coverage.
+- Fresh databases begin at v1 and converge through the same ordered migrations as upgraded databases. Fresh-create and representative historical fixtures must have identical current tables, columns, indexes, triggers, strict-decoding behavior, and restore coverage.
 - Every persistent change updates this document, schema-drift tests, restore/remap tables, backup/manifest compatibility, ownership and fiscal-lock triggers, and audit coverage as applicable.
 - Unknown future versions, unreadable schema versions, wrong keys, and migration/backfill failures stop before publishing a replacement database.

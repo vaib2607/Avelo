@@ -180,9 +180,13 @@ private struct VouchersBody: View {
         // the list's filter/scroll state is untouched because this never
         // calls reload()/reloadFirstPage().
         .background {
-            Button("") { AppActionRegistry.perform(.voucherCreate(.journal), router: env.router) }
-                .keyboardShortcut("i", modifiers: [.control])
-                .hidden()
+            ZStack {
+                Button("") { AppActionRegistry.perform(.voucherCreate(.journal), router: env.router) }
+                    .keyboardShortcut("i", modifiers: [.control])
+                Button("") { duplicateSelectedVoucher() }
+                    .keyboardShortcut("2", modifiers: [.option])
+            }
+            .hidden()
         }
     }
 
@@ -200,6 +204,12 @@ private struct VouchersBody: View {
         } catch {
             env.showError(AppError.wrap(error))
         }
+    }
+
+    private func duplicateSelectedVoucher() {
+        guard let selectedId = vm.selectedVoucherId,
+              let voucher = vm.vouchers.first(where: { $0.id == selectedId }) else { return }
+        duplicate(voucher)
     }
 
     private func exportInvoicePDF(_ voucher: Voucher) {
