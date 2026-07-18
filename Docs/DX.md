@@ -15,6 +15,7 @@ Use repo-owned commands so local, CI, and release evidence mean the same thing. 
 | `Avelo_Execution_Checklist.md` | next actions and evidence log | product behavior |
 | `Avelo_Release_Board.md` | canonical readiness verdict and backlog | low-level implementation design |
 | `DX.md` | supported commands and evidence format | release approval by itself |
+| `Git_Workflow.md` | branch, generated-file, and recovery practice | product or release readiness |
 
 The product roadmap is `Avelo_Master_Product_Execution_Plan.md`. It coordinates the normative documents and release board; it does not replace them.
 
