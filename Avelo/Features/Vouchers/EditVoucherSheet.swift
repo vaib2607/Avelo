@@ -282,6 +282,7 @@ private struct EditVoucherBody: View {
                 .buttonStyle(.plain)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .keyboardShortcut("+", modifiers: .command)
         }
     }
 
@@ -433,7 +434,7 @@ private struct LockedVoucherCorrectionView: View {
         GroupBox("Voucher") {
             VStack(alignment: .leading, spacing: 8) {
                 summaryRow("Date", DateFormatters.userDate.string(from: payload.voucher.date))
-                summaryRow("Type", payload.voucher.voucherTypeCode.rawValue)
+                summaryRow("Type", payload.voucher.voucherTypeCode.displayName)
                 summaryRow("Party", payload.voucher.partyAccountId?.uuidString ?? "—")
                 summaryRow("Narration", payload.voucher.narration.isEmpty ? "—" : payload.voucher.narration)
                 summaryRow("Financial Year", payload.financialYear.label)

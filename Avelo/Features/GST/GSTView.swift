@@ -32,6 +32,8 @@ public struct GSTView: View {
         }
         if vm == nil || vm?.companyId != ctx.companyId {
             let model = GSTViewModel(companyId: ctx.companyId, db: ctx.database)
+            model.fromDate = ctx.financialYear.startDate
+            model.toDate = ctx.financialYear.endDate
             model.reload()
             vm = model
         }

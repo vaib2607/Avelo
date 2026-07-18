@@ -251,6 +251,17 @@ public final class VoucherEditViewModel {
         lines.append(row)
     }
 
+    /// The natural (normal-balance) side for an account, used to pre-select
+    /// a sensible Debit/Credit default the moment a user picks an account
+    /// into a brand-new blank line, rather than always defaulting to Debit.
+    public func suggestedSide(for accountId: Account.ID?) -> LedgerSide {
+        guard let accountId,
+              let account = accounts.first(where: { $0.id == accountId }),
+              let group = groups.first(where: { $0.id == account.groupId })
+        else { return .debit }
+        return group.nature.normalBalance
+    }
+
     public func pasteTSV(_ text: String) {
         let parsed = text.split(whereSeparator: \.isNewline).compactMap { row -> LineRow? in
             let cols = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)

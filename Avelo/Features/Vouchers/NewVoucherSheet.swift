@@ -198,7 +198,7 @@ private struct NewVoucherBody: View {
     private var topBar: some View {
         VStack(spacing: 0) {
             ModuleChrome(
-                title: "New \(initialType.rawValue) Voucher",
+                title: "New \(initialType.displayName) Voucher",
                 subtitle: "Enter lines with keyboard-first debit/credit balance feedback, then post or cancel.",
                 hints: [
                     .init(title: "Save", key: "⌘↩"),
@@ -462,6 +462,7 @@ private struct NewVoucherBody: View {
             .buttonStyle(.plain)
             .font(.caption)
             .foregroundStyle(.secondary)
+            .keyboardShortcut("+", modifiers: .command)
         }
     }
 
@@ -499,7 +500,16 @@ private struct NewVoucherBody: View {
                                   eligibility: particularsFilter
                               )
                           },
-                          onCommitSelection: { focusedField = .amount(lineId) },
+                          onCommitSelection: {
+                              // Pre-select the natural Debit/Credit side only
+                              // for the first line of a brand-new voucher —
+                              // once any amount is on the grid, addLine()'s
+                              // own balancing-flip suggestion takes over.
+                              if !vm.singleEntryMode, vm.totalDebitPaise == 0, vm.totalCreditPaise == 0 {
+                                  line.side.wrappedValue = vm.suggestedSide(for: line.accountId.wrappedValue)
+                              }
+                              focusedField = .amount(lineId)
+                          },
                           isFocusedExternally: Binding(
                               get: { focusedField == .line(lineId) },
                               set: { if $0 { focusedField = .line(lineId) } }

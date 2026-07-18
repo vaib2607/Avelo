@@ -16,6 +16,11 @@ public struct MoneyTextField: View {
 
     @State private var text: String = ""
     @FocusState private var isFocused: Bool
+    /// When set (only by the `label:text:` convenience initializer), mirrors
+    /// every keystroke into the caller's raw text binding so live readers
+    /// (e.g. voucher-line running totals) see typed amounts before blur/Enter
+    /// commits them. Formatting/parsing on blur and Enter is unaffected.
+    private var liveTextMirror: Binding<String>? = nil
 
     public init(paise: Binding<Int64>,
                 placeholder: String = "0.00",
@@ -63,6 +68,9 @@ public struct MoneyTextField: View {
                 commitFromText()
                 onCommit?()
             }
+            .onChange(of: text) { _, newValue in
+                liveTextMirror?.wrappedValue = newValue
+            }
             .frame(height: AppMetrics.fieldHeight)
     }
 
@@ -96,5 +104,6 @@ extension MoneyTextField {
             }
         )
         self.init(paise: paiseBinding, placeholder: label, onCommit: onCommit, isFocusedExternally: isFocusedExternally)
+        self.liveTextMirror = text
     }
 }

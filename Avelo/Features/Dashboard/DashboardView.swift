@@ -141,7 +141,7 @@ public struct DashboardView: View {
                         let net = monthlyNetPaise(for: row)
                         Text(Currency.formatPaise(net))
                             .monospacedDigit()
-                            .foregroundStyle(net >= 0 ? .green : .red)
+                            .foregroundStyle(net >= 0 ? AppColors.moneyPositive : AppColors.moneyNegative)
                     }
                 }
                 .frame(minHeight: 200)
@@ -204,7 +204,7 @@ private struct KPICard: View {
             Text(Currency.formatPaise(value))
                 .font(.title3.bold())
                 .monospacedDigit()
-                .foregroundStyle(accent)
+                .foregroundStyle(value >= 0 ? AppColors.moneyPositive : AppColors.moneyNegative)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

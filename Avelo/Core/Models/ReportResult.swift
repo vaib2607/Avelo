@@ -231,10 +231,22 @@ public enum ReportResult {
         public let inputTaxPaise: Int64
         public let netPayablePaise: Int64
 
-        public var igstPaise: Int64 { output.last(where: { $0.label.contains("IGST") })?.amountPaise ?? 0 }
-        public var cgstPaise: Int64 { output.last(where: { $0.label.contains("CGST") })?.amountPaise ?? 0 }
-        public var sgstPaise: Int64 { output.last(where: { $0.label.contains("SGST") })?.amountPaise ?? 0 }
-        public var cessPaise: Int64 { output.last(where: { $0.label.contains("CESS") })?.amountPaise ?? 0 }
+        /// Net (output minus input) for a tax type, matched by label substring.
+        /// `output` holds sales-side (payable) buckets, `input` holds
+        /// purchase-side (deductible) buckets — both already contribute to
+        /// `netPayablePaise`, so the breakdown must net them too or
+        /// purchase-side postings are invisible here despite being counted
+        /// in the total.
+        private func net(matching keyword: String) -> Int64 {
+            let out = output.last(where: { $0.label.contains(keyword) })?.amountPaise ?? 0
+            let inp = input.last(where: { $0.label.contains(keyword) })?.amountPaise ?? 0
+            return out - inp
+        }
+
+        public var igstPaise: Int64 { net(matching: "IGST") }
+        public var cgstPaise: Int64 { net(matching: "CGST") }
+        public var sgstPaise: Int64 { net(matching: "SGST") }
+        public var cessPaise: Int64 { net(matching: "CESS") }
 
         public init(fromDate: Date,
                     toDate: Date,

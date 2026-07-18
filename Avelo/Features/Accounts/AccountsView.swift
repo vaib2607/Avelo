@@ -182,7 +182,8 @@ private struct AccountsBody: View {
                         Text(account.code).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(Currency.formatPaise(account.openingBalancePaise)).monospacedDigit()
+                    Text(Currency.formatPaise(env.accountTree?.tree?.findLedger(account.id)?.balancePaise ?? account.openingBalancePaise))
+                        .monospacedDigit()
                     Button {
                         AppActionRegistry.perform(.accountAlter, context: AppActionContext(accountId: account.id), router: env.router)
                     } label: {

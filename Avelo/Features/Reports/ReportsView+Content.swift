@@ -19,11 +19,34 @@ struct ReportsBody: View {
     @Bindable var vm: ReportsViewModel
 
     var body: some View {
-        HSplitView {
-            sidebar
-                .frame(minWidth: 220)
-            main
-                .frame(minWidth: 540)
+        VStack(spacing: 0) {
+            ModuleChrome(
+                title: "Reports",
+                subtitle: "Trial balance, ledgers, statements, and drill-down views built for quick review.",
+                hints: [
+                    .init(title: "Trial balance", key: "⌘1"),
+                    .init(title: "Ledger", key: "⌘6"),
+                    .init(title: "Refresh", key: "⌘R")
+                ]
+            )
+            Text("Reports > \(vm.selection.title)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
+            if let error = vm.error {
+                Text(error.localizedMessage)
+                    .font(.caption)
+                    .foregroundStyle(AppColors.error)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 4)
+            }
+            HSplitView {
+                sidebar
+                    .frame(minWidth: 220)
+                main
+                    .frame(minWidth: 540)
+            }
         }
         .safeAreaInset(edge: .bottom) {
             ModuleFooterBar(items: [
@@ -31,24 +54,6 @@ struct ReportsBody: View {
                 .init(title: "Shortcut", detail: "⌘1 opens Trial Balance; ⌘6 opens Ledger."),
                 .init(title: "Drill-down", detail: "Clickable rows open the related ledger or voucher.")
             ])
-        }
-        .overlay(alignment: .top) {
-            VStack(alignment: .leading, spacing: 8) {
-                ModuleChrome(
-                    title: "Reports",
-                    subtitle: "Trial balance, ledgers, statements, and drill-down views built for quick review.",
-                    hints: [
-                        .init(title: "Trial balance", key: "⌘1"),
-                        .init(title: "Ledger", key: "⌘6"),
-                        .init(title: "Refresh", key: "⌘R")
-                    ]
-                )
-                Text("Reports > \(vm.selection.title)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 4)
-            }
         }
     }
 
