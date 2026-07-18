@@ -98,6 +98,15 @@ extension ReportRepository {
             taxableBind.append(contentsOf: filter.voucherTypeCodes.sorted { $0.rawValue < $1.rawValue }.map { .text($0.rawValue) })
         }
         let taxable = try db.queryOne(taxableSQL, bind: taxableBind) { ($0.int("output_taxable"), $0.int("input_taxable")) } ?? (0, 0)
+        func netTax(_ keyword: String) throws -> Int64 {
+            let outputAmount = output.last(where: { $0.label.contains(keyword) })?.amountPaise ?? 0
+            let inputAmount = input.last(where: { $0.label.contains(keyword) })?.amountPaise ?? 0
+            return try CheckedMath.subtract(
+                outputAmount,
+                inputAmount,
+                context: "calculating GST \(keyword) net tax"
+            )
+        }
         return ReportResult.GstSummary(
             fromDate: fromDate,
             toDate: toDate,
@@ -107,6 +116,10 @@ extension ReportRepository {
             inputTaxablePaise: taxable.1,
             outputTaxPaise: outputTax,
             inputTaxPaise: inputTax,
+            igstPaise: try netTax("IGST"),
+            cgstPaise: try netTax("CGST"),
+            sgstPaise: try netTax("SGST"),
+            cessPaise: try netTax("CESS"),
             netPayablePaise: net
         )
     }

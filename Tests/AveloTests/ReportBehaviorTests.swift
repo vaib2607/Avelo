@@ -302,6 +302,10 @@ final class ReportBehaviorTests: XCTestCase {
         XCTAssertEqual(gst.inputTaxablePaise, 0)
         XCTAssertEqual(gst.outputTaxPaise, 1800)
         XCTAssertEqual(gst.inputTaxPaise, 0)
+        XCTAssertEqual(gst.cgstPaise, 900)
+        XCTAssertEqual(gst.sgstPaise, 900)
+        XCTAssertEqual(gst.igstPaise, 0)
+        XCTAssertEqual(gst.cessPaise, 0)
         XCTAssertEqual(gst.netPayablePaise, 1800)
     }
 

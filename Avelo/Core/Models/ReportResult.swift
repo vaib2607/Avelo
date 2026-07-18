@@ -230,23 +230,10 @@ public enum ReportResult {
         public let outputTaxPaise: Int64
         public let inputTaxPaise: Int64
         public let netPayablePaise: Int64
-
-        /// Net (output minus input) for a tax type, matched by label substring.
-        /// `output` holds sales-side (payable) buckets, `input` holds
-        /// purchase-side (deductible) buckets — both already contribute to
-        /// `netPayablePaise`, so the breakdown must net them too or
-        /// purchase-side postings are invisible here despite being counted
-        /// in the total.
-        private func net(matching keyword: String) -> Int64 {
-            let out = output.last(where: { $0.label.contains(keyword) })?.amountPaise ?? 0
-            let inp = input.last(where: { $0.label.contains(keyword) })?.amountPaise ?? 0
-            return out - inp
-        }
-
-        public var igstPaise: Int64 { net(matching: "IGST") }
-        public var cgstPaise: Int64 { net(matching: "CGST") }
-        public var sgstPaise: Int64 { net(matching: "SGST") }
-        public var cessPaise: Int64 { net(matching: "CESS") }
+        public let igstPaise: Int64
+        public let cgstPaise: Int64
+        public let sgstPaise: Int64
+        public let cessPaise: Int64
 
         public init(fromDate: Date,
                     toDate: Date,
@@ -256,6 +243,10 @@ public enum ReportResult {
                     inputTaxablePaise: Int64 = 0,
                     outputTaxPaise: Int64 = 0,
                     inputTaxPaise: Int64 = 0,
+                    igstPaise: Int64,
+                    cgstPaise: Int64,
+                    sgstPaise: Int64,
+                    cessPaise: Int64,
                     netPayablePaise: Int64) {
             self.fromDate = fromDate
             self.toDate = toDate
@@ -265,6 +256,10 @@ public enum ReportResult {
             self.inputTaxablePaise = inputTaxablePaise
             self.outputTaxPaise = outputTaxPaise
             self.inputTaxPaise = inputTaxPaise
+            self.igstPaise = igstPaise
+            self.cgstPaise = cgstPaise
+            self.sgstPaise = sgstPaise
+            self.cessPaise = cessPaise
             self.netPayablePaise = netPayablePaise
         }
     }
