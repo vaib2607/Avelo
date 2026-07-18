@@ -51,6 +51,10 @@ Package.resolved
 
 # Agent runtime state and generated application bundles
 .claude-flow/
+.claude-flow/logs/
+.claude-flow/daemon-state.json
+.claude-flow/daemon.pid
+.agents/logs/
 .claude/settings.local.json
 dist/
 
