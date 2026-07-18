@@ -51,9 +51,11 @@ Package.resolved
 
 # Agent runtime state and generated application bundles
 .claude-flow/
+.claude/settings.local.json
 dist/
 
 # Local Understand Anything working data; retain the committed dashboard assets.
 .ua/.trash-*/
 .ua/config.json
 .ua/intermediate/
+.ua/tmp/
