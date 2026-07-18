@@ -47,3 +47,13 @@ Package.resolved
 
 # opencode project config (machine-local, references ~/path skills)
 .opencode/
+.gstack/
+
+# Agent runtime state and generated application bundles
+.claude-flow/
+dist/
+
+# Local Understand Anything working data; retain the committed dashboard assets.
+.ua/.trash-*/
+.ua/config.json
+.ua/intermediate/
