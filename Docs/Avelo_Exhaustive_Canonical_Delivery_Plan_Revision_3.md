@@ -19,7 +19,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | --- | --- | --- |
 | #9b Balance Sheet | ~~DONE~~ | Scoped immutable `BalanceSheetScope`, selected-FY integrity/activity reconciliation, atomic comparison publication, same-company FY reset, automated proof, and bundled/accountant acceptance are complete. `BalanceSheetReconciliationTests` 10/0 and `ReportsViewModelTests` 14/0. |
 | #10 item-invoice default | ~~Implemented / automated proof~~; manual acceptance remaining | `VoucherEditViewModel`, `NewVoucherSheet`, draft tests; GUI/keyboard acceptance open. |
-| V027 dual track | Partial / proof remaining | Sections 4.1–4.6 landed below; remaining parity matrices and manual acceptance remain. |
+| V027 dual track | Partial / proof remaining | Sections 4.1–4.6 landed below; direct integrity matrix, malformed persisted-data matrix, and stock valuation parity now proven (§4.4/§4.6/§4.7, Phase 1.1–1.3). One representative staged-rollback case proven; full 5-stage rollback matrix, reversal/report-export parity, and manual acceptance remain. |
 | AVL-P0-020 keyboard baseline | ~~Implemented / automated proof~~; manual acceptance remaining | GUI traversal and VoiceOver acceptance open. |
 | AVL-P0-033 inventory capability | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant capability-toggle acceptance open. |
 | AVL-P0-034 mutation audit | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant audit-diff acceptance open. |
@@ -39,14 +39,21 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 
 ## 3. Reconciliation and release evidence
 
-~~`make test`, `make rule-audit`, `make rc-local`, bundle validation/self-test,
-and `make launch-smoke` passed on the current worktree.~~ Current bundle
-executable SHA-256:
-`25a702c569d0fcfbe0986d6ff5da18499a6e36abf10b162f3f70bc94aa22e8ec`.
+~~`make test` passed (604/604, 8 skipped) after every commit through the
+H6/§7/V027 Phase 1–3 work below.~~ `make rc-local`/bundle validation/
+self-test/`make launch-smoke` and the bundle executable SHA-256
+(`25a702c569d0fcfbe0986d6ff5da18499a6e36abf10b162f3f70bc94aa22e8ec`) are from
+the earlier fee084f-era session and have **not been re-run** since —
+re-validate before relying on them for release evidence. `make rule-audit`'s
+`docs-check` step fails in this environment on `rg: command not found`
+(missing ripgrep binary) — an environment/toolchain gap, not a code defect;
+net-check/R-16/R-15/R-4 all pass.
 
 Still required: named accountant, operator, keyboard/accessibility/visual/PDF/
 print acceptance; distribution-channel decision; Developer ID, hardened runtime,
-notarization, stapling, Gatekeeper, and clean-Mac install/upgrade proof.
+notarization, stapling, Gatekeeper, and clean-Mac install/upgrade proof;
+fresh `make rc-local`/bundle/launch-smoke run on final SHA; `rg` installed so
+`make rule-audit` can complete.
 
 ## 4. V027 — dual-track accounting and inventory
 
@@ -90,8 +97,28 @@ Evidence: `VoucherService.postInCurrentTransaction`, `ItemInvoiceService`,
 ~~Malformed legacy canonical IDs and unbalanced V026 data fail closed during
 migration.~~
 
-Remaining proof: full direct foreign-key/CHECK/trigger matrix, every staged
-composite failure boundary, and complete malformed persisted-data matrix.
+~~Direct integrity matrix:~~ cross-company ownership trigger for
+`trn_inventory_cost_allocations` (previously only `trn_accounting`/
+`trn_inventory` inserts had direct coverage), CHECK constraints
+(`amount_paise > 0`, `debit_or_credit` enum, `quantity_numerator/denominator
+> 0`, `movement_type` enum), and `UNIQUE(voucher_id, line_order)` all proven
+with happy/negative-path pairs. Evidence: `CanonicalIntegrityMatrixTests`
+(6/0).
+
+~~Malformed persisted-data matrix (legacy schema boundary):~~ cross-company
+legacy ledger line, duplicate legacy ledger-line id, and negative legacy
+stock-movement quantity all traced to fail closed at the V026 legacy
+schema's own triggers/PRIMARY KEY/CHECK constraints — structurally
+impossible to persist, so migration never sees them; stronger guarantee
+than a migration-time check. Evidence: `V027MigrationParityTests`
+(`testCrossCompanyLegacyLedgerLineFailsClosedAtLegacySchema`,
+`testDuplicateLegacyLedgerLineIdFailsClosedAtLegacySchema`,
+`testNegativeLegacyStockMovementQuantityFailsClosedAtLegacySchema`).
+
+Remaining proof: one representative staged-rollback case is proven (§4.7);
+the full composite failure boundary across all five posting stages
+(validation, accounting, inventory, allocation, audit write) is not yet a
+complete matrix.
 
 ### 4.5 Inventory policy
 
@@ -117,8 +144,19 @@ canonical restore/remap fixture landed.~~
 Evidence: `V027MigrationParityTests`,
 `RestoreServiceTests/testRestorePreservesCanonicalTracksAndAllocationLinks`.
 
-Remaining proof: broader historic reversal/cross-company/failure fixtures and
-full valuation/output parity.
+~~Stock valuation output parity:~~ FIFO and weighted-average items' closing
+quantity/value reconcile against an independent raw SQL sum over
+`trn_inventory` — the same authoritative-SQL-vs-live pattern already used
+for trial balance (`AccountTreeReconciliationTests`) and P&L
+(`ProfitLossReconciliationTests`), extended to inventory. Proves
+canonical-track reads aren't dropping/double-counting movements post
+migration, without re-deriving FIFO/weighted-average layer logic. Evidence:
+`StockValuationReconciliationTests` (2/0). Day Book already reads the
+canonical `trn_accounting_compat` view directly with existing behavioral
+tests; no separate parity harness was needed there.
+
+Remaining proof: broader historic reversal fixtures and full report/export
+canonical parity beyond stock valuation and trial balance/P&L/Day Book.
 
 ### 4.7 V027 exit
 
@@ -129,11 +167,24 @@ Completed automated slices:
   restore/remap proof.~~
 - ~~current `make test`, `make rule-audit`, `make rc-local`, bundle validation,
   self-test, and launch smoke.~~
+- ~~direct integrity matrix and malformed persisted-data matrix~~ (§4.4).
+- ~~FIFO/weighted-average stock valuation canonical parity~~ (§4.6).
+- ~~one representative staged-rollback case:~~ an inventory-stage failure
+  (unavailable main location, discovered after header/accounting
+  construction in the canonical posting order) leaves row counts unchanged
+  across `avelo_vouchers`, `trn_accounting`, `trn_inventory`,
+  `trn_inventory_cost_allocations`, and `avelo_audit_events` — empirically
+  proving the single outer re-entrant transaction claim rather than only
+  asserting the thrown error type. Evidence: `ItemInvoiceServiceTests`
+  (`testInventoryStageFailureLeavesNoPartialWriteAcrossAnyTable`).
 
 Open before V027 release-ready:
 
-- direct integrity and staged rollback matrices;
-- FIFO/weighted-average, reversal, report/export canonical parity;
+- full staged-rollback matrix across all five posting stages (validation,
+  accounting, inventory, allocation, audit write) — only the inventory
+  stage has a proven case;
+- reversal and report/export canonical parity beyond stock
+  valuation/trial-balance/P&L/Day Book;
 - named accountant/operator acceptance;
 - item-invoice default bundled GUI acceptance.
 
@@ -169,12 +220,14 @@ newline input, while the action bar preserves Command-Return. Both sheets use
 the shared focus vocabulary and show local inline failure context. Ledger and
 item cascades are model-owned, and item completion uses the exact posting
 predicate (including zero-rate validity and one trailing blank-row reuse).
-Focused evidence: `VoucherDraftTests` 44/0, `AppRouterTests` 11/0,
-`AppEnvironmentFlowTests` 15/0, and `KeyboardShortcutMapTests` 7/0;
-`make test`, `make rule-audit`, and
-`git diff --check` passed on the active worktree on 2026-07-19. The local
-bundle validation, bundle self-test, and launch smoke also passed; those do
-not replace the required interactive keyboard/VoiceOver acceptance.
+Focused evidence: `VoucherDraftTests` 45/0, `AppRouterTests` 13/0,
+`AppEnvironmentFlowTests` 18/0, and `KeyboardShortcutMapTests` 9/0
+(counts grown since the original 2026-07-19 pass as H6/S9/S11/§6.7 proof was
+added — see §7 and §6.7 below); `make test` (604/604) and `git diff --check`
+passed on the active worktree. `make rule-audit` blocked only on missing
+`rg` (§3). Bundle validation/bundle self-test/launch smoke are from the
+original fee084f-era pass and have not been re-run since; those never
+replace the required interactive keyboard/VoiceOver acceptance regardless.
 
 The item picker now provides focused searchable selection and an explicit
 commit callback. Still open: full create/edit focus and cascade UI matrix,
