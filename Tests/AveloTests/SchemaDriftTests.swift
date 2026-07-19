@@ -113,7 +113,8 @@ final class SchemaDriftTests: XCTestCase {
             "is_posted",
             "total_paise",
             "created_at",
-            "updated_at"
+            "updated_at",
+            "duplicated_from_voucher_id"
         ])
         XCTAssertEqual(try columns("avelo_bill_allocations", in: db), [
             "id",

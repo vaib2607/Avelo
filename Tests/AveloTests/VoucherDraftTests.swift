@@ -248,6 +248,46 @@ final class VoucherDraftTests: XCTestCase {
         let secondPosted = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: vm.buildDraft(), in: tc.fy).voucher
         XCTAssertNotEqual(secondPosted.id, posted.id)
         XCTAssertNotEqual(secondPosted.number, posted.number)
+        XCTAssertEqual(secondPosted.duplicatedFromVoucherId, posted.id,
+                        "The duplicate must record which voucher it was created from")
+    }
+
+    /// Duplicate lineage must not appear on ordinary (non-duplicate)
+    /// postings — only vouchers actually created via
+    /// `VoucherEditViewModel.duplicateDraft` should carry it.
+    @MainActor
+    func testOrdinaryVoucherPostHasNoLineage() throws {
+        let tc = try TestCompany.make()
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1_000, .debit),
+                tc.line(tc.salesId, 1_000, .credit)
+            ]), in: tc.fy
+        ).voucher
+        XCTAssertNil(posted.duplicatedFromVoucherId)
+    }
+
+    /// Duplicating the same source voucher twice must not collide — no
+    /// uniqueness constraint on the lineage column, both duplicates
+    /// independently record the same source.
+    @MainActor
+    func testDuplicatingSameSourceTwiceProducesTwoIndependentLineageRecords() throws {
+        let tc = try TestCompany.make()
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: tc.draft(on: "2024-06-01", lines: [
+                tc.line(tc.cashId, 1_000, .debit),
+                tc.line(tc.salesId, 1_000, .credit)
+            ]), in: tc.fy
+        ).voucher
+        let lines = try VoucherService(db: tc.db, companyId: tc.companyId).lines(for: posted.id)
+
+        for _ in 0..<2 {
+            let entry = VoucherEditViewModel.duplicateDraft(from: posted, lines: lines)
+            let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+            try vm.loadFromRecoveredDraft(entry)
+            let duplicate = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: vm.buildDraft(), in: tc.fy).voucher
+            XCTAssertEqual(duplicate.duplicatedFromVoucherId, posted.id)
+        }
     }
 
     /// AVL-P2-011 (Alt+2 duplicate): fresh-number proof already covers
@@ -298,6 +338,8 @@ final class VoucherDraftTests: XCTestCase {
             bind: [.text(tc.companyId.uuidString), .text(tc.fy.id.uuidString), .text(VoucherType.Code.sales.rawValue)]
         ) { $0.int(0) })
         XCTAssertEqual(sequenceValue, 1)
+        XCTAssertEqual(duplicatePosted.duplicatedFromVoucherId, posted.id,
+                        "Lineage must survive the FY boundary and still point at the original prior-FY voucher")
     }
 
     @MainActor

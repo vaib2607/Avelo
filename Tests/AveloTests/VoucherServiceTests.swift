@@ -317,6 +317,86 @@ final class VoucherServiceTests: XCTestCase {
         XCTAssertEqual(roundOffLine.side, .debit)
     }
 
+    /// `normalizedDraftForPosting` reconstructs `VoucherDraft` at two sites
+    /// inside the GST round-off branch (one before the round-off line is
+    /// added, one after) — each must explicitly carry
+    /// `duplicatedFromVoucherId` forward or a duplicated voucher's lineage
+    /// would silently vanish for exactly the GST-eligible types most likely
+    /// to need round-off. This exercises the branch that actually appends a
+    /// round-off line (the second, later reconstruction).
+    func testDuplicateLineageSurvivesGSTRoundOffNormalization() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let source = try svc.post(
+            draft: VoucherDraft(
+                mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-06-01")!,
+                partyAccountId: tc.customerId, narration: "Source invoice",
+                lines: [
+                    .init(accountId: tc.customerId, amountPaise: 11_799, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208"),
+                    .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
+                    .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit)
+                ]
+            ),
+            in: tc.fy
+        ).voucher
+
+        let duplicate = try svc.post(
+            draft: VoucherDraft(
+                mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2024-06-02")!,
+                partyAccountId: tc.customerId, narration: "Duplicate of source invoice",
+                lines: [
+                    .init(accountId: tc.customerId, amountPaise: 11_799, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit, taxCode: "7208"),
+                    .init(accountId: tc.cgstOutputId, amountPaise: 900, side: .credit),
+                    .init(accountId: tc.sgstOutputId, amountPaise: 900, side: .credit)
+                ],
+                duplicatedFromVoucherId: source.id
+            ),
+            in: tc.fy
+        ).voucher
+
+        // Confirm this actually exercised the round-off-adding branch, not
+        // just the early-return path.
+        let lines = try svc.lines(for: duplicate.id)
+        XCTAssertTrue(lines.contains { $0.accountId == tc.roundOffId })
+        XCTAssertEqual(duplicate.duplicatedFromVoucherId, source.id)
+    }
+
+    /// Reversing or cancelling a voucher that was itself a duplicate must
+    /// not bleed `duplicatedFromVoucherId` into the reversal/cancellation
+    /// voucher — those get their own lineage via `reversalOfId`, never a
+    /// borrowed "duplicated from" value.
+    func testReverseAndCancelOfADuplicateDoNotInheritDuplicateLineage() throws {
+        let tc = try TestCompany.make()
+        let svc = VoucherService(db: tc.db, companyId: tc.companyId)
+        let source = try svc.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 1_000, .debit), tc.line(tc.salesId, 1_000, .credit)
+        ]), in: tc.fy).voucher
+        let duplicate = try svc.post(
+            draft: VoucherDraft(
+                mode: .create, voucherTypeCode: .journal, date: DateFormatters.parseDate("2024-06-02")!,
+                narration: "Duplicate", lines: [
+                    .init(accountId: tc.cashId, amountPaise: 1_000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 1_000, side: .credit)
+                ],
+                duplicatedFromVoucherId: source.id
+            ),
+            in: tc.fy
+        ).voucher
+        XCTAssertEqual(duplicate.duplicatedFromVoucherId, source.id)
+
+        let reversed = try svc.reverse(duplicate.id, reason: "test reversal")
+        XCTAssertEqual(reversed.reversalOfId, duplicate.id)
+        XCTAssertNil(reversed.duplicatedFromVoucherId,
+                      "A reversal must not inherit the reversed voucher's duplicate lineage")
+
+        // Reload the original duplicate too: reversing it must not rewrite
+        // its own lineage field.
+        let persistedDuplicate = try XCTUnwrap(svc.findById(duplicate.id))
+        XCTAssertEqual(persistedDuplicate.duplicatedFromVoucherId, source.id)
+    }
+
     func testInvoiceEditRecomputesRoundOffDeterministically() throws {
         let tc = try TestCompany.make()
         let svc = VoucherService(db: tc.db, companyId: tc.companyId)
