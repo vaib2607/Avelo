@@ -7,6 +7,52 @@ preserves its scope and order. Strike-through means source plus applicable
 automated proof exists on the current dirty worktree; it never means human or
 distribution acceptance.
 
+### Design-first features vs proof gaps
+
+Two different kinds of "open" appear throughout this document and must not be
+conflated:
+
+- **Proof gaps** — the architecture/behavior already exists and is correct;
+  what's missing is a test or a small demonstrated-bug fix. This is the bulk
+  of the work closed in §4, §6, and §7 (integrity/malformed-data/valuation
+  matrices, H6/H7/H14–H19, Alt+2 fresh-number, Ctrl+R, Ctrl+I/PgUp/PgDn).
+- **Design-first features** — the capability genuinely does not exist yet and
+  requires a spike, a chosen design (command/memento history, multi-window
+  state ownership, a period-configuration DSL, lineage schema), or domain
+  input from accountants/operators before any code is safe to write. These
+  are explicitly **not** bugs, not mislabeled proof gaps, and not silently
+  scoped out — each is recorded with current state, why it's design-first,
+  preconditions for resuming, and next steps, so it can be picked up as its
+  own scoped session:
+  - **Phase 4** (§8): AVL-P1-017 multi-window (registry/router/draft
+    ownership spike required) and AVL-P1-025 undo/redo (command-history
+    design required).
+  - **H20–H21 zoom/restoration** (§7): return-stack primitives exist and are
+    tested in isolation but are wired into no UI drill-down; needs a
+    restoration-contract design (what exactly restores) before implementation.
+  - **Phase 5** (§10, §11–14): UOM discovery (needs accountant/operator input
+    on real-world unit patterns before any schema work) and H22 canonical
+    documentation (best done once the above designs settle, not before).
+  - Two smaller design-first slices surfaced during Phase 3 and are recorded
+    where they were found rather than as a separate phase: Alt+2 duplicate
+    lineage tracking (§2, needs a new schema column) and the general
+    comparative-period-configuration DSL (§2, AVL-P1-036).
+
+  Parking one of these is not the same as closing it — none of the above may
+  be marked DONE from a future proof-only pass; each requires its own design
+  decision first.
+
+### Acceptance and documentation remain separate gates
+
+Automated proof — however thorough — is never a substitute for named
+accountant/operator acceptance, keyboard/VoiceOver/accessibility traversal,
+visual/scroll/selection behavior on real hardware, PDF/print output
+verification, or canonical documentation reflecting final shipped behavior.
+Every §2 table row and every struck item in §4–§7 that still lists "manual
+acceptance remaining" stays open until that acceptance is actually performed
+and recorded (tester, date, build/SHA, steps, pass/fail) — not inferred from
+green tests. See §3 for the current release-evidence gate list.
+
 ## 1. Operating rules
 
 Keep the original authority order, offline/SQLCipher/checked-money contracts,
