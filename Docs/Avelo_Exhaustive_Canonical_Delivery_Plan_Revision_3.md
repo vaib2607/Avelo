@@ -30,7 +30,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | AVL-P1-026 Alt+C | ~~Implemented / automated proof~~; manual acceptance remaining | Focus return/audit GUI proof open. |
 | AVL-P1-036 comparative reports | Partial | Atomic publish, general period configuration, acceptance open. |
 | AVL-P1-037 Day Book | ~~Implemented / automated proof~~; manual acceptance remaining | Durable drill/edit/cancel/return loop proven (H14–H17, see §7); GUI/visual acceptance open. |
-| AVL-P2-011 Alt+2 duplicate | Implemented / proof remaining | Posted-flow lineage and fresh-number proof open. |
+| AVL-P2-011 Alt+2 duplicate | ~~Fresh-number proof~~; lineage tracking not built | Fresh/distinct number and id proven same-FY (`testDuplicateDraftPreloadsFreshEditorWithSourceVoucherLinesAndNewNumber`) and cross-FY (`testDuplicateAcrossFinancialYearsDrawsFreshNumberFromTargetFYSequence`, target FY's own sequence, no reuse/collision). **Lineage is an unbuilt feature, not a bug**: `Voucher` has `reversalOfId`/`cancellationVoucherId` for Reverse/Cancel lineage, but no field at all for "duplicated from" — `VoucherEditViewModel.duplicateDraft` copies narration/party/lines only, no source reference. Needs a new column + migration to close; parked like H20–H21. |
 | AVL-P2-012 Ctrl+R recall | Implemented / proof remaining | Shortcut/privacy/context acceptance open. |
 | AVL-P2-013 Ctrl+I/PgUp/PgDn | Partial | Selection/scroll/dirty/text-entry browse contract open. |
 | Voucher PR1b dirty navigation | ~~Implemented / automated proof~~; manual acceptance remaining | Direct-replacement/nested-provider bypass audit in §6.7 and §7 H6/H7 closed; full interactive dirty-transition acceptance open. |

@@ -250,6 +250,56 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertNotEqual(secondPosted.number, posted.number)
     }
 
+    /// AVL-P2-011 (Alt+2 duplicate): fresh-number proof already covers
+    /// same-FY duplication; this covers the cross-FY case explicitly since
+    /// numbering is scoped per financial year (`VoucherSequenceRepository`)
+    /// — duplicating a prior-FY voucher into the current FY must draw from
+    /// the target FY's own sequence, not collide with or reuse the source
+    /// FY's numbering.
+    @MainActor
+    func testDuplicateAcrossFinancialYearsDrawsFreshNumberFromTargetFYSequence() throws {
+        let tc = try TestCompany.make()
+        let priorFY = FinancialYear(
+            companyId: tc.companyId, label: "2023-24",
+            startDate: DateFormatters.parseDate("2023-04-01")!,
+            endDate: DateFormatters.parseDate("2024-03-31")!,
+            booksBeginDate: DateFormatters.parseDate("2023-04-01")!
+        )
+        try FinancialYearRepository(db: tc.db).insert(priorFY)
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(
+            draft: VoucherDraft(
+                mode: .create, voucherTypeCode: .sales, date: DateFormatters.parseDate("2023-06-01")!,
+                partyAccountId: tc.customerId, narration: "Prior-year sale",
+                lines: [
+                    .init(accountId: tc.customerId, amountPaise: 50_000, side: .debit),
+                    .init(accountId: tc.salesId, amountPaise: 50_000, side: .credit)
+                ]
+            ),
+            in: priorFY
+        ).voucher
+        let lines = try VoucherService(db: tc.db, companyId: tc.companyId).lines(for: posted.id)
+
+        let duplicateEntry = VoucherEditViewModel.duplicateDraft(from: posted, lines: lines)
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        try vm.loadFromRecoveredDraft(duplicateEntry)
+        vm.date = DateFormatters.parseDate("2024-06-01")!
+
+        // Duplicate posts into the CURRENT fy (tc.fy), not the source
+        // voucher's original financial year.
+        let duplicatePosted = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: vm.buildDraft(), in: tc.fy).voucher
+
+        XCTAssertNotEqual(duplicatePosted.id, posted.id)
+        XCTAssertNotEqual(duplicatePosted.number, posted.number)
+        XCTAssertEqual(duplicatePosted.financialYearId, tc.fy.id)
+        // A fresh sequence in the target FY starts at 1 regardless of the
+        // source voucher's position in the prior FY's own sequence.
+        let sequenceValue = try XCTUnwrap(tc.db.queryOne(
+            "SELECT last_number FROM avelo_voucher_sequences WHERE company_id = ? AND financial_year_id = ? AND voucher_type_code = ?",
+            bind: [.text(tc.companyId.uuidString), .text(tc.fy.id.uuidString), .text(VoucherType.Code.sales.rawValue)]
+        ) { $0.int(0) })
+        XCTAssertEqual(sequenceValue, 1)
+    }
+
     @MainActor
     func testDuplicatePaymentDraftKeepsOnlyCounterpartLines() throws {
         let tc = try TestCompany.make()
