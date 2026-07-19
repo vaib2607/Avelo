@@ -458,9 +458,27 @@ close before GUI multi-window expansion. `AVL-P1-025` undo/redo remains missing.
 
 **Current state:**
 
-- AVL-P1-017 multi-window: registry/router/ViewModel architecture is
-  single-window today; no shared, tested contract for per-window vs global
-  editor/draft state.
+- ~~AVL-P1-017 multi-window spike/design.~~ Traced the actual window wiring
+  (not assumed): `AppEnvironment`/`AppRouter`/`KeyboardBridge` are created
+  once in `AveloApp.init()` and shared by any window SwiftUI's default
+  `WindowGroup` spawns — a company switch or dirty edit in one window would
+  today silently affect a second window, since nothing currently prevents
+  macOS from giving the user one. `DatabaseManager` is already an `actor`
+  with `openHandles: [Company.ID: CompanyHandle]`, already idempotent on
+  `openCompany(id:)` — the DB connection layer is closer to
+  multi-window-ready than assumed. Two real, concrete conflicts found:
+  `DatabaseManager.closeCompany(id:)` has no reference counting (closing a
+  company in one window would close the shared connection out from under a
+  sibling window on the same company), and no lock/lease exists to prevent
+  the same posted voucher being opened for edit in two windows at once
+  (last-write-wins today, single-window-only-reachable; multi-window makes
+  it reachable via two windows instead of two rapid saves, but doesn't
+  introduce a new category of risk). Full ownership design (per-window
+  `AppRouter`/`WindowCompanyContext` vs shared `DatabaseManager`/
+  `KeyboardMonitor`), architecture-change outline, and test strategy are
+  recorded in full in the session transcript that produced this update —
+  design deliverable complete; **implementation not started**, by this
+  session's own explicit scope (design/spike only, no code).
 - AVL-P1-025 undo/redo: no command/memento/history implementation exists;
   editor actions apply directly to state with no reversible stack.
 
@@ -484,9 +502,20 @@ V027 posting).
 
 **Next steps when picked up:**
 
-- AVL-P1-017: finalize the multi-window state ownership diagram (per-window
-  vs global); implement registry/router changes; add targeted tests for
-  concurrent window scenarios.
+- AVL-P1-017: design is complete (see above). Implementation session should:
+  split `AppEnvironment` into a slim app-wide object (backup service,
+  registry, `DatabaseManager` reference) and a per-window
+  `WindowCompanyContext` (company/FY/database/featureSet/cache); move
+  `AppRouter`/`KeyboardBridge` construction from `AveloApp.init()` into the
+  per-window scene builder (`AppRouter` already needs no internal changes —
+  `AppRouterTests` already constructs bare instances freely); add
+  reference-counting to `DatabaseManager.closeCompany(id:)`; teach
+  `KeyboardMonitor.shared` to route to the key window's bridge instead of
+  one captured bridge; add the test suite outlined in the design (window-
+  scoped router independence, ref-counted close, same-company two-window
+  edit sequence, cross-window data-change notification, full regression
+  pass on every existing reconciliation harness). No schema/migration
+  needed for any of this.
 - AVL-P1-025: implement command/history model for voucher/editor; add tests
   covering undo/redo correctness, history limits, and interaction with
   posting/draft validation.
