@@ -35,7 +35,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | AVL-P2-013 Ctrl+I/PgUp/PgDn | Partial | Selection/scroll/dirty/text-entry browse contract open. |
 | Voucher PR1b dirty navigation | ~~Implemented / automated proof~~; manual acceptance remaining | Direct-replacement/nested-provider bypass audit in §6.7 and §7 H6/H7 closed; full interactive dirty-transition acceptance open. |
 | Day Book shell | ~~Implemented / automated proof~~; manual acceptance remaining | H14–H17 durable loop (drill-in → edit/cancel/reverse → dirty gate → scope-preserving reload) proven at ViewModel/router level; GUI scroll/visual acceptance open. |
-| Comparative prior-year columns | Implemented | Atomicity/reconciliation completion open. |
+| Comparative prior-year columns | ~~Implemented / automated proof~~; manual acceptance remaining | Atomic publish fixed for Trial Balance/P&L (H18–H19, see §7); reconciliation to standalone runs already proven for all three report types. GUI acceptance open. |
 
 ## 3. Reconciliation and release evidence
 
@@ -260,8 +260,40 @@ Retain Revision 3 H1–H23 scorecard and contracts unchanged:
   (`ReportsViewModelTests`). Table row identity (`Voucher.ID`) is what SwiftUI
   relies on for scroll-position stability across the reload; that visual
   behavior is GUI-only and stays open.
-- H18–H19 atomic comparative, H20–H21 zoom/restoration, H22 docs, and H23
-  manual matrix remain open as specified in Revision 3.
+- ~~H18–H19 atomic comparative.~~ Trial Balance and P&L previously assigned
+  the primary column before attempting the comparative fetch: a comparative
+  failure (e.g. a rescope whose prior-year window falls in a gap with no
+  financial year) left the primary column silently advanced to the new scope
+  while the comparative column kept its stale value from the previous scope —
+  two mismatched periods rendered side by side. Fixed to compute both periods
+  into locals and publish only together, matching Balance Sheet's existing
+  #9b atomic-publish contract; on failure the entire prior snapshot now
+  survives unchanged rather than partially updating. No other report type
+  carries a comparative column, so this closes H18–H19 in full. Evidence:
+  `testFailedComparativeRescopeLeavesEntireTrialBalanceSnapshotUnchanged`
+  (`ReportsViewModelTests`); production change in
+  `ReportsViewModel.reload()`'s `.trialBalance`/`.profitLoss` cases.
+- H20–H21 zoom/restoration — **audited, not implemented; parked as a scoped
+  follow-up feature, not a bug:**
+  1. *Current state:* `AppRouter.browseReturnStack`/`pushBrowseReturnContext`/
+     `popBrowseReturnContext` exist and are tested in isolation
+     (`AppRouterTests`), but no UI report drill-down calls them.
+     `ReportsBody+Navigation.openLedger(_:)` and other drill-ins overwrite
+     `vm.selection`/scope and reload directly, destroying the prior report's
+     scope/filters/selection with no push; no Back affordance exists anywhere.
+  2. *Open design questions:* On return, what exactly must restore — report
+     scope (company/FY/as-of)? Filters? Row selection? Scroll position, and if
+     so keyed on what identity? How does generic return-stack ownership
+     interact with Day Book's already-shipped H14–H17 scope-preservation loop
+     (§7 above), which solves a narrower version of this same problem for one
+     screen?
+  3. *Future implementation outline:* wire `pushBrowseReturnContext` at every
+     report drill-in entry point (account ledger, voucher drill, Day Book);
+     add a Back/Return affordance bound to `popBrowseReturnContext` that
+     restores scope/filters/selection per a documented contract; extend
+     `ReportsViewModelTests` with drill → edit/cancel → return scenarios
+     asserting restored context or a clearly documented adjustment.
+- H22 docs and H23 manual matrix remain open as specified in Revision 3.
 
 Manual/GUI acceptance still open for H6, H7, and H14–H17: keyboard/VoiceOver
 traversal, visual scroll/selection behavior, and named accountant/operator
