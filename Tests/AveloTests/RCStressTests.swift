@@ -38,10 +38,10 @@ final class RCStressTests: XCTestCase {
         let totals = try tc.db.queryOne(
             """
             SELECT
-              COALESCE(SUM(CASE WHEN side='debit' THEN amount_paise ELSE 0 END), 0) AS dr,
-              COALESCE(SUM(CASE WHEN side='credit' THEN amount_paise ELSE 0 END), 0) AS cr,
+              COALESCE(SUM(CASE WHEN debit_or_credit='debit' THEN amount_paise ELSE 0 END), 0) AS dr,
+              COALESCE(SUM(CASE WHEN debit_or_credit='credit' THEN amount_paise ELSE 0 END), 0) AS cr,
               COUNT(DISTINCT voucher_id) AS voucher_count
-            FROM avelo_ledger_lines
+            FROM trn_accounting
             """
         ) { ($0.int("dr"), $0.int("cr"), $0.int("voucher_count")) }
 

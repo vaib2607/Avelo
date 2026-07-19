@@ -834,7 +834,7 @@ final class RestoreServiceTests: XCTestCase {
             XCTAssertEqual(restoredVouchers.first?.totalPaise, 50000, "Iteration \(index)")
 
             let balanceSheet = try ReportService(db: restoredHandle.db, companyId: restored.id)
-                .balanceSheet(asOfDate: source.fy.endDate, financialYearId: restored.id)
+                .balanceSheet(asOfDate: source.fy.endDate, financialYearId: restoredFY.id)
             XCTAssertEqual(balanceSheet.totalAssetsPaise, balanceSheet.totalLiabilitiesPaise + balanceSheet.totalEquityPaise, "Iteration \(index)")
 
             await restoreManager.closeCompany(id: restored.id)
