@@ -51,6 +51,61 @@ final class V027MigrationParityTests: XCTestCase {
         XCTAssertEqual(try db.queryOne("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'trn_accounting'") { $0.int(0) }, 0)
     }
 
+    // MARK: 1.2 Malformed persisted-data matrix
+
+    /// Rev3 §4.4/§4.6 calls for cross-company legacy data to fail closed
+    /// before it reaches canonical tracks. Tracing the legacy schema shows
+    /// this is structurally impossible rather than merely migration-checked:
+    /// `avelo_ledger_lines` itself has a same-company trigger, so corrupted
+    /// legacy data can never be persisted in the first place.
+    func testCrossCompanyLegacyLedgerLineFailsClosedAtLegacySchema() throws {
+        let db = try v26Database()
+        let fixture = try TestCompany.seed(into: db, companyId: UUID(), companyName: "A")
+        let other = try TestCompany.seed(into: db, companyId: UUID(), companyName: "B")
+        let voucherId = UUID()
+        let now = Date()
+        try db.execute("INSERT INTO avelo_vouchers (id, company_id, financial_year_id, voucher_type_code, number, date, narration, total_paise, created_at, updated_at) VALUES (?, ?, ?, 'Journal', 'X', ?, 'x', 100, ?, ?)", [.text(voucherId.uuidString), .text(fixture.companyId.uuidString), .text(fixture.fy.id.uuidString), .date(DateFormatters.parseDate("2024-06-01")!), .timestamp(now), .timestamp(now)])
+
+        XCTAssertThrowsError(try db.execute(
+            "INSERT INTO avelo_ledger_lines (id, company_id, voucher_id, account_id, amount_paise, side, line_order) VALUES (?, ?, ?, ?, 100, 'debit', 0)",
+            [.text(UUID().uuidString), .text(other.companyId.uuidString), .text(voucherId.uuidString), .text(other.cashId.uuidString)]
+        ))
+    }
+
+    /// A duplicated canonical ID on legacy data can never occur either: the
+    /// legacy `avelo_ledger_lines` table has its own PRIMARY KEY, so a
+    /// duplicate id is rejected before migration, not silently backfilled
+    /// twice or with a collision.
+    func testDuplicateLegacyLedgerLineIdFailsClosedAtLegacySchema() throws {
+        let db = try v26Database()
+        let fixture = try TestCompany.seed(into: db, companyId: UUID(), companyName: "A")
+        let voucherId = UUID()
+        let dupId = UUID()
+        let now = Date()
+        try db.execute("INSERT INTO avelo_vouchers (id, company_id, financial_year_id, voucher_type_code, number, date, narration, total_paise, created_at, updated_at) VALUES (?, ?, ?, 'Journal', 'X', ?, 'x', 200, ?, ?)", [.text(voucherId.uuidString), .text(fixture.companyId.uuidString), .text(fixture.fy.id.uuidString), .date(DateFormatters.parseDate("2024-06-01")!), .timestamp(now), .timestamp(now)])
+        try db.execute("INSERT INTO avelo_ledger_lines (id, company_id, voucher_id, account_id, amount_paise, side, line_order) VALUES (?, ?, ?, ?, 100, 'debit', 0)", [.text(dupId.uuidString), .text(fixture.companyId.uuidString), .text(voucherId.uuidString), .text(fixture.cashId.uuidString)])
+
+        XCTAssertThrowsError(try db.execute(
+            "INSERT INTO avelo_ledger_lines (id, company_id, voucher_id, account_id, amount_paise, side, line_order) VALUES (?, ?, ?, ?, 100, 'credit', 1)",
+            [.text(dupId.uuidString), .text(fixture.companyId.uuidString), .text(voucherId.uuidString), .text(fixture.salesId.uuidString)]
+        ))
+    }
+
+    /// "Impossible inventory quantities" cannot reach migration either: the
+    /// legacy `avelo_stock_movements` table enforces `quantity > 0` directly.
+    func testNegativeLegacyStockMovementQuantityFailsClosedAtLegacySchema() throws {
+        let db = try v26Database()
+        let fixture = try TestCompany.seed(into: db, companyId: UUID(), companyName: "A")
+        let itemId = UUID()
+        let now = Date()
+        try db.execute("INSERT INTO avelo_inventory_items (id, company_id, code, name, unit, valuation_method, is_active, created_at) VALUES (?, ?, 'IT', 'Item', 'NOS', 'fifo', 1, ?)", [.text(itemId.uuidString), .text(fixture.companyId.uuidString), .timestamp(now)])
+
+        XCTAssertThrowsError(try db.execute(
+            "INSERT INTO avelo_stock_movements (id, company_id, item_id, voucher_id, date, movement_type, quantity, unit_cost_paise, total_value_paise, created_at) VALUES (?, ?, ?, NULL, ?, 'in', -5, 50, 100, ?)",
+            [.text(UUID().uuidString), .text(fixture.companyId.uuidString), .text(itemId.uuidString), .date(DateFormatters.parseDate("2024-06-01")!), .timestamp(now)]
+        ))
+    }
+
     private func v26Database() throws -> SQLiteDatabase {
         let db = try SQLiteDatabase(path: ":memory:")
         try MigrationRunner(migrations: MigrationRunner.defaultMigrations.filter { $0.version.rawValue <= 26 }).runMigrations(on: db)
