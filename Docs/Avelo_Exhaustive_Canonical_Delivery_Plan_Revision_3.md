@@ -27,20 +27,20 @@ conflated:
   - **Phase 4** (§8): AVL-P1-017 multi-window (registry/router/draft
     ownership spike required) and AVL-P1-025 undo/redo (command-history
     design required).
-  - **H20–H21 zoom/restoration** (§7): return-stack primitives exist and are
-    tested in isolation but are wired into no UI drill-down; needs a
-    restoration-contract design (what exactly restores) before implementation.
   - **Phase 5** (§10, §11–14): UOM discovery (needs accountant/operator input
     on real-world unit patterns before any schema work) and H22 canonical
     documentation (best done once the above designs settle, not before).
-  - Both smaller design-first slices originally logged here have since been
+  - Three smaller design-first slices originally logged here have since been
     designed and closed: Alt+2 duplicate lineage tracking (§2, AVL-P2-011)
     via `MigrationV031` (additive, self-referencing, follows the existing
-    `cancellation_voucher_id` pattern exactly), and the comparative-period-
+    `cancellation_voucher_id` pattern exactly); the comparative-period-
     configuration DSL (§2, AVL-P1-036) via `ComparativePeriod` (pure
     date-shift value type, no schema/service-layer change, default
-    preserves prior behavior exactly). Neither was a cross-cutting
-    redesign once actually scoped.
+    preserves prior behavior exactly); and H20–H21 zoom/restoration (§7) via
+    `ReportsNavigation.openLedger`/`returnToPreviousReport`, wiring the
+    already-existing `AppRouter` return-stack primitives once the actual
+    blast radius (only `openLedger`, not every drill-in) was traced. None
+    were a cross-cutting redesign once actually scoped.
 
   Parking one of these is not the same as closing it — none of the above may
   be marked DONE from a future proof-only pass; each requires its own design
@@ -414,26 +414,34 @@ Retain Revision 3 H1–H23 scorecard and contracts unchanged:
   `testFailedComparativeRescopeLeavesEntireTrialBalanceSnapshotUnchanged`
   (`ReportsViewModelTests`); production change in
   `ReportsViewModel.reload()`'s `.trialBalance`/`.profitLoss` cases.
-- H20–H21 zoom/restoration — **audited, not implemented; parked as a scoped
-  follow-up feature, not a bug:**
-  1. *Current state:* `AppRouter.browseReturnStack`/`pushBrowseReturnContext`/
-     `popBrowseReturnContext` exist and are tested in isolation
-     (`AppRouterTests`), but no UI report drill-down calls them.
-     `ReportsBody+Navigation.openLedger(_:)` and other drill-ins overwrite
-     `vm.selection`/scope and reload directly, destroying the prior report's
-     scope/filters/selection with no push; no Back affordance exists anywhere.
-  2. *Open design questions:* On return, what exactly must restore — report
-     scope (company/FY/as-of)? Filters? Row selection? Scroll position, and if
-     so keyed on what identity? How does generic return-stack ownership
-     interact with Day Book's already-shipped H14–H17 scope-preservation loop
-     (§7 above), which solves a narrower version of this same problem for one
-     screen?
-  3. *Future implementation outline:* wire `pushBrowseReturnContext` at every
-     report drill-in entry point (account ledger, voucher drill, Day Book);
-     add a Back/Return affordance bound to `popBrowseReturnContext` that
-     restores scope/filters/selection per a documented contract; extend
-     `ReportsViewModelTests` with drill → edit/cancel → return scenarios
-     asserting restored context or a clearly documented adjustment.
+- ~~H20–H21 zoom/restoration.~~ Tracing every drill-in call site found the
+  blast radius was narrower than the original audit assumed: `openVoucher`
+  (used by Day Book, Outstanding, Inventory movements, and Financial
+  Statements' own voucher links) already round-trips correctly — it's a
+  modal sheet over the unchanged report, and dismiss-triggered `reload()`
+  reuses the same selection/scope. Only `openLedger` actually destroyed
+  context. Since `asOf`/`fromDate`/`toDate`/`fyId` are never touched by a
+  ledger drill (same `ReportsViewModel` instance, only `.selection`/
+  `.ledgerAccountId` change), the restoration contract is narrow: push/
+  restore which report was showing, nothing else — no scope, filters, or
+  row selection exists to lose. `ReportsNavigation.openLedger`/
+  `returnToPreviousReport` (`Avelo/Features/Reports/ReportsView+Content.swift`)
+  wire `AppRouter`'s existing `pushBrowseReturnContext`/
+  `popBrowseReturnContext`/`BrowseSurface.report` primitives — no `AppRouter`
+  changes needed. A cross-company/FY stale-context guard discards rather
+  than applies a mismatched pop (a company/FY switch isn't blocked by any
+  dirty-gate while a ledger drill is open). A conditional "Back to X"
+  affordance sits next to the existing Reports breadcrumb, rendering only
+  when the stack is non-empty. Day Book's H14–H17 loop is untouched — Day
+  Book has no `openLedger` call site at all. Scroll-position restoration
+  remains an explicit, documented limitation (no such infrastructure exists
+  anywhere in this codebase, matching Day Book's own open item — not
+  fabricated here). Evidence: `ReportsViewModelTests`
+  (`testOpenLedgerPushesReturnContextAndRestoresPriorSelectionOnBack`,
+  `testRepeatedDrillsProduceCorrectLIFOReturnOrder`,
+  `testReturnContextFromDifferentCompanyIsDiscardedNotApplied`,
+  `testDrillEditVoucherReturnPreservesSelectionWithoutStackInvolvement`).
+  GUI acceptance (visual Back-button behavior, scroll) remains open.
 - H22 docs and H23 manual matrix remain open as specified in Revision 3.
 
 Manual/GUI acceptance still open for H6, H7, and H14–H17: keyboard/VoiceOver
