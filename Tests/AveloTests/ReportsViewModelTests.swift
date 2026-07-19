@@ -322,6 +322,64 @@ final class ReportsViewModelTests: XCTestCase {
         XCTAssertNil(vm.error)
     }
 
+    /// H14-H17 (Day Book durable loop): a `dataRevision`-driven reload (fired
+    /// after an Edit/Reverse dismiss) must reuse the existing `selectedDay`
+    /// scope rather than resetting it, and must keep the row selection intact
+    /// as long as the selected voucher still appears in the reloaded rows.
+    func testDayBookReloadPreservesSelectedDayAndValidSelection() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try service.post(draft: tc.draft(on: "2024-06-05", lines: [
+            tc.line(tc.cashId, 15000, .debit),
+            tc.line(tc.salesId, 15000, .credit)
+        ]), in: tc.fy)
+
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .dayBook
+        vm.selectedDay = DateFormatters.parseDate("2024-06-05")!
+        vm.loadDayBook(day: vm.selectedDay)
+        vm.selectedDayBookVoucherId = posted.voucher.id
+        XCTAssertEqual(vm.dayBook.count, 1)
+
+        // Simulate the ReportsView.onChange(of: env.dataRevision) reload path
+        // that runs after a voucher edit/reverse dismisses back to Day Book.
+        vm.reload()
+
+        XCTAssertEqual(vm.selectedDay, DateFormatters.parseDate("2024-06-05")!,
+                        "Reload triggered by a data-change notification must not reset the browsed day")
+        XCTAssertEqual(vm.dayBook.count, 1)
+        XCTAssertEqual(vm.selectedDayBookVoucherId, posted.voucher.id,
+                        "A still-present row's selection must survive the reload")
+    }
+
+    /// H14-H17: once a selected Day Book row's voucher no longer appears for
+    /// the browsed day (e.g. it was reversed and reversal moved/removed it),
+    /// the stale selection must be cleared rather than silently pointing at a
+    /// row that no longer exists in the refreshed table.
+    func testDayBookReloadClearsSelectionWhenVoucherNoLongerPresentForDay() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        let posted = try service.post(draft: tc.draft(on: "2024-06-05", lines: [
+            tc.line(tc.cashId, 15000, .debit),
+            tc.line(tc.salesId, 15000, .credit)
+        ]), in: tc.fy)
+
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .dayBook
+        vm.selectedDay = DateFormatters.parseDate("2024-06-05")!
+        vm.loadDayBook(day: vm.selectedDay)
+        vm.selectedDayBookVoucherId = posted.voucher.id
+
+        // Move the browsed day away from the voucher's date, matching what a
+        // reload after cancel/reverse against a different day would see.
+        vm.selectedDay = DateFormatters.parseDate("2024-06-06")!
+        vm.loadDayBook(day: vm.selectedDay)
+
+        XCTAssertTrue(vm.dayBook.isEmpty)
+        XCTAssertNil(vm.selectedDayBookVoucherId,
+                      "Selection must not silently reference a row absent from the current day's rows")
+    }
+
     func testReportDrillDownRoutesToEditVoucherSheet() {
         let router = AppRouter()
         let voucherId = UUID()
