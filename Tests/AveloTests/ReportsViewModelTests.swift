@@ -90,6 +90,104 @@ final class ReportsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.comparativeTrialBalance, standalone)
     }
 
+    /// AVL-P1-036: `.priorMonth` must reconcile to a standalone run for the
+    /// shifted month, and expose the matching column label — the same proof
+    /// as prior-year, extended to a different configured mode.
+    func testComparativePeriodPriorMonthReconcilesAndLabelsCorrectly() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try service.post(draft: tc.draft(on: "2024-05-01", lines: [
+            tc.line(tc.cashId, 15_000, .debit), tc.line(tc.salesId, 15_000, .credit)
+        ]), in: tc.fy)
+        _ = try service.post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 25_000, .debit), tc.line(tc.salesId, 25_000, .credit)
+        ]), in: tc.fy)
+
+        let asOf = DateFormatters.parseDate("2024-06-01")!
+        let priorAsOf = ComparativePeriod.priorMonth.shift(asOf)
+
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .trialBalance
+        vm.asOf = asOf
+        vm.comparativeEnabled = true
+        vm.comparativePeriod = .priorMonth
+        vm.reload()
+
+        let standalone = try ReportService(db: tc.db, companyId: tc.companyId)
+            .trialBalance(asOfDate: priorAsOf, financialYearId: tc.fy.id).rows
+
+        XCTAssertEqual(vm.comparativeTrialBalance, standalone)
+        XCTAssertEqual(vm.comparativeColumnLabel, "Prior Month (₹)")
+    }
+
+    /// AVL-P1-036: `.priorQuarter` — same proof, different mode, confirming
+    /// the DSL isn't special-cased to only work for month/year offsets.
+    /// `ReportService.trialBalance` rejects an `asOfDate` before the target
+    /// FY's start, so both dates (and their quarter-shifted comparative)
+    /// stay inside `tc.fy`'s own range rather than needing a second FY.
+    func testComparativePeriodPriorQuarterReconcilesAndLabelsCorrectly() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try service.post(draft: tc.draft(on: "2024-04-15", lines: [
+            tc.line(tc.cashId, 8_000, .debit), tc.line(tc.salesId, 8_000, .credit)
+        ]), in: tc.fy)
+        _ = try service.post(draft: tc.draft(on: "2024-07-15", lines: [
+            tc.line(tc.cashId, 25_000, .debit), tc.line(tc.salesId, 25_000, .credit)
+        ]), in: tc.fy)
+
+        let asOf = DateFormatters.parseDate("2024-07-15")!
+        let priorAsOf = ComparativePeriod.priorQuarter.shift(asOf)
+
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .trialBalance
+        vm.asOf = asOf
+        vm.comparativeEnabled = true
+        vm.comparativePeriod = .priorQuarter
+        vm.reload()
+
+        let standalone = try ReportService(db: tc.db, companyId: tc.companyId)
+            .trialBalance(asOfDate: priorAsOf, financialYearId: tc.fy.id).rows
+
+        XCTAssertEqual(vm.comparativeTrialBalance, standalone)
+        XCTAssertEqual(vm.comparativeColumnLabel, "Prior Quarter (₹)")
+    }
+
+    /// AVL-P1-036 + H18-H19: atomic publish-on-failure must hold under a
+    /// non-default configured mode too, not just the hardcoded prior-year
+    /// path it was originally proven against. `.priorQuarter`'s 3-month
+    /// offset gives enough room to reach outside `tc.fy`'s start (2024-04-01)
+    /// without needing `asOf` itself to violate the FY-start validation.
+    func testFailedComparativeRescopeLeavesSnapshotUnchangedUnderPriorQuarter() throws {
+        let tc = try TestCompany.make()
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try service.post(draft: tc.draft(on: "2024-07-15", lines: [
+            tc.line(tc.cashId, 25_000, .debit), tc.line(tc.salesId, 25_000, .credit)
+        ]), in: tc.fy)
+
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .trialBalance
+        vm.comparativeEnabled = true
+        vm.comparativePeriod = .priorQuarter
+        // asOf = 2024-07-15 -> priorQuarter = 2024-04-15, inside tc.fy itself: succeeds.
+        vm.asOf = DateFormatters.parseDate("2024-07-15")!
+        vm.reload()
+        XCTAssertNil(vm.error)
+        let snapshotPrimary = vm.trialBalance
+        let snapshotComparative = vm.comparativeTrialBalance
+        XCTAssertFalse(snapshotComparative.isEmpty)
+
+        // asOf = 2024-04-15 (still >= tc.fy.startDate, so still a valid
+        // primary request) -> priorQuarter = 2024-01-15, before tc.fy starts
+        // and covered by no financial year at all: comparative fails.
+        vm.asOf = DateFormatters.parseDate("2024-04-15")!
+        vm.reload()
+
+        XCTAssertNotNil(vm.error)
+        XCTAssertEqual(vm.trialBalance, snapshotPrimary,
+                        "Primary must not advance when its paired comparative fails, regardless of configured mode")
+        XCTAssertEqual(vm.comparativeTrialBalance, snapshotComparative)
+    }
+
     /// Phase 2.1/2.2 (H18-H19 atomic comparative): a scope change whose
     /// comparative fetch fails (e.g. the new prior-year window falls in a
     /// gap with no financial year) must not publish a fresh primary column
