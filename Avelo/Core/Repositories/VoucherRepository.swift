@@ -154,14 +154,14 @@ public struct VoucherRepository: Sendable {
     /// default while avoiding one statement execution per voucher during a
     /// bulk post.
     public func insertBatch(_ vouchers: [Voucher]) throws {
-        let maximumRowsPerStatement = 47 // 47 rows * 19 columns = 893 bindings
+        let maximumRowsPerStatement = 47 // 47 rows * 20 columns = 940 bindings
         var start = vouchers.startIndex
         while start < vouchers.endIndex {
             let end = vouchers.index(start, offsetBy: maximumRowsPerStatement, limitedBy: vouchers.endIndex) ?? vouchers.endIndex
-            let rowPlaceholder = "(" + Array(repeating: "?", count: 19).joined(separator: ", ") + ")"
+            let rowPlaceholder = "(" + Array(repeating: "?", count: 20).joined(separator: ", ") + ")"
             let values = Array(repeating: rowPlaceholder, count: vouchers.distance(from: start, to: end)).joined(separator: ", ")
             var bindings: [SQLValue] = []
-            bindings.reserveCapacity(vouchers.distance(from: start, to: end) * 19)
+            bindings.reserveCapacity(vouchers.distance(from: start, to: end) * 20)
             for voucher in vouchers[start..<end] {
                 bindings.append(contentsOf: Self.insertBindings(for: voucher))
             }
@@ -170,7 +170,7 @@ public struct VoucherRepository: Sendable {
                 INSERT INTO avelo_vouchers
                 (id, company_id, financial_year_id, voucher_type_code, number, date, party_account_id,
                  narration, status, is_reversal, reversal_of_id, cancelled_at, cancelled_by, cancellation_reason,
-                 cancellation_voucher_id, is_posted, total_paise, created_at, updated_at)
+                 cancellation_voucher_id, duplicated_from_voucher_id, is_posted, total_paise, created_at, updated_at)
                 VALUES \(values)
                 """,
                 bindings
@@ -196,6 +196,7 @@ public struct VoucherRepository: Sendable {
             .optionalText(voucher.cancelledBy),
             .optionalText(voucher.cancellationReason),
             .optionalText(voucher.cancellationVoucherId?.uuidString),
+            .optionalText(voucher.duplicatedFromVoucherId?.uuidString),
             .bool(voucher.isPosted),
             .integer(voucher.totalPaise),
             .timestamp(voucher.createdAt),
@@ -259,7 +260,8 @@ public struct VoucherRepository: Sendable {
     static let selectAllSQL: String = """
         SELECT v.id, v.company_id, v.financial_year_id, v.voucher_type_code, v.number, v.date, v.party_account_id,
                v.narration, v.status, v.is_reversal, v.reversal_of_id, v.cancelled_at, v.cancelled_by,
-               v.cancellation_reason, v.cancellation_voucher_id, v.is_posted, v.total_paise, v.created_at, v.updated_at
+               v.cancellation_reason, v.cancellation_voucher_id, v.duplicated_from_voucher_id,
+               v.is_posted, v.total_paise, v.created_at, v.updated_at
         FROM avelo_vouchers v
         LEFT JOIN avelo_accounts a ON a.id = v.party_account_id
     """
@@ -272,6 +274,7 @@ public struct VoucherRepository: Sendable {
         let party = try UUIDParsing.optional(try r.checkedOptionalText("party_account_id"), field: "avelo_vouchers.party_account_id")
         let reversalOf = try UUIDParsing.optional(try r.checkedOptionalText("reversal_of_id"), field: "avelo_vouchers.reversal_of_id")
         let cancellationVoucherId = try UUIDParsing.optional(try r.checkedOptionalText("cancellation_voucher_id"), field: "avelo_vouchers.cancellation_voucher_id")
+        let duplicatedFromVoucherId = try UUIDParsing.optional(try r.checkedOptionalText("duplicated_from_voucher_id"), field: "avelo_vouchers.duplicated_from_voucher_id")
         return Voucher(
             id: id,
             companyId: companyId,
@@ -288,6 +291,7 @@ public struct VoucherRepository: Sendable {
             cancelledBy: try r.checkedOptionalText("cancelled_by"),
             cancellationReason: try r.checkedOptionalText("cancellation_reason"),
             cancellationVoucherId: cancellationVoucherId,
+            duplicatedFromVoucherId: duplicatedFromVoucherId,
             isPosted: try r.requiredBool("is_posted"),
             totalPaise: try r.requiredInt("total_paise"),
             createdAt: try r.timestamp("created_at"),

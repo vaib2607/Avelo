@@ -27,6 +27,10 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
     public var linesJSON: String
     /// Ordered raw item editor rows for item-invoice recovery.
     public var itemLinesJSON: String?
+    /// Alt+2 duplicate lineage, set by `VoucherEditViewModel.duplicateDraft`
+    /// and carried through crash recovery. `nil` for ordinary in-progress
+    /// drafts.
+    public var duplicatedFromVoucherId: Voucher.ID?
     public var updatedAt: Date
 
     public init(id: ID = UUID(),
@@ -44,6 +48,7 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
                 salesPurchaseLedgerId: Account.ID? = nil,
                 linesJSON: String,
                 itemLinesJSON: String? = nil,
+                duplicatedFromVoucherId: Voucher.ID? = nil,
                 updatedAt: Date = Date()) {
         self.id = id
         self.companyId = companyId
@@ -60,6 +65,7 @@ public struct VoucherEntryDraft: Identifiable, Sendable, Hashable {
         self.salesPurchaseLedgerId = salesPurchaseLedgerId
         self.linesJSON = linesJSON
         self.itemLinesJSON = itemLinesJSON
+        self.duplicatedFromVoucherId = duplicatedFromVoucherId
         self.updatedAt = updatedAt
     }
 }

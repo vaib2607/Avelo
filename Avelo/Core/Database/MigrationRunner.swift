@@ -47,7 +47,8 @@ public struct MigrationRunner: Sendable {
         MigrationV027(),
         MigrationV028(),
         MigrationV029(),
-        MigrationV030()
+        MigrationV030(),
+        MigrationV031()
     ]
 
     /// Applies every pending migration inside its own transaction (AVL-P0-015).

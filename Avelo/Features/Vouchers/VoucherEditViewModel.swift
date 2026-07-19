@@ -535,6 +535,7 @@ public final class VoucherEditViewModel {
         accountLedgerId = entry.accountLedgerId
         salesOrPurchaseLedgerId = entry.salesPurchaseLedgerId
         draft.entryMode = entry.entryMode
+        draft.duplicatedFromVoucherId = entry.duplicatedFromVoucherId
         itemInvoiceMode = entry.entryMode == .itemInvoice
         let decoded = try decodeDraftLines(entry.linesJSON)
         if !decoded.isEmpty {
@@ -597,7 +598,8 @@ public final class VoucherEditViewModel {
             partyAccountId: voucher.partyAccountId,
             narration: voucher.narration,
             accountLedgerId: sourceLine?.accountId,
-            linesJSON: encodedLines
+            linesJSON: encodedLines,
+            duplicatedFromVoucherId: voucher.id
         )
     }
 

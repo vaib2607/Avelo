@@ -64,6 +64,10 @@ public struct VoucherDraft: Sendable, Hashable {
     public var billReferenceNumber: String?
     public var narration: String
     public var lines: [Line]
+    /// Alt+2 duplicate lineage: the source voucher's id, threaded through to
+    /// `Voucher.duplicatedFromVoucherId` at posting. `nil` for every other
+    /// draft (new, edit, recovered).
+    public var duplicatedFromVoucherId: Voucher.ID?
 
     public init(mode: Mode,
                 entryMode: EntryMode = .ledger,
@@ -73,7 +77,8 @@ public struct VoucherDraft: Sendable, Hashable {
                 billReferenceType: BillReferenceType? = nil,
                 billReferenceNumber: String? = nil,
                 narration: String = "",
-                lines: [Line] = []) {
+                lines: [Line] = [],
+                duplicatedFromVoucherId: Voucher.ID? = nil) {
         self.mode = mode
         self.entryMode = entryMode
         self.voucherTypeCode = voucherTypeCode
@@ -83,6 +88,7 @@ public struct VoucherDraft: Sendable, Hashable {
         self.billReferenceNumber = billReferenceNumber
         self.narration = narration
         self.lines = lines
+        self.duplicatedFromVoucherId = duplicatedFromVoucherId
     }
 
     public var totalDebitPaise: Int64 {

@@ -191,6 +191,7 @@ public final class VoucherService: Sendable {
                         narration: normalizedDraft.narration,
                         isReversal: false,
                         reversalOfId: nil,
+                        duplicatedFromVoucherId: normalizedDraft.duplicatedFromVoucherId,
                         isPosted: true,
                         totalPaise: normalizedDraft.totalDebitPaise,
                         createdAt: now,
@@ -286,6 +287,7 @@ public final class VoucherService: Sendable {
                 narration: normalizedDraft.narration,
                 isReversal: false,
                 reversalOfId: nil,
+                duplicatedFromVoucherId: normalizedDraft.duplicatedFromVoucherId,
                 isPosted: true,
                 totalPaise: total,
                 createdAt: now,
@@ -1149,7 +1151,8 @@ public final class VoucherService: Sendable {
             billReferenceType: draft.billReferenceType,
             billReferenceNumber: draft.billReferenceNumber,
             narration: draft.narration,
-            lines: reindexed(nonRoundOffLines)
+            lines: reindexed(nonRoundOffLines),
+            duplicatedFromVoucherId: draft.duplicatedFromVoucherId
         )
 
         let filledAccountIds = Set(normalizedWithoutRoundOff.filledLines.compactMap(\.accountId))
@@ -1203,7 +1206,8 @@ public final class VoucherService: Sendable {
             billReferenceType: draft.billReferenceType,
             billReferenceNumber: draft.billReferenceNumber,
             narration: draft.narration,
-            lines: reindexed(balancedLines)
+            lines: reindexed(balancedLines),
+            duplicatedFromVoucherId: draft.duplicatedFromVoucherId
         )
     }
 

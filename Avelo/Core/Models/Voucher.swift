@@ -23,6 +23,10 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
     public var cancelledBy: String?
     public var cancellationReason: String?
     public var cancellationVoucherId: ID?
+    /// Set only when this voucher was created via Alt+2 duplicate; records
+    /// the source voucher's id. Never set on originals, reversals, or
+    /// cancellations, and never mutated after insert.
+    public var duplicatedFromVoucherId: ID?
     public var isPosted: Bool
     public var totalPaise: Int64
     public let createdAt: Date
@@ -43,6 +47,7 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
                 cancelledBy: String? = nil,
                 cancellationReason: String? = nil,
                 cancellationVoucherId: ID? = nil,
+                duplicatedFromVoucherId: ID? = nil,
                 isPosted: Bool = true,
                 totalPaise: Int64 = 0,
                 createdAt: Date = Date(),
@@ -62,6 +67,7 @@ public struct Voucher: Identifiable, Hashable, Sendable, Codable {
         self.cancelledBy = cancelledBy
         self.cancellationReason = cancellationReason
         self.cancellationVoucherId = cancellationVoucherId
+        self.duplicatedFromVoucherId = duplicatedFromVoucherId
         self.isPosted = isPosted
         self.totalPaise = totalPaise
         self.createdAt = createdAt

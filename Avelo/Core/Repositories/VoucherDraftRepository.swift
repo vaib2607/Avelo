@@ -14,8 +14,9 @@ public struct VoucherDraftRepository: Sendable {
             INSERT INTO avelo_voucher_drafts
             (id, company_id, voucher_type_code, entry_mode, date, party_account_id, narration,
              bill_reference_type, bill_reference_number, cheque_number, cheque_due_date,
-             account_ledger_id, sales_purchase_ledger_id, lines_json, item_lines_json, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             account_ledger_id, sales_purchase_ledger_id, lines_json, item_lines_json,
+             duplicated_from_voucher_id, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 voucher_type_code = excluded.voucher_type_code,
                 entry_mode = excluded.entry_mode,
@@ -30,6 +31,7 @@ public struct VoucherDraftRepository: Sendable {
                 sales_purchase_ledger_id = excluded.sales_purchase_ledger_id,
                 lines_json = excluded.lines_json,
                 item_lines_json = excluded.item_lines_json,
+                duplicated_from_voucher_id = excluded.duplicated_from_voucher_id,
                 updated_at = excluded.updated_at
             """,
             [
@@ -48,6 +50,7 @@ public struct VoucherDraftRepository: Sendable {
                 .optionalText(entry.salesPurchaseLedgerId?.uuidString),
                 .text(entry.linesJSON),
                 .optionalText(entry.itemLinesJSON),
+                .optionalText(entry.duplicatedFromVoucherId?.uuidString),
                 .timestamp(entry.updatedAt)
             ]
         )
@@ -62,7 +65,8 @@ public struct VoucherDraftRepository: Sendable {
             """
             SELECT id, company_id, voucher_type_code, entry_mode, date, party_account_id, narration,
                    bill_reference_type, bill_reference_number, cheque_number, cheque_due_date,
-                   account_ledger_id, sales_purchase_ledger_id, lines_json, item_lines_json, updated_at
+                   account_ledger_id, sales_purchase_ledger_id, lines_json, item_lines_json,
+                   duplicated_from_voucher_id, updated_at
             FROM avelo_voucher_drafts
             WHERE company_id = ?
             ORDER BY updated_at DESC
@@ -98,6 +102,7 @@ public struct VoucherDraftRepository: Sendable {
             salesPurchaseLedgerId: try UUIDParsing.optional(try r.checkedOptionalText("sales_purchase_ledger_id"), field: "avelo_voucher_drafts.sales_purchase_ledger_id"),
             linesJSON: try r.requiredText("lines_json"),
             itemLinesJSON: try r.checkedOptionalText("item_lines_json"),
+            duplicatedFromVoucherId: try UUIDParsing.optional(try r.checkedOptionalText("duplicated_from_voucher_id"), field: "avelo_voucher_drafts.duplicated_from_voucher_id"),
             updatedAt: try r.timestamp("updated_at")
         )
     }
