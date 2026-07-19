@@ -538,4 +538,82 @@ final class ReportsViewModelTests: XCTestCase {
         }
         XCTAssertEqual(routedId, voucherId)
     }
+
+    // MARK: - H20-H21 zoom/restoration
+
+    func testOpenLedgerPushesReturnContextAndRestoresPriorSelectionOnBack() throws {
+        let tc = try TestCompany.make()
+        let router = AppRouter()
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .trialBalance
+        vm.asOf = DateFormatters.parseDate("2024-06-01")!
+
+        ReportsNavigation.openLedger(tc.cashId, vm: vm, router: router, dataRevision: 0)
+
+        XCTAssertEqual(vm.selection, .ledger)
+        XCTAssertEqual(vm.ledgerAccountId, tc.cashId)
+        XCTAssertEqual(router.browseReturnStack.count, 1)
+
+        ReportsNavigation.returnToPreviousReport(vm: vm, router: router)
+
+        XCTAssertEqual(vm.selection, .trialBalance)
+        XCTAssertTrue(router.browseReturnStack.isEmpty)
+    }
+
+    func testBackAffordanceAbsentWithEmptyReturnStack() {
+        let router = AppRouter()
+        XCTAssertTrue(router.browseReturnStack.isEmpty)
+    }
+
+    func testRepeatedDrillsProduceCorrectLIFOReturnOrder() throws {
+        let tc = try TestCompany.make()
+        let router = AppRouter()
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .profitLoss
+
+        ReportsNavigation.openLedger(tc.cashId, vm: vm, router: router, dataRevision: 0)
+        XCTAssertEqual(vm.selection, .ledger)
+
+        // Simulate a second drill from a different report onto the ledger,
+        // without returning first — the stack must hold both.
+        vm.selection = .outstanding
+        ReportsNavigation.openLedger(tc.salesId, vm: vm, router: router, dataRevision: 0)
+        XCTAssertEqual(router.browseReturnStack.count, 2)
+
+        ReportsNavigation.returnToPreviousReport(vm: vm, router: router)
+        XCTAssertEqual(vm.selection, .outstanding, "Most recently pushed context returns first")
+
+        ReportsNavigation.returnToPreviousReport(vm: vm, router: router)
+        XCTAssertEqual(vm.selection, .profitLoss, "Original context returns last")
+        XCTAssertTrue(router.browseReturnStack.isEmpty)
+    }
+
+    func testReturnContextFromDifferentCompanyIsDiscardedNotApplied() throws {
+        let tc = try TestCompany.make()
+        let router = AppRouter()
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .ledger
+
+        router.pushBrowseReturnContext(.init(
+            companyId: UUID(), // a different company than vm.companyId
+            financialYearId: tc.fy.id,
+            surface: .report(.trialBalance),
+            dataRevision: 0
+        ))
+
+        ReportsNavigation.returnToPreviousReport(vm: vm, router: router)
+
+        XCTAssertEqual(vm.selection, .ledger, "A stale cross-company context must not be applied")
+        XCTAssertTrue(router.browseReturnStack.isEmpty, "The stale context is still consumed, just not applied")
+    }
+
+    func testDrillEditVoucherReturnPreservesSelectionWithoutStackInvolvement() {
+        let router = AppRouter()
+        let voucherId = UUID()
+
+        ReportsNavigation.openVoucher(voucherId, router: router)
+
+        XCTAssertTrue(router.browseReturnStack.isEmpty,
+                       "Voucher drill-in is a modal sheet over the unchanged report; it must not touch the return stack")
+    }
 }
