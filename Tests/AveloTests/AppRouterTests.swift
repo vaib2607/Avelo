@@ -199,4 +199,26 @@ final class AppRouterTests: XCTestCase {
         XCTAssertTrue(applied)
         XCTAssertEqual(provider.discardCount, 1)
     }
+
+    /// `NewVoucherSheet` presents its nested `NewAccountSheet` through its own
+    /// isolated `AppRouter` instance specifically so a dirty voucher editor's
+    /// pending navigation can never be observed or cleared by that nested
+    /// sheet's lifecycle. This proves the isolation holds both ways.
+    func testNestedAccountCreationRouterCannotObserveOrClearParentPendingNavigation() {
+        let parentRouter = AppRouter()
+        let voucherProvider = DirtyProvider()
+        parentRouter.dirtyStateProvider = voucherProvider
+        parentRouter.go(.reports)
+        XCTAssertTrue(parentRouter.requiresDirtyNavigationDecision)
+
+        let nestedRouter = AppRouter()
+        nestedRouter.present(.newAccount)
+        XCTAssertEqual(nestedRouter.presentedSheet?.id, RouterSheet.newAccount.id)
+        nestedRouter.dismissPresentedSheet()
+        XCTAssertNil(nestedRouter.presentedSheet)
+
+        XCTAssertTrue(parentRouter.requiresDirtyNavigationDecision)
+        XCTAssertEqual(parentRouter.selection, .dashboard)
+        XCTAssertEqual(voucherProvider.discardCount, 0)
+    }
 }

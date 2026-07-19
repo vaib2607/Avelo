@@ -68,6 +68,29 @@ final class KeyboardShortcutMapTests: XCTestCase {
         ))
     }
 
+    /// S9/S11: `VoucherShortcutContract` and `AppActionRegistry` are two
+    /// separate shortcut-label sources (editor/table-scoped vs.
+    /// menu/toolbar/palette-scoped). Nothing enforces disjointness between
+    /// them at compile time, so a shared label here would mean two unrelated
+    /// commands display or claim the same chord in help/menu text.
+    func testVoucherShortcutContractLabelsDoNotCollideWithRegistryLabels() {
+        let contractKeys = Set(VoucherShortcutContract.editorRows.map(\.key)
+            + VoucherShortcutContract.tableRows.map(\.key))
+        let registryLabels = Set(AppActionRegistry.actions.compactMap(\.shortcutLabel))
+
+        XCTAssertTrue(contractKeys.isDisjoint(with: registryLabels),
+                       "Voucher editor/table chords must not collide with registry-driven menu/toolbar/palette chords")
+    }
+
+    /// S11: every function-key voucher-create shortcut label the registry
+    /// exposes must be unique — two voucher types silently sharing a label
+    /// would make the shortcut/help/menu text lie about which voucher opens.
+    func testRegistryShortcutLabelsAreUnique() {
+        let labels = AppActionRegistry.actions.compactMap(\.shortcutLabel)
+        XCTAssertEqual(labels.count, Set(labels).count,
+                       "Duplicate shortcutLabel values found in AppActionRegistry.actions: \(labels)")
+    }
+
     @MainActor
     func testNestedSheetCaptureRemainsActiveUntilEverySheetDismisses() {
         let monitor = KeyboardMonitor()
