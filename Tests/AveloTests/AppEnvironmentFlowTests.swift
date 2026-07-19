@@ -169,6 +169,93 @@ final class AppEnvironmentFlowTests: XCTestCase {
         XCTAssertEqual(provider.discardCount, 1)
     }
 
+    /// H6: `closeCompany()` must use the identical dirty-gate as `openCompany`
+    /// and `switchFinancialYear` — a dirty editor must block close until an
+    /// explicit Keep Editing/Discard decision, not just company-open/FY-switch.
+    func testDirtyEditorDefersCompanyCloseUntilDiscard() async throws {
+        let fixture = try await makeEnvironmentFixture()
+        defer { fixture.cleanup() }
+        let company = try await makeCompany(named: "Close Gate", manager: fixture.manager)
+        await fixture.env.openCompany(company.id)
+        let provider = EnvironmentDirtyProvider()
+        fixture.env.router.dirtyStateProvider = provider
+
+        fixture.env.closeCompany()
+
+        XCTAssertNotNil(fixture.env.companyContext, "Dirty editor must block company close")
+        XCTAssertEqual(fixture.env.companyContext?.companyId, company.id)
+        XCTAssertTrue(fixture.env.router.requiresDirtyNavigationDecision)
+        XCTAssertEqual(provider.discardCount, 0)
+
+        fixture.env.router.discardAndContinueNavigation()
+
+        XCTAssertNil(fixture.env.companyContext)
+        XCTAssertNil(fixture.env.accountTree)
+        XCTAssertEqual(fixture.env.router.selection, .dashboard)
+        XCTAssertEqual(provider.discardCount, 1)
+    }
+
+    /// H6: a second, different company-switch request made while the first is
+    /// still pending must not overwrite or duplicate it — only the first
+    /// request may ever run, and only once.
+    func testRepeatedCompanySwitchRequestsRetainOnlyTheFirstPendingIntent() async throws {
+        let fixture = try await makeEnvironmentFixture()
+        defer { fixture.cleanup() }
+        let first = try await makeCompany(named: "First Target", manager: fixture.manager)
+        let second = try await makeCompany(named: "Second Target", manager: fixture.manager)
+        let third = try await makeCompany(named: "Third Target", manager: fixture.manager)
+        await fixture.env.openCompany(first.id)
+        let provider = EnvironmentDirtyProvider()
+        fixture.env.router.dirtyStateProvider = provider
+
+        await fixture.env.openCompany(second.id)
+        await fixture.env.openCompany(third.id)
+
+        XCTAssertEqual(fixture.env.companyContext?.companyId, first.id,
+                        "Neither repeated request may mutate company state before the decision")
+        XCTAssertTrue(fixture.env.router.requiresDirtyNavigationDecision)
+
+        fixture.env.router.discardAndContinueNavigation()
+        for _ in 0..<200 where fixture.env.companyContext?.companyId != second.id {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+
+        XCTAssertEqual(fixture.env.companyContext?.companyId, second.id,
+                        "Only the first pending request may execute")
+        XCTAssertNotEqual(fixture.env.companyContext?.companyId, third.id)
+        XCTAssertEqual(provider.discardCount, 1)
+    }
+
+    /// H6 cross-company isolation: after a dirty switch is discarded and
+    /// completes, no prior-company account-tree instance, route, or sheet may
+    /// remain visible — the discard path must rebuild state exactly like the
+    /// clean path does, not just swap `companyId`.
+    func testDiscardedCompanySwitchLeavesNoStaleAccountTreeOrRouteState() async throws {
+        let fixture = try await makeEnvironmentFixture()
+        defer { fixture.cleanup() }
+        let first = try await makeCompany(named: "Stale Source", manager: fixture.manager)
+        let second = try await makeCompany(named: "Stale Target", manager: fixture.manager)
+        await fixture.env.openCompany(first.id)
+        let staleTree = fixture.env.accountTree
+        fixture.env.router.selection = .reports
+        fixture.env.router.present(.newVoucher)
+        let provider = EnvironmentDirtyProvider()
+        fixture.env.router.dirtyStateProvider = provider
+
+        await fixture.env.openCompany(second.id)
+        fixture.env.router.discardAndContinueNavigation()
+        for _ in 0..<200 where fixture.env.router.presentedSheet != nil
+            || fixture.env.companyContext?.companyId != second.id {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+
+        XCTAssertEqual(fixture.env.companyContext?.companyId, second.id)
+        XCTAssertEqual(fixture.env.accountTree?.companyId, second.id)
+        XCTAssertNotIdentical(fixture.env.accountTree, staleTree)
+        XCTAssertEqual(fixture.env.router.selection, .dashboard)
+        XCTAssertNil(fixture.env.router.presentedSheet)
+    }
+
     func testRootSheetBindingRoutesDirtyDismissalThroughRouter() async throws {
         let fixture = try await makeEnvironmentFixture()
         defer { fixture.cleanup() }

@@ -200,6 +200,25 @@ final class AppRouterTests: XCTestCase {
         XCTAssertEqual(provider.discardCount, 1)
     }
 
+    /// H6: two distinct external-context requests (e.g. two different
+    /// company-switch attempts) while dirty must not let the second replace
+    /// the first — only the first-requested continuation may ever run.
+    func testSecondDistinctExternalContextRequestDoesNotReplaceFirst() {
+        let router = AppRouter()
+        let provider = DirtyProvider()
+        router.dirtyStateProvider = provider
+        var firstRan = false
+        var secondRan = false
+
+        router.requestExternalContextChange { firstRan = true }
+        router.requestExternalContextChange { secondRan = true }
+        router.discardAndContinueNavigation()
+
+        XCTAssertTrue(firstRan, "The first pending external request must be the one that executes")
+        XCTAssertFalse(secondRan, "A later request must not silently overwrite the pending one")
+        XCTAssertEqual(provider.discardCount, 1)
+    }
+
     /// `NewVoucherSheet` presents its nested `NewAccountSheet` through its own
     /// isolated `AppRouter` instance specifically so a dirty voucher editor's
     /// pending navigation can never be observed or cleared by that nested
