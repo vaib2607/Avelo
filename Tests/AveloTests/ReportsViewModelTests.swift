@@ -90,6 +90,55 @@ final class ReportsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.comparativeTrialBalance, standalone)
     }
 
+    /// Phase 2.1/2.2 (H18-H19 atomic comparative): a scope change whose
+    /// comparative fetch fails (e.g. the new prior-year window falls in a
+    /// gap with no financial year) must not publish a fresh primary column
+    /// next to a stale comparative one from the previous scope. Trial
+    /// Balance/P&L previously assigned the primary column before attempting
+    /// the comparative fetch — a comparative failure left `trialBalance`
+    /// updated to the new scope while `comparativeTrialBalance` silently
+    /// kept its old value. Balance Sheet already had this atomic-publish
+    /// protection (#9b); this proves Trial Balance now has it too.
+    func testFailedComparativeRescopeLeavesEntireTrialBalanceSnapshotUnchanged() throws {
+        let tc = try TestCompany.make()
+        // A short prior FY covering only part of the prior-year window,
+        // leaving a real gap for a later rescope to fall into.
+        let shortPriorFY = FinancialYear(
+            companyId: tc.companyId, label: "2023 short",
+            startDate: DateFormatters.parseDate("2023-04-01")!,
+            endDate: DateFormatters.parseDate("2023-09-30")!,
+            booksBeginDate: DateFormatters.parseDate("2023-04-01")!
+        )
+        try FinancialYearRepository(db: tc.db).insert(shortPriorFY)
+        let service = VoucherService(db: tc.db, companyId: tc.companyId)
+        _ = try service.post(draft: tc.draft(on: "2023-04-15", lines: [
+            tc.line(tc.cashId, 11_100, .debit), tc.line(tc.salesId, 11_100, .credit)
+        ]), in: shortPriorFY)
+        _ = try service.post(draft: tc.draft(on: "2024-04-15", lines: [
+            tc.line(tc.cashId, 25_000, .debit), tc.line(tc.salesId, 25_000, .credit)
+        ]), in: tc.fy)
+
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .trialBalance
+        vm.asOf = DateFormatters.parseDate("2024-04-15")!
+        vm.comparativeEnabled = true
+        vm.reload()
+        XCTAssertNil(vm.error)
+        let snapshotPrimary = vm.trialBalance
+        let snapshotComparative = vm.comparativeTrialBalance
+        XCTAssertFalse(snapshotComparative.isEmpty)
+
+        // Prior-year date now lands in the gap after shortPriorFY ends.
+        vm.asOf = DateFormatters.parseDate("2024-11-01")!
+        vm.reload()
+
+        XCTAssertNotNil(vm.error, "The failed comparative fetch must surface an error")
+        XCTAssertEqual(vm.trialBalance, snapshotPrimary,
+                        "Primary must not silently advance to the new scope when its paired comparative fails")
+        XCTAssertEqual(vm.comparativeTrialBalance, snapshotComparative,
+                        "Comparative must not remain a stale mismatch from a different scope than primary")
+    }
+
     func testComparativeDisabledLeavesComparativeTrialBalanceEmpty() throws {
         let tc = try TestCompany.make()
         let service = VoucherService(db: tc.db, companyId: tc.companyId)

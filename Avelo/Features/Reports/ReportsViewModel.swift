@@ -99,19 +99,27 @@ public final class ReportsViewModel {
             }
             switch selection {
             case .trialBalance:
-                trialBalance = try svc.trialBalance(asOfDate: asOf, financialYearId: fyId).rows
-                comparativeTrialBalance = comparativeEnabled
-                    ? try svc.trialBalance(asOfDate: priorYear(asOf), financialYearId: financialYearID(containing: priorYear(asOf))).rows
+                // Compute both periods before publishing either: a comparative
+                // failure must not leave a fresh primary column next to a
+                // stale comparative one from the previous scope (same atomic
+                // publish contract as loadBalanceSheet).
+                let primaryTrialBalance = try svc.trialBalance(asOfDate: asOf, financialYearId: fyId).rows
+                let comparativeTrialBalanceRows = try comparativeEnabled
+                    ? svc.trialBalance(asOfDate: priorYear(asOf), financialYearId: financialYearID(containing: priorYear(asOf))).rows
                     : []
+                trialBalance = primaryTrialBalance
+                comparativeTrialBalance = comparativeTrialBalanceRows
             case .profitLoss:
-                profitLoss = try svc.profitAndLoss(fromDate: fromDate, toDate: toDate, financialYearId: fyId)
-                comparativeProfitLoss = comparativeEnabled
-                    ? try svc.profitAndLoss(
+                let primaryProfitLoss = try svc.profitAndLoss(fromDate: fromDate, toDate: toDate, financialYearId: fyId)
+                let comparativeProfitLossResult = try comparativeEnabled
+                    ? svc.profitAndLoss(
                         fromDate: priorYear(fromDate),
                         toDate: priorYear(toDate),
                         financialYearId: financialYearID(containing: priorYear(fromDate))
                     )
                     : nil
+                profitLoss = primaryProfitLoss
+                comparativeProfitLoss = comparativeProfitLossResult
             case .balanceSheet:
                 break
             case .gstSummary:
