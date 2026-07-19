@@ -89,7 +89,7 @@ final class MalformedUUIDHandlingTests: XCTestCase {
                    'line' AS narration
             """
         ) { try LedgerLineRepository.rowToLine($0) }) { error in
-            assertInvalidUUID(error, field: "avelo_ledger_lines.voucher_id", raw: "bad-voucher-id")
+            assertInvalidUUID(error, field: "trn_accounting.voucher_id", raw: "bad-voucher-id")
         }
     }
 
@@ -172,7 +172,7 @@ final class MalformedUUIDHandlingTests: XCTestCase {
                    '2024-04-01T00:00:00Z' AS created_at
             """
         ) { try InventoryRepository.rowToMovement($0) }) { error in
-            assertInvalidUUID(error, field: "avelo_stock_movements.voucher_id", raw: "bad-voucher-id")
+            assertInvalidUUID(error, field: "trn_inventory.voucher_id", raw: "bad-voucher-id")
         }
     }
 

@@ -119,11 +119,11 @@ final class ProfitLossReconciliationTests: XCTestCase {
                    a.opening_balance_side AS obs,
                    g.nature AS nature,
                    g.code AS group_code,
-                   COALESCE(SUM(CASE WHEN l.side='debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
-                   COALESCE(SUM(CASE WHEN l.side='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
+                   COALESCE(SUM(CASE WHEN l.debit_or_credit='debit' THEN l.amount_paise ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN l.debit_or_credit='credit' THEN l.amount_paise ELSE 0 END), 0) AS cr
             FROM avelo_accounts a
             JOIN avelo_account_groups g ON g.id = a.group_id
-            LEFT JOIN avelo_ledger_lines l ON l.account_id = a.id
+            LEFT JOIN trn_accounting l ON l.ledger_id = a.id
             LEFT JOIN avelo_vouchers v ON v.id = l.voucher_id
             WHERE a.company_id = ?
               AND a.is_active = 1
