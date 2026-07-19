@@ -33,13 +33,14 @@ conflated:
   - **Phase 5** (§10, §11–14): UOM discovery (needs accountant/operator input
     on real-world unit patterns before any schema work) and H22 canonical
     documentation (best done once the above designs settle, not before).
-  - One smaller design-first slice remains, recorded where it was found
-    rather than as a separate phase: the general comparative-period-
-    configuration DSL (§2, AVL-P1-036). Alt+2 duplicate lineage tracking
-    (§2, AVL-P2-011), also originally logged here, has since been designed
-    and closed via `MigrationV031` — a small, additive, self-referencing
-    column following the existing `cancellation_voucher_id` pattern
-    exactly, not a cross-cutting redesign.
+  - Both smaller design-first slices originally logged here have since been
+    designed and closed: Alt+2 duplicate lineage tracking (§2, AVL-P2-011)
+    via `MigrationV031` (additive, self-referencing, follows the existing
+    `cancellation_voucher_id` pattern exactly), and the comparative-period-
+    configuration DSL (§2, AVL-P1-036) via `ComparativePeriod` (pure
+    date-shift value type, no schema/service-layer change, default
+    preserves prior behavior exactly). Neither was a cross-cutting
+    redesign once actually scoped.
 
   Parking one of these is not the same as closing it — none of the above may
   be marked DONE from a future proof-only pass; each requires its own design
@@ -77,7 +78,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | AVL-P1-017 multi-window | Proof remaining | Registry consistency spike, editor/draft/window acceptance open. |
 | AVL-P1-025 undo/redo | Missing | Full design and implementation open. |
 | AVL-P1-026 Alt+C | ~~Implemented / automated proof~~; manual acceptance remaining | Focus return/audit GUI proof open. |
-| AVL-P1-036 comparative reports | ~~Atomic publish~~; general period configuration not built | Atomic publish closed via §7 H18–H19 fix (Trial Balance/P&L). **Period configuration is an unbuilt feature, not a bug**: today's model is a single hardcoded prior-year comparison (`priorYear()`, -1 year fixed) for exactly Trial Balance/P&L/Balance Sheet — no `basePeriod`/`comparisonPeriods[]`/mode (FY/quarter/month) DSL exists to configure. Parked like H20–H21; GUI acceptance also open. |
+| AVL-P1-036 comparative reports | ~~Atomic publish~~; ~~period configuration~~ | Atomic publish closed via §7 H18–H19 fix. **Period configuration closed**: `ComparativePeriod` (priorYear/priorMonth/priorQuarter/custom(monthsBack:)) replaces the hardcoded `priorYear()`, used identically by Trial Balance/P&L/Balance Sheet via `ReportsViewModel.comparativePeriod` (default `.priorYear`, bit-for-bit preserves prior behavior). No `ReportService` changes — the DSL only decides which date to ask for. `comparisonPeriods[]` from the original spec was scoped to a single `Optional` value: the UI renders exactly one comparative column per report today, a real array would be dead plumbing; documented as a non-breaking future extension. Evidence: `ComparativePeriodTests`, `ReportsViewModelTests` (priorMonth/priorQuarter reconciliation + atomic-publish-under-non-default-mode). GUI mode-picker not built (task scoped this as internal/labels-only); GUI acceptance open. |
 | AVL-P1-037 Day Book | ~~Implemented / automated proof~~; manual acceptance remaining | Durable drill/edit/cancel/return loop proven (H14–H17, see §7); GUI/visual acceptance open. |
 | AVL-P2-011 Alt+2 duplicate | ~~Fresh-number proof~~; ~~lineage tracking~~ | Fresh/distinct number and id proven same-FY and cross-FY. **Lineage closed**: `Voucher.duplicatedFromVoucherId` (`MigrationV031`, additive/nullable, same pattern as `cancellation_voucher_id`) records the source voucher, set only by `VoucherEditViewModel.duplicateDraft`, threaded through `VoucherDraft`/`VoucherEntryDraft`/both `VoucherService` posting paths. Proven same-FY, cross-FY, non-duplicate-stays-nil, repeated-duplicate, Reverse/Cancel-non-inheritance, and the GST-round-off reconstruction hazard (`normalizedDraftForPosting` rebuilds `VoucherDraft` at two sites that must explicitly thread the field or it silently vanishes for round-off-eligible types). Evidence: `VoucherDraftTests`, `VoucherServiceTests`. No UI surfacing (not requested); GUI/keyboard acceptance still open. |
 | AVL-P2-012 Ctrl+R recall | ~~Implemented / automated proof~~; manual acceptance remaining | Company-scope privacy (`testRecentNarrationsIsScopedToCompany`), distinct/most-recent-first ordering, limit, and Narration-only focus eligibility (S3, `KeyboardShortcutMapTests`) all proven. No cross-user boundary applies — single-operator per-company local database, no user/session concept exists. FY-scoping is intentionally absent (recall spans company history, standard Tally behavior), not a gap. Keyboard/VoiceOver acceptance open. |
