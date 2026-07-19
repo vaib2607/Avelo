@@ -3,9 +3,11 @@ import SwiftUI
 @MainActor
 extension ReportsBody {
     func openLedger(_ accountId: Account.ID) {
-        vm.selection = .ledger
-        vm.ledgerAccountId = accountId
-        vm.reload()
+        ReportsNavigation.openLedger(accountId, vm: vm, router: env.router, dataRevision: env.dataRevision)
+    }
+
+    func returnToPreviousReport() {
+        ReportsNavigation.returnToPreviousReport(vm: vm, router: env.router)
     }
 
     func openVoucher(_ id: Voucher.ID) {

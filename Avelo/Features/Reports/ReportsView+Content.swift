@@ -18,6 +18,15 @@ struct ReportsBody: View {
     @Environment(AppEnvironment.self) var env
     @Bindable var vm: ReportsViewModel
 
+    /// H20-H21: read-only peek at the top of the return stack, purely for
+    /// labeling the Back affordance — never pops. `nil` when the stack is
+    /// empty (button doesn't render) or its top isn't a report-selection
+    /// context (e.g. left over from some other future stack use).
+    private var previousReportTitle: String? {
+        guard case .report(let selection) = env.router.browseReturnStack.last?.surface else { return nil }
+        return selection.title
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ModuleChrome(
@@ -29,11 +38,21 @@ struct ReportsBody: View {
                     .init(title: "Refresh", key: "⌘R")
                 ]
             )
-            Text("Reports > \(vm.selection.title)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 4)
+            HStack(spacing: 8) {
+                Text("Reports > \(vm.selection.title)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let previousTitle = previousReportTitle {
+                    Button { returnToPreviousReport() } label: {
+                        Label("Back to \(previousTitle)", systemImage: "chevron.left")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
             if let error = vm.error, vm.selection != .balanceSheet {
                 Text(error.localizedMessage)
                     .font(.caption)
@@ -154,5 +173,37 @@ struct ReportsBody: View {
 enum ReportsNavigation {
     static func openVoucher(_ voucherId: Voucher.ID, router: AppRouter) {
         router.present(.editVoucher(voucherId))
+    }
+
+    /// H20-H21: pushes the pre-drill report selection so
+    /// `returnToPreviousReport(vm:router:)` can restore it. `asOf`/
+    /// `fromDate`/`toDate`/`fyId` are never touched by a ledger drill (same
+    /// `ReportsViewModel` instance, only `.selection`/`.ledgerAccountId`
+    /// change), so there is no scope to save — only which report was showing.
+    static func openLedger(_ accountId: Account.ID, vm: ReportsViewModel, router: AppRouter, dataRevision: Int) {
+        router.pushBrowseReturnContext(.init(
+            companyId: vm.companyId,
+            financialYearId: vm.fyId,
+            surface: .report(vm.selection),
+            dataRevision: dataRevision
+        ))
+        vm.selection = .ledger
+        vm.ledgerAccountId = accountId
+        vm.reload()
+    }
+
+    /// Restores the report selection pushed by `openLedger`. Discards
+    /// (rather than applies) a stale context whose company/FY no longer
+    /// matches the live one — a company/FY switch while a ledger drill was
+    /// open is not blocked by any dirty-gate (the report itself carries no
+    /// unsaved state), so this guard is the only thing preventing a
+    /// cross-tenant restore.
+    static func returnToPreviousReport(vm: ReportsViewModel, router: AppRouter) {
+        guard let context = router.popBrowseReturnContext(),
+              context.companyId == vm.companyId,
+              context.financialYearId == vm.fyId,
+              case .report(let selection) = context.surface else { return }
+        vm.selection = selection
+        vm.reload()
     }
 }
