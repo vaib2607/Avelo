@@ -65,7 +65,7 @@ extension ReportsBody {
                     TableColumn("Credit (₹)") { r in
                         Text(Currency.formatPaise(r.creditPaise)).monospacedDigit()
                     }
-                    TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                    TableColumn(vm.comparativeColumnLabel) { r in
                         if vm.comparativeEnabled {
                             if let prior = comparativeByAccount[r.id] {
                                 Text(safeDebitLessCredit(prior, context: "rendering trial balance comparative amount")).monospacedDigit()
@@ -102,7 +102,7 @@ extension ReportsBody {
                     TableColumn("Amount (₹)", content: { (r: ReportResult.TrialBalanceRow) in
                         Text(safeCreditLessDebit(r, context: "rendering profit and loss income amount")).monospacedDigit()
                     })
-                    TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                    TableColumn(vm.comparativeColumnLabel) { r in
                         if vm.comparativeEnabled {
                             if let prior = comparativeIncome[r.id] {
                                 Text(safeCreditLessDebit(prior, context: "rendering profit and loss comparative income amount")).monospacedDigit()
@@ -124,7 +124,7 @@ extension ReportsBody {
                     TableColumn("Amount (₹)", content: { (r: ReportResult.TrialBalanceRow) in
                         Text(safeDebitLessCredit(r, context: "rendering profit and loss expense amount")).monospacedDigit()
                     })
-                    TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                    TableColumn(vm.comparativeColumnLabel) { r in
                         if vm.comparativeEnabled {
                             if let prior = comparativeExpense[r.id] {
                                 Text(safeDebitLessCredit(prior, context: "rendering profit and loss comparative expense amount")).monospacedDigit()
@@ -189,7 +189,7 @@ extension ReportsBody {
                         TableColumn("Amount (₹)") { r in
                             Text(safeDebitLessCredit(r, context: "rendering balance sheet asset amount")).monospacedDigit()
                         }
-                        TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                        TableColumn(vm.comparativeColumnLabel) { r in
                             if vm.comparativeEnabled {
                                 if let prior = comparativeAssets[r.id] {
                                     Text(safeDebitLessCredit(prior, context: "rendering balance sheet comparative asset amount")).monospacedDigit()
@@ -212,7 +212,7 @@ extension ReportsBody {
                         TableColumn("Amount (₹)") { r in
                             Text(safeCreditLessDebit(r, context: "rendering balance sheet liability amount")).monospacedDigit()
                         }
-                        TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                        TableColumn(vm.comparativeColumnLabel) { r in
                             if vm.comparativeEnabled {
                                 if let prior = comparativeLiabilities[r.id] {
                                     Text(safeCreditLessDebit(prior, context: "rendering balance sheet comparative liability amount")).monospacedDigit()
@@ -234,7 +234,7 @@ extension ReportsBody {
                         TableColumn("Amount (₹)") { r in
                             Text(safeCreditLessDebit(r, context: "rendering balance sheet equity amount")).monospacedDigit()
                         }
-                        TableColumn(vm.comparativeEnabled ? "Prior Year (₹)" : "") { r in
+                        TableColumn(vm.comparativeColumnLabel) { r in
                             if vm.comparativeEnabled {
                                 if let prior = comparativeEquity[r.id] {
                                     Text(safeCreditLessDebit(prior, context: "rendering balance sheet comparative equity amount")).monospacedDigit()

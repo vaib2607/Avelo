@@ -57,9 +57,13 @@ public final class ReportsViewModel {
     // ReportService calls with a one-year-back date shift — no separate
     // report math, so it can't drift from the primary column's numbers.
     public var comparativeEnabled: Bool = false
+    /// AVL-P1-036: which offset the comparative column uses. Defaults to
+    /// prior-year, reproducing the previously-hardcoded behavior exactly.
+    public var comparativePeriod: ComparativePeriod = .priorYear
     public var comparativeTrialBalance: [ReportResult.TrialBalanceRow] = []
     public var comparativeProfitLoss: ReportResult.ProfitLoss?
     public var comparativeBalanceSheet: ReportResult.BalanceSheet?
+    public var comparativeColumnLabel: String { comparativeEnabled ? comparativePeriod.columnLabel : "" }
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase
@@ -105,7 +109,7 @@ public final class ReportsViewModel {
                 // publish contract as loadBalanceSheet).
                 let primaryTrialBalance = try svc.trialBalance(asOfDate: asOf, financialYearId: fyId).rows
                 let comparativeTrialBalanceRows = try comparativeEnabled
-                    ? svc.trialBalance(asOfDate: priorYear(asOf), financialYearId: financialYearID(containing: priorYear(asOf))).rows
+                    ? svc.trialBalance(asOfDate: comparativePeriod.shift(asOf), financialYearId: financialYearID(containing: comparativePeriod.shift(asOf))).rows
                     : []
                 trialBalance = primaryTrialBalance
                 comparativeTrialBalance = comparativeTrialBalanceRows
@@ -113,9 +117,9 @@ public final class ReportsViewModel {
                 let primaryProfitLoss = try svc.profitAndLoss(fromDate: fromDate, toDate: toDate, financialYearId: fyId)
                 let comparativeProfitLossResult = try comparativeEnabled
                     ? svc.profitAndLoss(
-                        fromDate: priorYear(fromDate),
-                        toDate: priorYear(toDate),
-                        financialYearId: financialYearID(containing: priorYear(fromDate))
+                        fromDate: comparativePeriod.shift(fromDate),
+                        toDate: comparativePeriod.shift(toDate),
+                        financialYearId: financialYearID(containing: comparativePeriod.shift(fromDate))
                     )
                     : nil
                 profitLoss = primaryProfitLoss
@@ -221,7 +225,7 @@ public final class ReportsViewModel {
             let primaryScope = try service.balanceSheetScope(asOfDate: asOf, financialYearId: fyId)
             var comparativeScope: BalanceSheetScope?
             if comparativeEnabled {
-                let comparativeAsOf = priorYear(asOf)
+                let comparativeAsOf = comparativePeriod.shift(asOf)
                 do {
                     balanceSheetErrorFinancialYearId = nil
                     balanceSheetErrorAsOf = comparativeAsOf
@@ -296,10 +300,6 @@ public final class ReportsViewModel {
             ))
         }
         return financialYear.id
-    }
-
-    private func priorYear(_ date: Date) -> Date {
-        Calendar(identifier: .gregorian).date(byAdding: .year, value: -1, to: date) ?? date
     }
 
 }
