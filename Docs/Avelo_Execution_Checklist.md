@@ -4,7 +4,7 @@ Snapshot: 2026-07-19
 
 ## Summary
 
-- [ ] UI audit #9b manual acceptance: Balance Sheet selection/as-of/comparative/Refresh use one scoped load path; selected-FY errors render locally with retry and no global alert. Automated FY-scope, malformed-current-FY, malformed-prior-FY, and ViewModel error-state proof passes. Accountant verifies the bundled macOS workflow.
+- [x] UI audit #9b acceptance: `BalanceSheetReconciliationTests` (10 tests: selected-FY before/after-bound corruptions, after-as-of exclusion, scoped imbalance, prior-FY isolation) and `ReportsViewModelTests` (14 tests: local typed error, atomic comparison failure, same-company FY reset, and no hidden Balance Sheet reload off-report) passed. Bundle validation, self-test, and launch smoke passed; bundled macOS/accountant acceptance was confirmed on 2026-07-19.
 
 This file is the remaining-work execution queue. It tracks only unfinished `AVL-*` backlog items from `Docs/Avelo_Release_Board.md`, grouped into dependency-ordered waves through P2.
 

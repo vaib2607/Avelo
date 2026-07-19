@@ -51,6 +51,7 @@ public final class AppRouter {
         case go(SidebarDestination)
         case present(RouterSheet)
         case dismissSheet
+        case external(@MainActor () -> Void)
     }
 
     public var selection: SidebarDestination = .dashboard {
@@ -115,14 +116,35 @@ public final class AppRouter {
 
     /// Deep-links to the Reports view showing the given account's ledger.
     public func openLedger(_ accountId: Account.ID) {
+        guard requestNavigation(.external { [weak self] in
+            self?.pendingLedgerAccountId = accountId
+            self?.selection = .reports
+        }) else { return }
         pendingLedgerAccountId = accountId
         selection = .reports
     }
 
     public func openReport(_ report: ReportSelection) {
         guard !report.requiresInventory || isInventoryEnabled else { return }
+        guard requestNavigation(.external { [weak self] in
+            self?.pendingReportSelection = report
+            self?.selection = .reports
+        }) else { return }
         pendingReportSelection = report
         selection = .reports
+    }
+
+    /// Company/FY changes are owned by `AppEnvironment`, but must use the
+    /// same unsaved-editor decision as router navigation before they replace
+    /// the active context.
+    @discardableResult
+    public func beginExternalContextChange(_ applyAfterDirtyDecision: @escaping @MainActor () -> Void) -> Bool {
+        requestNavigation(.external(applyAfterDirtyDecision))
+    }
+
+    public func requestExternalContextChange(_ apply: @escaping @MainActor () -> Void) {
+        guard beginExternalContextChange(apply) else { return }
+        apply()
     }
 
     public func present(_ sheet: RouterSheet) {
@@ -150,11 +172,19 @@ public final class AppRouter {
         let changed = featureSet != newValue
         featureSet = newValue
         if changed { capabilityRevision &+= 1 }
-        if !newValue.inventory {
-            if selection == .inventory { selection = .dashboard }
-            if pendingReportSelection?.requiresInventory == true { pendingReportSelection = nil }
-            if presentedSheet?.requiresInventory == true { presentedSheet = nil }
+        guard !newValue.inventory else { return }
+        let needsEviction = selection == .inventory
+            || pendingReportSelection?.requiresInventory == true
+            || presentedSheet?.requiresInventory == true
+        guard needsEviction else { return }
+        let applyEviction: @MainActor () -> Void = { [weak self] in
+            guard let self else { return }
+            if self.selection == .inventory { self.selection = .dashboard }
+            if self.pendingReportSelection?.requiresInventory == true { self.pendingReportSelection = nil }
+            if self.presentedSheet?.requiresInventory == true { self.presentedSheet = nil }
         }
+        guard requestNavigation(.external(applyEviction)) else { return }
+        applyEviction()
     }
 
     public func pushBrowseReturnContext(_ context: BrowseReturnContext) {
@@ -184,6 +214,16 @@ public final class AppRouter {
         keepEditing()
     }
 
+    /// A financial submission may close its own editor only after the service
+    /// transaction has committed. It is not a user-initiated discard.
+    public func completeVoucherSubmission(_ provider: any RouterDirtyStateProviding) {
+        guard dirtyStateProvider === provider else { return }
+        dirtyStateProvider = nil
+        pendingNavigation = nil
+        requiresDirtyNavigationDecision = false
+        presentedSheet = nil
+    }
+
     public func discardAndContinueNavigation() {
         guard let pendingNavigation else { return }
         self.pendingNavigation = nil
@@ -194,6 +234,7 @@ public final class AppRouter {
         case .go(let destination): selection = destination
         case .present(let sheet): presentedSheet = sheet
         case .dismissSheet: presentedSheet = nil
+        case .external(let apply): apply()
         }
     }
 

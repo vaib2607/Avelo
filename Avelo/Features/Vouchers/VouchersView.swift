@@ -82,6 +82,7 @@ private struct VouchersBody: View {
     @Environment(AppEnvironment.self) private var env
     @Bindable var vm: VouchersViewModel
     @Binding var showTypeFilter: Bool
+    @FocusState private var voucherTableFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -160,10 +161,8 @@ private struct VouchersBody: View {
                             .disabled(!AppActionRegistry.availability(for: .voucherAlter, in: context).isAvailable)
                         Button("Reverse") { AppActionRegistry.perform(.voucherReverse, context: context, router: env.router) }
                             .disabled(!AppActionRegistry.availability(for: .voucherReverse, in: context).isAvailable)
-                        // No ⌥2 keyboard shortcut here: Table has no row
-                        // selection binding, so a global shortcut would be
-                        // ambiguous across rows. Mouse-only until selection
-                        // state is added (tracked with AVL-P1-044).
+                        // ⌥2 is handled only by the focused table and uses
+                        // this same selected-row duplication path.
                         Button("Duplicate") { duplicate(v) }
                             .disabled(!AppActionRegistry.availability(for: .voucherDuplicate, in: context).isAvailable)
                         if AppActionRegistry.availability(for: .voucherExportPDF, in: context).isAvailable {
@@ -172,21 +171,22 @@ private struct VouchersBody: View {
                     }
                 }
             }
+            .focusable()
+            .focused($voucherTableFocused)
             .onKeyPress(.pageUp) { vm.selectPrevious(); return .handled }
             .onKeyPress(.pageDown) { vm.selectNext(); return .handled }
-        }
-        // AVL-P2-013 (Ctrl+I insert while browsing): opens a new voucher
-        // without touching vm.query/typeFilter/fromDate/toDate/pagination —
-        // the list's filter/scroll state is untouched because this never
-        // calls reload()/reloadFirstPage().
-        .background {
-            ZStack {
-                Button("") { AppActionRegistry.perform(.voucherCreate(.journal), router: env.router) }
-                    .keyboardShortcut("i", modifiers: [.control])
-                Button("") { duplicateSelectedVoucher() }
-                    .keyboardShortcut("2", modifiers: [.option])
+            .onKeyPress("i", phases: .down) { keyPress in
+                guard keyPress.modifiers == [.control] else { return .ignored }
+                // This path deliberately preserves filter, pagination, and
+                // selection: it creates a draft but never reloads the list.
+                AppActionRegistry.perform(.voucherCreate(.journal), router: env.router)
+                return .handled
             }
-            .hidden()
+            .onKeyPress("2", phases: .down) { keyPress in
+                guard keyPress.modifiers == [.option], vm.selectedVoucherId != nil else { return .ignored }
+                duplicateSelectedVoucher()
+                return .handled
+            }
         }
     }
 

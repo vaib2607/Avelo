@@ -160,17 +160,19 @@ extension ReportsBody {
     }
     @ViewBuilder
     var balanceSheetSection: some View {
+        let financialYearContext = vm.balanceSheetErrorFinancialYearId?.uuidString ?? "Financial year is required"
         if vm.isLoading {
             ProgressView("Loading Balance Sheet…")
                 .frame(maxWidth: .infinity, minHeight: 160)
-        } else if let error = vm.error {
+        } else if let requestError = vm.balanceSheetRequestError {
             ContentUnavailableView(
-                "Balance Sheet unavailable",
+                "\(requestError.periodName) Balance Sheet unavailable",
                 systemImage: "exclamationmark.triangle",
-                description: Text("\(error.localizedMessage)\nAs of \(DateFormatters.formatIsoDate(vm.asOf)).")
+                description: Text("\(requestError.underlyingError.localizedMessage)\nFinancial year: \(financialYearContext)\nAs of \(DateFormatters.formatIsoDate(vm.balanceSheetErrorAsOf ?? vm.asOf)).")
             )
             .frame(maxWidth: .infinity, minHeight: 160)
-            Button("Refresh") { vm.reload() }
+            Button("Refresh Balance Sheet") { vm.reload() }
+                .accessibilityLabel("Refresh Balance Sheet")
                 .keyboardShortcut("r", modifiers: .command)
         } else if let bs = vm.balanceSheet {
             let comparativeAssets = Dictionary(uniqueKeysWithValues: (vm.comparativeBalanceSheet?.assets.flatMap { $0.rows } ?? []).map { ($0.id, $0) })
@@ -247,13 +249,15 @@ extension ReportsBody {
                 }
             }
         } else {
-            EmptyStateView(
-                title: "No balance sheet data",
-                message: "Balance sheet rows appear once assets, liabilities, or equity accounts have posted activity.",
-                systemImage: "scale.3d",
-                actionTitle: "Refresh",
-                action: { vm.reload() }
+            ContentUnavailableView(
+                "Balance Sheet load invariant failed",
+                systemImage: "exclamationmark.triangle",
+                description: Text("The report completed without a result or scoped error. Refresh the current financial year before continuing.")
             )
+            .frame(maxWidth: .infinity, minHeight: 160)
+            Button("Refresh Balance Sheet") { vm.reload() }
+                .accessibilityLabel("Refresh Balance Sheet")
+                .keyboardShortcut("r", modifiers: .command)
         }
     }
     @ViewBuilder

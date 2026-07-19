@@ -186,6 +186,74 @@ final class ReportsViewModelTests: XCTestCase {
             return XCTFail("Expected typed Balance Sheet scope error")
         }
         XCTAssertEqual(error.code, .reportAsOfBeforeFinancialYear)
+        guard case .primary(.validation(let requestValidation)) = vm.balanceSheetRequestError else {
+            return XCTFail("Expected primary scoped request error preserving AppError")
+        }
+        XCTAssertEqual(requestValidation.code, .reportAsOfBeforeFinancialYear)
+    }
+
+    func testSameCompanyFinancialYearResetClearsOldBalanceSheetAndUsesNewScope() throws {
+        let tc = try TestCompany.make()
+        let nextFY = FinancialYear(
+            companyId: tc.companyId,
+            label: "2025-26",
+            startDate: DateFormatters.parseDate("2025-04-01")!,
+            endDate: DateFormatters.parseDate("2026-03-31")!,
+            booksBeginDate: DateFormatters.parseDate("2025-04-01")!
+        )
+        try FinancialYearRepository(db: tc.db).insert(nextFY)
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .balanceSheet
+        vm.asOf = tc.fy.endDate
+        vm.reload()
+        XCTAssertNotNil(vm.balanceSheet)
+
+        vm.resetFinancialYear(nextFY)
+
+        XCTAssertEqual(vm.fyId, nextFY.id)
+        XCTAssertEqual(vm.asOf, nextFY.endDate)
+        XCTAssertNil(vm.error)
+        XCTAssertNil(vm.balanceSheetRequestError)
+        XCTAssertNotNil(vm.balanceSheet)
+    }
+
+    func testComparativeBalanceSheetFailurePublishesNeitherPeriodAndKeepsComparativeIdentity() throws {
+        let tc = try TestCompany.make()
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .balanceSheet
+        vm.asOf = DateFormatters.parseDate("2024-06-01")!
+        vm.comparativeEnabled = true // There is deliberately no FY for 2023-06-01.
+
+        vm.reload()
+
+        XCTAssertNil(vm.balanceSheet)
+        XCTAssertNil(vm.comparativeBalanceSheet)
+        XCTAssertFalse(vm.isLoading)
+        guard case .comparative = vm.balanceSheetRequestError else {
+            return XCTFail("Expected the comparative scope to retain its error identity")
+        }
+        XCTAssertEqual(vm.balanceSheetErrorAsOf, DateFormatters.parseDate("2023-06-01")!)
+    }
+
+    func testFinancialYearResetOutsideBalanceSheetDoesNotRunHiddenBalanceSheetLoad() throws {
+        let tc = try TestCompany.make()
+        let nextFY = FinancialYear(
+            companyId: tc.companyId,
+            label: "2025-26",
+            startDate: DateFormatters.parseDate("2025-04-01")!,
+            endDate: DateFormatters.parseDate("2026-03-31")!,
+            booksBeginDate: DateFormatters.parseDate("2025-04-01")!
+        )
+        try FinancialYearRepository(db: tc.db).insert(nextFY)
+        let vm = ReportsViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id)
+        vm.selection = .trialBalance
+
+        vm.resetFinancialYear(nextFY)
+
+        XCTAssertEqual(vm.fyId, nextFY.id)
+        XCTAssertNil(vm.balanceSheet)
+        XCTAssertNil(vm.balanceSheetRequestError)
+        XCTAssertFalse(vm.isLoading)
     }
 
     func testLedgerSelectionWithoutAccountClearsLedgerResult() throws {

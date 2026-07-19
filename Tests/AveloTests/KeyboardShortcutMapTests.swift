@@ -28,6 +28,46 @@ final class KeyboardShortcutMapTests: XCTestCase {
         XCTAssertFalse(KeyboardShortcuts.isVoucherSwitch(keyCode: 18, modifiers: .command))
     }
 
+    func testVoucherEditorScopedChordsAreNotGlobalMonitorCommands() {
+        // These keys are deliberately handled by focused SwiftUI controls,
+        // never by KeyboardMonitor before native text editing receives them.
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 9, modifiers: .control))   // Ctrl+V
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 15, modifiers: .control))  // Ctrl+R
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 19, modifiers: .option))   // Alt+2
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 36, modifiers: .command))  // Cmd+Return
+    }
+
+    func testVoucherShortcutContractIncludesEveryScopedEditorAndTableChord() {
+        let keys = Set(VoucherShortcutContract.editorRows.map(\.key)
+            + VoucherShortcutContract.tableRows.map(\.key))
+
+        XCTAssertTrue(keys.contains("⌘↩"))
+        XCTAssertTrue(keys.contains("Return in Narration"))
+        XCTAssertTrue(keys.contains("⌥C in Account picker"))
+        XCTAssertTrue(keys.contains("⌃V"))
+        XCTAssertTrue(keys.contains("⌃R in Narration"))
+        XCTAssertTrue(keys.contains("⌥2"))
+        XCTAssertTrue(keys.contains("⌃I"))
+        XCTAssertTrue(keys.contains("PgUp / PgDn"))
+        XCTAssertEqual(VoucherShortcutContract.editorTitle(for: "⌘↩"), "Post / Save")
+        XCTAssertEqual(VoucherShortcutContract.editorTitle(for: "⌃R in Narration"), "Recall narration")
+    }
+
+    func testItemModeShortcutRequiresFreshEligibleNonTextEditorContext() {
+        XCTAssertTrue(VoucherShortcutContract.canToggleItemInvoice(
+            isFreshEligibleDraft: true,
+            isEditableTextFocused: false
+        ))
+        XCTAssertFalse(VoucherShortcutContract.canToggleItemInvoice(
+            isFreshEligibleDraft: false,
+            isEditableTextFocused: false
+        ))
+        XCTAssertFalse(VoucherShortcutContract.canToggleItemInvoice(
+            isFreshEligibleDraft: true,
+            isEditableTextFocused: true
+        ))
+    }
+
     @MainActor
     func testNestedSheetCaptureRemainsActiveUntilEverySheetDismisses() {
         let monitor = KeyboardMonitor()

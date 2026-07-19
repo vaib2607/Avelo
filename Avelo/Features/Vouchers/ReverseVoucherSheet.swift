@@ -16,7 +16,7 @@ public struct ReverseVoucherSheet: View {
             HStack {
                 Text("Reverse Voucher").font(.title2.bold())
                 Spacer()
-                Button { router.presentedSheet = nil } label: {
+                Button { router.dismissPresentedSheet() } label: {
                     Image(systemName: "xmark.circle.fill")
                 }
                 .buttonStyle(.plain)
@@ -34,7 +34,7 @@ public struct ReverseVoucherSheet: View {
             Divider()
             HStack {
                 Spacer()
-                Button("Cancel") { router.presentedSheet = nil }
+                Button("Cancel") { router.dismissPresentedSheet() }
                     .keyboardShortcut(.cancelAction)
                 Button("Reverse") { run() }
                     .keyboardShortcut(.defaultAction)
@@ -59,7 +59,7 @@ public struct ReverseVoucherSheet: View {
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher reversed.")
-            router.presentedSheet = nil
+            router.dismissPresentedSheet()
         } catch {
             env.showError(AppError.wrap(error))
         }

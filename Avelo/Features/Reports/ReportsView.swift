@@ -4,6 +4,7 @@ public struct ReportsView: View {
 
     @Environment(AppEnvironment.self) private var env
     @State private var vm: ReportsViewModel?
+    @State private var suppressNextRevisionReload = false
 
     public init() {}
 
@@ -12,8 +13,16 @@ public struct ReportsView: View {
             .navigationTitle("Reports")
             .onAppear { setup(); consumePendingLedger() }
             .onChange(of: env.companyContext?.companyId) { _, _ in setup() }
+            .onChange(of: env.companyContext?.financialYear.id) { _, _ in setup() }
             .onChange(of: env.companyContext?.isInventoryEnabled) { _, _ in enforceCapabilitySelection() }
-            .onChange(of: env.dataRevision) { _, _ in setup(); vm?.reload() }
+            .onChange(of: env.dataRevision) { _, _ in
+                setup()
+                if suppressNextRevisionReload {
+                    suppressNextRevisionReload = false
+                } else {
+                    vm?.reload()
+                }
+            }
             .onChange(of: env.router.pendingLedgerAccountId) { _, _ in consumePendingLedger() }
     }
 
@@ -30,6 +39,9 @@ public struct ReportsView: View {
             model.toDate = ctx.financialYear.endDate
             model.reload()
             vm = model
+        } else if vm?.fyId != ctx.financialYear.id {
+            suppressNextRevisionReload = true
+            vm?.resetFinancialYear(ctx.financialYear)
         }
         enforceCapabilitySelection()
         consumePendingReportSelection()

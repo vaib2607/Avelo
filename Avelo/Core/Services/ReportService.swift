@@ -72,22 +72,46 @@ public final class ReportService: Sendable {
     }
 
     public func balanceSheet(asOfDate: Date, financialYearId: FinancialYear.ID? = nil) throws -> ReportResult.BalanceSheet {
-        try verifyDualTrackIntegrity()
-        let financialYear = try validate(periodScope: .init(companyId: companyId, financialYearId: financialYearId, kind: .asOf(asOfDate)))
-        let f = makeFilter(financialYearId: financialYearId)
-        let key = ReportCache.Key(companyId: companyId, reportType: "balance_sheet", financialYearId: financialYearId, toDate: asOfDate)
-        if let cached: ReportResult.BalanceSheet = try Self.cache.value(for: key, db: db) { return cached }
-        let changeToken = try Self.cache.changeToken(db: db, companyId: companyId)
-        let report = try repository.balanceSheet(asOfDate: asOfDate, filter: f)
-        try ReconciliationCheck.verifyPostedVouchersBalance(
-            db: db,
-            companyId: companyId,
-            financialYearId: financialYearId,
-            fromDate: financialYear?.startDate,
-            toDate: asOfDate
-        )
-        try Self.cache.store(report, for: key, changeToken: changeToken)
-        return report
+        try balanceSheet(scope: balanceSheetScope(asOfDate: asOfDate, financialYearId: financialYearId))
+    }
+
+    /// Resolves all request inputs before a Balance Sheet candidate begins any
+    /// cache, reconciliation, opening, or report read.
+    public func balanceSheetScope(asOfDate: Date,
+                                  financialYearId: FinancialYear.ID?) throws -> BalanceSheetScope {
+        guard let financialYearId else {
+            throw AppError.validation(.init(code: .reportFinancialYearMissing, field: "financialYearId", message: "Select an existing financial year before opening Balance Sheet."))
+        }
+        guard let financialYear = try validate(periodScope: .init(companyId: companyId, financialYearId: financialYearId, kind: .asOf(asOfDate))) else {
+            throw AppError.validation(.init(code: .reportFinancialYearMissing, field: "financialYearId", message: "Select an existing financial year before opening Balance Sheet."))
+        }
+        return BalanceSheetScope(companyId: companyId, financialYearId: financialYear.id, financialYearStartDate: financialYear.startDate, asOfDate: asOfDate)
+    }
+
+    /// Produces an immutable candidate only after its explicit scope has been
+    /// validated. This is intentionally separate from scope construction so a
+    /// comparative caller can validate both periods before reading either one.
+    public func balanceSheet(scope: BalanceSheetScope) throws -> ReportResult.BalanceSheet {
+        guard scope.companyId == companyId else {
+            throw AppError.validation(.init(code: .reportFinancialYearCompanyMismatch, field: "companyId", message: "Balance Sheet scope belongs to another company."))
+        }
+        return try db.read { database in
+            try DualTrackReconciliationService(db: database, companyId: companyId).verify(balanceSheetScope: scope)
+            try ReconciliationCheck.verifyPostedVouchersBalance(
+                db: database,
+                companyId: scope.companyId,
+                financialYearId: scope.financialYearId,
+                fromDate: scope.financialYearStartDate,
+                toDate: scope.asOfDate
+            )
+            let f = ReportResult.ReportFilter(companyId: scope.companyId, financialYearId: scope.financialYearId)
+            let key = ReportCache.Key(companyId: scope.companyId, reportType: "balance_sheet", financialYearId: scope.financialYearId, toDate: scope.asOfDate)
+            if let cached: ReportResult.BalanceSheet = try Self.cache.value(for: key, db: database) { return cached }
+            let changeToken = try Self.cache.changeToken(db: database, companyId: scope.companyId)
+            let report = try ReportRepository(db: database).balanceSheet(asOfDate: scope.asOfDate, filter: f)
+            try Self.cache.store(report, for: key, changeToken: changeToken)
+            return report
+        }
     }
 
     public func gstSummary(fromDate: Date, toDate: Date) throws -> ReportResult.GstSummary {

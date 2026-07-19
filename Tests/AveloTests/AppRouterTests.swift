@@ -129,4 +129,74 @@ final class AppRouterTests: XCTestCase {
         XCTAssertFalse(router.requiresDirtyNavigationDecision)
         XCTAssertNil(router.dirtyStateProvider)
     }
+
+    func testDeepLinksRespectDirtyNavigationAndApplyOnlyAfterDiscard() {
+        let router = AppRouter()
+        let provider = DirtyProvider()
+        let accountId = UUID()
+        router.dirtyStateProvider = provider
+
+        router.openLedger(accountId)
+
+        XCTAssertEqual(router.selection, .dashboard)
+        XCTAssertNil(router.pendingLedgerAccountId)
+        XCTAssertTrue(router.requiresDirtyNavigationDecision)
+
+        router.discardAndContinueNavigation()
+
+        XCTAssertEqual(router.selection, .reports)
+        XCTAssertEqual(router.pendingLedgerAccountId, accountId)
+        XCTAssertEqual(provider.discardCount, 1)
+    }
+
+    func testCapabilityEvictionUsesDirtyNavigationBeforeDismissingSheet() {
+        let router = AppRouter()
+        let provider = DirtyProvider()
+        router.setInventoryEnabled(true)
+        router.selection = .inventory
+        router.presentedSheet = .newItem
+        router.dirtyStateProvider = provider
+
+        router.setInventoryEnabled(false)
+
+        guard case .newItem? = router.presentedSheet else {
+            return XCTFail("Dirty editor must remain visible until discard")
+        }
+        XCTAssertEqual(router.selection, .inventory, "route eviction must wait for the dirty decision too")
+        XCTAssertTrue(router.requiresDirtyNavigationDecision)
+
+        router.discardAndContinueNavigation()
+        XCTAssertNil(router.presentedSheet)
+        XCTAssertEqual(router.selection, .dashboard)
+        XCTAssertEqual(provider.discardCount, 1)
+    }
+
+    func testSuccessfulVoucherSubmissionClearsOnlyItsProviderAndDismissesSheet() {
+        let router = AppRouter()
+        let provider = DirtyProvider()
+        router.presentedSheet = .newVoucher
+        router.dirtyStateProvider = provider
+
+        router.completeVoucherSubmission(provider)
+
+        XCTAssertNil(router.presentedSheet)
+        XCTAssertNil(router.dirtyStateProvider)
+        XCTAssertFalse(router.requiresDirtyNavigationDecision)
+        XCTAssertEqual(provider.discardCount, 0)
+    }
+
+    func testExternalContextChangeWaitsForDirtyDiscard() {
+        let router = AppRouter()
+        let provider = DirtyProvider()
+        var applied = false
+        router.dirtyStateProvider = provider
+
+        router.requestExternalContextChange { applied = true }
+
+        XCTAssertFalse(applied)
+        XCTAssertTrue(router.requiresDirtyNavigationDecision)
+        router.discardAndContinueNavigation()
+        XCTAssertTrue(applied)
+        XCTAssertEqual(provider.discardCount, 1)
+    }
 }

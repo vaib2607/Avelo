@@ -80,6 +80,7 @@ final class VoucherDraftTests: XCTestCase {
     func testItemInvoiceCompletionAllowsZeroRateButRequiresItemAndPositiveQuantity() throws {
         let tc = try TestCompany.make()
         let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        XCTAssertFalse(vm.isRecoveredDraft)
         var row = VoucherEditViewModel.ItemLineRow()
         row.itemId = UUID()
         row.quantity = "2"
@@ -93,6 +94,49 @@ final class VoucherDraftTests: XCTestCase {
 
         row.quantity = "0"
         XCTAssertFalse(vm.isCompleteItemLine(row))
+    }
+
+    @MainActor
+    func testItemCascadeUsesPostingCompletionPredicateAndAppendsOneBlankRow() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        let itemId = UUID()
+        vm.itemLines = [.init(itemId: itemId, quantity: "2", rate: "0.00")]
+        let completedId = vm.itemLines[0].id
+
+        let nextId = vm.advanceItemAfterCommittedRate(lineId: completedId)
+
+        XCTAssertEqual(vm.itemLines.count, 2)
+        XCTAssertEqual(nextId, vm.itemLines[1].id)
+        XCTAssertNil(vm.itemLines[1].itemId)
+        XCTAssertEqual(vm.itemLines[1].quantity, "")
+        XCTAssertEqual(vm.advanceItemAfterCommittedRate(lineId: completedId), vm.itemLines[1].id)
+        XCTAssertEqual(vm.itemLines.count, 2)
+    }
+
+    @MainActor
+    func testItemCascadeDoesNotGrowAnIncompleteRow() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .sales)
+        vm.itemLines = [.init(itemId: UUID(), quantity: "", rate: "0.00")]
+
+        XCTAssertNil(vm.advanceItemAfterCommittedRate(lineId: vm.itemLines[0].id))
+        XCTAssertEqual(vm.itemLines.count, 1)
+    }
+
+    @MainActor
+    func testLedgerCascadeRetainsIncompleteRowAndAdvancesCompletedRow() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.lines = [.init(accountId: tc.customerId, amount: "", side: .debit)]
+        XCTAssertNil(vm.advanceLedgerAfterCommittedAmount(lineId: vm.lines[0].id))
+        XCTAssertEqual(vm.lines.count, 1)
+
+        vm.lines[0].amount = "10.00"
+        let nextId = vm.advanceLedgerAfterCommittedAmount(lineId: vm.lines[0].id)
+        XCTAssertEqual(vm.lines.count, 2)
+        XCTAssertEqual(nextId, vm.lines[1].id)
+        XCTAssertNil(vm.lines[1].accountId)
     }
 
     func testCheckedTotalsThrowOnOverflow() {
@@ -370,6 +414,7 @@ final class VoucherDraftTests: XCTestCase {
         try vm.loadFromRecoveredDraft(entry)
         vm.captureCleanEditorState()
 
+        XCTAssertTrue(vm.isRecoveredDraft)
         XCTAssertTrue(vm.itemInvoiceMode)
         XCTAssertEqual(vm.salesOrPurchaseLedgerId, tc.salesId)
         XCTAssertEqual(vm.itemLines.map(\.itemId), [firstItem, secondItem])
@@ -526,6 +571,64 @@ final class VoucherDraftTests: XCTestCase {
         edit.narration = "Changed local edit"
         edit.discardUnsavedChanges()
         XCTAssertNil(try VoucherDraftRepository(db: tc.db).mostRecent(companyId: tc.companyId))
+    }
+
+    @MainActor
+    func testSubmissionStateRejectsReentryAndKeepsTypedLocalFailure() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+
+        XCTAssertTrue(vm.beginSubmission())
+        XCTAssertTrue(vm.isSubmitting)
+        XCTAssertFalse(vm.beginSubmission())
+
+        let error = AppError.businessRule("A validation failure")
+        vm.setLocalEditorError(error)
+        XCTAssertEqual(vm.localEditorError?.localizedMessage, error.localizedMessage)
+
+        vm.endSubmission()
+        XCTAssertFalse(vm.isSubmitting)
+        XCTAssertTrue(vm.beginSubmission())
+        vm.endSubmission()
+    }
+
+    @MainActor
+    func testPrepareForSubmissionFailsLocallyBeforeAnyPostingService() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.lines = [.init()]
+
+        XCTAssertThrowsError(try vm.prepareForSubmission()) { error in
+            guard case AppError.validation = error else {
+                return XCTFail("Expected a typed validation error, got \(error)")
+            }
+        }
+    }
+
+    @MainActor
+    func testSharedSubmissionPostsOnceAndReleasesEditorState() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        let accountService = AccountService(db: tc.db, companyId: tc.companyId)
+        vm.load(accounts: try accountService.listActiveAccounts(),
+                groups: try accountService.listGroups(),
+                initialDate: tc.fy.startDate)
+        vm.lines = [
+            .init(accountId: tc.rentId, amount: "10.00", side: .debit),
+            .init(accountId: tc.cashId, amount: "10.00", side: .credit)
+        ]
+
+        let outcome = VoucherEditorSubmission.submit(
+            vm: vm,
+            operation: .create(voucherType: .journal, financialYear: tc.fy),
+            db: tc.db,
+            companyId: tc.companyId
+        )
+
+        guard case .posted = outcome else { return XCTFail("Expected shared command to post, got \(outcome)") }
+        XCTAssertFalse(vm.isSubmitting)
+        XCTAssertNil(vm.localEditorError)
+        XCTAssertEqual(try VoucherRepository(db: tc.db).list(filter: .init(companyId: tc.companyId)).count, 1)
     }
 
     @MainActor

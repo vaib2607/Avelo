@@ -23,6 +23,8 @@ public struct ShortcutHelpSheet: View {
 
                     section("Vouchers (function keys)", rows: voucherRows)
 
+                    section("Voucher editor and table", rows: voucherEditorRows)
+
                     section("Reports (Cmd+Opt)", rows: reportRows)
 
                     section("Other", rows: otherRows)
@@ -96,6 +98,11 @@ public struct ShortcutHelpSheet: View {
         ]
         if inventoryEnabled { rows.append(("Cmd+Opt+Shift+2", "Stock Ageing")) }
         return rows
+    }
+
+    private var voucherEditorRows: [(String, String)] {
+        VoucherShortcutContract.editorRows.map { ($0.key, $0.description) }
+            + VoucherShortcutContract.tableRows.map { ($0.key, $0.description) }
     }
 
     private var otherRows: [(String, String)] {

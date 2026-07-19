@@ -123,6 +123,70 @@ final class AppEnvironmentFlowTests: XCTestCase {
         XCTAssertNotNil(events.first?.reason)
     }
 
+    func testDirtyEditorDefersCompanyOpenUntilDiscard() async throws {
+        let fixture = try await makeEnvironmentFixture()
+        defer { fixture.cleanup() }
+        let first = try await makeCompany(named: "First", manager: fixture.manager)
+        let second = try await makeCompany(named: "Second", manager: fixture.manager)
+        await fixture.env.openCompany(first.id)
+        let provider = EnvironmentDirtyProvider()
+        fixture.env.router.dirtyStateProvider = provider
+
+        await fixture.env.openCompany(second.id)
+
+        XCTAssertEqual(fixture.env.companyContext?.companyId, first.id)
+        XCTAssertTrue(fixture.env.router.requiresDirtyNavigationDecision)
+
+        fixture.env.router.discardAndContinueNavigation()
+        for _ in 0..<200 where fixture.env.companyContext?.companyId != second.id {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        XCTAssertEqual(fixture.env.companyContext?.companyId, second.id)
+        XCTAssertEqual(provider.discardCount, 1)
+    }
+
+    func testDirtyEditorDefersFinancialYearSwitchUntilDiscard() async throws {
+        let fixture = try await makeEnvironmentFixture()
+        defer { fixture.cleanup() }
+        let company = try await makeCompany(named: "FY Gate", manager: fixture.manager)
+        await fixture.env.openCompany(company.id)
+        let initial = try XCTUnwrap(fixture.env.companyContext)
+        let next = try FinancialYearService(db: initial.database, companyId: company.id).create(
+            label: "2025-26",
+            startDate: DateFormatters.parseDate("2025-04-01")!,
+            endDate: DateFormatters.parseDate("2026-03-31")!,
+            booksBeginDate: DateFormatters.parseDate("2025-04-01")!
+        )
+        let provider = EnvironmentDirtyProvider()
+        fixture.env.router.dirtyStateProvider = provider
+
+        fixture.env.switchFinancialYear(next.id)
+
+        XCTAssertEqual(fixture.env.companyContext?.financialYear.id, initial.financialYear.id)
+        XCTAssertTrue(fixture.env.router.requiresDirtyNavigationDecision)
+        fixture.env.router.discardAndContinueNavigation()
+        XCTAssertEqual(fixture.env.companyContext?.financialYear.id, next.id)
+        XCTAssertEqual(provider.discardCount, 1)
+    }
+
+    func testRootSheetBindingRoutesDirtyDismissalThroughRouter() async throws {
+        let fixture = try await makeEnvironmentFixture()
+        defer { fixture.cleanup() }
+        let provider = EnvironmentDirtyProvider()
+        fixture.env.router.presentedSheet = .newVoucher
+        fixture.env.router.dirtyStateProvider = provider
+
+        fixture.env.presentedSheetBinding.wrappedValue = nil
+
+        guard case .newVoucher? = fixture.env.router.presentedSheet else {
+            return XCTFail("Binding dismissal bypassed the dirty decision")
+        }
+        XCTAssertTrue(fixture.env.router.requiresDirtyNavigationDecision)
+        fixture.env.router.discardAndContinueNavigation()
+        XCTAssertNil(fixture.env.router.presentedSheet)
+        XCTAssertEqual(provider.discardCount, 1)
+    }
+
     // Unit E / multi-window investigation, 2026-07-16: two independent
     // AppEnvironment/DatabaseManager pairs against the same app-support
     // root (matching what two real windows would produce) previously
@@ -493,6 +557,17 @@ final class AppEnvironmentFlowTests: XCTestCase {
             }
             XCTAssertEqual(message, "Seed account PURCHASE")
         }
+    }
+}
+
+@MainActor
+private final class EnvironmentDirtyProvider: RouterDirtyStateProviding {
+    var hasUnsavedChanges = true
+    private(set) var discardCount = 0
+
+    func discardUnsavedChanges() {
+        discardCount += 1
+        hasUnsavedChanges = false
     }
 }
 

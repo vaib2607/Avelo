@@ -9,6 +9,8 @@ public final class VoucherEditViewModel {
     public var accounts: [Account] = []
     public var validation: ValidationResult = .valid
     public var validationErrors: [ValidationError] = []
+    public private(set) var isSubmitting: Bool = false
+    public private(set) var localEditorError: AppError?
     public var narration: String = ""
     public var date: Date = Date()
     public var partyAccountId: Account.ID?
@@ -95,6 +97,33 @@ public final class VoucherEditViewModel {
         itemLineInput(row) != nil
     }
 
+    /// Returns the account field that should receive focus after a committed
+    /// ledger amount. An incomplete row never grows the grid.
+    public func advanceLedgerAfterCommittedAmount(lineId: UUID) -> UUID? {
+        guard let index = lines.firstIndex(where: { $0.id == lineId }) else { return nil }
+        let row = lines[index]
+        guard row.accountId != nil,
+              (Currency.parseRupeeInput(row.amount) ?? 0) != 0 else { return nil }
+        if let nextBlank = lines[(index + 1)...].first(where: { $0.accountId == nil }) {
+            return nextBlank.id
+        }
+        addLine()
+        return lines.last?.id
+    }
+
+    /// Uses the same predicate as `buildItemLineInputs()`: an item and a
+    /// positive whole quantity complete the row; zero rate remains valid.
+    /// It returns the next item picker to focus and appends at most one row.
+    public func advanceItemAfterCommittedRate(lineId: UUID) -> UUID? {
+        guard let index = itemLines.firstIndex(where: { $0.id == lineId }),
+              isCompleteItemLine(itemLines[index]) else { return nil }
+        if let nextBlank = itemLines[(index + 1)...].first(where: { $0.itemId == nil }) {
+            return nextBlank.id
+        }
+        addItemLine()
+        return itemLines.last?.id
+    }
+
     public var itemInvoiceValidationErrors: [String] {
         var errors: [String] = []
         if partyAccountId == nil { errors.append("Select a party account.") }
@@ -141,6 +170,10 @@ public final class VoucherEditViewModel {
     public let companyId: Company.ID
     public let db: SQLiteDatabase
     public let fyId: FinancialYear.ID
+    /// Recovery/duplicate flows preserve their recorded entry mode. Contextual
+    /// Ctrl+V is intentionally a fresh-entry shortcut, never a way to mutate
+    /// a recovered draft unexpectedly.
+    public private(set) var isRecoveredDraft: Bool = false
 
     /// Identity of this entry's autosaved draft row (AVL-P0-018). Stable for
     /// the lifetime of one "new voucher" sheet so repeated autosaves upsert
@@ -218,6 +251,71 @@ public final class VoucherEditViewModel {
     /// cause a phantom dirty prompt.
     public func captureCleanEditorState() {
         cleanEditorSnapshot = editorSnapshot()
+    }
+
+    public func beginSubmission() -> Bool {
+        guard !isSubmitting else { return false }
+        isSubmitting = true
+        localEditorError = nil
+        return true
+    }
+
+    public func endSubmission() {
+        isSubmitting = false
+    }
+
+    public func setLocalEditorError(_ error: AppError) {
+        localEditorError = error
+    }
+
+    public func clearLocalEditorError() {
+        localEditorError = nil
+    }
+
+    /// Validates the current, already-flushed UI state without touching
+    /// SQLite. The feature submission command is the sole caller that turns
+    /// this draft into a financial write.
+    public func prepareForSubmission() throws {
+        if itemInvoiceMode {
+            guard itemInvoiceValidationErrors.isEmpty else {
+                throw AppError.businessRule(itemInvoiceValidationErrors[0])
+            }
+            return
+        }
+        revalidate()
+        guard canPost else {
+            throw AppError.validation(validationErrors.first ?? .init(
+                code: .voucherDebitCreditMismatch,
+                field: "voucher",
+                message: "This voucher isn't ready to post yet."
+            ))
+        }
+    }
+
+    func focusTarget(for error: ValidationError) -> VoucherEditorFocusTarget {
+        switch error.field {
+        case "date": return .date
+        case "party", "partyAccountId": return .party
+        case "narration": return .narration
+        case "accountLedgerId": return .accountLedger
+        default:
+            if let row = lines.first(where: { $0.accountId == nil }) ?? lines.first {
+                return row.accountId == nil ? .ledgerAccount(row.id) : .ledgerAmount(row.id)
+            }
+            return .post
+        }
+    }
+
+    func submissionFocusTarget() -> VoucherEditorFocusTarget {
+        if itemInvoiceMode {
+            if partyAccountId == nil { return .party }
+            if salesOrPurchaseLedgerId == nil { return .salesPurchaseLedger }
+            if let row = itemLines.first(where: { $0.itemId == nil }) { return .item(row.id) }
+            if let row = itemLines.first(where: { itemLineInput($0) == nil }) { return .quantity(row.id) }
+            return .post
+        }
+        if let error = validationErrors.first { return focusTarget(for: error) }
+        return .post
     }
 
     public var hasUnsavedChanges: Bool {
@@ -425,6 +523,7 @@ public final class VoucherEditViewModel {
     /// creating a duplicate.
     public func loadFromRecoveredDraft(_ entry: VoucherEntryDraft) throws {
         draftPersistenceSuppressed = false
+        isRecoveredDraft = true
         draftId = entry.id
         date = entry.date
         partyAccountId = entry.partyAccountId

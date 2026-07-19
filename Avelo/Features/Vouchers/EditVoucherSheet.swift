@@ -99,20 +99,21 @@ private struct EditVoucherEditor: View {
             saveError = AppError.businessRule("No company is open — cannot save. Close this sheet, open a company, and try again.")
             return
         }
-        do {
-            let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
-            _ = try svc.edit(
-                payload.voucher.id,
-                with: vm.buildDraft(),
-                in: ctx.financialYear,
-                workflow: vm.buildWorkflowInputs()
-            )
+        switch VoucherEditorSubmission.submit(
+            vm: vm,
+            operation: .edit(voucherId: payload.voucher.id, financialYear: ctx.financialYear),
+            db: ctx.database,
+            companyId: ctx.companyId
+        ) {
+        case .posted:
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher updated.")
-            router.presentedSheet = nil
-        } catch {
-            saveError = AppError.wrap(error)
+            router.completeVoucherSubmission(vm)
+        case .validationFailed(let validationError):
+            saveError = validationError.map(AppError.validation) ?? vm.localEditorError
+        case .failed(let error):
+            saveError = error
         }
     }
 }
@@ -155,15 +156,9 @@ private struct EditInner: View {
     }
 }
 
-/// Same Tally-style Enter cascade as NewVoucherSheet's VoucherField, minus
-/// the single-entry Account field (edit mode is always double-entry lines).
-private enum EditVoucherField: Hashable {
-    case date
-    case party
-    case narration
-    case line(UUID)
-    case amount(UUID)
-}
+/// Edit mode shares the exact same focus vocabulary as create mode. It only
+/// exposes the subset applicable to an editable posted voucher.
+private typealias EditVoucherField = VoucherEditorFocusTarget
 
 @MainActor
 private struct EditVoucherBody: View {
@@ -171,6 +166,7 @@ private struct EditVoucherBody: View {
     let voucherNumber: String
     let onSave: (VoucherEditViewModel) -> Void
     @Environment(AppRouter.self) private var router
+    @State private var inputCommitter = InputCommitter()
     @FocusState private var focusedField: EditVoucherField?
 
     var body: some View {
@@ -186,9 +182,16 @@ private struct EditVoucherBody: View {
             totalsSection
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
+            if let error = vm.localEditorError {
+                Divider()
+                editorErrorPanel(error)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
             Divider()
             bottomBar
         }
+        .onKeyPress("r", phases: .down, action: handleNarrationRecallShortcut)
     }
 
     private var topBar: some View {
@@ -197,7 +200,8 @@ private struct EditVoucherBody: View {
                 title: "Edit Voucher \(voucherNumber)",
                 subtitle: "Adjust lines, narration, or voucher metadata before saving changes back to the books.",
                 hints: [
-                    .init(title: "Save", key: "⌘↩"),
+                    .init(title: VoucherShortcutContract.editorTitle(for: "⌘↩"), key: "⌘↩"),
+                    .init(title: VoucherShortcutContract.editorTitle(for: "⌃R in Narration"), key: "⌃R"),
                     .init(title: "Cancel", key: "Esc"),
                     .init(title: "Add line", key: "⌘+")
                 ]
@@ -228,7 +232,7 @@ private struct EditVoucherBody: View {
             DatePicker("Date", selection: $vm.date, displayedComponents: .date)
                 .focused($focusedField, equals: .date)
                 .onKeyPress(.return) {
-                    focusedField = vm.lines.first.map { .line($0.id) }
+                    focusedField = vm.lines.first.map { .ledgerAccount($0.id) }
                     return .handled
                 }
             if !isContra {
@@ -247,10 +251,22 @@ private struct EditVoucherBody: View {
                     }
                 }
                 TextField("Bill reference number", text: $vm.billReferenceNumber)
+                    .focused($focusedField, equals: .billReferenceNumber)
             }
             HStack(alignment: .top) {
-                TextField("Narration", text: $vm.narration, axis: .vertical)
-                    .lineLimit(2...4)
+                TextEditor(text: $vm.narration)
+                    .font(.body)
+                    .frame(minHeight: 56, maxHeight: 112)
+                    .overlay(alignment: .topLeading) {
+                        if vm.narration.isEmpty {
+                            Text("Narration")
+                                .foregroundStyle(.tertiary)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 8)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .accessibilityLabel("Narration")
                     .focused($focusedField, equals: .narration)
                 Menu {
                     if vm.narrationSuggestions.isEmpty {
@@ -265,7 +281,6 @@ private struct EditVoucherBody: View {
                 .accessibilityLabel("Recall a recent narration")
                 .menuStyle(.borderlessButton)
                 .frame(width: 24)
-                .keyboardShortcut("r", modifiers: [.control])
                 .onAppear { vm.loadNarrationSuggestions() }
                 .help("Recall a recent narration (⌃R)")
             }
@@ -294,10 +309,10 @@ private struct EditVoucherBody: View {
         return HStack {
             AccountPicker(selection: line.accountId,
                           accounts: vm.accounts,
-                          onCommitSelection: { focusedField = .amount(lineId) },
+                          onCommitSelection: { focusedField = .ledgerAmount(lineId) },
                           isFocusedExternally: Binding(
-                              get: { focusedField == .line(lineId) },
-                              set: { if $0 { focusedField = .line(lineId) } }
+                              get: { focusedField == .ledgerAccount(lineId) },
+                              set: { if $0 { focusedField = .ledgerAccount(lineId) } }
                           ))
             Picker("", selection: line.side) {
                 Text("Debit").tag(LedgerSide.debit)
@@ -308,9 +323,9 @@ private struct EditVoucherBody: View {
             MoneyTextField(label: "", text: line.amount, onCommit: {
                 advanceFocusAfterAmount(lineId: lineId)
             }, isFocusedExternally: Binding(
-                get: { focusedField == .amount(lineId) },
-                set: { if $0 { focusedField = .amount(lineId) } }
-            ))
+                get: { focusedField == .ledgerAmount(lineId) },
+                set: { if $0 { focusedField = .ledgerAmount(lineId) } }
+            ), inputCommitter: inputCommitter, inputCommitterID: EditVoucherField.ledgerAmount(lineId))
                 .frame(width: 160)
             Button { vm.removeLine(lineId) } label: { Image(systemName: "minus.circle") }
                 .buttonStyle(.plain)
@@ -322,16 +337,9 @@ private struct EditVoucherBody: View {
     /// only when this line is genuinely filled, then focus the next empty
     /// line's ledger field (or the freshly-added one).
     private func advanceFocusAfterAmount(lineId: UUID) {
-        guard let index = vm.lines.firstIndex(where: { $0.id == lineId }) else { return }
-        let filled = vm.lines[index].accountId != nil
-            && (Currency.parseRupeeInput(vm.lines[index].amount) ?? 0) != 0
-        guard filled else { return }
-        if let nextEmpty = vm.lines[(index + 1)...].first(where: { $0.accountId == nil }) {
-            focusedField = .line(nextEmpty.id)
-            return
+        if let target = vm.advanceLedgerAfterCommittedAmount(lineId: lineId) {
+            focusedField = .ledgerAccount(target)
         }
-        vm.addLine()
-        if let newLine = vm.lines.last { focusedField = .line(newLine.id) }
     }
 
     private var validationSection: some View {
@@ -343,28 +351,20 @@ private struct EditVoucherBody: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Always responds to the Save button/⌘Return: saves if valid, otherwise
-    /// re-validates so `validationSection` below surfaces exactly what's
-    /// missing instead of the button silently doing nothing.
-    private func attemptSave() {
-        vm.revalidate()
-        guard vm.canPost else {
-            if let first = vm.validationErrors.first { focus(first) }
-            return
-        }
+    /// The sole edit-editor submission route. Custom control buffers must be
+    /// committed before the shared feature command builds its draft.
+    private func submit() {
+        inputCommitter.commitAll()
+        vm.clearLocalEditorError()
         onSave(vm)
+        if vm.localEditorError != nil { focusedField = vm.submissionFocusTarget() }
     }
 
-    private func focus(_ error: ValidationError) {
-        switch error.field {
-        case "date": focusedField = .date
-        case "party", "partyAccountId": focusedField = .party
-        case "narration": focusedField = .narration
-        default:
-            if let row = vm.lines.first(where: { $0.accountId == nil }) ?? vm.lines.first {
-                focusedField = row.accountId == nil ? .line(row.id) : .amount(row.id)
-            }
-        }
+    private func handleNarrationRecallShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
+        guard keyPress.modifiers == [.control], focusedField == .narration else { return .ignored }
+        vm.loadNarrationSuggestions()
+        if let first = vm.narrationSuggestions.first { vm.narration = first }
+        return .handled
     }
 
     private var totalsSection: some View {
@@ -387,11 +387,23 @@ private struct EditVoucherBody: View {
             // click and the keyboard shortcut with zero feedback. `⌘Return`
             // instead of plain Return avoids colliding with MoneyTextField's
             // own onSubmit-adds-a-line behavior on the line grid above.
-            Button("Save") { attemptSave() }
+            Button("Save") { submit() }
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
+                .disabled(vm.isSubmitting)
+                .accessibilityIdentifier("voucher-editor-save")
         }
         .padding(16)
+    }
+
+    private func editorErrorPanel(_ error: AppError) -> some View {
+        GroupBox("Voucher not saved") {
+            Text(error.localizedMessage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(.red)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Voucher saving error")
     }
 }
 
@@ -422,7 +434,7 @@ private struct LockedVoucherCorrectionView: View {
             Divider()
             HStack {
                 Spacer()
-                Button("Close") { router.presentedSheet = nil }
+                Button("Close") { router.dismissPresentedSheet() }
                     .keyboardShortcut(.cancelAction)
                 Button("Reverse…") { router.present(.reverseVoucher(payload.voucher.id)) }
                     .keyboardShortcut("r", modifiers: [.command])

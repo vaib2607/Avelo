@@ -3,20 +3,6 @@ import SwiftUI
 import AppKit
 #endif
 
-struct OneShotSubmitGate {
-    private(set) var isInFlight: Bool = false
-
-    mutating func begin() -> Bool {
-        guard !isInFlight else { return false }
-        isInFlight = true
-        return true
-    }
-
-    mutating func end() {
-        isInFlight = false
-    }
-}
-
 public struct NewVoucherSheet: View {
 
     @Environment(AppEnvironment.self) private var env
@@ -99,30 +85,28 @@ public struct NewVoucherSheet: View {
             postError = AppError.businessRule("No company is open — cannot post. Close this sheet, open a company, and try again.")
             return
         }
-        do {
-            if vm.itemInvoiceMode, let party = vm.partyAccountId, let ledger = vm.salesOrPurchaseLedgerId {
-                _ = try ItemInvoiceService(db: ctx.database, companyId: ctx.companyId).post(
-                    voucherTypeCode: initialType,
-                    date: vm.date,
-                    partyAccountId: party,
-                    salesOrPurchaseLedgerId: ledger,
-                    items: vm.buildItemLineInputs(),
-                    narration: vm.narration,
-                    billReferenceType: vm.billReferenceType,
-                    billReferenceNumber: vm.billReferenceNumber.isEmpty ? nil : vm.billReferenceNumber,
-                    in: ctx.financialYear
-                )
-            } else {
-                let svc = VoucherService(db: ctx.database, companyId: ctx.companyId)
-                _ = try svc.post(draft: vm.buildDraft(), in: ctx.financialYear, workflow: vm.buildWorkflowInputs())
-            }
+        guard !vm.itemInvoiceMode || env.router.isInventoryEnabled else {
+            let error = AppError.businessRule("Inventory was disabled while this item invoice was open. Switch back to ledger mode or discard this draft.")
+            vm.setLocalEditorError(error)
+            postError = error
+            return
+        }
+        switch VoucherEditorSubmission.submit(
+            vm: vm,
+            operation: .create(voucherType: initialType, financialYear: ctx.financialYear),
+            db: ctx.database,
+            companyId: ctx.companyId
+        ) {
+        case .posted:
             vm.deleteDraft()
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher posted.")
-            router.presentedSheet = nil
-        } catch {
-            postError = AppError.wrap(error)
+            router.completeVoucherSubmission(vm)
+        case .validationFailed(let validationError):
+            postError = validationError.map(AppError.validation) ?? vm.localEditorError
+        case .failed(let error):
+            postError = error
         }
     }
 }
@@ -143,20 +127,9 @@ private struct NewVoucherEditor: View {
     }
 }
 
-/// Drives the Tally-style Enter cascade: Date -> Account/first line ledger ->
-/// its amount -> next blank line's ledger -> ... -> Narration.
-private enum VoucherField: Hashable {
-    case date
-    case party
-    case narration
-    case accountLedger
-    case salesPurchaseLedger
-    case line(UUID)
-    case amount(UUID)
-    case item(UUID)
-    case quantity(UUID)
-    case rate(UUID)
-}
+/// Compatibility spelling while this sheet migrates its row call sites to the
+/// shared editor focus vocabulary.
+private typealias VoucherField = VoucherEditorFocusTarget
 
 @MainActor
 private struct NewVoucherBody: View {
@@ -165,7 +138,6 @@ private struct NewVoucherBody: View {
     let onPost: (VoucherEditViewModel) -> Void
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
-    @State private var submitGate = OneShotSubmitGate()
     @State private var accountCreationSheet: RouterSheet?
     @State private var accountCreationTarget: AccountCreationTarget?
     @State private var accountCreationEligibility: (Account) -> Bool = { _ in true }
@@ -176,6 +148,8 @@ private struct NewVoucherBody: View {
 
     var body: some View {
         editorContent
+            .onKeyPress("v", phases: .down, action: handleItemModeShortcut)
+            .onKeyPress("r", phases: .down, action: handleNarrationRecallShortcut)
             .onAppear { router.dirtyStateProvider = vm }
             .onDisappear {
                 // Normal sheet dismissal is an explicit cancel/post path, so
@@ -209,6 +183,12 @@ private struct NewVoucherBody: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
             }
+            if let error = vm.localEditorError {
+                Divider()
+                editorErrorPanel(error)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
             Divider()
             bottomBar
         }
@@ -225,6 +205,9 @@ private struct NewVoucherBody: View {
             .onChange(of: vm.date) { _, _ in voucherDraftDidChange() }
             .onChange(of: vm.chequeNumber) { _, _ in voucherAutosaveDidChange() }
             .onChange(of: vm.chequeDueDate) { _, _ in voucherAutosaveDidChange() }
+            .onChange(of: vm.itemInvoiceMode) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.salesOrPurchaseLedgerId) { _, _ in voucherDraftDidChange() }
+            .onChange(of: vm.itemLines) { _, _ in voucherDraftDidChange() }
     }
 
     private var topBar: some View {
@@ -233,7 +216,8 @@ private struct NewVoucherBody: View {
                 title: "New \(initialType.displayName) Voucher",
                 subtitle: "Enter lines with keyboard-first debit/credit balance feedback, then post or cancel.",
                 hints: [
-                    .init(title: "Save", key: "⌘↩"),
+                    .init(title: VoucherShortcutContract.editorTitle(for: "⌘↩"), key: "⌘↩"),
+                    .init(title: VoucherShortcutContract.editorTitle(for: "⌃R in Narration"), key: "⌃R"),
                     .init(title: "Cancel", key: "Esc"),
                     .init(title: "Add line", key: "⌘+"),
                     .init(title: "Paste TSV", key: "⌘V")
@@ -291,13 +275,14 @@ private struct NewVoucherBody: View {
     private var isContra: Bool { initialType == .contra }
 
     private var isItemInvoiceEligible: Bool {
-        (initialType == .sales || initialType == .purchase) && !vm.items.isEmpty
+        env.router.isInventoryEnabled
+            && (initialType == .sales || initialType == .purchase)
+            && !vm.items.isEmpty
     }
 
     private var itemInvoiceToggle: some View {
         Toggle("Item invoice (GST auto-calculated from item masters)", isOn: $vm.itemInvoiceMode)
             .toggleStyle(.switch)
-            .keyboardShortcut("v", modifiers: [.control])
             .help("Toggle voucher / item-invoice mode (⌃V)")
     }
 
@@ -339,18 +324,13 @@ private struct NewVoucherBody: View {
     private func itemLineRow(line: Binding<VoucherEditViewModel.ItemLineRow>) -> some View {
         let lineId = line.wrappedValue.id
         return HStack {
-            Picker("", selection: line.itemId) {
-                Text("Choose item…").tag(InventoryItem.ID?.none)
-                ForEach(vm.items) { item in
-                    Text("\(item.code) — \(item.name)").tag(Optional(item.id))
-                }
-            }
-            .labelsHidden()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .focused($focusedField, equals: .item(lineId))
-            .onChange(of: line.itemId.wrappedValue) { _, itemId in
-                if itemId != nil { focusedField = .quantity(lineId) }
-            }
+            InventoryItemPicker(selection: line.itemId,
+                                items: vm.items,
+                                onCommitSelection: { focusedField = .quantity(lineId) },
+                                isFocusedExternally: Binding(
+                                    get: { focusedField == .item(lineId) },
+                                    set: { if $0 { focusedField = .item(lineId) } }
+                                ))
             TextField("", text: line.quantity)
                 .frame(width: 90)
                 .focused($focusedField, equals: .quantity(lineId))
@@ -388,7 +368,7 @@ private struct NewVoucherBody: View {
             DatePicker("Date", selection: $vm.date, displayedComponents: .date)
                 .focused($focusedField, equals: .date)
                 .onKeyPress(.return) {
-                    focusedField = vm.singleEntryMode ? .accountLedger : (vm.lines.first.map { .line($0.id) })
+                    focusedField = vm.singleEntryMode ? .accountLedger : (vm.lines.first.map { .ledgerAccount($0.id) })
                     return .handled
                 }
             // Tally's Contra has no party or bill reference — only fund
@@ -410,6 +390,7 @@ private struct NewVoucherBody: View {
                     }
                 }
                 TextField("Bill reference number", text: $vm.billReferenceNumber)
+                    .focused($focusedField, equals: .billReferenceNumber)
             }
             narrationField
         }
@@ -418,8 +399,19 @@ private struct NewVoucherBody: View {
 
     private var narrationField: some View {
         HStack(alignment: .top) {
-            TextField("Narration", text: $vm.narration, axis: .vertical)
-                .lineLimit(2...4)
+            TextEditor(text: $vm.narration)
+                .font(.body)
+                .frame(minHeight: 56, maxHeight: 112)
+                .overlay(alignment: .topLeading) {
+                    if vm.narration.isEmpty {
+                        Text("Narration")
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 8)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .accessibilityLabel("Narration")
                 .focused($focusedField, equals: .narration)
             narrationRecallMenu
         }
@@ -439,7 +431,6 @@ private struct NewVoucherBody: View {
         .accessibilityLabel("Recall a recent narration")
         .menuStyle(.borderlessButton)
         .frame(width: 24)
-        .keyboardShortcut("r", modifiers: [.control])
         .onAppear { vm.loadNarrationSuggestions() }
         .help("Recall a recent narration (⌃R)")
     }
@@ -461,7 +452,7 @@ private struct NewVoucherBody: View {
                                   )
                               },
                               onCommitSelection: {
-                                  if let firstLineId = vm.lines.first?.id { focusedField = .line(firstLineId) }
+                                  if let firstLineId = vm.lines.first?.id { focusedField = .ledgerAccount(firstLineId) }
                               },
                               isFocusedExternally: Binding(
                                   get: { focusedField == .accountLedger },
@@ -482,10 +473,12 @@ private struct NewVoucherBody: View {
             sectionLabel("Cheque (optional)")
             Form {
                 TextField("Cheque number", text: $vm.chequeNumber)
+                    .focused($focusedField, equals: .chequeNumber)
                 DatePicker("Cheque due date", selection: Binding(
                     get: { vm.chequeDueDate ?? vm.date },
                     set: { vm.chequeDueDate = $0 }
                 ), displayedComponents: .date)
+                .focused($focusedField, equals: .chequeDueDate)
             }
             .formStyle(.grouped)
         }
@@ -559,11 +552,11 @@ private struct NewVoucherBody: View {
                               if !vm.singleEntryMode, vm.totalDebitPaise == 0, vm.totalCreditPaise == 0 {
                                   line.side.wrappedValue = vm.suggestedSide(for: line.accountId.wrappedValue)
                               }
-                              focusedField = .amount(lineId)
+                              focusedField = .ledgerAmount(lineId)
                           },
                           isFocusedExternally: Binding(
-                              get: { focusedField == .line(lineId) },
-                              set: { if $0 { focusedField = .line(lineId) } }
+                              get: { focusedField == .ledgerAccount(lineId) },
+                              set: { if $0 { focusedField = .ledgerAccount(lineId) } }
                           ))
             if !vm.singleEntryMode {
                 Picker("", selection: line.side) {
@@ -576,9 +569,9 @@ private struct NewVoucherBody: View {
             MoneyTextField(label: "", text: line.amount, onCommit: {
                 advanceFocusAfterAmount(lineId: lineId)
             }, isFocusedExternally: Binding(
-                get: { focusedField == .amount(lineId) },
-                set: { if $0 { focusedField = .amount(lineId) } }
-            ), inputCommitter: inputCommitter, inputCommitterID: VoucherField.amount(lineId))
+                get: { focusedField == .ledgerAmount(lineId) },
+                set: { if $0 { focusedField = .ledgerAmount(lineId) } }
+            ), inputCommitter: inputCommitter, inputCommitterID: VoucherField.ledgerAmount(lineId))
                 .frame(width: 160)
             Button { vm.removeLine(lineId) } label: {
                 Image(systemName: "minus.circle")
@@ -596,30 +589,18 @@ private struct NewVoucherBody: View {
     /// empty line's ledger field if one already exists, otherwise the
     /// freshly-added blank line's ledger field.
     private func advanceFocusAfterAmount(lineId: UUID) {
-        guard let index = vm.lines.firstIndex(where: { $0.id == lineId }) else { return }
-        let filled = vm.lines[index].accountId != nil
-            && (Currency.parseRupeeInput(vm.lines[index].amount) ?? 0) != 0
-        guard filled else { return }
-        if let nextEmpty = vm.lines[(index + 1)...].first(where: { $0.accountId == nil }) {
-            focusedField = .line(nextEmpty.id)
-            return
+        if let target = vm.advanceLedgerAfterCommittedAmount(lineId: lineId) {
+            focusedField = .ledgerAccount(target)
         }
-        vm.addLine()
-        if let newLine = vm.lines.last { focusedField = .line(newLine.id) }
     }
 
     /// Item invoices use their own row collection and completion predicate.
     /// A zero rate is valid; only item plus positive quantity permits moving
     /// forward and adding a new blank row.
     private func advanceFocusAfterRate(lineId: UUID) {
-        guard let index = vm.itemLines.firstIndex(where: { $0.id == lineId }),
-              vm.isCompleteItemLine(vm.itemLines[index]) else { return }
-        if let nextBlank = vm.itemLines[(index + 1)...].first(where: { $0.itemId == nil }) {
-            focusedField = .item(nextBlank.id)
-            return
+        if let target = vm.advanceItemAfterCommittedRate(lineId: lineId) {
+            focusedField = .item(target)
         }
-        vm.addItemLine()
-        if let newLine = vm.itemLines.last { focusedField = .item(newLine.id) }
     }
 
     private var validationSection: some View {
@@ -629,6 +610,16 @@ private struct NewVoucherBody: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func editorErrorPanel(_ error: AppError) -> some View {
+        GroupBox("Voucher not posted") {
+            Text(error.localizedMessage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(.red)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Voucher posting error")
     }
 
     private var totalsSection: some View {
@@ -675,69 +666,54 @@ private struct NewVoucherBody: View {
             Spacer()
             Button("Cancel") { router.dismissPresentedSheet() }
                 .keyboardShortcut(.cancelAction)
-            // Deliberately NOT gated on `vm.canPost`: a button disabled for
-            // validation reasons swallows both mouse clicks and its
-            // `.keyboardShortcut(.defaultAction)` (which also collides with
-            // MoneyTextField's own onSubmit on plain Return) with zero
-            // feedback — this is what made voucher entry "not work" on both
-            // Enter and clicking Post while a field was still missing.
-            // `attemptSubmit()` always responds: posts if valid, otherwise
-            // shows exactly what's missing.
-            Button("Post") { flushAndPost() }
+            // Deliberately NOT gated on `vm.canPost`: a disabled button
+            // swallows both click and ⌘Return with no feedback. `submit()`
+            // instead flushes, validates, and presents a local typed error.
+            Button("Post") { submit() }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(submitGate.isInFlight)
+                .disabled(vm.isSubmitting)
+                .accessibilityIdentifier("voucher-editor-post")
         }
         .padding(16)
     }
 
-    /// Always responds to ⌘Return: posts if valid, otherwise re-validates
-    /// and surfaces the first error so the user knows why nothing happened.
-    private func attemptSubmit() {
-        guard !submitGate.isInFlight else { return }
-        if vm.itemInvoiceMode {
-            if vm.canPostItemInvoice {
-                postOnce()
-            } else {
-                env.showError(AppError.businessRule(vm.itemInvoiceValidationErrors.first ?? "This voucher isn't ready to post yet."))
-            }
-            return
-        }
-        vm.revalidate()
-        if vm.canPost {
-            postOnce()
-        } else if let first = vm.validationErrors.first {
-            focus(first)
-            env.showError(AppError.validation(first))
-        } else {
-            env.showError(AppError.businessRule("This voucher isn't ready to post yet — check the required fields above."))
-        }
-    }
-
-    /// Makes command-post deterministic even when a custom field retains an
-    /// internal edit buffer. Native bound TextFields are already live.
-    private func flushAndPost() {
+    /// The sole create-editor submission route. It flushes custom control
+    /// buffers before delegating to the feature-level transaction command.
+    private func submit() {
         inputCommitter.commitAll()
-        attemptSubmit()
-    }
-
-    private func focus(_ error: ValidationError) {
-        switch error.field {
-        case "date": focusedField = .date
-        case "party", "partyAccountId": focusedField = .party
-        case "narration": focusedField = .narration
-        case "accountLedgerId": focusedField = .accountLedger
-        default:
-            if let row = vm.lines.first(where: { $0.accountId == nil }) ?? vm.lines.first {
-                focusedField = row.accountId == nil ? .line(row.id) : .amount(row.id)
-            }
+        vm.clearLocalEditorError()
+        onPost(vm)
+        if vm.localEditorError != nil {
+            focusedField = vm.submissionFocusTarget()
         }
     }
 
-    private func postOnce() {
-        guard submitGate.begin() else { return }
-        defer { submitGate.end() }
-        onPost(vm)
+    private func handleItemModeShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
+        guard keyPress.modifiers == [.control],
+              VoucherShortcutContract.canToggleItemInvoice(
+                isFreshEligibleDraft: isItemInvoiceEligible && !vm.isRecoveredDraft,
+                isEditableTextFocused: isEditableTextFocus
+              ) else { return .ignored }
+        vm.itemInvoiceMode.toggle()
+        return .handled
+    }
+
+    private func handleNarrationRecallShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
+        guard keyPress.modifiers == [.control], focusedField == .narration else { return .ignored }
+        vm.loadNarrationSuggestions()
+        if let first = vm.narrationSuggestions.first { vm.narration = first }
+        return .handled
+    }
+
+    private var isEditableTextFocus: Bool {
+        guard let focusedField else { return false }
+        switch focusedField {
+        case .narration, .billReferenceNumber, .chequeNumber, .ledgerAmount, .quantity, .rate:
+            return true
+        default:
+            return false
+        }
     }
 
     private func pasteTSV() {
@@ -762,7 +738,7 @@ private struct NewVoucherBody: View {
         accountCreationTarget = target
         accountCreationEligibility = eligibility
         accountIDsBeforeCreation = Set(vm.accounts.map(\.id))
-        accountCreationRouter.presentedSheet = .newAccount
+        accountCreationRouter.present(.newAccount)
         accountCreationSheet = .newAccount
     }
 
@@ -779,19 +755,28 @@ private struct NewVoucherBody: View {
             ) {
             case .selected(let createdID):
                 switch target {
-                case .accountLedger: vm.accountLedgerId = createdID
-                case .party: vm.partyAccountId = createdID
-                case .salesOrPurchaseLedger: vm.salesOrPurchaseLedgerId = createdID
+                case .accountLedger:
+                    vm.accountLedgerId = createdID
+                    focusedField = .accountLedger
+                case .party:
+                    vm.partyAccountId = createdID
+                    focusedField = .party
+                case .salesOrPurchaseLedger:
+                    vm.salesOrPurchaseLedgerId = createdID
+                    focusedField = .salesPurchaseLedger
                 case .line(let id):
-                    if let index = vm.lines.firstIndex(where: { $0.id == id }) { vm.lines[index].accountId = createdID }
+                    if let index = vm.lines.firstIndex(where: { $0.id == id }) {
+                        vm.lines[index].accountId = createdID
+                        focusedField = .ledgerAccount(id)
+                    }
                 }
                 vm.revalidate()
             case .rejected:
-                env.showError(AppError.businessRule("The new account is not eligible for this field and was not selected."))
+                vm.setLocalEditorError(.businessRule("The new account is not eligible for this field and was not selected."))
             case .none:
                 break
             }
-        } catch { env.showError(AppError.wrap(error)) }
+        } catch { vm.setLocalEditorError(AppError.wrap(error)) }
     }
 
     private func resetAccountCreationRequest() {

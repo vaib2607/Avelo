@@ -1,6 +1,24 @@
 import SwiftUI
 import Observation
 
+public enum BalanceSheetRequestError: Error, Equatable, Sendable {
+    case primary(AppError)
+    case comparative(AppError)
+
+    public var underlyingError: AppError {
+        switch self {
+        case let .primary(error), let .comparative(error): return error
+        }
+    }
+
+    public var periodName: String {
+        switch self {
+        case .primary: return "Primary period"
+        case .comparative: return "Comparison period"
+        }
+    }
+}
+
 @MainActor
 @Observable
 public final class ReportsViewModel {
@@ -30,6 +48,9 @@ public final class ReportsViewModel {
     public var cashBankAccounts: [Account] = []
     public var isLoading: Bool = false
     public var error: AppError?
+    public var balanceSheetRequestError: BalanceSheetRequestError?
+    public var balanceSheetErrorFinancialYearId: FinancialYear.ID?
+    public var balanceSheetErrorAsOf: Date?
 
     // AVL-P1-036 (Alt+N comparative columns): prior-year-same-period column
     // for the three point-in-time/range statements. Reuses the same
@@ -42,7 +63,7 @@ public final class ReportsViewModel {
 
     public let companyId: Company.ID
     public let db: SQLiteDatabase
-    public let fyId: FinancialYear.ID?
+    public private(set) var fyId: FinancialYear.ID?
 
     public init(companyId: Company.ID, db: SQLiteDatabase, fyId: FinancialYear.ID?) {
         self.companyId = companyId
@@ -159,25 +180,69 @@ public final class ReportsViewModel {
         reload()
     }
 
+    /// Applies one settled FY transition.  The view owns observing environment
+    /// changes; this model owns clearing old scoped results before exactly one
+    /// reload of the currently selected report.
+    public func resetFinancialYear(_ financialYear: FinancialYear) {
+        guard financialYear.companyId == companyId, fyId != financialYear.id else { return }
+        fyId = financialYear.id
+        fromDate = financialYear.startDate
+        toDate = financialYear.endDate
+        asOf = financialYear.endDate
+        selectedDay = financialYear.startDate
+        balanceSheet = nil
+        comparativeBalanceSheet = nil
+        balanceSheetRequestError = nil
+        balanceSheetErrorFinancialYearId = nil
+        balanceSheetErrorAsOf = nil
+        error = nil
+        reload()
+    }
+
     private func loadBalanceSheet() {
         isLoading = true
         balanceSheet = nil
         comparativeBalanceSheet = nil
         error = nil
+        balanceSheetRequestError = nil
+        balanceSheetErrorFinancialYearId = fyId
+        balanceSheetErrorAsOf = asOf
         defer { isLoading = false }
         do {
             let service = ReportService(db: db, companyId: companyId)
-            balanceSheet = try service.balanceSheet(asOfDate: asOf, financialYearId: fyId)
+            let primaryScope = try service.balanceSheetScope(asOfDate: asOf, financialYearId: fyId)
+            var comparativeScope: BalanceSheetScope?
             if comparativeEnabled {
                 let comparativeAsOf = priorYear(asOf)
-                let comparativeFYId = try financialYearID(containing: comparativeAsOf)
-                comparativeBalanceSheet = try service.balanceSheet(
-                    asOfDate: comparativeAsOf,
-                    financialYearId: comparativeFYId
-                )
+                do {
+                    balanceSheetErrorFinancialYearId = nil
+                    balanceSheetErrorAsOf = comparativeAsOf
+                    let comparativeFYId = try financialYearID(containing: comparativeAsOf)
+                    balanceSheetErrorFinancialYearId = comparativeFYId
+                    balanceSheetErrorAsOf = comparativeAsOf
+                    comparativeScope = try service.balanceSheetScope(asOfDate: comparativeAsOf, financialYearId: comparativeFYId)
+                } catch {
+                    throw BalanceSheetRequestError.comparative(AppError.wrap(error))
+                }
             }
+            // Both requested periods now have valid explicit scopes. Only then
+            // may either candidate perform cache/reconciliation/report reads.
+            let primary = try service.balanceSheet(scope: primaryScope)
+            let comparative = try comparativeScope.map { try service.balanceSheet(scope: $0) }
+            // Publish only a fully verified primary/comparison pair.
+            balanceSheet = primary
+            comparativeBalanceSheet = comparative
+            balanceSheetErrorFinancialYearId = nil
+            balanceSheetErrorAsOf = nil
+        } catch let requestError as BalanceSheetRequestError {
+            balanceSheetRequestError = requestError
+            self.error = requestError.underlyingError
+            balanceSheet = nil
+            comparativeBalanceSheet = nil
         } catch {
-            self.error = AppError.wrap(error)
+            let requestError = BalanceSheetRequestError.primary(AppError.wrap(error))
+            balanceSheetRequestError = requestError
+            self.error = requestError.underlyingError
             balanceSheet = nil
             comparativeBalanceSheet = nil
         }

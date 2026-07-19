@@ -361,4 +361,84 @@ final class BalanceSheetReconciliationTests: XCTestCase {
             XCTAssertEqual(message, "Posted vouchers do not reconcile to paise.")
         }
     }
+
+    func testBalanceSheetRejectsSelectedFYVoucherDateBeforeYearRatherThanFilteringItOut() throws {
+        let tc = try makeSeededCompany()
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            narration: "Malformed selected FY fixture",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 10_000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit)
+            ]
+        ), in: tc.fy)
+        // A production trigger prevents this corruption. Remove it only in the
+        // isolated fixture so the report-side integrity gate is exercised.
+        try tc.db.execute("DROP TRIGGER trg_avelo_voucher_date_in_fy_update")
+        try tc.db.execute(
+            "UPDATE avelo_vouchers SET date = ? WHERE id = ?",
+            [.date(DateFormatters.parseDate("2024-03-31")!), .text(posted.voucher.id.uuidString)]
+        )
+
+        XCTAssertThrowsError(try ReportService(db: tc.db, companyId: tc.companyId).balanceSheet(
+            asOfDate: tc.fy.endDate,
+            financialYearId: tc.fy.id
+        )) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected typed selected-FY integrity failure")
+            }
+            XCTAssertEqual(validation.code, .canonicalTrackCoherenceFailure)
+        }
+    }
+
+    func testBalanceSheetRejectsSelectedFYVoucherDateAfterYearRatherThanFilteringItOut() throws {
+        let tc = try makeSeededCompany()
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            narration: "Malformed selected FY fixture",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 10_000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit)
+            ]
+        ), in: tc.fy)
+        try tc.db.execute("DROP TRIGGER trg_avelo_voucher_date_in_fy_update")
+        try tc.db.execute(
+            "UPDATE avelo_vouchers SET date = ? WHERE id = ?",
+            [.date(DateFormatters.parseDate("2025-04-01")!), .text(posted.voucher.id.uuidString)]
+        )
+
+        XCTAssertThrowsError(try ReportService(db: tc.db, companyId: tc.companyId).balanceSheet(
+            asOfDate: tc.fy.endDate,
+            financialYearId: tc.fy.id
+        )) { error in
+            guard case AppError.validation(let validation) = error else {
+                return XCTFail("Expected typed selected-FY integrity failure")
+            }
+            XCTAssertEqual(validation.code, .canonicalTrackCoherenceFailure)
+        }
+    }
+
+    func testBalanceSheetExcludesValidSelectedFYVoucherAfterAsOfWithoutIntegrityFailure() throws {
+        let tc = try makeSeededCompany()
+        _ = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: VoucherDraft(
+            mode: .create,
+            voucherTypeCode: .journal,
+            date: DateFormatters.parseDate("2025-03-01")!,
+            narration: "Future activity",
+            lines: [
+                .init(accountId: tc.cashId, amountPaise: 10_000, side: .debit),
+                .init(accountId: tc.salesId, amountPaise: 10_000, side: .credit)
+            ]
+        ), in: tc.fy)
+
+        let report = try ReportService(db: tc.db, companyId: tc.companyId).balanceSheet(
+            asOfDate: DateFormatters.parseDate("2024-12-31")!,
+            financialYearId: tc.fy.id
+        )
+        XCTAssertEqual(report.totalAssetsPaise, 0)
+    }
 }

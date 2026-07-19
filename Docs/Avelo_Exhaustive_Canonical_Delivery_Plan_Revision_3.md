@@ -17,7 +17,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 
 | Area | Reconciled state | Evidence / remaining work |
 | --- | --- | --- |
-| #9b Balance Sheet | ~~Implemented / automated proof~~; manual acceptance remaining | `ReportService.balanceSheet`, `ReportsViewModel`, `BalanceSheetReconciliationTests`; bundled accountant/macOS acceptance open. |
+| #9b Balance Sheet | ~~DONE~~ | Scoped immutable `BalanceSheetScope`, selected-FY integrity/activity reconciliation, atomic comparison publication, same-company FY reset, automated proof, and bundled/accountant acceptance are complete. `BalanceSheetReconciliationTests` 10/0 and `ReportsViewModelTests` 14/0. |
 | #10 item-invoice default | ~~Implemented / automated proof~~; manual acceptance remaining | `VoucherEditViewModel`, `NewVoucherSheet`, draft tests; GUI/keyboard acceptance open. |
 | V027 dual track | Partial / proof remaining | Sections 4.1–4.6 landed below; remaining parity matrices and manual acceptance remain. |
 | AVL-P0-020 keyboard baseline | ~~Implemented / automated proof~~; manual acceptance remaining | GUI traversal and VoiceOver acceptance open. |
@@ -141,12 +141,18 @@ Open before V027 release-ready:
 
 ~~Company + selected FY + selected as-of scope; typed scope errors; one load
 pipeline; strict loading/error/empty/table rendering; no false empty success;
-comparative validation; documented opening rules.~~
+comparative validation; documented opening rules.~~ Selected-FY integrity is
+checked before as-of filtering, candidate construction uses one read transaction,
+and same-company FY changes reset the owned scope without recreating the model.
 
 Evidence: `ReportService.balanceSheet`, `ReportsViewModel`,
 `BalanceSheetReconciliationTests`, `ReportsViewModelTests`.
 
-Open: bundled macOS behavior and accountant acceptance.
+~~Bundled macOS behavior and accountant acceptance.~~
+
+Status: **DONE** — scoped reconciliation, atomic comparison, same-company FY
+reset, bundle validation, and #9b manual acceptance were completed and
+confirmed on 2026-07-19.
 
 ## 6. Voucher redesign and shortcut program
 
@@ -154,22 +160,48 @@ Open: bundled macOS behavior and accountant acceptance.
 
 ~~Item-invoice default contract in §6.5 landed.~~
 
-The remaining sheet-layout redesign, unified `flushAndPost`, ledger/item Enter
-cascade acceptance, and complete shortcut matrix remain open unless separately
-proven. Plain Return in Narration must remain native input and never post.
+**PARTIAL — current implementation evidence:**
+`VoucherEditorSubmission` is now the sole create/edit service command;
+`VoucherEditViewModel` owns re-entry state, local typed errors, and
+pre-submission validation; both sheets flush registered custom fields before
+the command. Narration now uses `TextEditor`, so plain Return remains native
+newline input, while the action bar preserves Command-Return. Both sheets use
+the shared focus vocabulary and show local inline failure context. Ledger and
+item cascades are model-owned, and item completion uses the exact posting
+predicate (including zero-rate validity and one trailing blank-row reuse).
+Focused evidence: `VoucherDraftTests` 44/0, `AppRouterTests` 11/0,
+`AppEnvironmentFlowTests` 15/0, and `KeyboardShortcutMapTests` 7/0;
+`make test`, `make rule-audit`, and
+`git diff --check` passed on the active worktree on 2026-07-19. The local
+bundle validation, bundle self-test, and launch smoke also passed; those do
+not replace the required interactive keyboard/VoiceOver acceptance.
+
+The item picker now provides focused searchable selection and an explicit
+commit callback. Still open: full create/edit focus and cascade UI matrix,
+and bundled keyboard/VoiceOver/visual acceptance.
 
 ### 6.6 Shortcut contracts
 
-Existing implementation: Alt+C, Ctrl+V, Ctrl+R, Alt+2, Ctrl+I/PgUp/PgDn,
-and Command-Return paths exist in varying states. Their complete context,
-lineage, focus, collision, and human-acceptance contracts remain open.
+**PARTIAL — current implementation evidence:** Alt+C remains limited to the
+focused eligible `AccountPicker`; Ctrl+V is limited to a fresh eligible
+Sales/Purchase draft (never recovery or text editing) and Ctrl+R is Narration
+only; Ctrl+I, Alt+2, PgUp, and PgDn
+are now registered only on the focused voucher table, replacing hidden global
+shortcut buttons. `VoucherShortcutContract` is the help-text source for
+editor/table commands. Context/collision/manual acceptance proof remains open.
 
 ### 6.7 PR1b-close
 
-Not struck. All listed dirty-gate bypasses, capability eviction, direct sheet
-replacement, deep links, company/FY switching, provider lifecycle, and test
-matrix remain mandatory. H7/H10/H11 cannot be marked done until this closure
-slice passes.
+**PARTIAL — current implementation evidence:** `AppRouter` now dirty-gates
+ledger/report deep links, capability eviction, root sheet-binding dismissal,
+financial-year switching, company open/close, and post-success dismissal
+through one pending intent. `AppRouterTests` 11/0 and
+`AppEnvironmentFlowTests.testDirtyEditorDefersCompanyOpenUntilDiscard` and
+`testDirtyEditorDefersFinancialYearSwitchUntilDiscard` prove Keep Editing,
+Discard, one pending action, capability-route retention, and company/FY
+deferral. The direct-replacement audit beyond voucher paths,
+nested-account provider lifecycle acceptance, and the full dirty-transition
+matrix remain mandatory. H7/H10/H11 remain open.
 
 ### 6.8 Voucher acceptance order
 

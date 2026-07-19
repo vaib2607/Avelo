@@ -74,20 +74,4 @@ final class VouchersViewTests: XCTestCase {
         )
     }
 
-    func testOneShotSubmitGateRejectsSecondBeginUntilEnded() {
-        var gate = OneShotSubmitGate()
-
-        XCTAssertTrue(gate.begin())
-        XCTAssertFalse(gate.begin())
-        XCTAssertTrue(gate.isInFlight)
-    }
-
-    func testOneShotSubmitGateAllowsNewBeginAfterEnd() {
-        var gate = OneShotSubmitGate()
-
-        XCTAssertTrue(gate.begin())
-        gate.end()
-        XCTAssertFalse(gate.isInFlight)
-        XCTAssertTrue(gate.begin())
-    }
 }

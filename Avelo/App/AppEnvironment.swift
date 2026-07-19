@@ -247,6 +247,15 @@ public final class AppEnvironment {
     }
 
     public func openCompany(_ id: Company.ID) async {
+        guard router.beginExternalContextChange({ [weak self] in
+            Task { @MainActor in
+                await self?.applyOpenCompany(id)
+            }
+        }) else { return }
+        await applyOpenCompany(id)
+    }
+
+    private func applyOpenCompany(_ id: Company.ID) async {
         isBusy = true
         defer { isBusy = false; migrationProgress = nil }
         do {
@@ -289,6 +298,12 @@ public final class AppEnvironment {
     }
 
     public func switchFinancialYear(_ id: FinancialYear.ID) {
+        router.requestExternalContextChange { [weak self] in
+            self?.applyFinancialYearSwitch(id)
+        }
+    }
+
+    private func applyFinancialYearSwitch(_ id: FinancialYear.ID) {
         guard let ctx = companyContext else { return }
         do {
             guard let fy = try FinancialYearRepository(db: ctx.database).findById(id) else {
@@ -349,6 +364,12 @@ public final class AppEnvironment {
     }
 
     public func closeCompany() {
+        router.requestExternalContextChange { [weak self] in
+            self?.applyCloseCompany()
+        }
+    }
+
+    private func applyCloseCompany() {
         accountTreeReloadTask?.cancel()
         accountTreeReloadTask = nil
         if let ctx = companyContext {
@@ -402,7 +423,13 @@ public final class AppEnvironment {
     public var presentedSheetBinding: Binding<RouterSheet?> {
         Binding(
             get: { self.router.presentedSheet },
-            set: { self.router.presentedSheet = $0 }
+            set: { requestedSheet in
+                if let requestedSheet {
+                    self.router.present(requestedSheet)
+                } else {
+                    self.router.dismissPresentedSheet()
+                }
+            }
         )
     }
 }

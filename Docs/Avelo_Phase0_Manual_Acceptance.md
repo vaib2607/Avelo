@@ -68,6 +68,12 @@ Expected: non-destructive history and one understandable audit event per mutatio
 2. Verify per-account Trial Balance netting and later-FY carried openings.
 3. Test FY/GST boundaries, leap day, and midnight with the Mac set to a non-Indian timezone.
 4. Create intra/inter-state B2B invoices with tax and round-off; reconcile voucher, reports, PDF, and extracted totals.
+5. #9b Balance Sheet scoped-read acceptance, against one bundled SHA:
+   - switch within one company from FY1 to FY2 while Balance Sheet is selected; FY1 rows and errors disappear immediately, FY2 defaults to its valid as-of, and FY1 never reappears;
+   - change as-of within FY, enable/disable comparison, and use Refresh; verify no global/root alert, no false empty state, and no half-filled comparison;
+   - use the controlled selected-FY corruption fixture to verify the local error names the primary or comparison period, shows its FY/as-of context, and Refresh keeps the error explicit until the data/input is corrected;
+   - verify a valid selected FY remains readable when unrelated prior-FY item evidence is malformed, while opening balances still follow the documented accounting opening policy;
+   - keyboard-only: tab to Refresh, activate it, and return focus to the report; VoiceOver must announce the local error title, scope context, and Refresh action; check light/dark mode and narrow/wide window resizing.
 5. Verify legal names, GST details, inventory lines, multi-page pagination, and valid zero/negative display.
 
 Expected: every number derives from books and survives drill-down/printing. Covers `AVL-P0-001`, `022`, `023`, `024`, and `027`.
