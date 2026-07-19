@@ -33,10 +33,13 @@ conflated:
   - **Phase 5** (§10, §11–14): UOM discovery (needs accountant/operator input
     on real-world unit patterns before any schema work) and H22 canonical
     documentation (best done once the above designs settle, not before).
-  - Two smaller design-first slices surfaced during Phase 3 and are recorded
-    where they were found rather than as a separate phase: Alt+2 duplicate
-    lineage tracking (§2, needs a new schema column) and the general
-    comparative-period-configuration DSL (§2, AVL-P1-036).
+  - One smaller design-first slice remains, recorded where it was found
+    rather than as a separate phase: the general comparative-period-
+    configuration DSL (§2, AVL-P1-036). Alt+2 duplicate lineage tracking
+    (§2, AVL-P2-011), also originally logged here, has since been designed
+    and closed via `MigrationV031` — a small, additive, self-referencing
+    column following the existing `cancellation_voucher_id` pattern
+    exactly, not a cross-cutting redesign.
 
   Parking one of these is not the same as closing it — none of the above may
   be marked DONE from a future proof-only pass; each requires its own design
@@ -76,7 +79,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | AVL-P1-026 Alt+C | ~~Implemented / automated proof~~; manual acceptance remaining | Focus return/audit GUI proof open. |
 | AVL-P1-036 comparative reports | ~~Atomic publish~~; general period configuration not built | Atomic publish closed via §7 H18–H19 fix (Trial Balance/P&L). **Period configuration is an unbuilt feature, not a bug**: today's model is a single hardcoded prior-year comparison (`priorYear()`, -1 year fixed) for exactly Trial Balance/P&L/Balance Sheet — no `basePeriod`/`comparisonPeriods[]`/mode (FY/quarter/month) DSL exists to configure. Parked like H20–H21; GUI acceptance also open. |
 | AVL-P1-037 Day Book | ~~Implemented / automated proof~~; manual acceptance remaining | Durable drill/edit/cancel/return loop proven (H14–H17, see §7); GUI/visual acceptance open. |
-| AVL-P2-011 Alt+2 duplicate | ~~Fresh-number proof~~; lineage tracking not built | Fresh/distinct number and id proven same-FY (`testDuplicateDraftPreloadsFreshEditorWithSourceVoucherLinesAndNewNumber`) and cross-FY (`testDuplicateAcrossFinancialYearsDrawsFreshNumberFromTargetFYSequence`, target FY's own sequence, no reuse/collision). **Lineage is an unbuilt feature, not a bug**: `Voucher` has `reversalOfId`/`cancellationVoucherId` for Reverse/Cancel lineage, but no field at all for "duplicated from" — `VoucherEditViewModel.duplicateDraft` copies narration/party/lines only, no source reference. Needs a new column + migration to close; parked like H20–H21. |
+| AVL-P2-011 Alt+2 duplicate | ~~Fresh-number proof~~; ~~lineage tracking~~ | Fresh/distinct number and id proven same-FY and cross-FY. **Lineage closed**: `Voucher.duplicatedFromVoucherId` (`MigrationV031`, additive/nullable, same pattern as `cancellation_voucher_id`) records the source voucher, set only by `VoucherEditViewModel.duplicateDraft`, threaded through `VoucherDraft`/`VoucherEntryDraft`/both `VoucherService` posting paths. Proven same-FY, cross-FY, non-duplicate-stays-nil, repeated-duplicate, Reverse/Cancel-non-inheritance, and the GST-round-off reconstruction hazard (`normalizedDraftForPosting` rebuilds `VoucherDraft` at two sites that must explicitly thread the field or it silently vanishes for round-off-eligible types). Evidence: `VoucherDraftTests`, `VoucherServiceTests`. No UI surfacing (not requested); GUI/keyboard acceptance still open. |
 | AVL-P2-012 Ctrl+R recall | ~~Implemented / automated proof~~; manual acceptance remaining | Company-scope privacy (`testRecentNarrationsIsScopedToCompany`), distinct/most-recent-first ordering, limit, and Narration-only focus eligibility (S3, `KeyboardShortcutMapTests`) all proven. No cross-user boundary applies — single-operator per-company local database, no user/session concept exists. FY-scoping is intentionally absent (recall spans company history, standard Tally behavior), not a gap. Keyboard/VoiceOver acceptance open. |
 | AVL-P2-013 Ctrl+I/PgUp/PgDn | ~~Implemented / automated proof~~; manual acceptance remaining | Selection movement and boundary clamping fully proven (`testSelectNextAndPreviousMoveThroughLoadedPageWithoutTouchingFilterState`, `testSelectNextAtLastRowIsANoOp`). Ctrl+I structurally cannot mutate list/filter/selection state — its handler never references the list view model, only routes through `AppActionRegistry.perform` to open a fresh journal sheet. Dirty-state cooperation is inherent via the existing focus-scoped `.onKeyPress` (fires only when the voucher table owns focus, never during text entry). Keyboard/VoiceOver acceptance open. |
 | Voucher PR1b dirty navigation | ~~Implemented / automated proof~~; manual acceptance remaining | Direct-replacement/nested-provider bypass audit in §6.7 and §7 H6/H7 closed; full interactive dirty-transition acceptance open. |
