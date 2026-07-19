@@ -214,6 +214,50 @@ final class ItemInvoiceServiceTests: XCTestCase {
         }
     }
 
+    /// Phase 1.4 staged-rollback matrix: a failure discovered at the
+    /// inventory stage (unavailable main location, past header/accounting
+    /// construction in the canonical posting order) must leave zero rows in
+    /// every canonical/legacy table it would have touched — proving the
+    /// "one outer re-entrant transaction" claim empirically, not just
+    /// architecturally. Existing coverage only asserted the thrown error
+    /// type, never the absence of a partial write.
+    func testInventoryStageFailureLeavesNoPartialWriteAcrossAnyTable() throws {
+        let fx = try makeFixture()
+        try fx.tc.db.execute(
+            "UPDATE avelo_inventory_locations SET is_active = 0 WHERE company_id = ? AND code = 'MAIN'",
+            [.text(fx.tc.companyId.uuidString)]
+        )
+
+        let tables = ["avelo_vouchers", "trn_accounting", "trn_inventory", "trn_inventory_cost_allocations", "avelo_audit_events"]
+        func counts() throws -> [String: Int64] {
+            var result: [String: Int64] = [:]
+            for table in tables {
+                result[table] = try fx.tc.db.queryOne(
+                    "SELECT COUNT(*) FROM \(table) WHERE company_id = ?", bind: [.text(fx.tc.companyId.uuidString)]
+                ) { $0.int(0) } ?? -1
+            }
+            return result
+        }
+        // Fixture setup (account creation, company GSTIN update) legitimately
+        // writes its own audit events before this attempt — baseline before
+        // the failed post, not an absolute zero, is the correct invariant.
+        let before = try counts()
+
+        XCTAssertThrowsError(try ItemInvoiceService(db: fx.tc.db, companyId: fx.tc.companyId).post(
+            voucherTypeCode: .purchase,
+            date: DateFormatters.parseDate("2024-06-01")!,
+            partyAccountId: fx.supplierId,
+            salesOrPurchaseLedgerId: fx.purchaseId,
+            items: [.init(itemId: fx.itemId, quantity: 1, ratePaise: 10_000)],
+            in: fx.tc.fy
+        ))
+
+        let after = try counts()
+        for table in tables {
+            XCTAssertEqual(after[table], before[table], "\(table) row count must be unchanged after a failed post — no partial write")
+        }
+    }
+
     // MARK: - Purchase, intra-state (company MH, party also MH)
 
     func testPurchaseItemInvoiceSplitsCGSTSGSTForIntraState() throws {
