@@ -302,10 +302,45 @@ sign-off. Automated proof does not substitute for this.
 PR2b, PR3b, PR4, and PR5 requirements, prerequisites, test matrices, and exit
 criteria remain unchanged and unstruck.
 
-## 8. Multi-window and undo/redo
+## 8. Multi-window and undo/redo (deferred — design-first, not close-a-gap)
 
 Unchanged and open. `AVL-P1-017 Registry Connection Consistency Spike` must
 close before GUI multi-window expansion. `AVL-P1-025` undo/redo remains missing.
+
+**Current state:**
+
+- AVL-P1-017 multi-window: registry/router/ViewModel architecture is
+  single-window today; no shared, tested contract for per-window vs global
+  editor/draft state.
+- AVL-P1-025 undo/redo: no command/memento/history implementation exists;
+  editor actions apply directly to state with no reversible stack.
+
+**Nature of work:** explicitly design-first feature work, not close-a-gap
+proof. Multi-window requires a spike observing real GUI/editor behavior to
+define ownership of registry, router, and draft lifecycles across windows.
+Undo/redo requires choosing and designing a history model (command vs
+memento) integrated into voucher/editor flows with well-defined user
+expectations. Both cut across business/ViewModel/GUI layers and cannot be
+safely reduced to "add tests and tweak an ordering bug."
+
+**Preconditions for resuming:** dedicated design sessions to run the
+multi-window registry consistency spike with realistic scenarios (multiple
+windows editing drafts, navigating reports, posting), and to select/sketch an
+undo/redo design (likely command-based) with clear scope — which actions are
+undoable, per-session limits, how dirty state interacts with history. Updated
+technical notes must capture desired invariants (no double-edit of the same
+draft across windows, undo/redo only the user's own actions, bounded history
+per session) and impact on existing contracts (dirty routing, Day Book loop,
+V027 posting).
+
+**Next steps when picked up:**
+
+- AVL-P1-017: finalize the multi-window state ownership diagram (per-window
+  vs global); implement registry/router changes; add targeted tests for
+  concurrent window scenarios.
+- AVL-P1-025: implement command/history model for voucher/editor; add tests
+  covering undo/redo correctness, history limits, and interaction with
+  posting/draft validation.
 
 ## 9. P0 blockers
 
@@ -313,14 +348,46 @@ close before GUI multi-window expansion. `AVL-P1-025` undo/redo remains missing.
 implementation/proof landed.~~ Their named manual acceptance requirements stay
 open exactly as Revision 3 specifies.
 
-## 10. Units of measure
+## 10. Units of measure (deferred — domain discovery required)
 
 Discovery required before broader UOM work. No implicit base-unit calculation.
+
+**Current state:** no broader UOM implementation exists; plan explicitly
+states discovery is required before broader UOM work and forbids implicit
+base-unit calculation.
+
+**Nature of work:** domain and design-first work requiring human input. UOM
+discovery requires accountants/operators to enumerate real UOM patterns
+(boxes vs pieces, kg vs g, packs vs units) and constraints — this cannot be
+done as a purely technical proof slice.
+
+**Preconditions for resuming:** scheduled domain discovery sessions with
+accountants/operators to collect UOM use cases, allowable conversions, and
+accounting expectations; decide explicit vs implicit conversion rules and how
+inventory valuation should treat UOM.
+
+**Next steps when picked up:** turn discovery into a concrete UOM spec
+(schema implications, validation rules, posting interaction); implement
+minimal safe UOM support consistent with that spec and V027.
 
 ## 11–14. Phase 1-A, Phase 1-B, Phase 1-C, Phase 2
 
 All listed later backlog remains open in Revision 3 order. Do not infer closure
 from models, routes, migrations, or compatibility adapters.
+
+### H22 docs and backlog ordering (deferred)
+
+**Current state:** documentation and the Phase 1-A/B/C/2 backlog remain open
+and unstruck; behavior is still evolving and must be captured canonically
+once designs settle.
+
+**Nature of work:** best done once key behaviors (V027 parity, Day Book loop,
+comparative reports, shortcuts, undo/redo, multi-window) are stable, so docs
+reflect final contracts rather than a moving target.
+
+**Next steps when picked up:** update canonical docs to reflect final
+behaviors; keep the Phase 1-A/B/C/2 backlog aligned with actual
+implementation status.
 
 ## 15. Binding execution order
 
