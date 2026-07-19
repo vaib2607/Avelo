@@ -85,21 +85,23 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 
 ## 3. Reconciliation and release evidence
 
-~~`make test` passed (604/604, 8 skipped) after every commit through the
-H6/§7/V027 Phase 1–3 work below.~~ `make rc-local`/bundle validation/
-self-test/`make launch-smoke` and the bundle executable SHA-256
-(`25a702c569d0fcfbe0986d6ff5da18499a6e36abf10b162f3f70bc94aa22e8ec`) are from
-the earlier fee084f-era session and have **not been re-run** since —
-re-validate before relying on them for release evidence. `make rule-audit`'s
-`docs-check` step fails in this environment on `rg: command not found`
-(missing ripgrep binary) — an environment/toolchain gap, not a code defect;
-net-check/R-16/R-15/R-4 all pass.
+~~`make test` (610/610, 8 skipped), `make rule-audit` (net-check/R-16/R-15/
+R-4/docs-check all PASS), `make rc-local`, bundle validation, bundle
+self-test, and `make launch-smoke` all re-run and passed on final SHA
+`28ac559` (2026-07-20).~~ `rg` (ripgrep 15.2.0) installed via `brew install
+ripgrep`, closing the previous `docs-check` environment gap — no code or
+docs changed to work around it, the gate now genuinely passes. New bundle
+executable SHA-256: `199cd363e37e7bfe9d61f2427f2fa829e030b94940cafea8a8d99b7628469d62`
+(supersedes the stale fee084f-era `25a702c5...` value). Note:
+`Scripts/launch_smoke.sh` re-runs `validate_bundle.sh` + `bundle_selftest.sh`
+non-interactively — it does not actually open a GUI window, so "Launch smoke
+OK" here is not the same as confirming the bundled app opens cleanly on a
+real Mac; that still needs the manual GUI run the script's own output names.
 
 Still required: named accountant, operator, keyboard/accessibility/visual/PDF/
 print acceptance; distribution-channel decision; Developer ID, hardened runtime,
-notarization, stapling, Gatekeeper, and clean-Mac install/upgrade proof;
-fresh `make rc-local`/bundle/launch-smoke run on final SHA; `rg` installed so
-`make rule-audit` can complete.
+notarization, stapling, Gatekeeper, and clean-Mac install/upgrade proof; an
+actual GUI launch of the bundle (not just the non-interactive self-test).
 
 ## 4. V027 — dual-track accounting and inventory
 
