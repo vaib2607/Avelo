@@ -65,7 +65,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | --- | --- | --- |
 | #9b Balance Sheet | ~~DONE~~ | Scoped immutable `BalanceSheetScope`, selected-FY integrity/activity reconciliation, atomic comparison publication, same-company FY reset, automated proof, and bundled/accountant acceptance are complete. `BalanceSheetReconciliationTests` 10/0 and `ReportsViewModelTests` 14/0. |
 | #10 item-invoice default | ~~Implemented / automated proof~~; manual acceptance remaining | `VoucherEditViewModel`, `NewVoucherSheet`, draft tests; GUI/keyboard acceptance open. |
-| V027 dual track | Partial / proof remaining | Sections 4.1–4.6 landed below; direct integrity matrix, malformed persisted-data matrix, and stock valuation parity now proven (§4.4/§4.6/§4.7, Phase 1.1–1.3). One representative staged-rollback case proven; full 5-stage rollback matrix, reversal/report-export parity, and manual acceptance remain. |
+| V027 dual track | Partial / proof remaining | Sections 4.1–4.6 landed below; integrity matrix, malformed persisted-data matrix, staged-rollback matrix (4/5 stages), stock valuation parity, reversal parity (both paths), and GST Summary parity all proven (§4.4/§4.6/§4.7). Remaining: broader historic reversal fixtures, report/export parity for Outstanding/Cash Flow/Stock Ageing/PDF export, and manual acceptance. |
 | AVL-P0-020 keyboard baseline | ~~Implemented / automated proof~~; manual acceptance remaining | GUI traversal and VoiceOver acceptance open. |
 | AVL-P0-033 inventory capability | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant capability-toggle acceptance open. |
 | AVL-P0-034 mutation audit | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant audit-diff acceptance open. |
@@ -161,10 +161,26 @@ than a migration-time check. Evidence: `V027MigrationParityTests`
 `testDuplicateLegacyLedgerLineIdFailsClosedAtLegacySchema`,
 `testNegativeLegacyStockMovementQuantityFailsClosedAtLegacySchema`).
 
-Remaining proof: one representative staged-rollback case is proven (§4.7);
-the full composite failure boundary across all five posting stages
-(validation, accounting, inventory, allocation, audit write) is not yet a
-complete matrix.
+~~Staged-rollback matrix (4 of 5 stages):~~ validation, accounting, inventory,
+and audit-write stages each proven to leave zero row-count delta across
+`avelo_vouchers`/`trn_accounting`/`trn_inventory`/
+`trn_inventory_cost_allocations`/`avelo_audit_events`. Accounting and
+audit-write stages use an injected temporary SQLite trigger to force failure
+precisely inside the transaction (same technique as
+`InventoryCostAllocationServiceTests
+.testAuditFailureRollsBackAllocationAndLandedValue`), since no natural
+validation predicate reaches that deep. Evidence: `ItemInvoiceServiceTests`
+(`testValidationStageFailureLeavesNoPartialWriteAcrossAnyTable`,
+`testAccountingStageFailureLeavesNoPartialWriteAcrossAnyTable`,
+`testInventoryStageFailureLeavesNoPartialWriteAcrossAnyTable`,
+`testAuditWriteStageFailureLeavesNoPartialWriteAcrossAnyTable`). The
+**allocation** stage doesn't belong to this pipeline at all —
+`ItemInvoiceService.post()` never calls `InventoryCostAllocationService`
+inline (allocation is posted separately, after the voucher exists) — and is
+already proven by that service's own tests:
+`testAllocationRejectsRecoverableGSTSourceAndLeavesTargetsUntouched`
+(validation-stage) and `testAuditFailureRollsBackAllocationAndLandedValue`
+(audit-write-stage).
 
 ### 4.5 Inventory policy
 
@@ -201,8 +217,24 @@ migration, without re-deriving FIFO/weighted-average layer logic. Evidence:
 canonical `trn_accounting_compat` view directly with existing behavioral
 tests; no separate parity harness was needed there.
 
-Remaining proof: broader historic reversal fixtures and full report/export
-canonical parity beyond stock valuation and trial balance/P&L/Day Book.
+~~Reversal parity:~~ both reversal code paths proven to net the canonical
+tracks to zero — plain-voucher reversal (`VoucherService.reverse`) nets
+`trn_accounting` per ledger account; item-invoice reversal
+(`ItemInvoiceService.reverse`) nets both `trn_accounting` per account and
+`trn_inventory` net quantity per item. Evidence:
+`ReversalReconciliationTests.testPlainVoucherReversalNetsAccountingTrackToZero`,
+`ItemInvoiceServiceTests.testItemInvoiceReversalNetsCanonicalTracksToZero`.
+
+~~GST Summary report parity:~~ `ReportService.gstSummary`'s output/input tax
+totals reconcile against a raw SQL sum over `trn_accounting`, using direct
+journal postings to isolate the report's own aggregation from
+`ItemInvoiceService`'s GST computation (covered separately). Evidence:
+`GSTSummaryReconciliationTests.testGstSummaryOutputAndInputTaxReconcileToRawLedgerSums`.
+
+Remaining proof: broader historic reversal fixtures (multi-line, partial,
+cross-FY reversal scenarios beyond the two proven cases) and report/export
+canonical parity for report types still uncovered — Outstanding, Cash Flow,
+Stock Ageing, and Invoice PDF export have no reconciliation harness.
 
 ### 4.7 V027 exit
 
@@ -215,22 +247,26 @@ Completed automated slices:
   self-test, and launch smoke.~~
 - ~~direct integrity matrix and malformed persisted-data matrix~~ (§4.4).
 - ~~FIFO/weighted-average stock valuation canonical parity~~ (§4.6).
-- ~~one representative staged-rollback case:~~ an inventory-stage failure
-  (unavailable main location, discovered after header/accounting
-  construction in the canonical posting order) leaves row counts unchanged
-  across `avelo_vouchers`, `trn_accounting`, `trn_inventory`,
+- ~~staged-rollback matrix, 4 of 5 stages:~~ validation, accounting,
+  inventory, and audit-write stages all leave row counts unchanged across
+  `avelo_vouchers`, `trn_accounting`, `trn_inventory`,
   `trn_inventory_cost_allocations`, and `avelo_audit_events` — empirically
   proving the single outer re-entrant transaction claim rather than only
-  asserting the thrown error type. Evidence: `ItemInvoiceServiceTests`
-  (`testInventoryStageFailureLeavesNoPartialWriteAcrossAnyTable`).
+  asserting the thrown error type. The allocation stage is proven separately
+  by `InventoryCostAllocationServiceTests` since it isn't part of this
+  pipeline. Evidence: `ItemInvoiceServiceTests`
+  (`testValidationStageFailureLeavesNoPartialWriteAcrossAnyTable`,
+  `testAccountingStageFailureLeavesNoPartialWriteAcrossAnyTable`,
+  `testInventoryStageFailureLeavesNoPartialWriteAcrossAnyTable`,
+  `testAuditWriteStageFailureLeavesNoPartialWriteAcrossAnyTable`).
+- ~~reversal canonical parity~~ (plain-voucher and item-invoice paths) and
+  ~~GST Summary report parity~~ — see §4.6.
 
 Open before V027 release-ready:
 
-- full staged-rollback matrix across all five posting stages (validation,
-  accounting, inventory, allocation, audit write) — only the inventory
-  stage has a proven case;
-- reversal and report/export canonical parity beyond stock
-  valuation/trial-balance/P&L/Day Book;
+- broader historic reversal fixtures (multi-line/partial/cross-FY, beyond
+  the two proven single-item cases) and report/export canonical parity for
+  Outstanding, Cash Flow, Stock Ageing, and Invoice PDF export;
 - named accountant/operator acceptance;
 - item-invoice default bundled GUI acceptance.
 
