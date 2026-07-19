@@ -29,12 +29,12 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | AVL-P1-025 undo/redo | Missing | Full design and implementation open. |
 | AVL-P1-026 Alt+C | ~~Implemented / automated proof~~; manual acceptance remaining | Focus return/audit GUI proof open. |
 | AVL-P1-036 comparative reports | Partial | Atomic publish, general period configuration, acceptance open. |
-| AVL-P1-037 Day Book | Partial | Durable drill/edit/cancel/return loop open. |
+| AVL-P1-037 Day Book | ~~Implemented / automated proof~~; manual acceptance remaining | Durable drill/edit/cancel/return loop proven (H14–H17, see §7); GUI/visual acceptance open. |
 | AVL-P2-011 Alt+2 duplicate | Implemented / proof remaining | Posted-flow lineage and fresh-number proof open. |
 | AVL-P2-012 Ctrl+R recall | Implemented / proof remaining | Shortcut/privacy/context acceptance open. |
 | AVL-P2-013 Ctrl+I/PgUp/PgDn | Partial | Selection/scroll/dirty/text-entry browse contract open. |
-| Voucher PR1b dirty navigation | Partial | Remaining bypass audit in §6.7 open. |
-| Day Book shell | Implemented | Durable return/state/action work open. |
+| Voucher PR1b dirty navigation | ~~Implemented / automated proof~~; manual acceptance remaining | Direct-replacement/nested-provider bypass audit in §6.7 and §7 H6/H7 closed; full interactive dirty-transition acceptance open. |
+| Day Book shell | ~~Implemented / automated proof~~; manual acceptance remaining | H14–H17 durable loop (drill-in → edit/cancel/reverse → dirty gate → scope-preserving reload) proven at ViewModel/router level; GUI scroll/visual acceptance open. |
 | Comparative prior-year columns | Implemented | Atomicity/reconciliation completion open. |
 
 ## 3. Reconciliation and release evidence
@@ -195,13 +195,23 @@ editor/table commands. Context/collision/manual acceptance proof remains open.
 **PARTIAL — current implementation evidence:** `AppRouter` now dirty-gates
 ledger/report deep links, capability eviction, root sheet-binding dismissal,
 financial-year switching, company open/close, and post-success dismissal
-through one pending intent. `AppRouterTests` 11/0 and
-`AppEnvironmentFlowTests.testDirtyEditorDefersCompanyOpenUntilDiscard` and
-`testDirtyEditorDefersFinancialYearSwitchUntilDiscard` prove Keep Editing,
-Discard, one pending action, capability-route retention, and company/FY
-deferral. The direct-replacement audit beyond voucher paths,
-nested-account provider lifecycle acceptance, and the full dirty-transition
-matrix remain mandatory. H7/H10/H11 remain open.
+through one pending intent. `AppRouterTests` and
+`AppEnvironmentFlowTests.testDirtyEditorDefersCompanyOpenUntilDiscard`,
+`testDirtyEditorDefersFinancialYearSwitchUntilDiscard`,
+`testDirtyEditorDefersCompanyCloseUntilDiscard` prove Keep Editing, Discard,
+one pending action (including repeated/distinct requests — first retained,
+later rejected), capability-route retention, and company/FY/close deferral.
+~~Direct-replacement audit beyond voucher paths: every non-voucher sheet's
+self-dismiss (`router.presentedSheet = nil` on its own Cancel/Close) is
+structurally safe — `presentedSheet` is a single optional, so no sheet can
+replace another sheet's dirty editor.~~ ~~Nested-account provider lifecycle:
+`NewVoucherSheet`'s isolated `accountCreationRouter` cannot observe or clear
+the parent editor's pending navigation
+(`testNestedAccountCreationRouterCannotObserveOrClearParentPendingNavigation`).~~
+The full interactive dirty-transition matrix (keyboard/VoiceOver/visual)
+remains mandatory. H7 is DONE for every enumerated `AppRouter`-owned
+transition (see §7); H10/H11 retain their prior precise status, not broadened
+here.
 
 ### 6.8 Voucher acceptance order
 
@@ -216,9 +226,46 @@ Retain Revision 3 H1–H23 scorecard and contracts unchanged:
   resolution.~~
 - ~~H5 return-stack primitives, H8 provider wiring, H9 snapshots, H12 context
   shape, and H13 Day Book shell.~~
-- H6 company-switch dirty-order proof, H7/H10/H11 dirty closure, H14–H17 Day
-  Book durable loop, H18–H19 atomic comparative, H20–H21 zoom/restoration,
-  H22 docs, and H23 manual matrix remain open as specified in Revision 3.
+- ~~H6 company-switch dirty-order proof.~~ Traced every company-switch entry
+  point (`openCompany`, `closeCompany`, `switchFinancialYear`) to confirm each
+  routes through `AppRouter`'s single pending-intent gate before any mutation.
+  Closed three previously-unproven gaps: company close was never proven
+  dirty-gated (only clean close was tested); two distinct pending
+  company-switch targets while dirty had no proof that only the first
+  survives; and the discard path had no proof that stale `accountTree`/route/
+  sheet state is rebuilt, not just `companyId`. Evidence:
+  `testDirtyEditorDefersCompanyCloseUntilDiscard`,
+  `testRepeatedCompanySwitchRequestsRetainOnlyTheFirstPendingIntent`,
+  `testDiscardedCompanySwitchLeavesNoStaleAccountTreeOrRouteState`
+  (`AppEnvironmentFlowTests`), `testSecondDistinctExternalContextRequestDoesNotReplaceFirst`
+  (`AppRouterTests`). Repeated-request policy is reject-subsequent/retain-first,
+  matching `AppRouter.requestNavigation`'s existing guard. No production code
+  changed — the ordering was already correct; only the proof was missing.
+- H7 dirty closure: ~~DONE for every enumerated `AppRouter`-owned transition~~
+  (sheet dismissal, deep links, capability eviction, company open/close, FY
+  switch, nested-account provider isolation). Window/app-lifecycle dirty
+  closure is N/A — no such route exists in source. H10/H11 retain their prior
+  precise status; not broadened by this work.
+- ~~H14–H17 Day Book durable loop.~~ Audited row → drill-in → edit/cancel/
+  reverse → dirty protection → return-to-scope → refresh: drill-in and
+  Reverse both route through the single canonical `router.present` gate
+  (`ReportsNavigation.openVoucher`); a successful edit/reverse calls
+  `env.notifyDataChanged()`, which `ReportsView` observes to reload the
+  current selection while reusing `selectedDay` rather than resetting it;
+  stale row selection is cleared only when the selected voucher no longer
+  appears in the reloaded rows. No bypass or second route found; no
+  production code changed. Evidence:
+  `testDayBookReloadPreservesSelectedDayAndValidSelection`,
+  `testDayBookReloadClearsSelectionWhenVoucherNoLongerPresentForDay`
+  (`ReportsViewModelTests`). Table row identity (`Voucher.ID`) is what SwiftUI
+  relies on for scroll-position stability across the reload; that visual
+  behavior is GUI-only and stays open.
+- H18–H19 atomic comparative, H20–H21 zoom/restoration, H22 docs, and H23
+  manual matrix remain open as specified in Revision 3.
+
+Manual/GUI acceptance still open for H6, H7, and H14–H17: keyboard/VoiceOver
+traversal, visual scroll/selection behavior, and named accountant/operator
+sign-off. Automated proof does not substitute for this.
 
 PR2b, PR3b, PR4, and PR5 requirements, prerequisites, test matrices, and exit
 criteria remain unchanged and unstruck.
