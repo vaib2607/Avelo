@@ -11,9 +11,10 @@ import XCTest
 /// computation, which is already covered separately by
 /// `ItemInvoiceServiceTests` (e.g. `testSalesItemInvoicePostsIGSTForInterState`).
 ///
-/// Other report/export types remain out of scope for this pass: Outstanding,
-/// Cash Flow, Stock Ageing, and Invoice PDF export have no reconciliation
-/// harness yet (Rev3 §4.6).
+/// Outstanding, Cash Flow, and Stock Ageing parity are covered separately by
+/// `OutstandingReconciliationTests`, `CashFlowReconciliationTests`, and
+/// `StockAgeingReconciliationTests`. Invoice PDF export has no reconciliation
+/// harness — the feature does not exist in this codebase (Rev3 §4.6).
 final class GSTSummaryReconciliationTests: XCTestCase {
 
     func testGstSummaryOutputAndInputTaxReconcileToRawLedgerSums() throws {
