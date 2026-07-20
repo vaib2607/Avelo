@@ -25,22 +25,28 @@ conflated:
   preconditions for resuming, and next steps, so it can be picked up as its
   own scoped session:
   - **Phase 4** (§8): AVL-P1-017 multi-window (registry/router/draft
-    ownership spike required) and AVL-P1-025 undo/redo (command-history
-    design required).
+    ownership design complete, implementation not yet started). AVL-P1-025
+    undo/redo, also originally logged here, is now designed **and**
+    implemented — see the closed-slices list below.
   - **Phase 5** (§10, §11–14): UOM discovery (needs accountant/operator input
     on real-world unit patterns before any schema work) and H22 canonical
     documentation (best done once the above designs settle, not before).
-  - Three smaller design-first slices originally logged here have since been
-    designed and closed: Alt+2 duplicate lineage tracking (§2, AVL-P2-011)
-    via `MigrationV031` (additive, self-referencing, follows the existing
-    `cancellation_voucher_id` pattern exactly); the comparative-period-
-    configuration DSL (§2, AVL-P1-036) via `ComparativePeriod` (pure
-    date-shift value type, no schema/service-layer change, default
-    preserves prior behavior exactly); and H20–H21 zoom/restoration (§7) via
-    `ReportsNavigation.openLedger`/`returnToPreviousReport`, wiring the
-    already-existing `AppRouter` return-stack primitives once the actual
-    blast radius (only `openLedger`, not every drill-in) was traced. None
-    were a cross-cutting redesign once actually scoped.
+  - Four of the five smaller/Phase-4 design-first slices originally logged
+    here have since been designed and closed: Alt+2 duplicate lineage
+    tracking (§2, AVL-P2-011) via `MigrationV031` (additive,
+    self-referencing, follows the existing `cancellation_voucher_id`
+    pattern exactly); the comparative-period-configuration DSL (§2,
+    AVL-P1-036) via `ComparativePeriod` (pure date-shift value type, no
+    schema/service-layer change, default preserves prior behavior exactly);
+    H20–H21 zoom/restoration (§7) via `ReportsNavigation.openLedger`/
+    `returnToPreviousReport`, wiring the already-existing `AppRouter`
+    return-stack primitives once the actual blast radius (only
+    `openLedger`, not every drill-in) was traced; and AVL-P1-025 undo/redo
+    (§8) via a memento-based history over `VoucherEditViewModel`'s existing
+    `EditorSnapshot` type, no Command-per-keystroke graph. None were a
+    cross-cutting redesign once actually scoped. Only AVL-P1-017
+    multi-window remains implementation-pending — its own design (§8) is
+    likewise complete.
 
   Parking one of these is not the same as closing it — none of the above may
   be marked DONE from a future proof-only pass; each requires its own design
@@ -75,7 +81,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | AVL-P0-034 mutation audit | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant audit-diff acceptance open. |
 | AVL-P0-035 automatic inventory modes | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant workflow acceptance open. |
 | AVL-P0-036 legacy restore remapping | ~~Implemented / automated proof~~; operator acceptance remaining | Operator restore acceptance open. |
-| AVL-P1-017 multi-window | Proof remaining | Registry consistency spike, editor/draft/window acceptance open. |
+| AVL-P1-017 multi-window | ~~Registry consistency spike/design~~; implementation not started | Full per-window vs global ownership design closed (§8): `AppRouter`/`KeyboardBridge`/new `WindowCompanyContext` go per-window; `DatabaseManager`/`KeyboardMonitor` stay shared. Two concrete conflicts found and given a fix outline: `DatabaseManager.closeCompany` has no reference counting, and no lock/lease exists for same-voucher two-window edits (documented as accepted last-write-wins, matching existing single-window behavior). No schema change required. Implementation session still needed — design-only per that session's explicit scope. |
 | AVL-P1-025 undo/redo | ~~Implemented / automated proof~~; manual acceptance remaining | Memento-based history over the existing `EditorSnapshot` type (a Command-per-keystroke design doesn't fit this editor's two-way-binding fields). Cmd+Z/Shift+Cmd+Z, gated by the same `isEditableTextFocused` check as Ctrl+V/Ctrl+R so native text-field undo is never hijacked. Scoped to ledger-mode fields (item-invoice mode is a documented gap — `EditorSnapshot.ItemLine` doesn't capture full `ItemLineRow` fidelity). Bounded at 50 entries, sealed on successful post — never reaches posted `Voucher`/`LedgerLine` rows. A real redundant-checkpoint bug (dual-stack pre/post-mutation semantics conflict) was found and fixed before any tests were written, by moving to a single history-list-plus-cursor model. Evidence: `VoucherDraftTests` (7 new tests: round-trip, redo-invalidation, independent add/remove, bounded-depth eviction, seal-clears-history, posted-data non-interference). Keyboard/VoiceOver acceptance open. |
 | AVL-P1-026 Alt+C | ~~Implemented / automated proof~~; manual acceptance remaining | Focus return/audit GUI proof open. |
 | AVL-P1-036 comparative reports | ~~Atomic publish~~; ~~period configuration~~ | Atomic publish closed via §7 H18–H19 fix. **Period configuration closed**: `ComparativePeriod` (priorYear/priorMonth/priorQuarter/custom(monthsBack:)) replaces the hardcoded `priorYear()`, used identically by Trial Balance/P&L/Balance Sheet via `ReportsViewModel.comparativePeriod` (default `.priorYear`, bit-for-bit preserves prior behavior). No `ReportService` changes — the DSL only decides which date to ask for. `comparisonPeriods[]` from the original spec was scoped to a single `Optional` value: the UI renders exactly one comparative column per report today, a real array would be dead plumbing; documented as a non-breaking future extension. Evidence: `ComparativePeriodTests`, `ReportsViewModelTests` (priorMonth/priorQuarter reconciliation + atomic-publish-under-non-default-mode). GUI mode-picker not built (task scoped this as internal/labels-only); GUI acceptance open. |
@@ -96,7 +102,12 @@ self-test, and `make launch-smoke` all re-run and passed on final SHA
 ripgrep`, closing the previous `docs-check` environment gap — no code or
 docs changed to work around it, the gate now genuinely passes. New bundle
 executable SHA-256: `199cd363e37e7bfe9d61f2427f2fa829e030b94940cafea8a8d99b7628469d62`
-(supersedes the stale fee084f-era `25a702c5...` value). Note:
+(supersedes the stale fee084f-era `25a702c5...` value). `make test` was
+re-confirmed green again at 636/636 on `d2c8d55` (2026-07-20, after the
+Alt+2 lineage/comparative-DSL/H20-H21/undo-redo work) — `make rc-local`/
+bundle validation/self-test/launch-smoke were **not** re-run on that later
+SHA; the `28ac559` bundle evidence above predates those four features and
+should be refreshed before relying on it for a release decision. Note:
 `Scripts/launch_smoke.sh` re-runs `validate_bundle.sh` + `bundle_selftest.sh`
 non-interactively — it does not actually open a GUI window, so "Launch smoke
 OK" here is not the same as confirming the bundled app opens cleanly on a
@@ -308,14 +319,15 @@ newline input, while the action bar preserves Command-Return. Both sheets use
 the shared focus vocabulary and show local inline failure context. Ledger and
 item cascades are model-owned, and item completion uses the exact posting
 predicate (including zero-rate validity and one trailing blank-row reuse).
-Focused evidence: `VoucherDraftTests` 45/0, `AppRouterTests` 13/0,
+Focused evidence: `VoucherDraftTests` 54/0, `AppRouterTests` 13/0,
 `AppEnvironmentFlowTests` 18/0, and `KeyboardShortcutMapTests` 9/0
-(counts grown since the original 2026-07-19 pass as H6/S9/S11/§6.7 proof was
-added — see §7 and §6.7 below); `make test` (604/604) and `git diff --check`
-passed on the active worktree. `make rule-audit` blocked only on missing
-`rg` (§3). Bundle validation/bundle self-test/launch smoke are from the
-original fee084f-era pass and have not been re-run since; those never
-replace the required interactive keyboard/VoiceOver acceptance regardless.
+(counts grown since the original 2026-07-19 pass as H6/S9/S11/§6.7/Alt+2
+lineage/undo-redo proof was added — see §7, §6.7, and §8 below); full
+`make test` last confirmed at 636/636 on `d2c8d55` and `git diff --check`
+clean. `make rule-audit` fully green since `rg` was installed (§3). Bundle
+validation/bundle self-test/launch smoke were last actually re-run on
+`28ac559` (§3) — not re-run again since; that gap and the required
+interactive keyboard/VoiceOver acceptance both remain open regardless.
 
 The item picker now provides focused searchable selection and an explicit
 commit callback. Still open: full create/edit focus and cascade UI matrix,
@@ -444,9 +456,10 @@ Retain Revision 3 H1–H23 scorecard and contracts unchanged:
   GUI acceptance (visual Back-button behavior, scroll) remains open.
 - H22 docs and H23 manual matrix remain open as specified in Revision 3.
 
-Manual/GUI acceptance still open for H6, H7, and H14–H17: keyboard/VoiceOver
-traversal, visual scroll/selection behavior, and named accountant/operator
-sign-off. Automated proof does not substitute for this.
+Manual/GUI acceptance still open for H6, H7, H14–H17, H18–H19, and H20–H21:
+keyboard/VoiceOver traversal, visual scroll/selection/Back-button behavior,
+and named accountant/operator sign-off. Automated proof does not substitute
+for this.
 
 PR2b, PR3b, PR4, and PR5 requirements, prerequisites, test matrices, and exit
 criteria remain unchanged and unstruck.
