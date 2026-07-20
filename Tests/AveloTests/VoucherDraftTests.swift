@@ -988,4 +988,126 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertTrue(vm.isCashOrBank(account("CASH_IN_HAND", group: assetGroup)))        // legacy seed cash ledger
         XCTAssertFalse(vm.isCashOrBank(account("SUNDRY_DEBTORS", group: assetGroup)))
     }
+
+    // MARK: - AVL-P1-025 undo/redo
+
+    @MainActor
+    func testUndoRestoresLineCountAfterAddLine() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.captureCleanEditorState()
+        let baselineCount = vm.lines.count
+
+        vm.addLine()
+        XCTAssertEqual(vm.lines.count, baselineCount + 1)
+        XCTAssertTrue(vm.canUndo)
+
+        vm.undo()
+        XCTAssertEqual(vm.lines.count, baselineCount)
+    }
+
+    @MainActor
+    func testRedoReappliesUndoneAddLine() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.captureCleanEditorState()
+        let baselineCount = vm.lines.count
+
+        vm.addLine()
+        let afterAddCount = vm.lines.count
+        vm.undo()
+        XCTAssertEqual(vm.lines.count, baselineCount)
+        XCTAssertTrue(vm.canRedo)
+
+        vm.redo()
+        XCTAssertEqual(vm.lines.count, afterAddCount)
+        XCTAssertFalse(vm.canRedo)
+    }
+
+    @MainActor
+    func testNewCheckpointAfterUndoClearsRedoStack() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.captureCleanEditorState()
+
+        vm.addLine()
+        vm.undo()
+        XCTAssertTrue(vm.canRedo)
+
+        vm.addLine()
+        XCTAssertFalse(vm.canRedo, "A new checkpoint after undo must invalidate anything the user could have redone")
+    }
+
+    @MainActor
+    func testAddLineAndRemoveLineAreIndependentlyUndoable() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.captureCleanEditorState()
+        let baselineCount = vm.lines.count
+
+        vm.addLine()
+        let addedId = vm.lines.last!.id
+        vm.removeLine(addedId)
+        XCTAssertEqual(vm.lines.count, baselineCount)
+
+        vm.undo() // undoes the remove
+        XCTAssertEqual(vm.lines.count, baselineCount + 1)
+
+        vm.undo() // undoes the add
+        XCTAssertEqual(vm.lines.count, baselineCount)
+        XCTAssertFalse(vm.canUndo)
+    }
+
+    @MainActor
+    func testUndoStackBoundedAtMaxHistoryDepth() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.captureCleanEditorState()
+
+        for _ in 0..<60 { vm.addLine() }
+
+        var undoCount = 0
+        while vm.canUndo {
+            vm.undo()
+            undoCount += 1
+        }
+        XCTAssertEqual(undoCount, 49, "History is capped at 50 entries (1 baseline + 49 undoable steps), oldest evicted first")
+    }
+
+    @MainActor
+    func testUndoStackClearedAfterSealingHistory() throws {
+        let tc = try TestCompany.make()
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.captureCleanEditorState()
+        vm.addLine()
+        XCTAssertTrue(vm.canUndo)
+
+        // Mirrors what NewVoucherSheet/EditVoucherSheet call on successful
+        // post — no lingering reference may offer "undo" into a now-posted,
+        // immutable voucher.
+        vm.sealUndoHistory()
+
+        XCTAssertFalse(vm.canUndo)
+        XCTAssertFalse(vm.canRedo)
+    }
+
+    @MainActor
+    func testUndoAfterSealingNeverTouchesPostedVoucherOrLedgerLines() throws {
+        let tc = try TestCompany.make()
+        let posted = try VoucherService(db: tc.db, companyId: tc.companyId).post(draft: tc.draft(on: "2024-06-01", lines: [
+            tc.line(tc.cashId, 1_000, .debit), tc.line(tc.salesId, 1_000, .credit)
+        ]), in: tc.fy).voucher
+        let linesBefore = try VoucherService(db: tc.db, companyId: tc.companyId).lines(for: posted.id)
+
+        let vm = VoucherEditViewModel(companyId: tc.companyId, db: tc.db, fyId: tc.fy.id, initialType: .journal)
+        vm.captureCleanEditorState()
+        vm.addLine()
+        vm.sealUndoHistory() // matches the post-success call site
+
+        vm.undo() // no-op: history is empty
+        XCTAssertFalse(vm.canUndo)
+
+        let linesAfter = try VoucherService(db: tc.db, companyId: tc.companyId).lines(for: posted.id)
+        XCTAssertEqual(linesBefore, linesAfter, "Undo must never reach a posted voucher's ledger lines")
+    }
 }
