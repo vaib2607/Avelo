@@ -75,7 +75,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | --- | --- | --- |
 | #9b Balance Sheet | ~~DONE~~ | Scoped immutable `BalanceSheetScope`, selected-FY integrity/activity reconciliation, atomic comparison publication, same-company FY reset, automated proof, and bundled/accountant acceptance are complete. `BalanceSheetReconciliationTests` 10/0 and `ReportsViewModelTests` 14/0. |
 | #10 item-invoice default | ~~Implemented / automated proof~~; manual acceptance remaining | `VoucherEditViewModel`, `NewVoucherSheet`, draft tests; GUI/keyboard acceptance open. |
-| V027 dual track | Partial / proof remaining | Sections 4.1–4.6 landed below; integrity matrix, malformed persisted-data matrix, staged-rollback matrix (4/5 stages), stock valuation parity, reversal parity (both paths), and GST Summary parity all proven (§4.4/§4.6/§4.7). Remaining: broader historic reversal fixtures, report/export parity for Outstanding/Cash Flow/Stock Ageing/PDF export, and manual acceptance. |
+| V027 dual track | Partial / manual acceptance remaining | Sections 4.1–4.6 landed below; integrity matrix, malformed persisted-data matrix, staged-rollback matrix (4/5 stages), stock valuation parity, reversal parity (both paths, plus broader multi-line/cross-FY/partial-return fixtures), GST Summary parity, and Outstanding/Cash Flow/Stock Ageing/Invoice PDF export parity all proven (§4.4/§4.6/§4.7). Remaining: named accountant/operator acceptance and item-invoice default bundled GUI acceptance. |
 | AVL-P0-020 keyboard baseline | ~~Implemented / automated proof~~; manual acceptance remaining | GUI traversal and VoiceOver acceptance open. |
 | AVL-P0-033 inventory capability | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant capability-toggle acceptance open. |
 | AVL-P0-034 mutation audit | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant audit-diff acceptance open. |
@@ -106,12 +106,21 @@ executable SHA-256: `199cd363e37e7bfe9d61f2427f2fa829e030b94940cafea8a8d99b76284
 re-confirmed green again at 636/636 on `d2c8d55` (2026-07-20, after the
 Alt+2 lineage/comparative-DSL/H20-H21/undo-redo work) — `make rc-local`/
 bundle validation/self-test/launch-smoke were **not** re-run on that later
-SHA; the `28ac559` bundle evidence above predates those four features and
-should be refreshed before relying on it for a release decision. Note:
+SHA; the `28ac559` bundle evidence above predated those four features.
+
+~~That gap is closed: `make test` (643/643, 8 skipped, now including the
+Outstanding/Cash Flow/Stock Ageing/Invoice PDF parity harnesses and the
+three broader reversal fixtures — see §4.6/§4.7), `make rule-audit`
+(net-check/R-16/R-15/R-4/docs-check all PASS), `make bundle`,
+`make validate-bundle`, `make bundle-selftest`, and `make launch-smoke` all
+re-run and passed on SHA `dff31b6` (2026-07-21).~~ New bundle executable
+SHA-256: `f8bac85c747405fcd2ad8201684be25ac3ae4475c284e6eedd55f1878d502331`
+(supersedes the stale `28ac559`-era `199cd363...` value). Note:
 `Scripts/launch_smoke.sh` re-runs `validate_bundle.sh` + `bundle_selftest.sh`
 non-interactively — it does not actually open a GUI window, so "Launch smoke
 OK" here is not the same as confirming the bundled app opens cleanly on a
-real Mac; that still needs the manual GUI run the script's own output names.
+real Mac; that still needs the manual GUI run the script's own output names,
+and remains explicitly out of scope for this technical-only pass.
 
 Still required: named accountant, operator, keyboard/accessibility/visual/PDF/
 print acceptance; distribution-channel decision; Developer ID, hardened runtime,
@@ -248,10 +257,29 @@ journal postings to isolate the report's own aggregation from
 `ItemInvoiceService`'s GST computation (covered separately). Evidence:
 `GSTSummaryReconciliationTests.testGstSummaryOutputAndInputTaxReconcileToRawLedgerSums`.
 
-Remaining proof: broader historic reversal fixtures (multi-line, partial,
-cross-FY reversal scenarios beyond the two proven cases) and report/export
-canonical parity for report types still uncovered — Outstanding, Cash Flow,
-Stock Ageing, and Invoice PDF export have no reconciliation harness.
+~~Broader reversal fixtures:~~ multi-line (5 ledgers), cross-FY (original FY
+locked after posting, reversal lands in the newly opened FY per
+`VoucherService.reversalFinancialYear`), and partial item-invoice return
+(residual = sold minus returned) all proven, alongside the original 2-line
+single-FY case. Evidence: `ReversalReconciliationTests`
+(`testMultiLineVoucherReversalNetsAllLedgersToZero`,
+`testCrossFinancialYearReversalNetsAccountingTrackToZero`,
+`testPartialItemInvoiceReturnLeavesCorrectResidualAcrossCanonicalTracks`).
+
+~~Report/export canonical parity — Outstanding, Cash Flow, Stock Ageing,
+Invoice PDF export:~~ all four now have reconciliation harnesses following
+the same authoritative-SQL-vs-live pattern. Outstanding's total reconciles
+to a raw signed sum over `avelo_bill_allocations` (deliberately not
+replaying `BillAllocationEngine`'s FIFO match order — the total is order-
+independent). Cash Flow's net reconciles to the raw `trn_accounting`
+movement on the cash/bank ledgers themselves (a real accounting identity
+independent of section classification). Stock Ageing's on-hand qty/value
+reconcile to a raw `trn_inventory_compat` sum. Invoice PDF export's
+rendered grand total reconciles to the raw party-ledger debit sum
+(`InvoicePDFService` already existed with its own line-item/tax-breakdown
+test coverage — this adds the total-vs-ledger parity check specifically).
+Evidence: `OutstandingReconciliationTests`, `CashFlowReconciliationTests`,
+`StockAgeingReconciliationTests`, `InvoicePDFParityTests`.
 
 ### 4.7 V027 exit
 
@@ -276,16 +304,20 @@ Completed automated slices:
   `testAccountingStageFailureLeavesNoPartialWriteAcrossAnyTable`,
   `testInventoryStageFailureLeavesNoPartialWriteAcrossAnyTable`,
   `testAuditWriteStageFailureLeavesNoPartialWriteAcrossAnyTable`).
-- ~~reversal canonical parity~~ (plain-voucher and item-invoice paths) and
-  ~~GST Summary report parity~~ — see §4.6.
+- ~~reversal canonical parity~~ (plain-voucher and item-invoice paths),
+  ~~GST Summary report parity~~, ~~broader reversal fixtures~~
+  (multi-line/cross-FY/partial-return), and ~~Outstanding/Cash Flow/Stock
+  Ageing/Invoice PDF export canonical parity~~ — see §4.6.
+- ~~current `make test` (643/643, 8 skipped), `make rule-audit`, `make bundle`,
+  `make validate-bundle`, `make bundle-selftest`, and `make launch-smoke`,
+  re-run and passed on SHA `dff31b6`~~ (§3).
 
 Open before V027 release-ready:
 
-- broader historic reversal fixtures (multi-line/partial/cross-FY, beyond
-  the two proven single-item cases) and report/export canonical parity for
-  Outstanding, Cash Flow, Stock Ageing, and Invoice PDF export;
 - named accountant/operator acceptance;
-- item-invoice default bundled GUI acceptance.
+- item-invoice default bundled GUI acceptance;
+- an actual GUI launch of the bundle on real hardware (launch-smoke is
+  non-interactive and does not open a window — see §3).
 
 ## 5. Balance Sheet #9b
 
@@ -323,11 +355,12 @@ Focused evidence: `VoucherDraftTests` 54/0, `AppRouterTests` 13/0,
 `AppEnvironmentFlowTests` 18/0, and `KeyboardShortcutMapTests` 9/0
 (counts grown since the original 2026-07-19 pass as H6/S9/S11/§6.7/Alt+2
 lineage/undo-redo proof was added — see §7, §6.7, and §8 below); full
-`make test` last confirmed at 636/636 on `d2c8d55` and `git diff --check`
-clean. `make rule-audit` fully green since `rg` was installed (§3). Bundle
-validation/bundle self-test/launch smoke were last actually re-run on
-`28ac559` (§3) — not re-run again since; that gap and the required
-interactive keyboard/VoiceOver acceptance both remain open regardless.
+`make test` last confirmed at 643/643 (8 skipped) on `dff31b6` and
+`git diff --check` clean. `make rule-audit` fully green since `rg` was
+installed (§3). Bundle validation/bundle self-test/launch smoke were
+re-confirmed on that same SHA `dff31b6` (§3) — the required interactive
+keyboard/VoiceOver acceptance remains open regardless (automated proof is
+never a substitute for it).
 
 The item picker now provides focused searchable selection and an explicit
 commit callback. Still open: full create/edit focus and cascade UI matrix,
