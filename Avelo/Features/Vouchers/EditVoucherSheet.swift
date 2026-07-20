@@ -106,6 +106,7 @@ private struct EditVoucherEditor: View {
             companyId: ctx.companyId
         ) {
         case .posted:
+            vm.sealUndoHistory()
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher updated.")
@@ -174,10 +175,10 @@ private struct EditVoucherBody: View {
             topBar
             Divider()
             ScrollView { mainContent }
-                .onChange(of: vm.lines) { _, _ in vm.revalidate() }
-                .onChange(of: vm.partyAccountId) { _, _ in vm.revalidate() }
-                .onChange(of: vm.narration) { _, _ in vm.revalidate() }
-                .onChange(of: vm.date) { _, _ in vm.revalidate() }
+                .onChange(of: vm.lines) { _, _ in vm.revalidate(); vm.scheduleCheckpoint() }
+                .onChange(of: vm.partyAccountId) { _, _ in vm.revalidate(); vm.scheduleCheckpoint() }
+                .onChange(of: vm.narration) { _, _ in vm.revalidate(); vm.scheduleCheckpoint() }
+                .onChange(of: vm.date) { _, _ in vm.revalidate(); vm.scheduleCheckpoint() }
             Divider()
             totalsSection
                 .padding(.horizontal, 16)
@@ -192,6 +193,7 @@ private struct EditVoucherBody: View {
             bottomBar
         }
         .onKeyPress("r", phases: .down, action: handleNarrationRecallShortcut)
+        .onKeyPress("z", phases: .down, action: handleUndoRedoShortcut)
     }
 
     private var topBar: some View {
@@ -365,6 +367,28 @@ private struct EditVoucherBody: View {
         vm.loadNarrationSuggestions()
         if let first = vm.narrationSuggestions.first { vm.narration = first }
         return .handled
+    }
+
+    private func handleUndoRedoShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
+        guard VoucherShortcutContract.canUndoRedo(isEditableTextFocused: isEditableTextFocus) else { return .ignored }
+        if keyPress.modifiers == [.command, .shift] {
+            guard vm.canRedo else { return .ignored }
+            vm.redo()
+            return .handled
+        }
+        guard keyPress.modifiers == [.command], vm.canUndo else { return .ignored }
+        vm.undo()
+        return .handled
+    }
+
+    private var isEditableTextFocus: Bool {
+        guard let focusedField else { return false }
+        switch focusedField {
+        case .narration, .billReferenceNumber, .chequeNumber, .ledgerAmount, .quantity, .rate:
+            return true
+        default:
+            return false
+        }
     }
 
     private var totalsSection: some View {

@@ -99,6 +99,7 @@ public struct NewVoucherSheet: View {
         ) {
         case .posted:
             vm.deleteDraft()
+            vm.sealUndoHistory()
             env.markAccountTreeDirty()
             env.notifyDataChanged()
             env.showSuccess("Voucher posted.")
@@ -150,6 +151,7 @@ private struct NewVoucherBody: View {
         editorContent
             .onKeyPress("v", phases: .down, action: handleItemModeShortcut)
             .onKeyPress("r", phases: .down, action: handleNarrationRecallShortcut)
+            .onKeyPress("z", phases: .down, action: handleUndoRedoShortcut)
             .onAppear { router.dirtyStateProvider = vm }
             .onDisappear {
                 // Normal sheet dismissal is an explicit cancel/post path, so
@@ -706,6 +708,18 @@ private struct NewVoucherBody: View {
         return .handled
     }
 
+    private func handleUndoRedoShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
+        guard VoucherShortcutContract.canUndoRedo(isEditableTextFocused: isEditableTextFocus) else { return .ignored }
+        if keyPress.modifiers == [.command, .shift] {
+            guard vm.canRedo else { return .ignored }
+            vm.redo()
+            return .handled
+        }
+        guard keyPress.modifiers == [.command], vm.canUndo else { return .ignored }
+        vm.undo()
+        return .handled
+    }
+
     private var isEditableTextFocus: Bool {
         guard let focusedField else { return false }
         switch focusedField {
@@ -727,10 +741,12 @@ private struct NewVoucherBody: View {
     private func voucherDraftDidChange() {
         vm.revalidate()
         vm.scheduleAutosave()
+        vm.scheduleCheckpoint()
     }
 
     private func voucherAutosaveDidChange() {
         vm.scheduleAutosave()
+        vm.scheduleCheckpoint()
     }
 
     private func beginAccountCreation(for target: AccountCreationTarget,

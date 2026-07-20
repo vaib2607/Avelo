@@ -185,6 +185,123 @@ public final class VoucherEditViewModel {
     private var draftPersistenceSuppressed = false
     private var cleanEditorSnapshot: EditorSnapshot?
 
+    // MARK: - Undo/redo (AVL-P1-025)
+    //
+    // Memento-based over the existing EditorSnapshot type (already built for
+    // dirty-state detection), not a per-field Command graph: fields here are
+    // edited via direct two-way SwiftUI bindings, not intent-dispatching
+    // methods, so a Command.apply()/undo() pair per keystroke doesn't fit
+    // without a much larger UI rewrite. A checkpoint already fully describes
+    // editor state, which is exactly what restore(_:) needs.
+    //
+    // Scoped to ledger-mode fields only (everything EditorSnapshot captures
+    // except itemLines): EditorSnapshot.ItemLine only keeps itemId/quantity/
+    // rate, fewer fields than the live ItemLineRow, so restoring item-invoice
+    // mode from it would be lossy. Item-invoice undo is a documented gap,
+    // not silently shipped incorrect.
+    // A single history list plus a cursor, not separate undo/redo stacks:
+    // every checkpoint call records "this is now the state" (uniformly
+    // post-mutation), and undo/redo just walks the cursor. Two independent
+    // stacks with mixed pre-mutation (addLine) and post-mutation (debounced
+    // field edits) push semantics produced a real bug caught before writing
+    // any tests: addLine's immediate pre-mutation push plus lines' onChange
+    // scheduling a debounced post-mutation push for the same action created
+    // a redundant history entry, making the first Cmd+Z visibly no-op. A
+    // single index-walked history has only one semantic, so that class of
+    // bug can't recur.
+    private var undoHistory: [EditorSnapshot] = []
+    private var undoHistoryIndex: Int = -1
+    private var checkpointTask: Task<Void, Never>?
+    private static let maxUndoHistoryDepth = 50
+
+    public var canUndo: Bool { undoHistoryIndex > 0 }
+    public var canRedo: Bool { undoHistoryIndex >= 0 && undoHistoryIndex < undoHistory.count - 1 }
+
+    /// Records the current state as a checkpoint immediately (no debounce),
+    /// called *after* the mutation — used by discrete structural actions
+    /// like addLine()/removeLine() where the call site is already the
+    /// natural boundary.
+    private func recordUndoCheckpointNow() {
+        checkpointTask?.cancel()
+        checkpointTask = nil
+        recordCheckpoint()
+    }
+
+    /// Debounced checkpoint for free-text-adjacent field edits (narration,
+    /// amounts, dates, pickers) — mirrors scheduleAutosave()'s exact
+    /// 800ms-pause-in-typing pattern so Cmd+Z coalesces into one step per
+    /// pause rather than firing once per keystroke.
+    public func scheduleCheckpoint() {
+        checkpointTask?.cancel()
+        checkpointTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard !Task.isCancelled else { return }
+            self?.recordCheckpoint()
+        }
+    }
+
+    private func recordCheckpoint() {
+        let snapshot = editorSnapshot()
+        if undoHistory.isEmpty {
+            undoHistory = [snapshot]
+            undoHistoryIndex = 0
+            return
+        }
+        guard undoHistory[undoHistoryIndex] != snapshot else { return }
+        // A new checkpoint after undoing invalidates everything the user
+        // could have redone past this point.
+        undoHistory.removeSubrange((undoHistoryIndex + 1)...)
+        undoHistory.append(snapshot)
+        undoHistoryIndex += 1
+        if undoHistory.count > Self.maxUndoHistoryDepth {
+            undoHistory.removeFirst()
+            undoHistoryIndex -= 1
+        }
+    }
+
+    public func undo() {
+        guard canUndo else { return }
+        undoHistoryIndex -= 1
+        restore(undoHistory[undoHistoryIndex])
+    }
+
+    public func redo() {
+        guard canRedo else { return }
+        undoHistoryIndex += 1
+        restore(undoHistory[undoHistoryIndex])
+    }
+
+    /// Clears history — called once the editor's session is over (posted
+    /// successfully) so no lingering reference can offer "undo" into a now-
+    /// immutable posted voucher. Posted history itself is never touched by
+    /// undo/redo; this only discards the in-memory stack.
+    public func sealUndoHistory() {
+        checkpointTask?.cancel()
+        checkpointTask = nil
+        undoHistory.removeAll()
+        undoHistoryIndex = -1
+    }
+
+    private func restore(_ snapshot: EditorSnapshot) {
+        date = snapshot.date
+        partyAccountId = snapshot.partyAccountId
+        billReferenceType = snapshot.billReferenceType
+        billReferenceNumber = snapshot.billReferenceNumber
+        chequeNumber = snapshot.chequeNumber
+        chequeDueDate = snapshot.chequeDueDate
+        tdsSectionCode = snapshot.tdsSectionCode
+        tdsTaxAmount = snapshot.tdsTaxAmount
+        tcsSectionCode = snapshot.tcsSectionCode
+        tcsTaxAmount = snapshot.tcsTaxAmount
+        narration = snapshot.narration
+        singleEntryMode = snapshot.singleEntryMode
+        accountLedgerId = snapshot.accountLedgerId
+        lines = snapshot.lines.map {
+            LineRow(accountId: $0.accountId, amount: $0.amount, side: $0.side,
+                    taxCode: $0.taxCode, costCenter: $0.costCenter)
+        }
+    }
+
     private struct EditorSnapshot: Equatable {
         struct LedgerLine: Equatable {
             let accountId: Account.ID?
@@ -250,7 +367,15 @@ public final class VoucherEditViewModel {
     /// or recovery has populated the raw UI text, so formatter output cannot
     /// cause a phantom dirty prompt.
     public func captureCleanEditorState() {
-        cleanEditorSnapshot = editorSnapshot()
+        let snapshot = editorSnapshot()
+        cleanEditorSnapshot = snapshot
+        // The same moment the dirty-tracking baseline is set is the correct
+        // moment to seed undo history — undo must be able to return all the
+        // way to this clean starting point, not just to the first edit.
+        checkpointTask?.cancel()
+        checkpointTask = nil
+        undoHistory = [snapshot]
+        undoHistoryIndex = 0
     }
 
     public func beginSubmission() -> Bool {
@@ -424,6 +549,7 @@ public final class VoucherEditViewModel {
             }
         }
         lines.append(row)
+        recordUndoCheckpointNow()
     }
 
     /// The natural (normal-balance) side for an account, used to pre-select
@@ -726,6 +852,7 @@ public final class VoucherEditViewModel {
 
     public func removeLine(_ id: UUID) {
         lines.removeAll(where: { $0.id == id })
+        recordUndoCheckpointNow()
     }
 
     public var totalDebitPaise: Int64 {
