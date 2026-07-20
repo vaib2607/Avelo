@@ -76,7 +76,7 @@ flip requires path or test evidence in Status, Execution, and Release Board.
 | AVL-P0-035 automatic inventory modes | ~~Implemented / automated proof~~; manual acceptance remaining | Accountant workflow acceptance open. |
 | AVL-P0-036 legacy restore remapping | ~~Implemented / automated proof~~; operator acceptance remaining | Operator restore acceptance open. |
 | AVL-P1-017 multi-window | Proof remaining | Registry consistency spike, editor/draft/window acceptance open. |
-| AVL-P1-025 undo/redo | Missing | Full design and implementation open. |
+| AVL-P1-025 undo/redo | ~~Implemented / automated proof~~; manual acceptance remaining | Memento-based history over the existing `EditorSnapshot` type (a Command-per-keystroke design doesn't fit this editor's two-way-binding fields). Cmd+Z/Shift+Cmd+Z, gated by the same `isEditableTextFocused` check as Ctrl+V/Ctrl+R so native text-field undo is never hijacked. Scoped to ledger-mode fields (item-invoice mode is a documented gap — `EditorSnapshot.ItemLine` doesn't capture full `ItemLineRow` fidelity). Bounded at 50 entries, sealed on successful post — never reaches posted `Voucher`/`LedgerLine` rows. A real redundant-checkpoint bug (dual-stack pre/post-mutation semantics conflict) was found and fixed before any tests were written, by moving to a single history-list-plus-cursor model. Evidence: `VoucherDraftTests` (7 new tests: round-trip, redo-invalidation, independent add/remove, bounded-depth eviction, seal-clears-history, posted-data non-interference). Keyboard/VoiceOver acceptance open. |
 | AVL-P1-026 Alt+C | ~~Implemented / automated proof~~; manual acceptance remaining | Focus return/audit GUI proof open. |
 | AVL-P1-036 comparative reports | ~~Atomic publish~~; ~~period configuration~~ | Atomic publish closed via §7 H18–H19 fix. **Period configuration closed**: `ComparativePeriod` (priorYear/priorMonth/priorQuarter/custom(monthsBack:)) replaces the hardcoded `priorYear()`, used identically by Trial Balance/P&L/Balance Sheet via `ReportsViewModel.comparativePeriod` (default `.priorYear`, bit-for-bit preserves prior behavior). No `ReportService` changes — the DSL only decides which date to ask for. `comparisonPeriods[]` from the original spec was scoped to a single `Optional` value: the UI renders exactly one comparative column per report today, a real array would be dead plumbing; documented as a non-breaking future extension. Evidence: `ComparativePeriodTests`, `ReportsViewModelTests` (priorMonth/priorQuarter reconciliation + atomic-publish-under-non-default-mode). GUI mode-picker not built (task scoped this as internal/labels-only); GUI acceptance open. |
 | AVL-P1-037 Day Book | ~~Implemented / automated proof~~; manual acceptance remaining | Durable drill/edit/cancel/return loop proven (H14–H17, see §7); GUI/visual acceptance open. |
@@ -451,12 +451,41 @@ sign-off. Automated proof does not substitute for this.
 PR2b, PR3b, PR4, and PR5 requirements, prerequisites, test matrices, and exit
 criteria remain unchanged and unstruck.
 
-## 8. Multi-window and undo/redo (deferred — design-first, not close-a-gap)
+## 8. Multi-window (deferred — design-first) and undo/redo (closed)
 
-Unchanged and open. `AVL-P1-017 Registry Connection Consistency Spike` must
-close before GUI multi-window expansion. `AVL-P1-025` undo/redo remains missing.
+`AVL-P1-017 Registry Connection Consistency Spike` must close before GUI
+multi-window expansion — design complete, implementation deferred (below).
+`AVL-P1-025` undo/redo is implemented and automated-proven (below); manual
+keyboard/VoiceOver acceptance remains open.
 
-**Current state:**
+~~AVL-P1-025 undo/redo.~~ Memento-based history over `VoucherEditViewModel`'s
+existing `EditorSnapshot` type (already built for `hasUnsavedChanges` dirty
+detection) — not a per-field Command graph, because editor fields use direct
+two-way SwiftUI bindings, not intent-dispatching methods, so
+`Command.apply()`/`.undo()` per keystroke doesn't fit without a much larger
+UI rewrite. A single history-list-plus-cursor model (not separate undo/redo
+stacks) — chosen after a real bug was found and fixed *before any tests were
+written*: two stacks with mixed pre-mutation (`addLine`) and post-mutation
+(debounced field-edit) push semantics produced a redundant history entry
+that made the first Cmd+Z visibly no-op. Bounded at 50 entries, sealed
+(`sealUndoHistory()`) on successful post at both `NewVoucherSheet`/
+`EditVoucherSheet` success paths — undo never reaches a posted `Voucher`/
+`LedgerLine` row, proven directly (`testUndoAfterSealingNeverTouchesPostedVoucherOrLedgerLines`).
+Cmd+Z/Shift+Cmd+Z wired via the same `.onKeyPress`/`isEditableTextFocused`
+mechanism Ctrl+V/Ctrl+R already use, so native NSTextField/TextEditor
+character-level undo is never hijacked mid-edit. Scoped to ledger-mode
+fields only — item-invoice mode is a documented gap (`EditorSnapshot.ItemLine`
+doesn't capture full `ItemLineRow` fidelity, would be lossy if restored).
+No schema change; already correctly per-window by construction (each editor
+sheet gets its own `VoucherEditViewModel` instance). Evidence:
+`VoucherDraftTests` (`testUndoRestoresLineCountAfterAddLine`,
+`testRedoReappliesUndoneAddLine`, `testNewCheckpointAfterUndoClearsRedoStack`,
+`testAddLineAndRemoveLineAreIndependentlyUndoable`,
+`testUndoStackBoundedAtMaxHistoryDepth`,
+`testUndoStackClearedAfterSealingHistory`,
+`testUndoAfterSealingNeverTouchesPostedVoucherOrLedgerLines`).
+
+**Current state (AVL-P1-017 only):**
 
 - ~~AVL-P1-017 multi-window spike/design.~~ Traced the actual window wiring
   (not assumed): `AppEnvironment`/`AppRouter`/`KeyboardBridge` are created
@@ -479,26 +508,15 @@ close before GUI multi-window expansion. `AVL-P1-025` undo/redo remains missing.
   recorded in full in the session transcript that produced this update —
   design deliverable complete; **implementation not started**, by this
   session's own explicit scope (design/spike only, no code).
-- AVL-P1-025 undo/redo: no command/memento/history implementation exists;
-  editor actions apply directly to state with no reversible stack.
 
 **Nature of work:** explicitly design-first feature work, not close-a-gap
 proof. Multi-window requires a spike observing real GUI/editor behavior to
-define ownership of registry, router, and draft lifecycles across windows.
-Undo/redo requires choosing and designing a history model (command vs
-memento) integrated into voucher/editor flows with well-defined user
-expectations. Both cut across business/ViewModel/GUI layers and cannot be
-safely reduced to "add tests and tweak an ordering bug."
+define ownership of registry, router, and draft lifecycles across windows —
+cuts across business/ViewModel/GUI layers and cannot be safely reduced to
+"add tests and tweak an ordering bug."
 
-**Preconditions for resuming:** dedicated design sessions to run the
-multi-window registry consistency spike with realistic scenarios (multiple
-windows editing drafts, navigating reports, posting), and to select/sketch an
-undo/redo design (likely command-based) with clear scope — which actions are
-undoable, per-session limits, how dirty state interacts with history. Updated
-technical notes must capture desired invariants (no double-edit of the same
-draft across windows, undo/redo only the user's own actions, bounded history
-per session) and impact on existing contracts (dirty routing, Day Book loop,
-V027 posting).
+**Preconditions for resuming:** an implementation session to execute the
+already-complete AVL-P1-017 design below.
 
 **Next steps when picked up:**
 
@@ -516,9 +534,6 @@ V027 posting).
   edit sequence, cross-window data-change notification, full regression
   pass on every existing reconciliation harness). No schema/migration
   needed for any of this.
-- AVL-P1-025: implement command/history model for voucher/editor; add tests
-  covering undo/redo correctness, history limits, and interaction with
-  posting/draft validation.
 
 ## 9. P0 blockers
 
