@@ -1,0 +1,9 @@
+Session summary (2026-07-22): V027 parity harnesses (Outstanding/CashFlow/
+StockAgeing/InvoicePDF + broader reversal fixtures), release-gate refresh
+(test/rule-audit/bundle/validate/selftest/launch-smoke all green on
+dff31b6), and Tally->Mac shortcut remap (Ctrl+R/V/I, Alt+2/C -> Shift+Cmd+R,
+Cmd+E/I/D/N). All automated. Still open, human-only: manual GUI/keyboard/
+VoiceOver acceptance for the shortcut remap and every other named §2 row,
+plus real Apple notarization/distribution gates. See
+Docs/Avelo_Exhaustive_Canonical_Delivery_Plan_Revision_3.md for the full
+list.
