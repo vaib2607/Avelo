@@ -149,7 +149,7 @@ private struct NewVoucherBody: View {
 
     var body: some View {
         editorContent
-            .onKeyPress("v", phases: .down, action: handleItemModeShortcut)
+            .onKeyPress("e", phases: .down, action: handleItemModeShortcut)
             .onKeyPress("r", phases: .down, action: handleNarrationRecallShortcut)
             .onKeyPress("z", phases: .down, action: handleUndoRedoShortcut)
             .onAppear { router.dirtyStateProvider = vm }
@@ -219,7 +219,7 @@ private struct NewVoucherBody: View {
                 subtitle: "Enter lines with keyboard-first debit/credit balance feedback, then post or cancel.",
                 hints: [
                     .init(title: VoucherShortcutContract.editorTitle(for: "⌘↩"), key: "⌘↩"),
-                    .init(title: VoucherShortcutContract.editorTitle(for: "⌃R in Narration"), key: "⌃R"),
+                    .init(title: VoucherShortcutContract.editorTitle(for: "⇧⌘R in Narration"), key: "⇧⌘R"),
                     .init(title: "Cancel", key: "Esc"),
                     .init(title: "Add line", key: "⌘+"),
                     .init(title: "Paste TSV", key: "⌘V")
@@ -285,7 +285,7 @@ private struct NewVoucherBody: View {
     private var itemInvoiceToggle: some View {
         Toggle("Item invoice (GST auto-calculated from item masters)", isOn: $vm.itemInvoiceMode)
             .toggleStyle(.switch)
-            .help("Toggle voucher / item-invoice mode (⌃V)")
+            .help("Toggle voucher / item-invoice mode (⌘E)")
     }
 
     private var itemGridSection: some View {
@@ -434,7 +434,7 @@ private struct NewVoucherBody: View {
         .menuStyle(.borderlessButton)
         .frame(width: 24)
         .onAppear { vm.loadNarrationSuggestions() }
-        .help("Recall a recent narration (⌃R)")
+        .help("Recall a recent narration (⇧⌘R)")
     }
 
     /// Tally single-entry "Account" field: the cash/bank ledger this voucher
@@ -692,7 +692,7 @@ private struct NewVoucherBody: View {
     }
 
     private func handleItemModeShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
-        guard keyPress.modifiers == [.control],
+        guard keyPress.modifiers == [.command],
               VoucherShortcutContract.canToggleItemInvoice(
                 isFreshEligibleDraft: isItemInvoiceEligible && !vm.isRecoveredDraft,
                 isEditableTextFocused: isEditableTextFocus
@@ -702,7 +702,7 @@ private struct NewVoucherBody: View {
     }
 
     private func handleNarrationRecallShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
-        guard keyPress.modifiers == [.control], focusedField == .narration else { return .ignored }
+        guard keyPress.modifiers == [.command, .shift], focusedField == .narration else { return .ignored }
         vm.loadNarrationSuggestions()
         if let first = vm.narrationSuggestions.first { vm.narration = first }
         return .handled

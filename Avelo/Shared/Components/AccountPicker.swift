@@ -82,10 +82,10 @@ public struct AccountPicker: View {
             pickerButtonFocused = true
             isExpanded = true
         }
-        .onKeyPress("c", phases: .down, action: handleCreateAccountShortcut)
+        .onKeyPress("n", phases: .down, action: handleCreateAccountShortcut)
         // Keep the picker reachable when it can create an account. This
         // matters most for filtered fields (for example cash/bank): an empty
-        // eligible list must not also hide the Alt+C escape hatch.
+        // eligible list must not also hide the ⌘N escape hatch.
         .disabled(!isEditable || (sortedAccounts.isEmpty && onCreate == nil))
         .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
             popoverContent
@@ -113,7 +113,7 @@ public struct AccountPicker: View {
                 TextField("Type code or name…", text: $query)
                     .textFieldStyle(.plain)
                     .focused($searchFieldFocused)
-                    .onKeyPress("c", phases: .down, action: handleCreateAccountShortcut)
+                    .onKeyPress("n", phases: .down, action: handleCreateAccountShortcut)
                     .onSubmit(pickSelected)
                     .onChange(of: query) { _, _ in selectedIndex = 0 }
             }
@@ -208,7 +208,7 @@ public struct AccountPicker: View {
 
     private func handleCreateAccountShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
         guard onCreate != nil,
-              keyPress.modifiers.contains(.option),
+              keyPress.modifiers == [.command],
               pickerButtonFocused || searchFieldFocused else {
             return .ignored
         }

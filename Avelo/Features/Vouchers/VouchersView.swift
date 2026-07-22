@@ -161,7 +161,7 @@ private struct VouchersBody: View {
                             .disabled(!AppActionRegistry.availability(for: .voucherAlter, in: context).isAvailable)
                         Button("Reverse") { AppActionRegistry.perform(.voucherReverse, context: context, router: env.router) }
                             .disabled(!AppActionRegistry.availability(for: .voucherReverse, in: context).isAvailable)
-                        // ⌥2 is handled only by the focused table and uses
+                        // ⌘D is handled only by the focused table and uses
                         // this same selected-row duplication path.
                         Button("Duplicate") { duplicate(v) }
                             .disabled(!AppActionRegistry.availability(for: .voucherDuplicate, in: context).isAvailable)
@@ -176,14 +176,14 @@ private struct VouchersBody: View {
             .onKeyPress(.pageUp) { vm.selectPrevious(); return .handled }
             .onKeyPress(.pageDown) { vm.selectNext(); return .handled }
             .onKeyPress("i", phases: .down) { keyPress in
-                guard keyPress.modifiers == [.control] else { return .ignored }
+                guard keyPress.modifiers == [.command] else { return .ignored }
                 // This path deliberately preserves filter, pagination, and
                 // selection: it creates a draft but never reloads the list.
                 AppActionRegistry.perform(.voucherCreate(.journal), router: env.router)
                 return .handled
             }
-            .onKeyPress("2", phases: .down) { keyPress in
-                guard keyPress.modifiers == [.option], vm.selectedVoucherId != nil else { return .ignored }
+            .onKeyPress("d", phases: .down) { keyPress in
+                guard keyPress.modifiers == [.command], vm.selectedVoucherId != nil else { return .ignored }
                 duplicateSelectedVoucher()
                 return .handled
             }

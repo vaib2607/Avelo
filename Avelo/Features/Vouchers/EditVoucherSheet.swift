@@ -203,7 +203,7 @@ private struct EditVoucherBody: View {
                 subtitle: "Adjust lines, narration, or voucher metadata before saving changes back to the books.",
                 hints: [
                     .init(title: VoucherShortcutContract.editorTitle(for: "⌘↩"), key: "⌘↩"),
-                    .init(title: VoucherShortcutContract.editorTitle(for: "⌃R in Narration"), key: "⌃R"),
+                    .init(title: VoucherShortcutContract.editorTitle(for: "⇧⌘R in Narration"), key: "⇧⌘R"),
                     .init(title: "Cancel", key: "Esc"),
                     .init(title: "Add line", key: "⌘+")
                 ]
@@ -284,7 +284,7 @@ private struct EditVoucherBody: View {
                 .menuStyle(.borderlessButton)
                 .frame(width: 24)
                 .onAppear { vm.loadNarrationSuggestions() }
-                .help("Recall a recent narration (⌃R)")
+                .help("Recall a recent narration (⇧⌘R)")
             }
         }
         .formStyle(.grouped)
@@ -363,7 +363,7 @@ private struct EditVoucherBody: View {
     }
 
     private func handleNarrationRecallShortcut(_ keyPress: KeyPress) -> KeyPress.Result {
-        guard keyPress.modifiers == [.control], focusedField == .narration else { return .ignored }
+        guard keyPress.modifiers == [.command, .shift], focusedField == .narration else { return .ignored }
         vm.loadNarrationSuggestions()
         if let first = vm.narrationSuggestions.first { vm.narration = first }
         return .handled
