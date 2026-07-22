@@ -31,10 +31,12 @@ final class KeyboardShortcutMapTests: XCTestCase {
     func testVoucherEditorScopedChordsAreNotGlobalMonitorCommands() {
         // These keys are deliberately handled by focused SwiftUI controls,
         // never by KeyboardMonitor before native text editing receives them.
-        XCTAssertNil(KeyboardShortcuts.command(keyCode: 9, modifiers: .control))   // Ctrl+V
-        XCTAssertNil(KeyboardShortcuts.command(keyCode: 15, modifiers: .control))  // Ctrl+R
-        XCTAssertNil(KeyboardShortcuts.command(keyCode: 19, modifiers: .option))   // Alt+2
-        XCTAssertNil(KeyboardShortcuts.command(keyCode: 36, modifiers: .command))  // Cmd+Return
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 14, modifiers: .command))               // Cmd+E
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 15, modifiers: [.command, .shift]))      // Shift+Cmd+R
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 2, modifiers: .command))                 // Cmd+D
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 34, modifiers: .command))                // Cmd+I
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 45, modifiers: .command))                // Cmd+N
+        XCTAssertNil(KeyboardShortcuts.command(keyCode: 36, modifiers: .command))                // Cmd+Return
     }
 
     func testVoucherShortcutContractIncludesEveryScopedEditorAndTableChord() {
@@ -43,14 +45,14 @@ final class KeyboardShortcutMapTests: XCTestCase {
 
         XCTAssertTrue(keys.contains("⌘↩"))
         XCTAssertTrue(keys.contains("Return in Narration"))
-        XCTAssertTrue(keys.contains("⌥C in Account picker"))
-        XCTAssertTrue(keys.contains("⌃V"))
-        XCTAssertTrue(keys.contains("⌃R in Narration"))
-        XCTAssertTrue(keys.contains("⌥2"))
-        XCTAssertTrue(keys.contains("⌃I"))
+        XCTAssertTrue(keys.contains("⌘N in Account picker"))
+        XCTAssertTrue(keys.contains("⌘E"))
+        XCTAssertTrue(keys.contains("⇧⌘R in Narration"))
+        XCTAssertTrue(keys.contains("⌘D"))
+        XCTAssertTrue(keys.contains("⌘I"))
         XCTAssertTrue(keys.contains("PgUp / PgDn"))
         XCTAssertEqual(VoucherShortcutContract.editorTitle(for: "⌘↩"), "Post / Save")
-        XCTAssertEqual(VoucherShortcutContract.editorTitle(for: "⌃R in Narration"), "Recall narration")
+        XCTAssertEqual(VoucherShortcutContract.editorTitle(for: "⇧⌘R in Narration"), "Recall narration")
     }
 
     func testItemModeShortcutRequiresFreshEligibleNonTextEditorContext() {

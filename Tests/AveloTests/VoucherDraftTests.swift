@@ -216,7 +216,7 @@ final class VoucherDraftTests: XCTestCase {
         XCTAssertNil(vm.lines.last?.accountId)
     }
 
-    // AVL-P2-011: duplicate voucher (⌥2) reuses the draft-recovery preload path.
+    // AVL-P2-011: duplicate voucher (⌘D) reuses the draft-recovery preload path.
 
     @MainActor
     func testDuplicateDraftPreloadsFreshEditorWithSourceVoucherLinesAndNewNumber() throws {
